@@ -40,6 +40,57 @@ import {
 // Update images per page to match 5x4 grid
 const IMAGES_PER_PAGE = 20; // 5 columns x 4 rows
 
+// URL transformation function - copied from ImageThumbnails.tsx lines 84-110
+const getEnhancedImageUrl = (
+  baseUrl: string,
+  width?: string,
+  quality?: string
+) => {
+  let params = [];
+  // Always check for truthy values and non-empty strings
+  if (width && width.trim() !== "") params.push(`w=${width}`);
+  if (quality && quality.trim() !== "") params.push(`q=${quality}`);
+
+  if (params.length === 0) return baseUrl;
+
+  // Handle different Cloudflare URL formats
+  // Format: https://imagedelivery.net/account/image-id/public
+  // Should become: https://imagedelivery.net/account/image-id/w=400,q=85
+  if (baseUrl.includes("imagedelivery.net")) {
+    // Check if URL already has transformations (contains variant like 'public')
+    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
+      // Replace the last segment (usually 'public') with our parameters
+      const urlParts = baseUrl.split("/");
+      urlParts[urlParts.length - 1] = params.join(",");
+      const transformedUrl = urlParts.join("/");
+      console.log("GalleryImageSelector URL transformation:", {
+        baseUrl,
+        transformedUrl,
+        params,
+      });
+      return transformedUrl;
+    } else {
+      // URL doesn't have a variant, append transformations
+      const transformedUrl = `${baseUrl}/${params.join(",")}`;
+      console.log("GalleryImageSelector URL transformation:", {
+        baseUrl,
+        transformedUrl,
+        params,
+      });
+      return transformedUrl;
+    }
+  }
+
+  // Fallback for other URL formats - try to replace /public if it exists
+  const transformedUrl = baseUrl.replace(/\/public$/, `/${params.join(",")}`);
+  console.log("GalleryImageSelector URL transformation (fallback):", {
+    baseUrl,
+    transformedUrl,
+    params,
+  });
+  return transformedUrl;
+};
+
 interface GalleryImageSelectorProps {
   selectedImageIds: string[];
   onImageSelect: (image: ImageData) => void;
@@ -485,7 +536,7 @@ export function GalleryImageSelector({
                 >
                   <div className="relative flex-1 flex items-center justify-center bg-background">
                     <img
-                      src={imageData.url}
+                      src={getEnhancedImageUrl(imageData.url, "400", "85")}
                       alt={imageData.filename}
                       className="max-w-full max-h-[300px] w-auto h-auto object-contain"
                       loading="lazy"

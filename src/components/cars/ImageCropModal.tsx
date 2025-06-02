@@ -43,16 +43,30 @@ import {
   RotateCcw,
   Play,
   Pause,
+  Check,
+  X,
+  Maximize2,
+  Scissors,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
 import { CloudflareImage } from "@/components/ui/CloudflareImage";
 import { useAPI } from "@/hooks/useAPI";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ImageCropModalProps {
   isOpen: boolean;
   onClose: () => void;
   image: ImageData | null;
+  // Optional props for gallery usage (not implemented yet)
+  enablePreview?: boolean;
+  galleryId?: string;
+  onImageReplaced?: (originalImageId: string, newImageData: any) => void;
 }
 
 interface ImageDimensions {
@@ -76,12 +90,13 @@ interface CloudflareUploadResult {
   error?: string;
 }
 
-type ProcessingMethod = "cloud" | "local";
-
 export function ImageCropModal({
   isOpen,
   onClose,
   image,
+  enablePreview,
+  galleryId,
+  onImageReplaced,
 }: ImageCropModalProps) {
   const api = useAPI();
 
@@ -99,10 +114,6 @@ export function ImageCropModal({
   // Cloudflare settings
   const [cloudflareWidth, setCloudflareWidth] = useState<string>("3000");
   const [cloudflareQuality, setCloudflareQuality] = useState<string>("100");
-
-  // Processing settings
-  const [processingMethod, setProcessingMethod] =
-    useState<ProcessingMethod>("cloud");
 
   // Live preview settings
   const [livePreviewEnabled, setLivePreviewEnabled] = useState<boolean>(true);
@@ -150,27 +161,13 @@ export function ImageCropModal({
   // Debounce timer for live preview
   const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load processing method preference from localStorage
+  // Load live preview preference from localStorage
   useEffect(() => {
-    const savedMethod = localStorage.getItem(
-      "imageCropMethod"
-    ) as ProcessingMethod;
-    if (savedMethod && (savedMethod === "cloud" || savedMethod === "local")) {
-      setProcessingMethod(savedMethod);
-    }
-
-    // Load live preview preference
     const savedLivePreview = localStorage.getItem("imageCropLivePreview");
     if (savedLivePreview !== null) {
       setLivePreviewEnabled(savedLivePreview === "true");
     }
   }, []);
-
-  // Save processing method preference to localStorage
-  const handleProcessingMethodChange = (method: ProcessingMethod) => {
-    setProcessingMethod(method);
-    localStorage.setItem("imageCropMethod", method);
-  };
 
   // Save live preview preference and handle toggle
   const handleLivePreviewToggle = (enabled: boolean) => {
@@ -247,11 +244,21 @@ export function ImageCropModal({
     (baseUrl: string) => {
       if (!baseUrl.includes("imagedelivery.net")) return baseUrl;
 
-      const urlParts = baseUrl.split("/");
-      // Use the same width as preview to ensure consistent dimensions
-      // This prevents coordinate scaling issues between preview and processing
-      urlParts[urlParts.length - 1] = `w=${cloudflareWidth},q=100`;
-      return urlParts.join("/");
+      const params = [`w=${cloudflareWidth}`, "q=100"];
+
+      // Handle different Cloudflare URL formats
+      // Format: https://imagedelivery.net/account/image-id/public
+      // Should become: https://imagedelivery.net/account/image-id/w=3000,q=100
+      if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
+        // Replace the last segment (usually 'public') with our parameters
+        const urlParts = baseUrl.split("/");
+        urlParts[urlParts.length - 1] = params.join(",");
+        return urlParts.join("/");
+      } else {
+        // URL doesn't have a variant, append transformations
+        // This handles cases where database URLs are missing /public suffix
+        return `${baseUrl}/${params.join(",")}`;
+      }
     },
     [cloudflareWidth]
   );
@@ -260,42 +267,58 @@ export function ImageCropModal({
   const getPreviewImageUrl = useCallback((baseUrl: string) => {
     if (!baseUrl.includes("imagedelivery.net")) return baseUrl;
 
-    const urlParts = baseUrl.split("/");
-    // Request medium resolution for preview: width=1500, quality=90
-    urlParts[urlParts.length - 1] = "w=1500,q=90";
-    return urlParts.join("/");
+    const params = ["w=1500", "q=90"];
+
+    // Handle different Cloudflare URL formats
+    // Format: https://imagedelivery.net/account/image-id/public
+    // Should become: https://imagedelivery.net/account/image-id/w=1500,q=90
+    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
+      // Replace the last segment (usually 'public') with our parameters
+      const urlParts = baseUrl.split("/");
+      urlParts[urlParts.length - 1] = params.join(",");
+      return urlParts.join("/");
+    } else {
+      // URL doesn't have a variant, append transformations
+      // This handles cases where database URLs are missing /public suffix
+      return `${baseUrl}/${params.join(",")}`;
+    }
   }, []);
 
-  // Cache image locally for live preview
+  // Cache image locally for live preview - disabled for cloud-only
   const cacheImageForPreview = useCallback(async () => {
-    if (!image?.url || processingMethod !== "local" || !api) return;
+    if (!api || !image?.url) return;
 
     try {
-      // Use medium resolution for preview (1500px wide)
       const previewImageUrl = getPreviewImageUrl(image.url);
 
-      const result = await api.post<any>("/images/cache-for-preview", {
+      const requestData = {
         imageUrl: previewImageUrl,
-        imageId: image._id,
-      });
+        imageId: (image as any)._id || (image as any).id || "unknown",
+      };
 
-      if (result.success) {
+      const result = await api.post<{
+        success?: boolean;
+        cachedPath?: string;
+        error?: string;
+      }>("images/cache-for-preview", requestData);
+
+      if (result.success && result.cachedPath) {
         setCachedImagePath(result.cachedPath);
-        console.log("Image cached for preview:", result.cachedPath);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to cache image for preview:", error);
     }
-  }, [image?.url, image?._id, processingMethod, getPreviewImageUrl, api]);
+  }, [api, image?.url, getPreviewImageUrl]);
 
-  // Generate live preview using C++ executable
+  // Generate live preview - disabled for cloud-only
   const generateLivePreview = useCallback(async () => {
     if (
+      !api ||
       !livePreviewEnabled ||
       !cachedImagePath ||
       !originalDimensions ||
-      processingMethod !== "local" ||
-      !api
+      cropArea.width <= 0 ||
+      cropArea.height <= 0
     ) {
       return;
     }
@@ -303,45 +326,48 @@ export function ImageCropModal({
     setIsGeneratingPreview(true);
 
     try {
-      const result = await api.post<any>("/images/live-preview", {
+      const requestData = {
         cachedImagePath,
         cropX: cropArea.x,
         cropY: cropArea.y,
         cropWidth: cropArea.width,
         cropHeight: cropArea.height,
-        outputWidth: 400, // Small preview size
+        outputWidth: 400, // Fixed preview width
         outputHeight: Math.round(
           400 * (parseInt(outputHeight) / parseInt(outputWidth))
         ),
         scale: scale,
         previewImageDimensions: originalDimensions,
-      });
+      };
+
+      const result = await api.post<{
+        success?: boolean;
+        previewImageData?: string;
+        processingTime?: number;
+        error?: string;
+      }>("images/live-preview", requestData);
 
       if (result.success && result.previewImageData) {
-        // Convert base64 to blob URL
-        const byteCharacters = atob(result.previewImageData);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: "image/jpeg" });
-
         // Clean up previous preview URL
         if (livePreviewUrl) {
           URL.revokeObjectURL(livePreviewUrl);
         }
 
-        const blobUrl = URL.createObjectURL(blob);
-        setLivePreviewUrl(blobUrl);
-        setPreviewProcessingTime(result.processingTime);
+        // Create data URL from base64
+        const dataUrl = `data:image/jpeg;base64,${result.previewImageData}`;
+        setLivePreviewUrl(dataUrl);
+
+        if (result.processingTime) {
+          setPreviewProcessingTime(result.processingTime);
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to generate live preview:", error);
     } finally {
       setIsGeneratingPreview(false);
     }
   }, [
+    api,
     livePreviewEnabled,
     cachedImagePath,
     originalDimensions,
@@ -349,9 +375,7 @@ export function ImageCropModal({
     scale,
     outputWidth,
     outputHeight,
-    processingMethod,
     livePreviewUrl,
-    api,
   ]);
 
   // Debounced live preview generation
@@ -362,15 +386,18 @@ export function ImageCropModal({
 
     previewTimeoutRef.current = setTimeout(() => {
       generateLivePreview();
-    }, 300); // 300ms debounce
+    }, 300);
   }, [generateLivePreview]);
 
   // Helper function to check if live preview should trigger
   const shouldTriggerLivePreview = useCallback(() => {
     return (
-      livePreviewEnabled && cachedImagePath && processingMethod === "local"
+      livePreviewEnabled &&
+      cachedImagePath &&
+      cropArea.width > 0 &&
+      cropArea.height > 0
     );
-  }, [livePreviewEnabled, cachedImagePath, processingMethod]);
+  }, [livePreviewEnabled, cachedImagePath, cropArea]);
 
   // Helper function to build enhanced Cloudflare URL
   const getEnhancedImageUrl = (
@@ -396,6 +423,7 @@ export function ImageCropModal({
         return urlParts.join("/");
       } else {
         // URL doesn't have a variant, append transformations
+        // This handles cases where database URLs are missing /public suffix
         return `${baseUrl}/${params.join(",")}`;
       }
     }
@@ -638,12 +666,42 @@ export function ImageCropModal({
     }
   }, [highResImageUrl]);
 
-  // Cache image when modal opens or image changes (for local processing)
+  // Cache image for live preview when modal opens - disabled for cloud-only
   useEffect(() => {
-    if (isOpen && image && processingMethod === "local") {
+    if (isOpen && image?.url && livePreviewEnabled) {
       cacheImageForPreview();
     }
-  }, [isOpen, image, processingMethod, cacheImageForPreview]);
+  }, [isOpen, image?.url, livePreviewEnabled, cacheImageForPreview]);
+
+  // Auto-generate initial live preview when crop area is ready
+  useEffect(() => {
+    if (
+      originalDimensions &&
+      cropArea.width > 0 &&
+      cropArea.height > 0 &&
+      shouldTriggerLivePreview()
+    ) {
+      debouncedGeneratePreview();
+    }
+  }, [
+    originalDimensions,
+    cropArea,
+    shouldTriggerLivePreview,
+    debouncedGeneratePreview,
+  ]);
+
+  // Trigger live preview when output dimensions change
+  useEffect(() => {
+    if (shouldTriggerLivePreview()) {
+      debouncedGeneratePreview();
+    }
+  }, [
+    outputWidth,
+    outputHeight,
+    scale,
+    shouldTriggerLivePreview,
+    debouncedGeneratePreview,
+  ]);
 
   // Cleanup preview URL on unmount
   useEffect(() => {
@@ -658,67 +716,32 @@ export function ImageCropModal({
   }, [livePreviewUrl]);
 
   const handleProcess = async () => {
-    if (!image || !enhancedImageUrl || !originalDimensions) {
-      toast({
-        title: "Error",
-        description: "No image selected for processing",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!api) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to process images.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate crop area
-    if (!validateCropArea(cropArea, originalDimensions)) {
-      toast({
-        title: "Error",
-        description:
-          "Crop area exceeds image boundaries. Please adjust the crop area.",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!image || !enhancedImageUrl || !api) return;
 
     setIsProcessing(true);
-    setError(null);
-    setProcessingStatus("Processing image...");
+    setCloudflareResult(null);
+    setRemoteServiceUsed(false);
 
     try {
-      const processingImageUrl = getProcessingImageUrl(image.url || "");
-
-      console.log("🚀 Making crop API call with:", {
-        processingImageUrl: processingImageUrl.substring(0, 100) + "...",
-        cropArea,
-        outputWidth: parseInt(outputWidth),
-        outputHeight: parseInt(outputHeight),
-        scale,
-        processingMethod,
-        originalDimensions,
-      });
-
-      const result = await api.post<any>("/images/crop-image", {
-        imageUrl: processingImageUrl, // Use high-res for processing
-        cropX: cropArea.x,
-        cropY: cropArea.y,
-        cropWidth: cropArea.width,
-        cropHeight: cropArea.height,
+      const requestData = {
+        imageUrl: getProcessingImageUrl(image.url),
+        cropX: Math.round(cropArea.x),
+        cropY: Math.round(cropArea.y),
+        cropWidth: Math.round(cropArea.width),
+        cropHeight: Math.round(cropArea.height),
         outputWidth: parseInt(outputWidth),
         outputHeight: parseInt(outputHeight),
         scale: scale,
-        processingMethod: processingMethod, // Add processing method
-        uploadToCloudflare: false, // Don't upload yet, just process
-        originalFilename: image?.filename,
-        originalCarId: image?.carId,
-        previewImageDimensions: originalDimensions, // Pass preview dimensions for scaling
-      });
+        uploadToCloudflare: false,
+        originalFilename: image.filename,
+        previewImageDimensions: originalDimensions,
+      };
+
+      console.log("🚀 Crop API request data:", requestData);
+
+      const result = await api.post<any>("/images/crop-image", requestData);
+
+      console.log("📥 Crop API response:", result);
 
       if (result.success) {
         // Handle both local API (imageData) and cloud service (processedImageUrl) responses
@@ -743,25 +766,38 @@ export function ImageCropModal({
 
         toast({
           title: "Success",
-          description: `Image cropped successfully using ${
-            result.remoteServiceUsed ? "Cloud Run service" : "local binary"
-          }`,
+          description: `Image cropped successfully using Sharp processing`,
         });
       } else {
         throw new Error(result.error || "Processing failed");
       }
     } catch (error) {
-      console.error("Processing error:", error);
+      console.error("❌ Processing error:", error);
 
       // Parse error response to get both error and suggestion
       let errorMessage =
         error instanceof Error ? error.message : "Unknown error occurred";
       let suggestion = "";
 
-      // Check if this is a cloud processing failure with suggestion
+      // Check for common configuration issues
       if (errorMessage.includes("crop-image endpoint may not be available")) {
         suggestion =
-          "Try switching to 'Local Processing' in the settings below.";
+          "There may be an issue with the image processing service. Please try again.";
+      } else if (
+        errorMessage.includes("Failed to download image: 403") ||
+        errorMessage.includes("Failed to download image: Forbidden")
+      ) {
+        suggestion =
+          "This appears to be a Cloudflare access issue. Make sure you're using a valid image URL.";
+      } else if (
+        errorMessage.includes("connection refused") ||
+        errorMessage.includes("ECONNREFUSED")
+      ) {
+        suggestion =
+          "Network connectivity issue. Check your internet connection.";
+      } else if (errorMessage.includes("getaddrinfo ENOTFOUND")) {
+        suggestion =
+          "Network connectivity issue. Check your internet connection.";
       }
 
       setError(errorMessage);
@@ -802,10 +838,8 @@ export function ImageCropModal({
     setProcessingStatus(`Generating ${multiplier}x high-resolution version...`);
 
     try {
-      const processingImageUrl = getProcessingImageUrl(image.url || "");
-
       const result = await api.post<any>("/images/crop-image", {
-        imageUrl: processingImageUrl, // Use high-res for processing
+        imageUrl: getProcessingImageUrl(image.url || ""),
         cropX: cropArea.x,
         cropY: cropArea.y,
         cropWidth: cropArea.width,
@@ -813,11 +847,10 @@ export function ImageCropModal({
         outputWidth: parseInt(outputWidth) * multiplier,
         outputHeight: parseInt(outputHeight) * multiplier,
         scale: scale * multiplier,
-        processingMethod: processingMethod, // Add processing method
-        uploadToCloudflare: false, // Don't upload yet, just process
+        uploadToCloudflare: false,
         originalFilename: image?.filename,
         originalCarId: image?.carId,
-        previewImageDimensions: originalDimensions, // Pass preview dimensions for scaling
+        previewImageDimensions: originalDimensions,
       });
 
       if (result.success) {
@@ -905,10 +938,8 @@ export function ImageCropModal({
       const isHighRes = !!highResImageUrl;
       const multiplier = isHighRes ? highResMultiplier || 2 : 1;
 
-      const processingImageUrl = getProcessingImageUrl(image?.url || "");
-
       const result = await api.post<any>("/images/crop-image", {
-        imageUrl: processingImageUrl, // Use high-res for processing
+        imageUrl: getProcessingImageUrl(image?.url || ""),
         cropX: cropArea.x,
         cropY: cropArea.y,
         cropWidth: cropArea.width,
@@ -916,11 +947,10 @@ export function ImageCropModal({
         outputWidth: parseInt(outputWidth) * multiplier,
         outputHeight: parseInt(outputHeight) * multiplier,
         scale: scale * multiplier,
-        processingMethod: processingMethod, // Add processing method
-        uploadToCloudflare: true, // Upload this time
+        uploadToCloudflare: true,
         originalFilename: image?.filename,
         originalCarId: image?.carId,
-        previewImageDimensions: originalDimensions, // Pass preview dimensions for scaling
+        previewImageDimensions: originalDimensions,
       });
 
       if (result.success && result.cloudflareUpload?.success) {
@@ -1074,7 +1104,7 @@ export function ImageCropModal({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label>Live Preview</Label>
-                  {processingMethod === "local" && (
+                  {livePreviewEnabled && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -1099,17 +1129,15 @@ export function ImageCropModal({
                 </div>
 
                 <div className="border rounded-lg p-4 bg-muted/50 relative">
-                  {livePreviewEnabled &&
-                  processingMethod === "local" &&
-                  livePreviewUrl ? (
+                  {livePreviewEnabled && livePreviewUrl ? (
                     <div className="space-y-2">
-                      <CloudflareImage
+                      <Image
                         src={livePreviewUrl}
                         alt="Live preview"
                         width={400}
                         height={400}
                         className="w-full h-auto max-h-40 lg:max-h-48 object-contain rounded border"
-                        variant="medium"
+                        unoptimized={true}
                       />
                       <div className="flex items-center justify-between">
                         <p className="text-xs text-muted-foreground">
@@ -1126,37 +1154,7 @@ export function ImageCropModal({
                     <div className="h-40 lg:h-48 flex items-center justify-center text-muted-foreground">
                       <div className="text-center space-y-2">
                         <Eye className="h-8 w-8 mx-auto opacity-50" />
-                        <p className="text-sm">
-                          {processingMethod !== "local"
-                            ? "Live preview available in local processing mode"
-                            : !livePreviewEnabled
-                              ? "Live preview disabled"
-                              : cachedImagePath
-                                ? "Live preview will appear here"
-                                : "Caching image for preview..."}
-                        </p>
-                        {livePreviewEnabled &&
-                          cachedImagePath &&
-                          processingMethod === "local" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={generateLivePreview}
-                              disabled={isGeneratingPreview}
-                            >
-                              {isGeneratingPreview ? (
-                                <>
-                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                  Generating...
-                                </>
-                              ) : (
-                                <>
-                                  <Eye className="mr-1 h-3 w-3" />
-                                  Generate Preview
-                                </>
-                              )}
-                            </Button>
-                          )}
+                        <p className="text-sm">Live preview disabled</p>
                       </div>
                     </div>
                   )}
@@ -1165,22 +1163,6 @@ export function ImageCropModal({
                   {isGeneratingPreview && (
                     <div className="absolute bottom-2 right-2">
                       <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
-                    </div>
-                  )}
-
-                  {livePreviewEnabled && processingMethod === "local" && (
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      {cachedImagePath ? (
-                        <div className="flex items-center gap-1">
-                          <CheckCircle className="h-3 w-3 text-green-600" />
-                          Image cached for preview
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Caching image for preview...
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -1215,10 +1197,6 @@ export function ImageCropModal({
                               ...prev,
                               x: Math.max(0, newX),
                             }));
-                            // Trigger live preview on input change
-                            if (shouldTriggerLivePreview()) {
-                              debouncedGeneratePreview();
-                            }
                           }
                         }}
                         min="0"
@@ -1243,10 +1221,6 @@ export function ImageCropModal({
                               ...prev,
                               y: Math.max(0, newY),
                             }));
-                            // Trigger live preview on input change
-                            if (shouldTriggerLivePreview()) {
-                              debouncedGeneratePreview();
-                            }
                           }
                         }}
                         min="0"
@@ -1271,10 +1245,6 @@ export function ImageCropModal({
                               ...prev,
                               width: Math.max(1, newWidth),
                             }));
-                            // Trigger live preview on input change
-                            if (shouldTriggerLivePreview()) {
-                              debouncedGeneratePreview();
-                            }
                           }
                         }}
                         min="1"
@@ -1299,10 +1269,6 @@ export function ImageCropModal({
                               ...prev,
                               height: Math.max(1, newHeight),
                             }));
-                            // Trigger live preview on input change
-                            if (shouldTriggerLivePreview()) {
-                              debouncedGeneratePreview();
-                            }
                           }
                         }}
                         min="1"
@@ -1344,10 +1310,6 @@ export function ImageCropModal({
                     value={[scale]}
                     onValueChange={(value) => {
                       setScale(value[0]);
-                      // Trigger live preview on scale change
-                      if (shouldTriggerLivePreview()) {
-                        debouncedGeneratePreview();
-                      }
                     }}
                     min={0.1}
                     max={3.0}
@@ -1360,9 +1322,6 @@ export function ImageCropModal({
                       size="sm"
                       onClick={() => {
                         setScale(0.5);
-                        if (shouldTriggerLivePreview()) {
-                          debouncedGeneratePreview();
-                        }
                       }}
                     >
                       0.5x
@@ -1372,9 +1331,6 @@ export function ImageCropModal({
                       size="sm"
                       onClick={() => {
                         setScale(1.0);
-                        if (shouldTriggerLivePreview()) {
-                          debouncedGeneratePreview();
-                        }
                       }}
                     >
                       1.0x
@@ -1384,9 +1340,6 @@ export function ImageCropModal({
                       size="sm"
                       onClick={() => {
                         setScale(1.5);
-                        if (shouldTriggerLivePreview()) {
-                          debouncedGeneratePreview();
-                        }
                       }}
                     >
                       1.5x
@@ -1396,9 +1349,6 @@ export function ImageCropModal({
                       size="sm"
                       onClick={() => {
                         setScale(2.0);
-                        if (shouldTriggerLivePreview()) {
-                          debouncedGeneratePreview();
-                        }
                       }}
                     >
                       2.0x
@@ -1423,10 +1373,6 @@ export function ImageCropModal({
                         value={outputWidth}
                         onChange={(e) => {
                           setOutputWidth(e.target.value);
-                          // Trigger live preview on output dimension change
-                          if (shouldTriggerLivePreview()) {
-                            debouncedGeneratePreview();
-                          }
                         }}
                         placeholder="1080"
                         min="100"
@@ -1441,10 +1387,6 @@ export function ImageCropModal({
                         value={outputHeight}
                         onChange={(e) => {
                           setOutputHeight(e.target.value);
-                          // Trigger live preview on output dimension change
-                          if (shouldTriggerLivePreview()) {
-                            debouncedGeneratePreview();
-                          }
                         }}
                         placeholder="1920"
                         min="100"
@@ -1465,10 +1407,6 @@ export function ImageCropModal({
                         if (originalDimensions) {
                           initializeCropArea(originalDimensions, 1080, 1920);
                         }
-                        // Trigger live preview on preset change
-                        if (shouldTriggerLivePreview()) {
-                          debouncedGeneratePreview();
-                        }
                       }}
                       className="text-xs"
                     >
@@ -1483,10 +1421,6 @@ export function ImageCropModal({
                         setOutputHeight("1350");
                         if (originalDimensions) {
                           initializeCropArea(originalDimensions, 1080, 1350);
-                        }
-                        // Trigger live preview on preset change
-                        if (shouldTriggerLivePreview()) {
-                          debouncedGeneratePreview();
                         }
                       }}
                       className="text-xs"
@@ -1503,10 +1437,6 @@ export function ImageCropModal({
                         if (originalDimensions) {
                           initializeCropArea(originalDimensions, 1080, 1080);
                         }
-                        // Trigger live preview on preset change
-                        if (shouldTriggerLivePreview()) {
-                          debouncedGeneratePreview();
-                        }
                       }}
                       className="text-xs"
                     >
@@ -1522,43 +1452,12 @@ export function ImageCropModal({
                         if (originalDimensions) {
                           initializeCropArea(originalDimensions, 1920, 1080);
                         }
-                        // Trigger live preview on preset change
-                        if (shouldTriggerLivePreview()) {
-                          debouncedGeneratePreview();
-                        }
                       }}
                       className="text-xs"
                     >
                       16:9 (1920×1080)
                     </Button>
                   </div>
-                </div>
-
-                {/* Processing Method */}
-                <div className="space-y-2">
-                  <Label>Processing Method</Label>
-                  <Select
-                    value={processingMethod}
-                    onValueChange={handleProcessingMethodChange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cloud">
-                        <div className="flex items-center gap-2">
-                          <Cloud className="h-4 w-4" />
-                          Cloud Processing (Recommended)
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="local">
-                        <div className="flex items-center gap-2">
-                          <Monitor className="h-4 w-4" />
-                          Local Processing
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
 
                 {/* Cloudflare Settings */}
@@ -1623,13 +1522,13 @@ export function ImageCropModal({
                   <div className="space-y-2">
                     <Label>Processed Image</Label>
                     <div className="border rounded-lg p-2 bg-muted/50">
-                      <CloudflareImage
+                      <Image
                         src={processedImageUrl}
                         alt="Processed image"
                         width={200}
                         height={200}
                         className="w-full h-auto max-h-32 object-contain rounded"
-                        variant="medium"
+                        unoptimized={true}
                       />
                       {processedDimensions && (
                         <p className="text-xs text-muted-foreground mt-1">
@@ -1646,13 +1545,13 @@ export function ImageCropModal({
                   <div className="space-y-2">
                     <Label>High-Resolution Image</Label>
                     <div className="border rounded-lg p-2 bg-muted/50">
-                      <CloudflareImage
+                      <Image
                         src={highResImageUrl}
                         alt="High-res processed image"
                         width={200}
                         height={200}
                         className="w-full h-auto max-h-32 object-contain rounded"
-                        variant="large"
+                        unoptimized={true}
                       />
                       {highResDimensions && (
                         <p className="text-xs text-muted-foreground mt-1">

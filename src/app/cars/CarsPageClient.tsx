@@ -245,14 +245,14 @@ export default function CarsPageClient({
 
         // Fetch cars, makes, and clients in parallel using authenticated API
         console.log("🔍 Making API calls:", {
-          carsURL: `cars/simple?${queryParams.toString()}`,
+          carsURL: `cars?${queryParams.toString()}`,
           makesURL: "cars/makes",
           clientsURL: "clients",
         });
 
         const [carsResponse, makesResponse, clientsResponse] =
           await Promise.all([
-            api.get(`cars/simple?${queryParams.toString()}`),
+            api.get(`cars?${queryParams.toString()}`),
             api.get("cars/makes"),
             api.get("clients"),
           ]);

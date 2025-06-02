@@ -1,14 +1,25 @@
 import { ObjectId } from "mongodb";
 
 /**
- * Converts ObjectId to string, handling null/undefined cases
+ * Converts ObjectId to string, handling null/undefined cases and various formats
  */
 export function objectIdToString(
-  id: ObjectId | string | null | undefined
+  id: ObjectId | string | { $oid: string } | null | undefined
 ): string | undefined {
   if (!id) return undefined;
+
+  // Handle ObjectId instances (most common case)
+  if (id instanceof ObjectId) return id.toString();
+
+  // Handle string format
   if (typeof id === "string") return id;
-  return id.toString();
+
+  // Handle $oid format (legacy/backup)
+  if (typeof id === "object") {
+    if ("$oid" in id && id.$oid) return id.$oid;
+  }
+
+  return undefined;
 }
 
 /**

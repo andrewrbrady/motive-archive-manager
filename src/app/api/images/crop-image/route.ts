@@ -10,7 +10,6 @@ interface CropImageRequest {
   outputWidth: number;
   outputHeight: number;
   scale: number;
-  processingMethod?: "cloud" | "local";
   uploadToCloudflare?: boolean;
   originalFilename?: string;
   originalCarId?: string;
@@ -58,8 +57,6 @@ export async function POST(request: NextRequest) {
       outputWidth: body.outputWidth,
       outputHeight: body.outputHeight,
       scale: body.scale,
-      processingMethod: body.processingMethod,
-      uploadToCloudflare: body.uploadToCloudflare,
       previewImageDimensions: body.previewImageDimensions,
     });
 
@@ -72,7 +69,6 @@ export async function POST(request: NextRequest) {
       outputWidth,
       outputHeight,
       scale,
-      processingMethod,
       uploadToCloudflare = false,
       originalFilename,
       originalCarId,
@@ -115,243 +111,8 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Try the remote crop service if configured and requested
-      const remoteServiceUrl = process.env.CANVAS_EXTENSION_SERVICE_URL;
-      const shouldTryRemote = processingMethod !== "local" && remoteServiceUrl;
-
-      console.log("🔍 Remote service decision:", {
-        processingMethod,
-        hasRemoteServiceUrl: !!remoteServiceUrl,
-        shouldTryRemote,
-        processingMethodNotLocal: processingMethod !== "local",
-      });
-
-      if (shouldTryRemote) {
-        try {
-          console.log("🌐 Trying remote crop service...");
-          console.log("🔗 Remote service URL:", remoteServiceUrl);
-
-          const remoteResponse = await fetch(`${remoteServiceUrl}/crop-image`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              imageUrl,
-              cropX,
-              cropY,
-              cropWidth,
-              cropHeight,
-              outputWidth,
-              outputHeight,
-              scale,
-              previewImageDimensions,
-            }),
-          });
-
-          if (remoteResponse.ok) {
-            const remoteResult = await remoteResponse.json();
-            console.log("✅ Remote crop service succeeded");
-
-            let result: any = {
-              success: true,
-              message: "Image cropped successfully using remote service",
-              remoteServiceUsed: true,
-              imageSize: remoteResult.imageSize || 0,
-              actualImageDimensions: remoteResult.actualImageDimensions,
-              scaledCropCoordinates: remoteResult.scaledCropCoordinates,
-            };
-
-            // Handle Cloudflare upload if requested
-            if (
-              uploadToCloudflare &&
-              (remoteResult.imageData || remoteResult.processedImageUrl)
-            ) {
-              try {
-                console.log("☁️ Cloud service upload - available data:", {
-                  hasImageData: !!remoteResult.imageData,
-                  hasProcessedImageUrl: !!remoteResult.processedImageUrl,
-                  processedImageUrlType: typeof remoteResult.processedImageUrl,
-                });
-
-                let imageBuffer;
-
-                if (remoteResult.imageData) {
-                  // Convert base64 to buffer for upload
-                  console.log("📦 Converting imageData (base64) to buffer...");
-                  imageBuffer = Buffer.from(remoteResult.imageData, "base64");
-                } else if (
-                  remoteResult.processedImageUrl &&
-                  remoteResult.processedImageUrl.startsWith("data:image/")
-                ) {
-                  // Extract base64 from data URL
-                  console.log(
-                    "📦 Converting processedImageUrl (data URL) to buffer..."
-                  );
-                  const base64Data =
-                    remoteResult.processedImageUrl.split(",")[1];
-                  imageBuffer = Buffer.from(base64Data, "base64");
-                } else {
-                  throw new Error(
-                    "No valid image data found in cloud service response"
-                  );
-                }
-
-                console.log(
-                  "✅ Image buffer created, size:",
-                  imageBuffer.length
-                );
-
-                const formData = new FormData();
-
-                // Generate filename based on the new naming convention
-                let filename;
-                if (originalFilename) {
-                  const nameWithoutExt = originalFilename.replace(
-                    /\.[^/.]+$/,
-                    ""
-                  );
-                  const requestedW =
-                    requestedWidth || Math.round(outputWidth / (scale || 1));
-                  const requestedH =
-                    requestedHeight || Math.round(outputHeight / (scale || 1));
-
-                  // Check if this is a 2x scale (or higher)
-                  const scaleFactor = scale || 1;
-                  if (scaleFactor >= 2) {
-                    const scaleMultiplier = Math.round(scaleFactor);
-                    filename = `${nameWithoutExt}-CROPPED-${requestedW}x${requestedH}-${scaleMultiplier}X.jpg`;
-                  } else {
-                    filename = `${nameWithoutExt}-CROPPED-${requestedW}x${requestedH}.jpg`;
-                  }
-                } else {
-                  filename = `cropped_image_${Date.now()}.jpg`;
-                }
-
-                const file = new File([imageBuffer], filename, {
-                  type: "image/jpeg",
-                });
-
-                formData.append("files", file);
-
-                if (originalCarId) {
-                  formData.append("carId", originalCarId);
-                }
-
-                formData.append(
-                  "metadata",
-                  JSON.stringify({
-                    category: "processed",
-                    processing: "image_crop",
-                    originalImage: imageUrl,
-                    parameters: {
-                      cropX,
-                      cropY,
-                      cropWidth,
-                      cropHeight,
-                      outputWidth,
-                      outputHeight,
-                      scale,
-                    },
-                    processedAt: new Date().toISOString(),
-                    remoteServiceUsed: true,
-                  })
-                );
-
-                console.log("📤 Calling upload API with:", {
-                  filename,
-                  fileSize: imageBuffer.length,
-                  carId: originalCarId,
-                  hasMetadata: true,
-                });
-
-                const uploadResponse = await fetch(
-                  `${request.nextUrl.origin}/api/images/upload`,
-                  {
-                    method: "POST",
-                    body: formData,
-                  }
-                );
-
-                console.log(
-                  "📥 Upload response status:",
-                  uploadResponse.status
-                );
-                console.log(
-                  "📥 Upload response headers:",
-                  Object.fromEntries(uploadResponse.headers.entries())
-                );
-
-                if (uploadResponse.ok) {
-                  const uploadResult = await uploadResponse.json();
-                  console.log("✅ Upload result:", uploadResult);
-                  result.cloudflareUpload = uploadResult;
-                  console.log("✅ Cloudflare upload successful");
-                } else {
-                  const errorText = await uploadResponse.text();
-                  console.error(
-                    "❌ Failed to upload to Cloudflare:",
-                    uploadResponse.status,
-                    errorText
-                  );
-                  result.cloudflareUpload = {
-                    success: false,
-                    error: `Upload failed: ${uploadResponse.status} - ${errorText}`,
-                  };
-                }
-              } catch (uploadError) {
-                console.error("❌ Error uploading to Cloudflare:", uploadError);
-                result.cloudflareUpload = {
-                  success: false,
-                  error: `Upload error: ${uploadError instanceof Error ? uploadError.message : "Unknown error"}`,
-                };
-              }
-            } else if (!uploadToCloudflare) {
-              // Return the image data for preview
-              if (remoteResult.processedImageUrl) {
-                result.processedImageUrl = remoteResult.processedImageUrl;
-              } else if (remoteResult.imageData) {
-                result.imageData = remoteResult.imageData;
-              }
-            }
-
-            return NextResponse.json(result);
-          } else {
-            console.log(
-              "⚠️ Remote crop service failed:",
-              remoteResponse.status
-            );
-
-            // Special handling for 404 - crop endpoint not available
-            if (remoteResponse.status === 404) {
-              console.log(
-                "⚠️ Crop endpoint not available on remote service, falling back to local processing"
-              );
-            }
-
-            throw new Error(`Remote service failed: ${remoteResponse.status}`);
-          }
-        } catch (remoteError) {
-          console.log("⚠️ Remote service error:", remoteError);
-
-          // If user explicitly chose cloud but it failed, don't fall back to local
-          if (processingMethod === "cloud") {
-            return NextResponse.json(
-              {
-                error: `Cloud processing failed: ${remoteError instanceof Error ? remoteError.message : "Unknown error"}. The crop-image endpoint may not be available on the remote service.`,
-                suggestion: "Try using local processing method instead.",
-              },
-              { status: 500 }
-            );
-          }
-
-          console.log("⚠️ Falling back to local Sharp processing...");
-        }
-      } else if (processingMethod === "local") {
-        console.log("🔧 Local processing explicitly requested, using Sharp...");
-      } else {
-        console.log("🔧 No remote service URL configured, using Sharp...");
-      }
+      // Always use Sharp for image processing - reliable on both local and Vercel
+      console.log("🔧 Using Sharp for image processing");
 
       // Local processing using Sharp (in-memory)
       console.log("📥 Downloading image from:", imageUrl);
@@ -495,7 +256,6 @@ export async function POST(request: NextRequest) {
       let result: any = {
         success: true,
         message: "Image cropped successfully using Sharp",
-        remoteServiceUsed: false,
         imageSize: processedImageBuffer.length,
         actualImageDimensions: { width: actualWidth, height: actualHeight },
         scaledCropCoordinates: {

@@ -59,9 +59,7 @@ export function useCars(params: CarsQueryParams = {}) {
         queryParams.set("model", model);
       }
 
-      const data: any = await api.get(
-        `/api/cars/simple?${queryParams.toString()}`
-      );
+      const data: any = await api.get(`/api/cars?${queryParams.toString()}`);
 
       return {
         cars: data.cars as Car[],

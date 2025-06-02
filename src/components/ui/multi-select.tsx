@@ -56,6 +56,21 @@ export function MultiSelect({
     (option) => !value.some((v) => v.value === option.value)
   );
 
+  const isSelected = (option: Option) => {
+    return value.some((v) => v.value === option.value);
+  };
+
+  const handleSelect = (option: Option) => {
+    setInputValue("");
+    if (isSelected(option)) {
+      // Unselect if already selected
+      onChange(value.filter((v) => v.value !== option.value));
+    } else {
+      // Select if not selected
+      onChange([...value, option]);
+    }
+  };
+
   return (
     <Command
       onKeyDown={handleKeyDown}
@@ -77,7 +92,7 @@ export function MultiSelect({
             >
               {option.label}
               <button
-                className="ml-1 ring-offset-[hsl(var(--background))] rounded-full outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:ring-offset-2"
+                className="ml-1 ring-offset-[hsl(var(--background))] rounded-full outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus-ring-offset-2"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     handleUnselect(option);
@@ -100,9 +115,14 @@ export function MultiSelect({
             ref={inputRef}
             value={inputValue}
             onValueChange={setInputValue}
-            onBlur={() => {
-              setOpen(false);
-              setInputValue("");
+            onBlur={(e) => {
+              // Only close if not clicking inside the dropdown
+              setTimeout(() => {
+                if (!e.currentTarget.closest("[data-multi-select-dropdown]")) {
+                  setOpen(false);
+                  setInputValue("");
+                }
+              }, 150);
             }}
             onFocus={() => setOpen(true)}
             placeholder={value.length === 0 ? placeholder : undefined}
@@ -111,34 +131,35 @@ export function MultiSelect({
         </div>
       </div>
       <div className="relative mt-2">
-        {open && selectables.length > 0 ? (
-          <div className="absolute w-full z-50 top-0 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-md outline-none animate-in overflow-hidden">
-            <CommandGroup className="max-h-[200px] overflow-auto">
-              <div className="w-full bg-[hsl(var(--background))] p-2">
-                <div className="grid grid-cols-2 gap-2">
-                  {selectables.map((option) => (
-                    <CommandItem
+        {open && options.length > 0 ? (
+          <div
+            data-multi-select-dropdown
+            className="absolute w-full z-50 top-0 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-md outline-none animate-in overflow-hidden"
+          >
+            <div className="max-h-[200px] overflow-auto p-1">
+              <div className="space-y-0.5">
+                {options.map((option) => {
+                  const selected = isSelected(option);
+                  return (
+                    <div
                       key={option.value}
-                      value={option.value}
                       onMouseDown={(e) => {
                         e.preventDefault();
-                        e.stopPropagation();
+                        handleSelect(option);
                       }}
-                      onSelect={() => {
-                        setInputValue("");
-                        onChange([...value, option]);
-                      }}
-                      className="cursor-pointer bg-[hsl(var(--background))] hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))] flex items-center rounded-md px-3 py-2 transition-colors text-left"
+                      className={cn(
+                        "cursor-pointer rounded-md px-3 py-2 transition-colors text-left text-sm w-full",
+                        selected
+                          ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
+                          : "hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
+                      )}
                     >
-                      <div className="w-4 h-4 border rounded-sm flex items-center justify-center transition-colors border-[hsl(var(--border))]"></div>
-                      <span className="text-sm truncate ml-3">
-                        {option.label}
-                      </span>
-                    </CommandItem>
-                  ))}
-                </div>
+                      <span className="truncate">{option.label}</span>
+                    </div>
+                  );
+                })}
               </div>
-            </CommandGroup>
+            </div>
           </div>
         ) : null}
       </div>

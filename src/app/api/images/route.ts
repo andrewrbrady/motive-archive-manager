@@ -1,15 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { ObjectId } from "mongodb";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 
 // Images can be cached for short periods
 
 export async function GET(request: NextRequest) {
   try {
+    // Verify authentication following cars/deliverables pattern
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      return authResult;
+    }
+
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    // Enhanced pagination support with pageSize parameter (max 100 for images)
+    const pageSize = Math.min(
+      parseInt(
+        searchParams.get("pageSize") || searchParams.get("limit") || "20"
+      ),
+      100 // Maximum page size for performance
+    );
     const search = searchParams.get("search");
     const angle = searchParams.get("angle");
     const movement = searchParams.get("movement");
@@ -19,12 +32,12 @@ export async function GET(request: NextRequest) {
 
     console.log("[API] Images request:", {
       page,
-      limit,
+      pageSize,
       search,
       filters: { angle, movement, tod, view, carId },
     });
 
-    const skip = (page - 1) * limit;
+    const skip = (page - 1) * pageSize;
 
     // Build query
     const query: any = {};
@@ -102,60 +115,110 @@ export async function GET(request: NextRequest) {
       query.$and = (query.$and || []).concat(filterConditions);
     }
 
-    // Handle search separately
-    if (search) {
-      const searchConditions = [
-        { filename: { $regex: search, $options: "i" } },
-        { "metadata.description": { $regex: search, $options: "i" } },
-      ];
+    // Enhanced search implementation following cars/deliverables pattern
+    if (search && search.trim()) {
+      const searchTerms = search.trim().split(/\s+/).filter(Boolean);
 
-      // Add search as an additional AND condition
-      query.$and = (query.$and || []).concat([{ $or: searchConditions }]);
+      if (searchTerms.length > 0) {
+        const searchConditions: any[] = [];
+
+        searchTerms.forEach((term) => {
+          // Escape special regex characters to prevent errors
+          const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const searchRegex = new RegExp(escapedTerm, "i");
+
+          // Apply search to primary fields
+          searchConditions.push(
+            { filename: searchRegex },
+            { "metadata.description": searchRegex }
+          );
+        });
+
+        // For multi-word searches, also try to match the full search term
+        if (searchTerms.length > 1) {
+          const fullSearchRegex = new RegExp(
+            search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+            "i"
+          );
+          searchConditions.push(
+            { filename: fullSearchRegex },
+            { "metadata.description": fullSearchRegex }
+          );
+        }
+
+        // Add search as an additional AND condition
+        query.$and = (query.$and || []).concat([{ $or: searchConditions }]);
+      }
     }
 
-    // [REMOVED] // [REMOVED] console.log("[API] MongoDB query:", JSON.stringify(query, null, 2));
-
     const db = await getDatabase();
-    const imagesCollection = db.collection("images");
+    if (!db) {
+      console.error("Failed to get database instance");
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
 
-    // Get total count for pagination
-    const total = await imagesCollection.countDocuments(query);
+    try {
+      const imagesCollection = db.collection("images");
 
-    // Get paginated images
-    const images = await imagesCollection
-      .find(query)
-      .sort({ updatedAt: -1, createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .toArray();
+      // Get total count for pagination
+      const total = await imagesCollection.countDocuments(query);
 
-    // Process images
-    const processedImages = images.map((img) => {
-      return {
-        ...img,
-        _id: img._id.toString(),
-        carId: img.carId ? img.carId.toString() : "",
-        url: getFormattedImageUrl(img.url),
-      };
-    });
+      // Get paginated images
+      const images = await imagesCollection
+        .find(query)
+        .sort({ updatedAt: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .toArray();
 
-    const response = {
-      images: processedImages,
-      pagination: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit),
-      },
-    };
+      // Process images
+      const processedImages = images.map((img) => {
+        return {
+          ...img,
+          _id: img._id.toString(),
+          carId: img.carId ? img.carId.toString() : "",
+          url: fixCloudflareImageUrl(img.url),
+        };
+      });
 
-    console.log("[API] Sending response:", {
-      totalImages: total,
-      currentPage: page,
-      imagesInResponse: processedImages.length,
-    });
+      const response = NextResponse.json({
+        images: processedImages,
+        pagination: {
+          total,
+          page,
+          limit: pageSize, // Maintain backward compatibility with 'limit' field
+          pageSize,
+          pages: Math.ceil(total / pageSize),
+        },
+      });
 
-    return NextResponse.json(response);
+      console.log("[API] Sending response:", {
+        totalImages: total,
+        currentPage: page,
+        imagesInResponse: processedImages.length,
+      });
+
+      // Add cache headers for better performance following cars/deliverables pattern
+      response.headers.set(
+        "Cache-Control",
+        "public, s-maxage=60, stale-while-revalidate=300"
+      );
+      response.headers.set("ETag", `"images-${total}-${page}-${pageSize}"`);
+
+      return response;
+    } catch (dbError) {
+      console.error("Database operation error:", dbError);
+      return NextResponse.json(
+        {
+          error: "Database operation failed",
+          details: dbError instanceof Error ? dbError.message : "Unknown error",
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("[API] Error fetching images:", error);
     return NextResponse.json(

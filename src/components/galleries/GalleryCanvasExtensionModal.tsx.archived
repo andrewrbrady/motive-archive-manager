@@ -13,17 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Loader2,
-  Settings,
-  Cloud,
-  Monitor,
   Check,
   X,
   Download,
@@ -44,8 +34,6 @@ interface GalleryCanvasExtensionModalProps {
   galleryId: string;
   onImageReplaced?: (originalImageId: string, newImageData: any) => void;
 }
-
-type ProcessingMethod = "cloud" | "local";
 
 interface ProcessedImageData {
   _id: string;
@@ -91,8 +79,6 @@ export function GalleryCanvasExtensionModal({
   const [whiteThresh, setWhiteThresh] = useState<string>("90");
   const [cloudflareWidth, setCloudflareWidth] = useState<string>("2000");
   const [cloudflareQuality, setCloudflareQuality] = useState<string>("100");
-  const [processingMethod, setProcessingMethod] =
-    useState<ProcessingMethod>("cloud");
   const [originalDimensions, setOriginalDimensions] =
     useState<ImageDimensions | null>(null);
   const [processedImage, setProcessedImage] =
@@ -138,26 +124,33 @@ export function GalleryCanvasExtensionModal({
     return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
   };
 
+  // Helper function to get original processing URL (without enhancements)
+  const getProcessingImageUrl = (baseUrl: string) => {
+    if (baseUrl.includes("imagedelivery.net")) {
+      // For Cloudflare URLs, use the base URL without any suffix
+      const urlParts = baseUrl.split("/");
+      // Remove any existing variant (like w=2000,q=100 or public)
+      if (
+        urlParts[urlParts.length - 1].includes("=") ||
+        urlParts[urlParts.length - 1] === "public"
+      ) {
+        urlParts.pop();
+      }
+      return urlParts.join("/");
+    }
+    // For other URLs, try to remove any suffix
+    return baseUrl.replace(/\/[^\/]*$/, "");
+  };
+
   // Memoize the enhanced image URL
   const enhancedImageUrl = useMemo(() => {
     if (!image?.url) return null;
     return getEnhancedImageUrl(image.url, cloudflareWidth, cloudflareQuality);
   }, [image?.url, cloudflareWidth, cloudflareQuality]);
 
-  // Load processing method preference from localStorage
-  useEffect(() => {
-    if (!api) return; // Add conditional check inside async function
-    const savedMethod = localStorage.getItem(
-      "canvasExtensionMethod"
-    ) as ProcessingMethod;
-    if (savedMethod && (savedMethod === "cloud" || savedMethod === "local")) {
-      setProcessingMethod(savedMethod);
-    }
-  }, [api]);
-
   // Load original image dimensions
   useEffect(() => {
-    if (!api) return; // Add conditional check inside async function
+    if (!api) return;
     if (enhancedImageUrl) {
       const img = new window.Image();
       img.onload = () => {
@@ -209,22 +202,34 @@ export function GalleryCanvasExtensionModal({
     return null;
   }
 
-  // Save processing method preference to localStorage
-  const handleProcessingMethodChange = (method: ProcessingMethod) => {
-    setProcessingMethod(method);
-    localStorage.setItem("canvasExtensionMethod", method);
-  };
-
   const handlePreview = async () => {
     if (!api) return; // Add conditional check inside async function
     if (!image || !enhancedImageUrl) return;
 
+    // Use original processing URL for API calls, not enhanced URL
+    const processingImageUrl = getProcessingImageUrl(image.url);
+
+    console.log("📐 Canvas Extension processing starting:", {
+      originalUrl: image.url,
+      enhancedUrl: enhancedImageUrl.substring(0, 100) + "...",
+      processingUrl: processingImageUrl,
+      urlTransformation: {
+        from: image.url,
+        to: processingImageUrl,
+        isCloudflare: image.url.includes("imagedelivery.net"),
+      },
+      parameters: {
+        desiredHeight: parseInt(desiredHeight),
+        paddingPct: parseFloat(paddingPct),
+        whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+      },
+    });
+
     const parameters = {
-      imageUrl: enhancedImageUrl,
+      imageUrl: processingImageUrl,
       desiredHeight: parseInt(desiredHeight),
       paddingPct: parseFloat(paddingPct),
       whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
-      processingMethod,
     };
 
     const result = await previewProcessImage({
@@ -235,8 +240,13 @@ export function GalleryCanvasExtensionModal({
     });
 
     if (result) {
+      console.log("✅ Canvas Extension processing completed successfully");
       setProcessedImage(result.processedImage);
       setShowPreview(true);
+    } else {
+      console.error(
+        "❌ Canvas Extension processing failed - no result returned"
+      );
     }
   };
 
@@ -244,12 +254,19 @@ export function GalleryCanvasExtensionModal({
     if (!api) return; // Add conditional check inside async function
     if (!image || !processedImage) return;
 
+    // Use original processing URL for API calls, not enhanced URL
+    const processingImageUrl = getProcessingImageUrl(image.url);
+
+    console.log("🔄 Canvas Extension replacement starting:", {
+      originalUrl: image.url,
+      processingUrl: processingImageUrl,
+    });
+
     const parameters = {
-      imageUrl: enhancedImageUrl,
+      imageUrl: processingImageUrl,
       desiredHeight: parseInt(desiredHeight),
       paddingPct: parseFloat(paddingPct),
       whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
-      processingMethod,
     };
 
     const result = await replaceImageInGallery(
@@ -260,8 +277,11 @@ export function GalleryCanvasExtensionModal({
     );
 
     if (result && onImageReplaced) {
+      console.log("✅ Canvas Extension replacement completed successfully");
       onImageReplaced(result.originalImageId, result.processedImage);
       handleClose();
+    } else {
+      console.error("❌ Canvas Extension replacement failed");
     }
   };
 
@@ -280,17 +300,12 @@ export function GalleryCanvasExtensionModal({
       const targetWidth = processedDimensions.width * multiplier;
       const targetHeight = processedDimensions.height * multiplier;
 
-      // Get the high-resolution source image from Cloudflare
-      // Use the multiplied width to get a proportionally larger source image
-      const highResCloudflareWidth = parseInt(cloudflareWidth) * multiplier;
-      const highResSourceUrl = getEnhancedImageUrl(
-        image.url,
-        highResCloudflareWidth.toString(),
-        cloudflareQuality
-      );
+      // Get the high-resolution source image from Cloudflare for display purposes
+      // But use the original processing URL for API calls
+      const processingImageUrl = getProcessingImageUrl(image.url);
 
       const requestData: ExtendCanvasData = {
-        imageUrl: highResSourceUrl, // Use high-resolution source from Cloudflare
+        imageUrl: processingImageUrl, // Use original processing URL, not enhanced URL
         desiredHeight: targetHeight,
         paddingPct: parseFloat(paddingPct),
         whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
@@ -539,38 +554,6 @@ export function GalleryCanvasExtensionModal({
                     />
                   </div>
                 </div>
-              </div>
-
-              {/* Processing Method Settings */}
-              <div className="p-3 border rounded-lg bg-muted/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <Settings className="h-4 w-4" />
-                  <Label className="text-sm font-medium">
-                    Processing Method
-                  </Label>
-                </div>
-                <Select
-                  value={processingMethod}
-                  onValueChange={handleProcessingMethodChange}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select processing method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cloud">
-                      <div className="flex items-center gap-2">
-                        <Cloud className="h-4 w-4" />
-                        <span>Cloud Run</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="local">
-                      <div className="flex items-center gap-2">
-                        <Monitor className="h-4 w-4" />
-                        <span>Local Binary</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
 
               <div>

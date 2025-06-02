@@ -1,12 +1,15 @@
+import React from "react";
 import Image, { ImageProps } from "next/image";
 import {
   CLOUDFLARE_VARIANTS,
   isCloudflareImageUrl,
   cloudflareImageLoader,
 } from "@/lib/cloudflare-image-loader";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { MotiveLogo } from "./MotiveLogo";
+import { LoadingSpinner } from "./loading";
 
 interface CloudflareImageProps extends Omit<ImageProps, "src" | "loader"> {
   src: string;
@@ -40,8 +43,21 @@ export function CloudflareImage({
   const imageRef = useRef<HTMLImageElement>(null);
   const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
 
-  // Use the URL as-is since it's now a base URL, and let Next.js + custom loader handle sizing
-  const optimizedSrc = src;
+  // Phase 2: Fix missing Cloudflare variants - ensure URL has proper variant
+  const optimizedSrc = useMemo(() => {
+    if (src.includes("imagedelivery.net")) {
+      // Check if URL already has a variant (ends with /public, /thumbnail, etc. or has transform params)
+      const hasVariant = src.match(
+        /\/(public|thumbnail|medium|large|w=\d+)(?:,.*)?$/
+      );
+      if (!hasVariant) {
+        // Missing variant - append the correct one based on variant prop
+        const cloudflareVariant = CLOUDFLARE_VARIANTS[variant] || "public";
+        return `${src}/${cloudflareVariant}`;
+      }
+    }
+    return src;
+  }, [src, variant]);
 
   // Phase 2B Task 1: Add cache optimization headers for Cloudflare URLs
   const getCacheOptimizedSrc = useCallback((src: string) => {
@@ -105,33 +121,33 @@ export function CloudflareImage({
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     const target = e.target as HTMLImageElement;
-    console.error("CloudflareImage load error:", {
-      originalSrc: src,
-      optimizedSrc: getCacheOptimizedSrc(optimizedSrc),
-      finalSrc: target.src,
-      error: e,
-      isAboveFold,
-      useIntersectionLazyLoad,
-      variant,
-      alt,
-    });
+    const isDevelopment = process.env.NODE_ENV === "development";
+
+    // Phase 2: Simple development error handling - just try fallbacks without noise
+    if (isDevelopment) {
+      console.warn(`CloudflareImage: Image failed to load, trying fallback...`);
+    }
+
     setImageError(true);
     setIsLoading(false);
 
-    // Enhanced fallback logic
+    // Try fallback if available
     if (fallback && target.src !== fallback) {
-      console.log("Attempting fallback URL:", fallback);
       target.src = fallback;
-      return; // Don't mark as error yet, let fallback attempt load
+      return;
     }
 
-    // If src includes Cloudflare transformations, try original without transforms
-    if (src.includes("imagedelivery.net") && src.includes(",")) {
-      const originalUrl = src.split("/").slice(0, -1).join("/") + "/public";
-      if (target.src !== originalUrl) {
-        console.log("Attempting original Cloudflare URL:", originalUrl);
-        target.src = originalUrl;
-        return; // Don't mark as error yet, let original attempt load
+    // Phase 2: If Cloudflare URL failed, try /public variant as it's most reliable
+    if (src.includes("imagedelivery.net")) {
+      const baseUrl = src.split("/").slice(0, -1).join("/");
+      const publicUrl = `${baseUrl}/public`;
+
+      if (target.src !== publicUrl) {
+        if (isDevelopment) {
+          console.warn("CloudflareImage: Trying /public variant fallback");
+        }
+        target.src = publicUrl;
+        return;
       }
     }
 
@@ -139,12 +155,6 @@ export function CloudflareImage({
   };
 
   const handleLoad = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    console.log("CloudflareImage loaded successfully:", {
-      src: optimizedSrc,
-      variant,
-      naturalWidth: (e.target as HTMLImageElement).naturalWidth,
-      naturalHeight: (e.target as HTMLImageElement).naturalHeight,
-    });
     setIsLoading(false);
     setImageError(false);
     props.onLoad?.(e);
@@ -232,6 +242,7 @@ export function CloudflareImage({
     ...filteredProps
   } = props;
 
+  // Phase 2: Enhanced image props with development environment detection
   const imageProps: ImageProps = {
     src: getCacheOptimizedSrc(optimizedSrc),
     className: cn(
@@ -241,10 +252,20 @@ export function CloudflareImage({
     ),
     onError: handleError,
     onLoad: handleLoad,
-    // Phase 2B Task 1: Add fetchpriority for above-fold images
+    // Phase 2: Add fetchpriority for above-fold images
     fetchPriority: isAboveFold ? "high" : "auto",
-    // Phase 2B Task 1: Intelligent loading strategy - only set if above fold or using intersection observer
-    ...(isAboveFold ? { priority: true } : { loading: "lazy" }),
+    // Phase 2: Development-aware loading strategy
+    ...(process.env.NODE_ENV === "development"
+      ? {
+          // In development, use unoptimized loading to avoid /_next/image issues
+          unoptimized: src.includes("imagedelivery.net"),
+          // Still respect priority for above-fold images
+          ...(isAboveFold ? { priority: true } : { loading: "lazy" }),
+        }
+      : {
+          // In production, use normal optimization
+          ...(isAboveFold ? { priority: true } : { loading: "lazy" }),
+        }),
     ...filteredProps, // Use filtered props to avoid conflicts
     // Ensure alt prop is always present and comes after filteredProps to override any conflicts
     alt: alt || "",

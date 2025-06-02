@@ -31,8 +31,8 @@ import {
   PerformanceMonitor,
   usePerformanceTimer,
 } from "@/components/performance/PerformanceMonitor";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { Skeleton } from "@/components/ui/skeleton";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 
 interface FilterParams {
   make?: string;
@@ -114,7 +114,7 @@ function CarImage({ car, className = "aspect-video" }: CarImageProps) {
       if (car.images && car.images.length > 0) {
         const firstImage = car.images[0];
         if (firstImage && firstImage.url) {
-          const baseUrl = getFormattedImageUrl(firstImage.url);
+          const baseUrl = fixCloudflareImageUrl(firstImage.url);
           const fullUrl = getEnhancedImageUrl(baseUrl, "400", "85");
           const blurUrl = getEnhancedImageUrl(baseUrl, "50", "30");
 
@@ -150,7 +150,7 @@ function CarImage({ car, className = "aspect-video" }: CarImageProps) {
           if (car.images && car.images.length > 0) {
             const firstImage = car.images[0];
             if (firstImage && firstImage.url) {
-              const baseUrl = getFormattedImageUrl(firstImage.url);
+              const baseUrl = fixCloudflareImageUrl(firstImage.url);
               const fullUrl = getEnhancedImageUrl(baseUrl, "400", "85");
               const blurUrl = getEnhancedImageUrl(baseUrl, "50", "30");
 
@@ -180,7 +180,7 @@ function CarImage({ car, className = "aspect-video" }: CarImageProps) {
         }
 
         // Use enhanced URL transformation with proper quality parameters
-        const baseUrl = getFormattedImageUrl(data.url);
+        const baseUrl = fixCloudflareImageUrl(data.url);
         const finalImageUrl = getEnhancedImageUrl(baseUrl, "400", "85");
         const blurImageUrl = getEnhancedImageUrl(baseUrl, "50", "30");
 
@@ -199,7 +199,7 @@ function CarImage({ car, className = "aspect-video" }: CarImageProps) {
         if (car.images && car.images.length > 0) {
           const firstImage = car.images[0];
           if (firstImage && firstImage.url) {
-            const baseUrl = getFormattedImageUrl(firstImage.url);
+            const baseUrl = fixCloudflareImageUrl(firstImage.url);
             const fullUrl = getEnhancedImageUrl(baseUrl, "400", "85");
             const blurUrl = getEnhancedImageUrl(baseUrl, "50", "30");
 
@@ -368,7 +368,7 @@ export default function CarsPageOptimized({
       currentPage: number;
       pageSize: number;
     };
-  }>(`cars/simple?${queryParams}`, {
+  }>(`cars?${queryParams}`, {
     staleTime: 2 * 60 * 1000, // 2 minutes cache for cars list
     retry: 2,
     retryDelay: 1000,

@@ -15,6 +15,7 @@ export interface Gallery {
   name: string;
   description?: string;
   imageIds: string[];
+  primaryImageId?: string;
   createdAt: string;
   updatedAt: string;
   thumbnailImage?: {

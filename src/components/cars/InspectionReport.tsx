@@ -328,7 +328,7 @@ export default function InspectionReport({
                       className="relative rounded-lg overflow-hidden"
                     >
                       <img
-                        src={`https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${imageId}/public`}
+                        src={`https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${imageId}/w=400,q=85`}
                         alt="Inspection image"
                         className="w-full h-auto object-cover"
                       />

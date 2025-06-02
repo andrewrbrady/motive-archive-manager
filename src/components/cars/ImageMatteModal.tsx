@@ -40,6 +40,10 @@ interface ImageMatteModalProps {
   isOpen: boolean;
   onClose: () => void;
   image: ImageData | null;
+  // Optional props for gallery usage (not implemented yet)
+  enablePreview?: boolean;
+  galleryId?: string;
+  onImageReplaced?: (originalImageId: string, newImageData: any) => void;
 }
 
 interface ImageDimensions {
@@ -69,6 +73,9 @@ export function ImageMatteModal({
   isOpen,
   onClose,
   image,
+  enablePreview,
+  galleryId,
+  onImageReplaced,
 }: ImageMatteModalProps) {
   // Early return if modal is not open - must be before ALL hooks
   if (!isOpen) {

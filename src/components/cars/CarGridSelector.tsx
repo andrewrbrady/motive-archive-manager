@@ -169,9 +169,7 @@ export function CarGridSelector({
         if (filters.status) queryParams.set("status", filters.status);
 
         // Fetch cars
-        const carsData = (await api.get(
-          `cars/simple?${queryParams.toString()}`
-        )) as {
+        const carsData = (await api.get(`cars?${queryParams.toString()}`)) as {
           cars: Car[];
           pagination?: { totalCount: number };
         };

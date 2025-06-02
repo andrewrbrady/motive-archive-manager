@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { LocationResponse } from "@/models/location";
@@ -135,7 +135,7 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
           );
           setPrimaryImage({
             id: imageData._id,
-            url: getFormattedImageUrl(imageData.url),
+            url: fixCloudflareImageUrl(imageData.url),
           });
           setUsingCarImage(false);
         } catch (error) {
@@ -152,7 +152,7 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
               );
               setPrimaryImage({
                 id: fallbackImageData._id,
-                url: getFormattedImageUrl(fallbackImageData.url),
+                url: fixCloudflareImageUrl(fallbackImageData.url),
               });
               setUsingCarImage(false);
             } catch (fallbackError) {
@@ -176,7 +176,7 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
           );
           setPrimaryImage({
             id: imageData._id,
-            url: getFormattedImageUrl(imageData.url),
+            url: fixCloudflareImageUrl(imageData.url),
           });
           setUsingCarImage(false);
         } catch (error) {
@@ -197,7 +197,7 @@ export default function EventCard({ event, onEdit, onDelete }: EventCardProps) {
             );
             setPrimaryImage({
               id: carImageData._id,
-              url: getFormattedImageUrl(carImageData.url),
+              url: fixCloudflareImageUrl(carImageData.url),
             });
             setUsingCarImage(true);
           } catch (carImageError) {

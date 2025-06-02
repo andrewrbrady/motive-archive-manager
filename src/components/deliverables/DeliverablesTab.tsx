@@ -77,7 +77,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     }
   };
 
-  // Actions object for components
+  // Actions for child components
   const actions = {
     onEdit: (deliverable: Deliverable) => {
       // Edit functionality is handled by EditDeliverableForm component
@@ -85,6 +85,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     onDelete: handleDelete,
     onDuplicate: handleDuplicate,
     onStatusChange: handleStatusChange,
+    onRefresh: fetchDeliverables,
   };
 
   return (

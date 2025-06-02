@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
+import { ImageData } from "@/app/images/columns";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -11,26 +13,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Loader2,
-  Settings,
-  Cloud,
-  Monitor,
   Check,
   X,
-  Expand,
   Eye,
+  AlertCircle,
+  CheckCircle,
+  Pause,
+  Play,
+  Expand,
   RefreshCw,
   Zap,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { toast as hotToast } from "react-hot-toast";
 import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGalleryImageProcessing } from "@/lib/hooks/useGalleryImageProcessing";
 import Image from "next/image";
 
@@ -43,7 +41,6 @@ interface BatchCanvasExtensionModalProps {
   onImageProcessed?: (originalImageId: string, newImageData: any) => void;
 }
 
-type ProcessingMethod = "cloud" | "local";
 type ProcessingStage = "settings" | "preview" | "replacing";
 
 interface ProcessingStatus {
@@ -68,8 +65,6 @@ export function BatchCanvasExtensionModal({
   const [whiteThresh, setWhiteThresh] = useState<string>("90");
   const [cloudflareWidth, setCloudflareWidth] = useState<string>("2000");
   const [cloudflareQuality, setCloudflareQuality] = useState<string>("100");
-  const [processingMethod, setProcessingMethod] =
-    useState<ProcessingMethod>("cloud");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isReplacing, setIsReplacing] = useState(false);
   const [isReplacing2x, setIsReplacing2x] = useState(false);
@@ -81,16 +76,6 @@ export function BatchCanvasExtensionModal({
 
   const { previewProcessImage, replaceImageInGallery } =
     useGalleryImageProcessing();
-
-  // Load processing method preference from localStorage
-  useEffect(() => {
-    const savedMethod = localStorage.getItem(
-      "canvasExtensionMethod"
-    ) as ProcessingMethod;
-    if (savedMethod && (savedMethod === "cloud" || savedMethod === "local")) {
-      setProcessingMethod(savedMethod);
-    }
-  }, []);
 
   // Initialize processing statuses when images change
   useEffect(() => {
@@ -107,12 +92,6 @@ export function BatchCanvasExtensionModal({
       setStage("settings");
     }
   }, [images]);
-
-  // Save processing method preference to localStorage
-  const handleProcessingMethodChange = (method: ProcessingMethod) => {
-    setProcessingMethod(method);
-    localStorage.setItem("canvasExtensionMethod", method);
-  };
 
   // Helper function to build enhanced Cloudflare URL
   const getEnhancedImageUrl = (
@@ -174,7 +153,7 @@ export function BatchCanvasExtensionModal({
           desiredHeight: parseInt(desiredHeight),
           paddingPct: parseFloat(paddingPct),
           whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
-          processingMethod,
+
           requestedWidth: Math.round((parseInt(desiredHeight) * 16) / 9), // Default aspect ratio
           requestedHeight: parseInt(desiredHeight),
           scaleMultiplier: 1,
@@ -317,7 +296,7 @@ export function BatchCanvasExtensionModal({
           desiredHeight: parseInt(desiredHeight),
           paddingPct: parseFloat(paddingPct),
           whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
-          processingMethod,
+
           requestedWidth: Math.round((parseInt(desiredHeight) * 16) / 9), // Default aspect ratio
           requestedHeight: parseInt(desiredHeight),
           scaleMultiplier: 1,
@@ -441,7 +420,7 @@ export function BatchCanvasExtensionModal({
           desiredHeight: targetHeight,
           paddingPct: parseFloat(paddingPct),
           whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
-          processingMethod,
+
           requestedWidth: Math.round((parseInt(desiredHeight) * 16) / 9), // Use original requested dimensions
           requestedHeight: parseInt(desiredHeight), // Use original requested dimensions
           scaleMultiplier: multiplier,
@@ -626,39 +605,6 @@ export function BatchCanvasExtensionModal({
                       />
                     </div>
                   </div>
-                </div>
-
-                {/* Processing Method Settings */}
-                <div className="p-3 border rounded-lg bg-muted/30">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Settings className="h-4 w-4" />
-                    <Label className="text-sm font-medium">
-                      Processing Method
-                    </Label>
-                  </div>
-                  <Select
-                    value={processingMethod}
-                    onValueChange={handleProcessingMethodChange}
-                    disabled={isProcessing}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select processing method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cloud">
-                        <div className="flex items-center gap-2">
-                          <Cloud className="h-4 w-4" />
-                          <span>Cloud Run</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="local">
-                        <div className="flex items-center gap-2">
-                          <Monitor className="h-4 w-4" />
-                          <span>Local Binary</span>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
 

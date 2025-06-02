@@ -1,5 +1,14 @@
 import { ObjectId } from "mongodb";
 
+// New interface for platform data from API
+export interface DeliverablePlatform {
+  _id: string;
+  name: string;
+  category: string;
+  isActive: boolean;
+}
+
+// Keep the old Platform type for backward compatibility with existing data
 export type Platform =
   | "Instagram Reels"
   | "Instagram Post"
@@ -52,7 +61,8 @@ export interface Deliverable {
   // Basic Information
   title: string;
   description?: string;
-  platform: Platform;
+  platform: Platform; // Keep for backward compatibility - will be migrated to platforms array
+  platforms?: string[]; // New field for multiple platform IDs
   type: DeliverableType;
 
   // Technical Details

@@ -31,15 +31,26 @@ import {
   Settings,
   Cloud,
   Monitor,
+  ZoomIn,
+  Palette,
+  Check,
+  X,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
 import { useAPI } from "@/hooks/useAPI";
+import { useGalleryImageProcessing } from "@/lib/hooks/useGalleryImageProcessing";
+import { toast as hotToast } from "react-hot-toast";
 
 interface CanvasExtensionModalProps {
   isOpen: boolean;
   onClose: () => void;
   image: ImageData | null;
+  // New optional props for preview workflow
+  enablePreview?: boolean;
+  galleryId?: string;
+  onImageReplaced?: (originalImageId: string, newImageData: any) => void;
 }
 
 interface ImageDimensions {
@@ -65,12 +76,34 @@ interface ExtendCanvasResponse {
   cloudflareUpload?: CloudflareUploadResult;
 }
 
-type ProcessingMethod = "cloud" | "local";
+// New interface for gallery preview workflow
+interface ProcessedImageData {
+  _id: string;
+  url: string;
+  filename: string;
+  metadata: any;
+  carId: string;
+}
+
+interface ExtendCanvasData {
+  imageUrl: string;
+  desiredHeight: number;
+  paddingPct: number;
+  whiteThresh: number;
+  uploadToCloudflare: boolean;
+  originalFilename: string;
+  requestedWidth: number;
+  requestedHeight: number;
+  scaleMultiplier: number;
+}
 
 export function CanvasExtensionModal({
   isOpen,
   onClose,
   image,
+  enablePreview = false,
+  galleryId,
+  onImageReplaced,
 }: CanvasExtensionModalProps) {
   // Early return if modal is not open - must be before ALL hooks
   if (!isOpen) {
@@ -84,8 +117,6 @@ export function CanvasExtensionModal({
   const [whiteThresh, setWhiteThresh] = useState<string>("90");
   const [cloudflareWidth, setCloudflareWidth] = useState<string>("2000");
   const [cloudflareQuality, setCloudflareQuality] = useState<string>("100");
-  const [processingMethod, setProcessingMethod] =
-    useState<ProcessingMethod>("cloud");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessingHighRes, setIsProcessingHighRes] = useState(false);
@@ -112,15 +143,30 @@ export function CanvasExtensionModal({
     useState<boolean>(false);
   const [useTestImage, setUseTestImage] = useState(false);
 
-  // Load processing method preference from localStorage
-  useEffect(() => {
-    const savedMethod = localStorage.getItem(
-      "canvasExtensionMethod"
-    ) as ProcessingMethod;
-    if (savedMethod && (savedMethod === "cloud" || savedMethod === "local")) {
-      setProcessingMethod(savedMethod);
-    }
-  }, []);
+  // New state for preview workflow
+  const [processedImage, setProcessedImage] =
+    useState<ProcessedImageData | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Always call the hook but only use values when enablePreview is true
+  const galleryHook = useGalleryImageProcessing();
+
+  // Always destructure the hook values to maintain consistent execution
+  const {
+    previewProcessImage: galleryPreviewProcessImage,
+    replaceImageInGallery: galleryReplaceImageInGallery,
+    isProcessing: isGalleryProcessing,
+    isReplacing: galleryIsReplacing,
+  } = galleryHook;
+
+  // Conditionally use the values based on enablePreview
+  const previewProcessImage = enablePreview
+    ? galleryPreviewProcessImage
+    : undefined;
+  const replaceImageInGallery = enablePreview
+    ? galleryReplaceImageInGallery
+    : undefined;
+  const isReplacing = enablePreview ? galleryIsReplacing : false;
 
   // Helper function to build enhanced Cloudflare URL
   const getEnhancedImageUrl = (
@@ -147,12 +193,31 @@ export function CanvasExtensionModal({
         return urlParts.join("/");
       } else {
         // URL doesn't have a variant, append transformations
+        // This handles cases where database URLs are missing /public suffix
         return `${baseUrl}/${params.join(",")}`;
       }
     }
 
     // Fallback for other URL formats - try to replace /public if it exists
     return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
+  };
+
+  // Helper function to get original processing URL (without enhancements) for gallery workflow
+  const getProcessingImageUrl = (baseUrl: string) => {
+    if (baseUrl.includes("imagedelivery.net")) {
+      // For Cloudflare URLs, use the base URL without any suffix
+      const urlParts = baseUrl.split("/");
+      // Remove any existing variant (like w=2000,q=100 or public)
+      if (
+        urlParts[urlParts.length - 1].includes("=") ||
+        urlParts[urlParts.length - 1] === "public"
+      ) {
+        urlParts.pop();
+      }
+      return urlParts.join("/");
+    }
+    // For other URLs, try to remove any suffix
+    return baseUrl.replace(/\/[^\/]*$/, "");
   };
 
   // Memoize the enhanced image URL to prevent useEffect dependency array changes
@@ -332,6 +397,25 @@ export function CanvasExtensionModal({
     }
   }, [highResImageUrl]);
 
+  // New effects for preview workflow
+  // Load processed image dimensions when processed image changes (preview workflow)
+  useEffect(() => {
+    if (!api) return; // Add conditional check inside async function
+    if (processedImage?.url) {
+      const img = new window.Image();
+      img.onload = () => {
+        setProcessedDimensions({
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        });
+      };
+      img.src = processedImage.url;
+    } else if (!enablePreview) {
+      // For direct processing, keep existing behavior
+      setProcessedDimensions(null);
+    }
+  }, [processedImage?.url, api, enablePreview]);
+
   // Authentication check after ALL hooks are declared
   if (!api) {
     return (
@@ -345,12 +429,6 @@ export function CanvasExtensionModal({
       </Dialog>
     );
   }
-
-  // Save processing method preference to localStorage
-  const handleProcessingMethodChange = (method: ProcessingMethod) => {
-    setProcessingMethod(method);
-    localStorage.setItem("canvasExtensionMethod", method);
-  };
 
   // Get the current enhanced image URL for display
   const currentImageUrl = useTestImage ? testImageUrl : enhancedImageUrl;
@@ -368,7 +446,6 @@ export function CanvasExtensionModal({
         desiredHeight: parseInt(desiredHeight),
         paddingPct: parseFloat(paddingPct),
         whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
-        processingMethod: processingMethod,
         uploadToCloudflare: false,
         originalFilename: image.filename,
       })) as ExtendCanvasResponse;
@@ -602,6 +679,103 @@ export function CanvasExtensionModal({
     }
   };
 
+  // New handlers for preview workflow
+  const handlePreview = async () => {
+    if (!api) return; // Add conditional check inside async function
+    if (!image || !enhancedImageUrl) return;
+    if (!enablePreview || !galleryId || !previewProcessImage) return;
+
+    // Use original processing URL for API calls, not enhanced URL
+    const processingImageUrl = getProcessingImageUrl(image.url);
+
+    console.log("📐 Canvas Extension processing starting:", {
+      originalUrl: image.url,
+      enhancedUrl: enhancedImageUrl.substring(0, 100) + "...",
+      processingUrl: processingImageUrl,
+      urlTransformation: {
+        from: image.url,
+        to: processingImageUrl,
+        isCloudflare: image.url.includes("imagedelivery.net"),
+      },
+      parameters: {
+        desiredHeight: parseInt(desiredHeight),
+        paddingPct: parseFloat(paddingPct),
+        whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+      },
+    });
+
+    const parameters = {
+      imageUrl: processingImageUrl,
+      desiredHeight: parseInt(desiredHeight),
+      paddingPct: parseFloat(paddingPct),
+      whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+    };
+
+    const result = await previewProcessImage({
+      galleryId,
+      imageId: image._id,
+      processingType: "canvas-extension",
+      parameters,
+    });
+
+    if (result) {
+      console.log("✅ Canvas Extension processing completed successfully");
+      setProcessedImage(result.processedImage);
+      setShowPreview(true);
+    } else {
+      console.error(
+        "❌ Canvas Extension processing failed - no result returned"
+      );
+    }
+  };
+
+  const handleReplaceImage = async () => {
+    if (!api) return; // Add conditional check inside async function
+    if (!image || !processedImage) return;
+    if (
+      !enablePreview ||
+      !galleryId ||
+      !replaceImageInGallery ||
+      !onImageReplaced
+    )
+      return;
+
+    // Use original processing URL for API calls, not enhanced URL
+    const processingImageUrl = getProcessingImageUrl(image.url);
+
+    console.log("🔄 Canvas Extension replacement starting:", {
+      originalUrl: image.url,
+      processingUrl: processingImageUrl,
+    });
+
+    const parameters = {
+      imageUrl: processingImageUrl,
+      desiredHeight: parseInt(desiredHeight),
+      paddingPct: parseFloat(paddingPct),
+      whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+    };
+
+    const result = await replaceImageInGallery(
+      galleryId,
+      image._id,
+      "canvas-extension",
+      parameters
+    );
+
+    if (result && onImageReplaced) {
+      console.log("✅ Canvas Extension replacement completed successfully");
+      onImageReplaced(result.originalImageId, result.processedImage);
+      handleClose();
+    } else {
+      console.error("❌ Canvas Extension replacement failed");
+    }
+  };
+
+  const handleDiscardPreview = () => {
+    setProcessedImage(null);
+    setShowPreview(false);
+  };
+
   const handleReset = () => {
     setProcessedImageUrl(null);
     setProcessedDimensions(null);
@@ -617,6 +791,9 @@ export function CanvasExtensionModal({
     setImageLoadError(false);
     setProcessedImageLoadError(false);
     setUseTestImage(false);
+    // Reset preview workflow state
+    setProcessedImage(null);
+    setShowPreview(false);
   };
 
   const handleClose = () => {
@@ -730,49 +907,20 @@ export function CanvasExtensionModal({
                 </div>
               </div>
 
-              {/* Processing Method Settings */}
-              <div className="p-3 border rounded-lg bg-muted/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <Settings className="h-4 w-4" />
-                  <Label className="text-sm font-medium">
-                    Processing Method
-                  </Label>
+              {/* Desired Height */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="desiredHeight">Desired Height (pixels)</Label>
+                  <Input
+                    id="desiredHeight"
+                    type="number"
+                    value={desiredHeight}
+                    onChange={(e) => setDesiredHeight(e.target.value)}
+                    placeholder="1200"
+                    min="100"
+                    max="5000"
+                  />
                 </div>
-                <Select
-                  value={processingMethod}
-                  onValueChange={handleProcessingMethodChange}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select processing method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cloud">
-                      <div className="flex items-center gap-2">
-                        <Cloud className="h-4 w-4" />
-                        <span>Cloud Run</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="local">
-                      <div className="flex items-center gap-2">
-                        <Monitor className="h-4 w-4" />
-                        <span>Local Binary</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="desiredHeight">Desired Height (pixels)</Label>
-                <Input
-                  id="desiredHeight"
-                  type="number"
-                  value={desiredHeight}
-                  onChange={(e) => setDesiredHeight(e.target.value)}
-                  placeholder="1200"
-                  min="100"
-                  max="5000"
-                />
 
                 {/* Aspect Ratio Preset Buttons */}
                 {originalDimensions && (
@@ -879,147 +1027,207 @@ export function CanvasExtensionModal({
               </div>
 
               <Button
-                onClick={handleProcess}
-                disabled={isProcessing || !image}
+                onClick={enablePreview ? handlePreview : handleProcess}
+                disabled={
+                  (enablePreview ? isGalleryProcessing : isProcessing) || !image
+                }
                 variant="outline"
                 className="w-full"
               >
-                {isProcessing ? (
+                {(enablePreview ? isGalleryProcessing : isProcessing) ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
+                    {enablePreview ? "Generating Preview..." : "Processing..."}
                   </>
+                ) : enablePreview ? (
+                  "Generate Preview"
                 ) : (
                   "Process Image"
                 )}
               </Button>
 
-              {/* Cloudflare Upload Status */}
-              {cloudflareResult && (
-                <div
-                  className={`p-3 rounded-lg border ${
-                    cloudflareResult.success
-                      ? "bg-green-500/10 border-green-500/20 dark:bg-green-500/10 dark:border-green-500/20"
-                      : "bg-red-500/10 border-red-500/20 dark:bg-red-500/10 dark:border-red-500/20"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {cloudflareResult.success ? (
-                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    )}
-                    <span
-                      className={`text-sm font-medium ${
-                        cloudflareResult.success
-                          ? "text-green-700 dark:text-green-300"
-                          : "text-red-700 dark:text-red-300"
-                      }`}
-                    >
-                      {cloudflareResult.success
-                        ? "Uploaded to Cloudflare"
-                        : "Upload Failed"}
-                    </span>
+              {/* Preview workflow results */}
+              {enablePreview && showPreview && processedImage && (
+                <div className="space-y-2">
+                  <div className="p-3 rounded-lg border bg-blue-500/10 border-blue-500/20">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-medium text-blue-700">
+                        Preview Generated
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-600/80 mt-1">
+                      Preview the result on the right, then choose to replace or
+                      discard
+                    </p>
                   </div>
-                  {cloudflareResult.success && cloudflareResult.filename && (
-                    <p className="text-xs text-green-600/80 dark:text-green-400/80 mt-1">
-                      Saved as: {cloudflareResult.filename}
-                    </p>
-                  )}
-                  {!cloudflareResult.success && cloudflareResult.error && (
-                    <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1">
-                      Error: {cloudflareResult.error}
-                    </p>
-                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      onClick={handleReplaceImage}
+                      disabled={isReplacing}
+                      variant="default"
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {isReplacing ? (
+                        <>
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          Replacing...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="mr-1 h-3 w-3" />
+                          Replace
+                        </>
+                      )}
+                    </Button>
+
+                    <Button
+                      onClick={handleDiscardPreview}
+                      disabled={isReplacing}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <X className="mr-1 h-3 w-3" />
+                      Discard
+                    </Button>
+                  </div>
                 </div>
               )}
 
-              {processedImageUrl && (
-                <div className="space-y-2">
-                  {/* High-Resolution Processing Section */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      onClick={() => handleHighResProcess(2)}
-                      disabled={isProcessingHighRes}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
+              {/* Direct processing workflow results */}
+              {!enablePreview && (
+                <>
+                  {/* Cloudflare Upload Status */}
+                  {cloudflareResult && (
+                    <div
+                      className={`p-3 rounded-lg border ${
+                        cloudflareResult.success
+                          ? "bg-green-500/10 border-green-500/20 dark:bg-green-500/10 dark:border-green-500/20"
+                          : "bg-red-500/10 border-red-500/20 dark:bg-red-500/10 dark:border-red-500/20"
+                      }`}
                     >
-                      {isProcessingHighRes && highResMultiplier === 2 ? (
-                        <>
-                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                          2x...
-                        </>
-                      ) : (
-                        "Generate 2x"
-                      )}
-                    </Button>
-
-                    <Button
-                      onClick={() => handleHighResProcess(4)}
-                      disabled={isProcessingHighRes}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                    >
-                      {isProcessingHighRes && highResMultiplier === 4 ? (
-                        <>
-                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                          4x...
-                        </>
-                      ) : (
-                        "Generate 4x"
-                      )}
-                    </Button>
-                  </div>
-
-                  {!cloudflareResult?.success && (
-                    <>
-                      {image?.carId && (
-                        <p className="text-xs text-muted-foreground text-center">
-                          Processed image will be associated with this car
+                      <div className="flex items-center gap-2">
+                        {cloudflareResult.success ? (
+                          <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                        )}
+                        <span
+                          className={`text-sm font-medium ${
+                            cloudflareResult.success
+                              ? "text-green-700 dark:text-green-300"
+                              : "text-red-700 dark:text-red-300"
+                          }`}
+                        >
+                          {cloudflareResult.success
+                            ? "Uploaded to Cloudflare"
+                            : "Upload Failed"}
+                        </span>
+                      </div>
+                      {cloudflareResult.success &&
+                        cloudflareResult.filename && (
+                          <p className="text-xs text-green-600/80 dark:text-green-400/80 mt-1">
+                            Saved as: {cloudflareResult.filename}
+                          </p>
+                        )}
+                      {!cloudflareResult.success && cloudflareResult.error && (
+                        <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1">
+                          Error: {cloudflareResult.error}
                         </p>
                       )}
+                    </div>
+                  )}
+
+                  {processedImageUrl && (
+                    <div className="space-y-2">
+                      {/* High-Resolution Processing Section */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          onClick={() => handleHighResProcess(2)}
+                          disabled={isProcessingHighRes}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                        >
+                          {isProcessingHighRes && highResMultiplier === 2 ? (
+                            <>
+                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                              2x...
+                            </>
+                          ) : (
+                            "Generate 2x"
+                          )}
+                        </Button>
+
+                        <Button
+                          onClick={() => handleHighResProcess(4)}
+                          disabled={isProcessingHighRes}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                        >
+                          {isProcessingHighRes && highResMultiplier === 4 ? (
+                            <>
+                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                              4x...
+                            </>
+                          ) : (
+                            "Generate 4x"
+                          )}
+                        </Button>
+                      </div>
+
+                      {!cloudflareResult?.success && (
+                        <>
+                          {image?.carId && (
+                            <p className="text-xs text-muted-foreground text-center">
+                              Processed image will be associated with this car
+                            </p>
+                          )}
+                          <Button
+                            onClick={handleUploadToCloudflare}
+                            disabled={isUploading}
+                            variant="outline"
+                            className="w-full"
+                          >
+                            {isUploading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="mr-2 h-4 w-4" />
+                                Upload to Cloudflare
+                              </>
+                            )}
+                          </Button>
+                        </>
+                      )}
+
+                      {cloudflareResult?.success && (
+                        <Button
+                          onClick={handleViewInGallery}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          View in Gallery
+                        </Button>
+                      )}
+
                       <Button
-                        onClick={handleUploadToCloudflare}
-                        disabled={isUploading}
+                        onClick={handleReset}
                         variant="outline"
                         className="w-full"
                       >
-                        {isUploading ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Uploading...
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="mr-2 h-4 w-4" />
-                            Upload to Cloudflare
-                          </>
-                        )}
+                        Reset
                       </Button>
-                    </>
+                    </div>
                   )}
-
-                  {cloudflareResult?.success && (
-                    <Button
-                      onClick={handleViewInGallery}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      View in Gallery
-                    </Button>
-                  )}
-
-                  <Button
-                    onClick={handleReset}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    Reset
-                  </Button>
-                </div>
+                </>
               )}
             </div>
           </div>
@@ -1170,9 +1378,11 @@ export function CanvasExtensionModal({
             <div>
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">
-                  {highResImageUrl
-                    ? `High-Res Image (${highResMultiplier}x)`
-                    : "Processed Image"}
+                  {enablePreview && showPreview && processedImage
+                    ? "Preview Result"
+                    : highResImageUrl
+                      ? `High-Res Image (${highResMultiplier}x)`
+                      : "Processed Image"}
                 </Label>
                 {(highResDimensions || processedDimensions) && (
                   <span className="text-xs text-muted-foreground">
@@ -1185,15 +1395,23 @@ export function CanvasExtensionModal({
                 )}
               </div>
               <div className="mt-2 border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
-                {highResImageUrl || processedImageUrl ? (
+                {/* Display logic for both workflows */}
+                {(enablePreview && processedImage?.url) ||
+                (!enablePreview && (highResImageUrl || processedImageUrl)) ? (
                   <div className="relative max-w-full max-h-[600px]">
                     {!processedImageLoadError ? (
                       <Image
-                        src={(highResImageUrl || processedImageUrl)!}
+                        src={
+                          enablePreview && processedImage?.url
+                            ? processedImage.url
+                            : (highResImageUrl || processedImageUrl)!
+                        }
                         alt={
-                          highResImageUrl
-                            ? "High-resolution processed image"
-                            : "Processed image"
+                          enablePreview && processedImage?.url
+                            ? "Preview result"
+                            : highResImageUrl
+                              ? "High-resolution processed image"
+                              : "Processed image"
                         }
                         width={0}
                         height={0}
@@ -1201,20 +1419,29 @@ export function CanvasExtensionModal({
                         className="w-auto h-auto max-w-full max-h-[600px] object-contain"
                         style={{ width: "auto", height: "auto" }}
                         onError={(e) => {
-                          const src = (highResImageUrl || processedImageUrl)!;
+                          const src =
+                            enablePreview && processedImage?.url
+                              ? processedImage.url
+                              : (highResImageUrl || processedImageUrl)!;
                           console.error("Processed image failed to load:", {
                             src: src,
                             isHighRes: !!highResImageUrl,
+                            isPreview: enablePreview && !!processedImage?.url,
                             error: e,
                           });
                           setProcessedImageLoadError(true);
                         }}
                         onLoad={(e) => {
+                          const src =
+                            enablePreview && processedImage?.url
+                              ? processedImage.url
+                              : (highResImageUrl || processedImageUrl)!;
                           console.log("Processed image loaded successfully:", {
-                            src: (highResImageUrl || processedImageUrl)!,
+                            src: src,
                             naturalWidth: e.currentTarget.naturalWidth,
                             naturalHeight: e.currentTarget.naturalHeight,
                             isHighRes: !!highResImageUrl,
+                            isPreview: enablePreview && !!processedImage?.url,
                           });
                           setProcessedImageLoadError(false);
                         }}
@@ -1222,11 +1449,17 @@ export function CanvasExtensionModal({
                       />
                     ) : (
                       <img
-                        src={(highResImageUrl || processedImageUrl)!}
+                        src={
+                          enablePreview && processedImage?.url
+                            ? processedImage.url
+                            : (highResImageUrl || processedImageUrl)!
+                        }
                         alt={
-                          highResImageUrl
-                            ? "High-resolution processed image"
-                            : "Processed image"
+                          enablePreview && processedImage?.url
+                            ? "Preview result"
+                            : highResImageUrl
+                              ? "High-resolution processed image"
+                              : "Processed image"
                         }
                         className="w-auto h-auto max-w-full max-h-[600px] object-contain"
                         style={{ width: "auto", height: "auto" }}
@@ -1234,22 +1467,8 @@ export function CanvasExtensionModal({
                           console.error("🚨 FALLBACK IMG TAG ERROR ANALYSIS:", {
                             errorType: "HTML img tag fallback",
                             attemptedSrc: e.currentTarget.src,
-                            imageObject: image,
+                            isPreview: enablePreview,
                             originalSrc: image?.url,
-                            currentImageUrl,
-                            fallbackAttempted: true,
-                            urlValidation: {
-                              isString: typeof e.currentTarget.src === "string",
-                              isNotEmpty:
-                                !!e.currentTarget.src &&
-                                e.currentTarget.src.length > 0,
-                              startsWithHttp:
-                                e.currentTarget.src?.startsWith("http"),
-                              containsImageDelivery:
-                                e.currentTarget.src?.includes(
-                                  "imagedelivery.net"
-                                ),
-                            },
                           });
                         }}
                         onLoad={(e) => {
@@ -1258,14 +1477,21 @@ export function CanvasExtensionModal({
                             naturalWidth: e.currentTarget.naturalWidth,
                             naturalHeight: e.currentTarget.naturalHeight,
                             fallbackWorked: true,
-                            imageObject: image,
+                            isPreview: enablePreview,
                           });
                         }}
                       />
                     )}
-                    {highResImageUrl && (
+                    {/* High-res indicator - only for direct processing workflow */}
+                    {!enablePreview && highResImageUrl && (
                       <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
                         {highResMultiplier}x High-Res
+                      </div>
+                    )}
+                    {/* Preview indicator - only for preview workflow */}
+                    {enablePreview && showPreview && processedImage && (
+                      <div className="absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium">
+                        Preview
                       </div>
                     )}
                   </div>
@@ -1274,15 +1500,17 @@ export function CanvasExtensionModal({
                     <div className="text-center">
                       <Eye className="h-8 w-8 mx-auto mb-2" />
                       <p className="text-sm">
-                        Processed image will appear here
+                        {enablePreview
+                          ? "Preview will appear here"
+                          : "Processed image will appear here"}
                       </p>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Toggle between processed and high-res images */}
-              {processedImageUrl && (
+              {/* Toggle between processed and high-res images - only for direct processing */}
+              {!enablePreview && processedImageUrl && (
                 <div className="flex gap-2 mt-2">
                   {highResImageUrl ? (
                     <>

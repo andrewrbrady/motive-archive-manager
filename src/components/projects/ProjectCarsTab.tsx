@@ -29,7 +29,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { CarGridSelector } from "../cars/CarGridSelector";
 import { useAPI } from "@/hooks/useAPI";
 
@@ -91,7 +91,7 @@ function ProjectCarCard({
 
         setPrimaryImage({
           id: imageToUse._id,
-          url: getFormattedImageUrl(imageToUse.url),
+          url: fixCloudflareImageUrl(imageToUse.url),
         });
 
         setLoading(false);
@@ -108,7 +108,7 @@ function ProjectCarCard({
             )) as any;
             setPrimaryImage({
               id: imageData._id,
-              url: getFormattedImageUrl(imageData.url),
+              url: fixCloudflareImageUrl(imageData.url),
             });
           } catch (error) {
             // If primary image fetch fails, try the first image
@@ -123,7 +123,7 @@ function ProjectCarCard({
                 )) as any;
                 setPrimaryImage({
                   id: fallbackImageData._id,
-                  url: getFormattedImageUrl(fallbackImageData.url),
+                  url: fixCloudflareImageUrl(fallbackImageData.url),
                 });
               } catch (fallbackError) {
                 console.error("Error fetching fallback image:", fallbackError);

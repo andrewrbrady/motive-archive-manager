@@ -17,11 +17,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { Plus } from "lucide-react";
 import toast from "react-hot-toast";
-import { Platform, DeliverableType } from "@/types/deliverable";
+import {
+  Platform,
+  DeliverableType,
+  DeliverablePlatform,
+} from "@/types/deliverable";
 import { FirestoreUser } from "@/types/firebase";
 import { useAPI } from "@/hooks/useAPI";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
 
 interface Car {
   _id: string;
@@ -43,7 +49,12 @@ export default function NewDeliverableForm({
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState("");
-  const [platform, setPlatform] = useState<Platform>();
+  const [selectedPlatforms, setSelectedPlatforms] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [availablePlatforms, setAvailablePlatforms] = useState<
+    DeliverablePlatform[]
+  >([]);
   const [type, setType] = useState<DeliverableType>();
   const [duration, setDuration] = useState(0);
   const [aspectRatio, setAspectRatio] = useState("");
@@ -64,6 +75,23 @@ export default function NewDeliverableForm({
   const isAnySelectOpen = Object.values(openSelects).some(Boolean);
 
   useEffect(() => {
+    const fetchPlatforms = async () => {
+      if (!api) {
+        console.log("API client not available for fetching platforms");
+        return;
+      }
+
+      try {
+        const response = await api.get("platforms");
+        const data = response as DeliverablePlatform[];
+        console.log("NewDeliverableForm: Fetched platforms:", data);
+        setAvailablePlatforms(data);
+      } catch (error) {
+        console.error("Error fetching platforms:", error);
+        toast.error("Failed to fetch platforms");
+      }
+    };
+
     const fetchUsers = async () => {
       if (!api) {
         console.log("API client not available for fetching users");
@@ -71,26 +99,20 @@ export default function NewDeliverableForm({
       }
 
       try {
-        // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Starting to fetch users...");
-        const response = await api.get("users");
+        // Use the new editors endpoint that doesn't require admin access
+        const response = await api.get("users/editors");
         const data = response as any;
 
-        // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Raw API response:", data);
-        // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Data is array:", Array.isArray(data));
+        console.log("NewDeliverableForm: Raw API response:", data);
+        console.log("NewDeliverableForm: Data is array:", Array.isArray(data));
 
-        // Handle the correct API response structure: { users: [...], total: number }
-        if (data.users && Array.isArray(data.users)) {
-          const activeUsers = data.users.filter(
-            (user: FirestoreUser) => user.status === "active"
-          );
-          // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Active users:", activeUsers.length);
-          // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Sample user:", activeUsers[0]);
-          setUsers(activeUsers);
-        } else if (Array.isArray(data)) {
-          // Fallback for legacy API responses that return array directly
+        if (Array.isArray(data)) {
+          // Filter to only active users
           const activeUsers = data.filter(
             (user: FirestoreUser) => user.status === "active"
           );
+          console.log("NewDeliverableForm: Active users:", activeUsers.length);
+          console.log("NewDeliverableForm: Sample user:", activeUsers[0]);
           setUsers(activeUsers);
         } else {
           console.error("Unexpected API response structure:", data);
@@ -102,7 +124,10 @@ export default function NewDeliverableForm({
       }
     };
 
-    // Only fetch users if we don't already have them
+    // Only fetch platforms and users if we don't already have them
+    if (availablePlatforms.length === 0 && api) {
+      fetchPlatforms();
+    }
     if (users.length === 0 && api) {
       fetchUsers();
     }
@@ -128,7 +153,7 @@ export default function NewDeliverableForm({
 
   const resetForm = () => {
     setTitle("");
-    setPlatform(undefined);
+    setSelectedPlatforms([]);
     setType(undefined);
     setDuration(0);
     setAspectRatio("");
@@ -146,7 +171,7 @@ export default function NewDeliverableForm({
     e.preventDefault();
     if (
       !title ||
-      !platform ||
+      selectedPlatforms.length === 0 ||
       !type ||
       !editor ||
       !editDeadline ||
@@ -179,7 +204,7 @@ export default function NewDeliverableForm({
 
       const requestBody: any = {
         title,
-        platform,
+        platforms: selectedPlatforms.map((p) => p.value), // Send array of platform IDs
         type,
         duration,
         aspect_ratio: aspectRatio,
@@ -299,47 +324,16 @@ export default function NewDeliverableForm({
                     >
                       Platform
                     </label>
-                    <Select
-                      value={platform || ""}
-                      onValueChange={(value) => setPlatform(value as Platform)}
-                      open={openSelects["platform"]}
-                      onOpenChange={(open) =>
-                        handleSelectOpenChange("platform", open)
-                      }
-                    >
-                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                        <SelectValue placeholder="Select platform" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem
-                          key="instagram-reels"
-                          value="Instagram Reels"
-                        >
-                          Instagram Reels
-                        </SelectItem>
-                        <SelectItem key="youtube" value="YouTube">
-                          YouTube
-                        </SelectItem>
-                        <SelectItem key="youtube-shorts" value="YouTube Shorts">
-                          YouTube Shorts
-                        </SelectItem>
-                        <SelectItem key="tiktok" value="TikTok">
-                          TikTok
-                        </SelectItem>
-                        <SelectItem key="facebook" value="Facebook">
-                          Facebook
-                        </SelectItem>
-                        <SelectItem
-                          key="bring-a-trailer"
-                          value="Bring a Trailer"
-                        >
-                          Bring a Trailer
-                        </SelectItem>
-                        <SelectItem key="other" value="Other">
-                          Other
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      value={selectedPlatforms}
+                      onChange={(values) => setSelectedPlatforms(values)}
+                      options={availablePlatforms.map((p) => ({
+                        label: p.name,
+                        value: p._id,
+                      }))}
+                      placeholder="Select platforms"
+                      className="text-sm"
+                    />
                   </div>
 
                   <div className="space-y-1.5">
@@ -409,8 +403,11 @@ export default function NewDeliverableForm({
                     <Input
                       id="duration"
                       type="number"
-                      value={duration}
-                      onChange={(e) => setDuration(parseInt(e.target.value))}
+                      value={isNaN(duration) ? "" : duration.toString()}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        setDuration(isNaN(value) ? 0 : value);
+                      }}
                       min={0}
                       required
                       className="text-sm"
@@ -502,12 +499,9 @@ export default function NewDeliverableForm({
                     >
                       Edit Deadline
                     </label>
-                    <Input
-                      id="editDeadline"
-                      type="date"
+                    <DateTimePicker
                       value={editDeadline}
-                      onChange={(e) => setEditDeadline(e.target.value)}
-                      required
+                      onChange={(value) => setEditDeadline(value)}
                       className="text-sm"
                     />
                   </div>
@@ -519,12 +513,9 @@ export default function NewDeliverableForm({
                     >
                       Release Date
                     </label>
-                    <Input
-                      id="releaseDate"
-                      type="date"
+                    <DateTimePicker
                       value={releaseDate}
-                      onChange={(e) => setReleaseDate(e.target.value)}
-                      required
+                      onChange={(value) => setReleaseDate(value)}
                       className="text-sm"
                     />
                   </div>

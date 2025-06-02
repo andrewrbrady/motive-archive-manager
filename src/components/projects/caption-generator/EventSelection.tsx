@@ -36,7 +36,22 @@ export function EventSelection({
   }
 
   if (projectEvents.length === 0) {
-    return null; // Don't show anything if no events
+    return (
+      <div className="space-y-3 p-4 rounded-lg bg-[var(--background-secondary)] border border-[hsl(var(--border-subtle))]">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white">
+            Select Events for Caption
+          </h3>
+        </div>
+        <div className="text-center py-6 text-[hsl(var(--foreground-muted))]">
+          <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">No events available for this car</p>
+          <p className="text-xs mt-1">
+            Events will appear here when added to the car
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (

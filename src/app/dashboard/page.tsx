@@ -25,6 +25,7 @@ import {
 import Link from "next/link";
 import { Calendar, Clock } from "lucide-react";
 import { ExternalLink } from "lucide-react";
+import { PlatformBadges } from "@/components/deliverables/PlatformBadges";
 
 interface DeliverableResponse {
   deliverables: (Deliverable & { car?: Car })[];
@@ -310,19 +311,16 @@ function DashboardInner() {
                           <Table>
                             <TableHeader>
                               <TableRow className="hover:bg-transparent">
-                                <TableHead className="w-[30%] py-1.5 pl-6 pr-2 text-xs font-medium">
+                                <TableHead className="w-[35%] py-1.5 pl-6 pr-2 text-xs font-medium">
                                   Title
                                 </TableHead>
-                                <TableHead className="w-[20%] py-1.5 px-2 text-xs font-medium">
+                                <TableHead className="w-[30%] py-1.5 px-2 text-xs font-medium">
                                   Platform
                                 </TableHead>
-                                <TableHead className="w-[15%] py-1.5 px-2 text-xs font-medium">
-                                  Type
-                                </TableHead>
-                                <TableHead className="w-[15%] py-1.5 px-2 text-xs font-medium whitespace-nowrap">
+                                <TableHead className="w-[20%] py-1.5 px-2 text-xs font-medium whitespace-nowrap">
                                   Deadline
                                 </TableHead>
-                                <TableHead className="w-[20%] py-1.5 pl-2 pr-3 text-right text-xs font-medium">
+                                <TableHead className="w-[15%] py-1.5 pl-2 pr-3 text-right text-xs font-medium">
                                   Status
                                 </TableHead>
                               </TableRow>
@@ -333,25 +331,23 @@ function DashboardInner() {
                                   key={deliverable._id?.toString()}
                                   className="hover:bg-muted/50"
                                 >
-                                  <TableCell className="w-[30%] py-1.5 pl-6 pr-2 text-xs font-medium">
+                                  <TableCell className="w-[35%] py-1.5 pl-6 pr-2 text-xs font-medium">
                                     {deliverable.title}
                                   </TableCell>
-                                  <TableCell className="w-[20%] py-1.5 px-2 text-xs">
-                                    {deliverable.platform}
+                                  <TableCell className="w-[30%] py-1.5 px-2 text-xs">
+                                    <PlatformBadges
+                                      platform={deliverable.platform}
+                                      platforms={deliverable.platforms}
+                                      maxVisible={2}
+                                      size="sm"
+                                    />
                                   </TableCell>
-                                  <TableCell className="w-[15%] py-1.5 px-2 text-xs whitespace-nowrap">
-                                    {deliverable.type}
-                                    {deliverable.duration &&
-                                      ` • ${deliverable.duration}s`}
-                                    {deliverable.aspect_ratio &&
-                                      ` • ${deliverable.aspect_ratio}`}
-                                  </TableCell>
-                                  <TableCell className="w-[15%] py-1.5 px-2 text-xs whitespace-nowrap">
+                                  <TableCell className="w-[20%] py-1.5 px-2 text-xs whitespace-nowrap">
                                     {new Date(
                                       deliverable.edit_deadline
                                     ).toLocaleDateString()}
                                   </TableCell>
-                                  <TableCell className="w-[20%] py-1.5 pl-2 pr-3 text-right">
+                                  <TableCell className="w-[15%] py-1.5 pl-2 pr-3 text-right">
                                     <StatusSelector
                                       deliverableId={
                                         deliverable._id?.toString() || ""
@@ -384,9 +380,17 @@ function DashboardInner() {
                                   <p className="text-xs font-medium truncate">
                                     {deliverable.title}
                                   </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {deliverable.platform} • {deliverable.type}
-                                  </p>
+                                  <div className="text-xs text-muted-foreground">
+                                    <PlatformBadges
+                                      platform={deliverable.platform}
+                                      platforms={deliverable.platforms}
+                                      maxVisible={2}
+                                      size="sm"
+                                    />
+                                    <span className="ml-2">
+                                      • {deliverable.type}
+                                    </span>
+                                  </div>
                                 </div>
                                 <div className="flex items-center gap-1">
                                   {deliverable.dropbox_link && (
@@ -496,19 +500,16 @@ function DashboardInner() {
                           <Table>
                             <TableHeader>
                               <TableRow className="hover:bg-transparent">
-                                <TableHead className="w-[30%] py-1.5 pl-6 pr-2 text-xs font-medium">
+                                <TableHead className="w-[35%] py-1.5 pl-6 pr-2 text-xs font-medium">
                                   Title
                                 </TableHead>
-                                <TableHead className="w-[20%] py-1.5 px-2 text-xs font-medium">
+                                <TableHead className="w-[30%] py-1.5 px-2 text-xs font-medium">
                                   Platform
                                 </TableHead>
-                                <TableHead className="w-[15%] py-1.5 px-2 text-xs font-medium">
-                                  Type
-                                </TableHead>
-                                <TableHead className="w-[15%] py-1.5 px-2 text-xs font-medium whitespace-nowrap">
+                                <TableHead className="w-[20%] py-1.5 px-2 text-xs font-medium whitespace-nowrap">
                                   Deadline
                                 </TableHead>
-                                <TableHead className="w-[20%] py-1.5 pl-2 pr-3 text-right text-xs font-medium">
+                                <TableHead className="w-[15%] py-1.5 pl-2 pr-3 text-right text-xs font-medium">
                                   Status
                                 </TableHead>
                               </TableRow>
@@ -519,25 +520,23 @@ function DashboardInner() {
                                   key={deliverable._id?.toString()}
                                   className="hover:bg-muted/50"
                                 >
-                                  <TableCell className="w-[30%] py-1.5 pl-6 pr-2 text-xs font-medium">
+                                  <TableCell className="w-[35%] py-1.5 pl-6 pr-2 text-xs font-medium">
                                     {deliverable.title}
                                   </TableCell>
-                                  <TableCell className="w-[20%] py-1.5 px-2 text-xs">
-                                    {deliverable.platform}
+                                  <TableCell className="w-[30%] py-1.5 px-2 text-xs">
+                                    <PlatformBadges
+                                      platform={deliverable.platform}
+                                      platforms={deliverable.platforms}
+                                      maxVisible={2}
+                                      size="sm"
+                                    />
                                   </TableCell>
-                                  <TableCell className="w-[15%] py-1.5 px-2 text-xs whitespace-nowrap">
-                                    {deliverable.type}
-                                    {deliverable.duration &&
-                                      ` • ${deliverable.duration}s`}
-                                    {deliverable.aspect_ratio &&
-                                      ` • ${deliverable.aspect_ratio}`}
-                                  </TableCell>
-                                  <TableCell className="w-[15%] py-1.5 px-2 text-xs whitespace-nowrap">
+                                  <TableCell className="w-[20%] py-1.5 px-2 text-xs whitespace-nowrap">
                                     {new Date(
                                       deliverable.edit_deadline
                                     ).toLocaleDateString()}
                                   </TableCell>
-                                  <TableCell className="w-[20%] py-1.5 pl-2 pr-3 text-right">
+                                  <TableCell className="w-[15%] py-1.5 pl-2 pr-3 text-right">
                                     <StatusSelector
                                       deliverableId={
                                         deliverable._id?.toString() || ""
@@ -570,9 +569,17 @@ function DashboardInner() {
                                   <p className="text-xs font-medium truncate">
                                     {deliverable.title}
                                   </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {deliverable.platform} • {deliverable.type}
-                                  </p>
+                                  <div className="text-xs text-muted-foreground">
+                                    <PlatformBadges
+                                      platform={deliverable.platform}
+                                      platforms={deliverable.platforms}
+                                      maxVisible={2}
+                                      size="sm"
+                                    />
+                                    <span className="ml-2">
+                                      • {deliverable.type}
+                                    </span>
+                                  </div>
                                 </div>
                                 <div className="flex items-center gap-1">
                                   {deliverable.dropbox_link && (

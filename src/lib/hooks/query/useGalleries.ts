@@ -8,6 +8,7 @@ export interface Gallery {
   name: string;
   description?: string;
   imageIds: string[];
+  primaryImageId?: string;
   orderedImages?: {
     id: string;
     order: number;

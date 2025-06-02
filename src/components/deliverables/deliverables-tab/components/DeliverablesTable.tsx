@@ -15,6 +15,7 @@ import { safeFormat, formatDeliverableDuration } from "../utils";
 import { StatusSelector } from "../../StatusSelector";
 import YouTubeUploadHelper from "../../YouTubeUploadHelper";
 import EditDeliverableForm from "../../EditDeliverableForm";
+import { PlatformBadges } from "../../PlatformBadges";
 
 interface DeliverablesTableProps {
   deliverables: Deliverable[];
@@ -80,7 +81,7 @@ export default function DeliverablesTable({
   };
 
   const getColumnCount = () => {
-    let count = 9; // Base columns
+    let count = 8; // Base columns (reduced from 9 due to Type column removal)
     if (isBatchMode) count += 1; // Checkbox column
     if (showCarColumn) count += 1; // Car column
     return count;
@@ -115,28 +116,25 @@ export default function DeliverablesTable({
                 Car
               </TableHead>
             )}
-            <TableHead className="w-[15%] px-2 py-1.5 text-xs font-medium">
+            <TableHead className="w-[24%] px-2 py-1.5 text-xs font-medium">
               Platform
             </TableHead>
             <TableHead className="w-[10%] px-2 py-1.5 text-xs font-medium">
-              Type
-            </TableHead>
-            <TableHead className="w-[8%] px-2 py-1.5 text-xs font-medium">
               Status
             </TableHead>
-            <TableHead className="w-[6%] px-2 py-1.5 text-xs font-medium">
+            <TableHead className="w-[8%] px-2 py-1.5 text-xs font-medium">
               Duration
             </TableHead>
-            <TableHead className="w-[12%] px-2 py-1.5 text-xs font-medium">
+            <TableHead className="w-[13%] px-2 py-1.5 text-xs font-medium">
               Editor
             </TableHead>
-            <TableHead className="w-[12%] px-2 py-1.5 text-xs font-medium">
+            <TableHead className="w-[13%] px-2 py-1.5 text-xs font-medium">
               Deadline
             </TableHead>
-            <TableHead className="w-[12%] px-2 py-1.5 text-xs font-medium">
+            <TableHead className="w-[13%] px-2 py-1.5 text-xs font-medium">
               Release Date
             </TableHead>
-            <TableHead className="w-[16%] text-right px-2 py-1.5 text-xs font-medium">
+            <TableHead className="w-[12%] text-right px-2 py-1.5 text-xs font-medium">
               Actions
             </TableHead>
           </TableRow>
@@ -203,10 +201,12 @@ export default function DeliverablesTable({
                     </TableCell>
                   )}
                   <TableCell className="px-2 py-1.5 text-xs">
-                    {renderCell(deliverable, "platform")}
-                  </TableCell>
-                  <TableCell className="px-2 py-1.5 text-xs">
-                    {renderCell(deliverable, "type")}
+                    <PlatformBadges
+                      platform={deliverable.platform}
+                      platforms={deliverable.platforms}
+                      maxVisible={2}
+                      size="sm"
+                    />
                   </TableCell>
                   <TableCell className="px-2 py-1.5 text-xs">
                     {renderCell(deliverable, "status")}
@@ -265,7 +265,7 @@ export default function DeliverablesTable({
 
                           <EditDeliverableForm
                             deliverable={deliverable}
-                            onDeliverableUpdated={() => {}}
+                            onDeliverableUpdated={actions.onRefresh}
                             onClose={() => {}}
                           />
                           <Button

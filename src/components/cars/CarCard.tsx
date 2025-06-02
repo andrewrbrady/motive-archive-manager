@@ -9,8 +9,9 @@ import { Trash2 } from "lucide-react";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { cn } from "@/lib/utils";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { useAPI } from "@/hooks/useAPI";
+import { Badge } from "@/components/ui/badge";
 
 // Helper function to build enhanced Cloudflare URL for car card thumbnails
 const getEnhancedImageUrl = (
@@ -88,7 +89,7 @@ const CarCard = memo(function CarCard({
       if (car.images && car.images.length > 0) {
         const primary = car.images.find((img) => img.metadata?.isPrimary);
         if (primary) {
-          const baseUrl = getFormattedImageUrl(primary.url);
+          const baseUrl = fixCloudflareImageUrl(primary.url);
           const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
 
           console.log("[CarCard] URL transformation:", {
@@ -103,7 +104,7 @@ const CarCard = memo(function CarCard({
           });
         } else {
           // Use first image if no primary is marked
-          const baseUrl = getFormattedImageUrl(car.images[0].url);
+          const baseUrl = fixCloudflareImageUrl(car.images[0].url);
           const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
 
           console.log("[CarCard] URL transformation (first image):", {
@@ -127,7 +128,7 @@ const CarCard = memo(function CarCard({
         const fetchImage = async () => {
           try {
             const imageData = await api.get(`images/${car.primaryImageId}`);
-            const baseUrl = getFormattedImageUrl((imageData as any).url);
+            const baseUrl = fixCloudflareImageUrl((imageData as any).url);
             const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
 
             console.log("[CarCard] URL transformation (API fetch):", {
@@ -151,7 +152,7 @@ const CarCard = memo(function CarCard({
                 const fallbackImageData = await api.get(
                   `images/${car.imageIds[0]}`
                 );
-                const baseUrl = getFormattedImageUrl(
+                const baseUrl = fixCloudflareImageUrl(
                   (fallbackImageData as any).url
                 );
                 const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");

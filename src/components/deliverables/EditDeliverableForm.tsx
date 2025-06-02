@@ -17,13 +17,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { Pencil } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { Deliverable, Platform, DeliverableType } from "@/types/deliverable";
+import {
+  Deliverable,
+  Platform,
+  DeliverableType,
+  DeliverablePlatform,
+} from "@/types/deliverable";
 import { format } from "date-fns";
 import UserSelector from "@/components/users/UserSelector";
-import { useUsers } from "@/hooks/useUsers";
+import { useEditors } from "@/hooks/useEditors";
 import { useAPI } from "@/hooks/useAPI";
+import { FirestoreUser } from "@/types/firebase";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
 
 interface EditDeliverableFormProps {
   deliverable: Deliverable;
@@ -33,7 +41,8 @@ interface EditDeliverableFormProps {
 
 interface UpdateDeliverableData {
   title: string;
-  platform: Platform;
+  platform?: Platform; // Keep for backward compatibility
+  platforms?: string[]; // New field for multiple platform IDs
   type: DeliverableType;
   duration: number;
   aspect_ratio: string;
@@ -55,24 +64,57 @@ export default function EditDeliverableForm({
   onDeliverableUpdated,
   onClose,
 }: EditDeliverableFormProps) {
-  const { data: users = [] } = useUsers();
+  const { data: editors = [] } = useEditors();
   const api = useAPI();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState(deliverable.title);
-  const [platform, setPlatform] = useState<Platform>(deliverable.platform);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [availablePlatforms, setAvailablePlatforms] = useState<
+    DeliverablePlatform[]
+  >([]);
   const [type, setType] = useState<DeliverableType>(deliverable.type);
   const [duration, setDuration] = useState(deliverable.duration);
   const [aspectRatio, setAspectRatio] = useState(deliverable.aspect_ratio);
   const [editor, setEditor] = useState(deliverable.firebase_uid || "");
   const [editDeadline, setEditDeadline] = useState(
     deliverable.edit_deadline
-      ? new Date(deliverable.edit_deadline).toISOString().split("T")[0]
+      ? (() => {
+          const date = new Date(deliverable.edit_deadline);
+          // Return ISO datetime string in format expected by DateTimePicker
+          return (
+            date.getFullYear() +
+            "-" +
+            String(date.getMonth() + 1).padStart(2, "0") +
+            "-" +
+            String(date.getDate()).padStart(2, "0") +
+            "T" +
+            String(date.getHours()).padStart(2, "0") +
+            ":" +
+            String(date.getMinutes()).padStart(2, "0")
+          );
+        })()
       : ""
   );
   const [releaseDate, setReleaseDate] = useState(
     deliverable.release_date
-      ? new Date(deliverable.release_date).toISOString().split("T")[0]
+      ? (() => {
+          const date = new Date(deliverable.release_date);
+          // Return ISO datetime string in format expected by DateTimePicker
+          return (
+            date.getFullYear() +
+            "-" +
+            String(date.getMonth() + 1).padStart(2, "0") +
+            "-" +
+            String(date.getDate()).padStart(2, "0") +
+            "T" +
+            String(date.getHours()).padStart(2, "0") +
+            ":" +
+            String(date.getMinutes()).padStart(2, "0")
+          );
+        })()
       : ""
   );
   const [dropboxLink, setDropboxLink] = useState(
@@ -88,12 +130,24 @@ export default function EditDeliverableForm({
   );
   const [editorName, setEditorName] = useState(deliverable.editor || "");
 
-  // Helper function to safely format dates
+  // Helper function to safely format date with better datetime handling
   const safeFormatDate = (date: any): string => {
+    if (!date) return "";
     try {
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return "";
-      return format(d, "yyyy-MM-dd");
+      const parsedDate = new Date(date);
+      if (isNaN(parsedDate.getTime())) return "";
+      // Return ISO datetime string in format expected by DateTimePicker
+      return (
+        parsedDate.getFullYear() +
+        "-" +
+        String(parsedDate.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(parsedDate.getDate()).padStart(2, "0") +
+        "T" +
+        String(parsedDate.getHours()).padStart(2, "0") +
+        ":" +
+        String(parsedDate.getMinutes()).padStart(2, "0")
+      );
     } catch (error) {
       console.error("Error formatting date:", error);
       return "";
@@ -102,8 +156,8 @@ export default function EditDeliverableForm({
 
   // Helper function to find user UID from name (for legacy data)
   const findUserUidFromName = (editorName: string): string | null => {
-    if (!editorName || !users.length) return null;
-    const user = users.find((u) => u.name === editorName);
+    if (!editorName || !editors.length) return null;
+    const user = editors.find((u) => u.name === editorName);
     return user ? user.uid : null;
   };
 
@@ -111,8 +165,46 @@ export default function EditDeliverableForm({
   useEffect(() => {
     if (!api || !deliverable) return;
 
+    const fetchPlatforms = async () => {
+      if (!api) {
+        console.log("API client not available for fetching platforms");
+        return;
+      }
+
+      try {
+        const response = await api.get("platforms");
+        const data = response as DeliverablePlatform[];
+        console.log("EditDeliverableForm: Fetched platforms:", data);
+        setAvailablePlatforms(data);
+
+        // Initialize selected platforms based on deliverable data
+        if (deliverable.platforms && deliverable.platforms.length > 0) {
+          // New format: platforms array with IDs
+          const selectedPlatformOptions = deliverable.platforms
+            .map((platformId) => {
+              const platform = data.find((p) => p._id === platformId);
+              return platform
+                ? { label: platform.name, value: platform._id }
+                : null;
+            })
+            .filter(Boolean) as { label: string; value: string }[];
+          setSelectedPlatforms(selectedPlatformOptions);
+        } else if (deliverable.platform) {
+          // Legacy format: single platform string
+          const platform = data.find((p) => p.name === deliverable.platform);
+          if (platform) {
+            setSelectedPlatforms([
+              { label: platform.name, value: platform._id },
+            ]);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching platforms:", error);
+        toast.error("Failed to fetch platforms");
+      }
+    };
+
     setTitle(deliverable.title);
-    setPlatform(deliverable.platform);
     setType(deliverable.type);
     setDuration(deliverable.duration);
     setAspectRatio(deliverable.aspect_ratio);
@@ -121,8 +213,8 @@ export default function EditDeliverableForm({
     let initialEditorId: string | null = null;
     if (deliverable.firebase_uid) {
       initialEditorId = deliverable.firebase_uid;
-    } else if (deliverable.editor && users.length) {
-      const user = users.find((u) => u.name === deliverable.editor);
+    } else if (deliverable.editor && editors.length) {
+      const user = editors.find((u) => u.name === deliverable.editor);
       initialEditorId = user ? user.uid : null;
     }
     setEditorId(initialEditorId);
@@ -132,7 +224,12 @@ export default function EditDeliverableForm({
     setReleaseDate(safeFormatDate(deliverable.release_date));
     setDropboxLink(deliverable.dropbox_link || "");
     setSocialMediaLink(deliverable.social_media_link || "");
-  }, [deliverable, users, api]);
+
+    // Fetch platforms if not already loaded
+    if (availablePlatforms.length === 0) {
+      fetchPlatforms();
+    }
+  }, [deliverable, editors, api, availablePlatforms.length]);
 
   // Authentication check - don't render if not authenticated
   if (!api) {
@@ -147,7 +244,13 @@ export default function EditDeliverableForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !platform || !type || !editDeadline || !releaseDate) {
+    if (
+      !title ||
+      !selectedPlatforms.length ||
+      !type ||
+      !editDeadline ||
+      !releaseDate
+    ) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -156,7 +259,7 @@ export default function EditDeliverableForm({
     try {
       const updateData: UpdateDeliverableData = {
         title,
-        platform,
+        platforms: selectedPlatforms.map((p) => p.value),
         type,
         duration: type === "Photo Gallery" ? 0 : duration,
         aspect_ratio: aspectRatio,
@@ -236,118 +339,70 @@ export default function EditDeliverableForm({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="platform"
-                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
-                    >
-                      Platform
-                    </label>
-                    <Select
-                      value={platform}
-                      onValueChange={(value) => setPlatform(value as Platform)}
-                      open={openSelects["platform"]}
-                      onOpenChange={(open) =>
-                        handleSelectOpenChange("platform", open)
-                      }
-                    >
-                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                        <SelectValue placeholder="Select platform" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Instagram Reels">
-                          Instagram Reels
-                        </SelectItem>
-                        <SelectItem value="Instagram Post">
-                          Instagram Post
-                        </SelectItem>
-                        <SelectItem value="Instagram Story">
-                          Instagram Story
-                        </SelectItem>
-                        <SelectItem value="YouTube">YouTube</SelectItem>
-                        <SelectItem value="YouTube Shorts">
-                          YouTube Shorts
-                        </SelectItem>
-                        <SelectItem value="TikTok">TikTok</SelectItem>
-                        <SelectItem value="Facebook">Facebook</SelectItem>
-                        <SelectItem value="Bring a Trailer">
-                          Bring a Trailer
-                        </SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="platforms"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Platforms
+                  </label>
+                  <MultiSelect
+                    value={selectedPlatforms}
+                    onChange={setSelectedPlatforms}
+                    options={availablePlatforms.map((p) => ({
+                      label: p.name,
+                      value: p._id,
+                    }))}
+                    placeholder="Select platforms"
+                  />
+                </div>
 
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="type"
-                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
-                    >
-                      Type
-                    </label>
-                    <Select
-                      value={type}
-                      onValueChange={(value) =>
-                        setType(value as DeliverableType)
-                      }
-                      open={openSelects["type"]}
-                      onOpenChange={(open) =>
-                        handleSelectOpenChange("type", open)
-                      }
-                    >
-                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Photo Gallery">
-                          Photo Gallery
-                        </SelectItem>
-                        <SelectItem value="Video">Video</SelectItem>
-                        <SelectItem value="Mixed Gallery">
-                          Mixed Gallery
-                        </SelectItem>
-                        <SelectItem value="Video Gallery">
-                          Video Gallery
-                        </SelectItem>
-                        <SelectItem value="Still">Still</SelectItem>
-                        <SelectItem value="Graphic">Graphic</SelectItem>
-                        <SelectItem value="feature">Feature</SelectItem>
-                        <SelectItem value="promo">Promo</SelectItem>
-                        <SelectItem value="review">Review</SelectItem>
-                        <SelectItem value="walkthrough">Walkthrough</SelectItem>
-                        <SelectItem value="highlights">Highlights</SelectItem>
-                        <SelectItem value="Marketing Email">
-                          Marketing Email
-                        </SelectItem>
-                        <SelectItem value="Blog">Blog</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="type"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Type
+                  </label>
+                  <Select
+                    value={type}
+                    onValueChange={(value) => setType(value as DeliverableType)}
+                    open={openSelects["type"]}
+                    onOpenChange={(open) =>
+                      handleSelectOpenChange("type", open)
+                    }
+                  >
+                    <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Photo Gallery">
+                        Photo Gallery
+                      </SelectItem>
+                      <SelectItem value="Video">Video</SelectItem>
+                      <SelectItem value="Mixed Gallery">
+                        Mixed Gallery
+                      </SelectItem>
+                      <SelectItem value="Video Gallery">
+                        Video Gallery
+                      </SelectItem>
+                      <SelectItem value="Still">Still</SelectItem>
+                      <SelectItem value="Graphic">Graphic</SelectItem>
+                      <SelectItem value="feature">Feature</SelectItem>
+                      <SelectItem value="promo">Promo</SelectItem>
+                      <SelectItem value="review">Review</SelectItem>
+                      <SelectItem value="walkthrough">Walkthrough</SelectItem>
+                      <SelectItem value="highlights">Highlights</SelectItem>
+                      <SelectItem value="Marketing Email">
+                        Marketing Email
+                      </SelectItem>
+                      <SelectItem value="Blog">Blog</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="duration"
-                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
-                    >
-                      Duration (seconds)
-                    </label>
-                    <Input
-                      id="duration"
-                      type="number"
-                      value={type === "Photo Gallery" ? "N/A" : duration}
-                      onChange={(e) => setDuration(parseInt(e.target.value))}
-                      min={0}
-                      required={type !== "Photo Gallery"}
-                      disabled={type === "Photo Gallery"}
-                      placeholder={type === "Photo Gallery" ? "N/A" : undefined}
-                      className="text-sm"
-                    />
-                  </div>
-
                   <div className="space-y-1.5">
                     <label
                       htmlFor="aspectRatio"
@@ -367,6 +422,26 @@ export default function EditDeliverableForm({
                         <SelectItem value="4:5">4:5</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="duration"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Duration (seconds)
+                    </label>
+                    <Input
+                      id="duration"
+                      type="number"
+                      value={type === "Photo Gallery" ? "N/A" : duration}
+                      onChange={(e) => setDuration(parseInt(e.target.value))}
+                      min={0}
+                      required={type !== "Photo Gallery"}
+                      disabled={type === "Photo Gallery"}
+                      placeholder={type === "Photo Gallery" ? "N/A" : undefined}
+                      className="text-sm"
+                    />
                   </div>
                 </div>
               </div>
@@ -415,12 +490,9 @@ export default function EditDeliverableForm({
                     >
                       Edit Deadline
                     </label>
-                    <Input
-                      id="editDeadline"
-                      type="date"
+                    <DateTimePicker
                       value={editDeadline}
-                      onChange={(e) => setEditDeadline(e.target.value)}
-                      required
+                      onChange={(value) => setEditDeadline(value)}
                       className="text-sm"
                     />
                   </div>
@@ -432,12 +504,9 @@ export default function EditDeliverableForm({
                     >
                       Release Date
                     </label>
-                    <Input
-                      id="releaseDate"
-                      type="date"
+                    <DateTimePicker
                       value={releaseDate}
-                      onChange={(e) => setReleaseDate(e.target.value)}
-                      required
+                      onChange={(value) => setReleaseDate(value)}
                       className="text-sm"
                     />
                   </div>

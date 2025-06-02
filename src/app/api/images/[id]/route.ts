@@ -3,9 +3,9 @@ export const dynamic = "force-dynamic";
 export const revalidate = 3600; // Revalidate every hour
 
 import { NextResponse } from "next/server";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { getDatabase, getMongoClient } from "@/lib/mongodb";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { createStaticResponse } from "@/lib/cache-utils";
-import { getMongoClient, getDatabase } from "@/lib/mongodb";
 
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
 
@@ -63,7 +63,7 @@ export async function GET(request: Request) {
 
         // Format the image URL with appropriate variant based on metadata
         const variant = determineImageVariant(imageByCloudflareId);
-        const imageUrl = getFormattedImageUrl(imageByCloudflareId.url, variant);
+        const imageUrl = fixCloudflareImageUrl(imageByCloudflareId.url);
 
         // Return the formatted response with cache headers
         return createStaticResponse({
@@ -118,7 +118,7 @@ export async function GET(request: Request) {
     let imageUrl;
 
     try {
-      imageUrl = getFormattedImageUrl(image.url, variant);
+      imageUrl = fixCloudflareImageUrl(image.url);
       // [REMOVED] // [REMOVED] console.log(`[Image API] Formatted URL for image ${id}: ${imageUrl}`);
     } catch (urlError) {
       console.error(`[Image API] Error formatting URL: ${urlError}`);

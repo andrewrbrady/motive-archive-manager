@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MongoClient, ObjectId, UpdateFilter } from "mongodb";
 import { getDatabase, getMongoClient } from "@/lib/mongodb";
 import { DB_NAME } from "@/constants";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -276,7 +276,7 @@ export async function GET(request: Request) {
         ...image,
         _id: image._id.toString(),
         carId: image.carId.toString(),
-        url: getFormattedImageUrl(image.url),
+        url: fixCloudflareImageUrl(image.url),
       }));
 
       const newTotalImages = await db
@@ -309,7 +309,7 @@ export async function GET(request: Request) {
       ...image,
       _id: image._id.toString(),
       carId: image.carId.toString(),
-      url: getFormattedImageUrl(image.url),
+      url: fixCloudflareImageUrl(image.url),
     }));
 
     // Calculate pagination metadata

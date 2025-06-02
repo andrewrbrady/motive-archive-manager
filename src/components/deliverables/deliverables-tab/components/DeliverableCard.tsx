@@ -7,6 +7,7 @@ import { safeFormat, formatDeliverableDuration } from "../utils";
 import { StatusSelector } from "../../StatusSelector";
 import YouTubeUploadHelper from "../../YouTubeUploadHelper";
 import EditDeliverableForm from "../../EditDeliverableForm";
+import { PlatformBadges } from "../../PlatformBadges";
 
 interface DeliverableCardProps {
   deliverable: Deliverable;
@@ -37,9 +38,16 @@ export default function DeliverableCard({
           <p className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] truncate mb-1">
             {deliverable.title}
           </p>
-          <p className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-            {deliverable.platform} • {deliverable.type}
-          </p>
+          <div className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] flex items-center gap-2">
+            <PlatformBadges
+              platform={deliverable.platform}
+              platforms={deliverable.platforms}
+              maxVisible={2}
+              size="sm"
+            />
+            <span>•</span>
+            <span>{deliverable.type}</span>
+          </div>
           {showCarInfo && carInfo && (
             <p className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mt-1">
               {carInfo.year} {carInfo.make} {carInfo.model}
@@ -114,7 +122,7 @@ export default function DeliverableCard({
       <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
         <EditDeliverableForm
           deliverable={deliverable}
-          onDeliverableUpdated={() => {}}
+          onDeliverableUpdated={actions.onRefresh}
           onClose={() => {}}
         />
         <Button

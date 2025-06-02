@@ -36,6 +36,8 @@ Comprehensive guides for development and usage:
 
 Technical documentation for developers:
 
+- **[React Development Best Practices](./development/REACT_DEVELOPMENT_BEST_PRACTICES.md)** - 🆕 **Essential guide for avoiding common React errors**
+- **[Quick Fix Reference](./development/QUICK_FIX_REFERENCE.md)** - 🆕 **Emergency fixes for React state/image loading errors**
 - **[Makes API Analysis](./development/MAKES_API_ANALYSIS.md)** - Technical analysis of makes API implementation
 - **[Events Tab Analysis](./development/EVENTS_TAB_ANALYSIS.md)** - Technical analysis of events tab performance
 - **[Post-Migration Cleanup](./development/POST_MIGRATION_CLEANUP_COMPLETION_SUMMARY.md)** - Database migration cleanup procedures
@@ -94,15 +96,32 @@ Deployment and infrastructure documentation:
 
 ## 🔍 Quick Reference
 
+### 🆘 Emergency React Error Fixes
+
+**Getting state update or image loading errors? Start here:**
+
+1. **[Quick Fix Reference Card](./development/QUICK_FIX_REFERENCE.md)** - Immediate solutions for common errors
+2. **[React Development Best Practices](./development/REACT_DEVELOPMENT_BEST_PRACTICES.md)** - Comprehensive prevention guide
+
+**Common Issues:**
+
+- ❌ "Can't perform a React state update on a component that hasn't mounted yet"
+- ❌ "CloudflareImage load error: {}"
+- ❌ useDebounce causing state updates
+- ❌ Console error loops / ReactQueryErrorHandler issues
+
 ### Recently Added (Latest Updates)
 
-1. **MakesDropdown Component** - Reusable dropdown with scrolling and loading states
-2. **Makes API Optimization** - Complete optimization with curated database
-3. **Cars Page Performance** - Progressive loading and optimization improvements
-4. **Image Management** - Enhanced image deletion and primary image handling
+1. **🆕 React Development Guides** - Essential error prevention and fix guides
+2. **MakesDropdown Component** - Reusable dropdown with scrolling and loading states
+3. **Makes API Optimization** - Complete optimization with curated database
+4. **Cars Page Performance** - Progressive loading and optimization improvements
+5. **Image Management** - Enhanced image deletion and primary image handling
 
 ### Most Important Guides
 
+- **[Quick Fix Reference](./development/QUICK_FIX_REFERENCE.md)** - 🆘 Emergency React error fixes
+- **[React Development Best Practices](./development/REACT_DEVELOPMENT_BEST_PRACTICES.md)** - Essential development guide
 - [MakesDropdown Component Guide](./guides/MAKES_DROPDOWN_DOCUMENTATION.md)
 - [Performance Optimization Guide](./PERFORMANCE_OPTIMIZATION_GUIDE.md)
 - [Car Tabs Optimization Guide](./guides/CAR_TABS_OPTIMIZATION_GUIDE.md)
@@ -110,6 +129,7 @@ Deployment and infrastructure documentation:
 
 ### Emergency Procedures
 
+- **[Quick Fix Reference](./development/QUICK_FIX_REFERENCE.md)** - React error emergency fixes
 - [Nuclear Auth Safety Measures](./deployment/NUCLEAR_AUTH_SAFETY_MEASURES.md)
 - [Nuclear Auth Instructions](./deployment/NUCLEAR_AUTH_INSTRUCTIONS.md)
 
@@ -127,10 +147,11 @@ When adding new documentation:
 
 For questions about the documentation or the application:
 
-1. Check the relevant section above
-2. Review the troubleshooting guides
-3. Consult the developer guide for technical issues
-4. Refer to API documentation for integration questions
+1. **React Development Issues**: Start with [Quick Fix Reference](./development/QUICK_FIX_REFERENCE.md)
+2. Check the relevant section above
+3. Review the troubleshooting guides
+4. Consult the developer guide for technical issues
+5. Refer to API documentation for integration questions
 
 ---
 

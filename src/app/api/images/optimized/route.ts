@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { ObjectId } from "mongodb";
 import { caches, cacheKeys, cacheUtils } from "@/lib/database/cache";
 import { validateQueryPerformance } from "@/lib/database/indexes";
@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
       ...img,
       _id: img._id.toString(),
       carId: img.carId ? img.carId.toString() : "",
-      url: getFormattedImageUrl(img.url),
+      url: fixCloudflareImageUrl(img.url),
     }));
 
     const response = {

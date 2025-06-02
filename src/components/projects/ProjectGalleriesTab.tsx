@@ -37,7 +37,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { useSession } from "@/hooks/useFirebaseAuth";
 import { useAPI } from "@/hooks/useAPI";
 
@@ -80,7 +80,7 @@ function ProjectGalleryCard({
       <div className="relative aspect-[16/9]">
         {gallery.thumbnailImage ? (
           <Image
-            src={getFormattedImageUrl(gallery.thumbnailImage.url)}
+            src={fixCloudflareImageUrl(gallery.thumbnailImage.url)}
             alt={gallery.name}
             fill
             className="object-cover"
@@ -408,7 +408,7 @@ export function ProjectGalleriesTab({
                         <div className="w-12 h-12 relative rounded overflow-hidden bg-background-primary">
                           {gallery.thumbnailImage ? (
                             <Image
-                              src={getFormattedImageUrl(
+                              src={fixCloudflareImageUrl(
                                 gallery.thumbnailImage.url
                               )}
                               alt={gallery.name}

@@ -18,7 +18,8 @@ export interface IDeliverable extends Document {
   car_id?: mongoose.Types.ObjectId;
   title: string;
   description?: string;
-  platform: Platform;
+  platform: Platform; // Keep for backward compatibility
+  platforms?: string[]; // New field for multiple platform IDs
   type: DeliverableType;
   duration: number;
   actual_duration?: number;
@@ -70,7 +71,7 @@ const deliverableSchema = new mongoose.Schema(
     },
     platform: {
       type: String,
-      required: true,
+      required: false, // Make optional for new deliverables that use platforms array
       enum: [
         "Instagram Reels",
         "Instagram Post",
@@ -82,6 +83,11 @@ const deliverableSchema = new mongoose.Schema(
         "Bring a Trailer",
         "Other",
       ],
+    },
+    platforms: {
+      type: [String], // Array of platform IDs
+      required: false,
+      index: true,
     },
     type: {
       type: String,

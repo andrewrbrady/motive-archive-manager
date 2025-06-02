@@ -335,11 +335,127 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
       llmText += `Make: ${car.make}\n`;
       llmText += `Model: ${car.model}\n`;
       if (car.color) llmText += `Color: ${car.color}\n`;
-      // Add more car details as needed
+      if (car.vin) llmText += `VIN: ${car.vin}\n`;
+      if (car.condition) llmText += `Condition: ${car.condition}\n`;
+      if (car.interior_color)
+        llmText += `Interior Color: ${car.interior_color}\n`;
+
+      // Mileage
+      if (car.mileage) {
+        llmText += `Mileage: ${car.mileage.value} ${car.mileage.unit || "mi"}\n`;
+      }
+
+      // Engine specifications
+      if (car.engine) {
+        if (car.engine.type) llmText += `Engine Type: ${car.engine.type}\n`;
+        if (car.engine.displacement) {
+          llmText += `Engine Displacement: ${car.engine.displacement.value} ${car.engine.displacement.unit}\n`;
+        }
+        if (car.engine.power?.hp) {
+          llmText += `Horsepower: ${car.engine.power.hp} HP`;
+          if (car.engine.power.kW) llmText += ` (${car.engine.power.kW} kW)`;
+          llmText += `\n`;
+        }
+        if (car.engine.torque?.["lb-ft"]) {
+          llmText += `Torque: ${car.engine.torque["lb-ft"]} lb-ft`;
+          if (car.engine.torque.Nm) llmText += ` (${car.engine.torque.Nm} Nm)`;
+          llmText += `\n`;
+        }
+        if (car.engine.configuration)
+          llmText += `Engine Configuration: ${car.engine.configuration}\n`;
+        if (car.engine.cylinders)
+          llmText += `Cylinders: ${car.engine.cylinders}\n`;
+        if (car.engine.fuelType)
+          llmText += `Fuel Type: ${car.engine.fuelType}\n`;
+        if (car.engine.features && car.engine.features.length > 0) {
+          llmText += `Engine Features: ${car.engine.features.join(", ")}\n`;
+        }
+      }
+
+      // Transmission
+      if (car.transmission?.type) {
+        llmText += `Transmission: ${car.transmission.type}`;
+        if (car.transmission.speeds)
+          llmText += ` (${car.transmission.speeds}-speed)`;
+        llmText += `\n`;
+      }
+
+      // Manufacturing details
+      if (car.manufacturing) {
+        if (car.manufacturing.series)
+          llmText += `Series: ${car.manufacturing.series}\n`;
+        if (car.manufacturing.trim)
+          llmText += `Trim: ${car.manufacturing.trim}\n`;
+        if (car.manufacturing.bodyClass)
+          llmText += `Body Class: ${car.manufacturing.bodyClass}\n`;
+        if (car.manufacturing.plant) {
+          let plantInfo = [];
+          if (car.manufacturing.plant.city)
+            plantInfo.push(car.manufacturing.plant.city);
+          if (car.manufacturing.plant.country)
+            plantInfo.push(car.manufacturing.plant.country);
+          if (car.manufacturing.plant.company)
+            plantInfo.push(`(${car.manufacturing.plant.company})`);
+          if (plantInfo.length > 0)
+            llmText += `Manufacturing Plant: ${plantInfo.join(", ")}\n`;
+        }
+      }
+
+      // Performance
+      if (car.performance) {
+        if (car.performance["0_to_60_mph"]) {
+          llmText += `0-60 mph: ${car.performance["0_to_60_mph"].value} ${car.performance["0_to_60_mph"].unit}\n`;
+        }
+        if (car.performance.top_speed) {
+          llmText += `Top Speed: ${car.performance.top_speed.value} ${car.performance.top_speed.unit}\n`;
+        }
+      }
+
+      // Interior features
+      if (car.interior_features) {
+        if (car.interior_features.seats)
+          llmText += `Seats: ${car.interior_features.seats}\n`;
+        if (car.interior_features.upholstery)
+          llmText += `Upholstery: ${car.interior_features.upholstery}\n`;
+        if (
+          car.interior_features.features &&
+          car.interior_features.features.length > 0
+        ) {
+          llmText += `Interior Features: ${car.interior_features.features.join(", ")}\n`;
+        }
+      }
+
+      // Dimensions
+      if (car.dimensions) {
+        const dimKeys = [
+          "length",
+          "width",
+          "height",
+          "wheelbase",
+          "weight",
+        ] as const;
+        dimKeys.forEach((key) => {
+          if (car.dimensions![key]) {
+            const dim = car.dimensions![key]!;
+            llmText += `${key.charAt(0).toUpperCase() + key.slice(1)}: ${dim.value} ${dim.unit}\n`;
+          }
+        });
+      }
+
+      // Additional features
+      if (car.doors) llmText += `Doors: ${car.doors}\n`;
+      if (car.location) llmText += `Location: ${car.location}\n`;
+
+      // Description
+      if (car.description) llmText += `Description: ${car.description}\n`;
     } else if (carDetails.length > 1) {
       llmText += "SELECTED CARS:\n";
       carDetails.forEach((car, index) => {
-        llmText += `Car ${index + 1}: ${car.year} ${car.make} ${car.model}\n`;
+        llmText += `Car ${index + 1}: ${car.year} ${car.make} ${car.model}`;
+        if (car.color) llmText += ` (${car.color})`;
+        if (car.engine?.type) llmText += ` - ${car.engine.type}`;
+        if (car.transmission?.type) llmText += ` - ${car.transmission.type}`;
+        llmText += `\n`;
       });
     }
     llmText += "\n";

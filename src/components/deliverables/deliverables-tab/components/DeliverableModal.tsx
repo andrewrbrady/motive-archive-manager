@@ -120,7 +120,7 @@ export default function DeliverableModal({
               <YouTubeUploadHelper deliverable={deliverable} />
               <EditDeliverableForm
                 deliverable={deliverable}
-                onDeliverableUpdated={() => {}}
+                onDeliverableUpdated={actions.onRefresh}
                 onClose={() => {}}
               />
               <Button

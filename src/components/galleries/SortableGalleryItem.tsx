@@ -21,12 +21,63 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { GalleryCanvasExtensionModal } from "./GalleryCanvasExtensionModal";
-import { GalleryImageMatteModal } from "./GalleryImageMatteModal";
-import { GalleryCropModal } from "./GalleryCropModal";
+import { CanvasExtensionModal } from "../cars/CanvasExtensionModal";
+import { ImageMatteModal } from "../cars/ImageMatteModal";
+import { ImageCropModal } from "../cars/ImageCropModal";
 import { ImageData } from "@/app/images/columns";
 import { useAPI } from "@/hooks/useAPI";
 import { toast } from "react-hot-toast";
+
+// URL transformation function - copied from ImageThumbnails.tsx lines 84-110
+const getEnhancedImageUrl = (
+  baseUrl: string,
+  width?: string,
+  quality?: string
+) => {
+  let params = [];
+  // Always check for truthy values and non-empty strings
+  if (width && width.trim() !== "") params.push(`w=${width}`);
+  if (quality && quality.trim() !== "") params.push(`q=${quality}`);
+
+  if (params.length === 0) return baseUrl;
+
+  // Handle different Cloudflare URL formats
+  // Format: https://imagedelivery.net/account/image-id/public
+  // Should become: https://imagedelivery.net/account/image-id/w=400,q=85
+  if (baseUrl.includes("imagedelivery.net")) {
+    // Check if URL already has transformations (contains variant like 'public')
+    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
+      // Replace the last segment (usually 'public') with our parameters
+      const urlParts = baseUrl.split("/");
+      urlParts[urlParts.length - 1] = params.join(",");
+      const transformedUrl = urlParts.join("/");
+      console.log("SortableGalleryItem URL transformation:", {
+        baseUrl,
+        transformedUrl,
+        params,
+      });
+      return transformedUrl;
+    } else {
+      // URL doesn't have a variant, append transformations
+      const transformedUrl = `${baseUrl}/${params.join(",")}`;
+      console.log("SortableGalleryItem URL transformation:", {
+        baseUrl,
+        transformedUrl,
+        params,
+      });
+      return transformedUrl;
+    }
+  }
+
+  // Fallback for other URL formats - try to replace /public if it exists
+  const transformedUrl = baseUrl.replace(/\/public$/, `/${params.join(",")}`);
+  console.log("SortableGalleryItem URL transformation (fallback):", {
+    baseUrl,
+    transformedUrl,
+    params,
+  });
+  return transformedUrl;
+};
 
 interface SortableGalleryItemProps {
   id: string;
@@ -97,6 +148,15 @@ export function SortableGalleryItem({
     zIndex: isDragging ? 1 : 0,
   };
 
+  // Get enhanced URLs for different display sizes
+  const thumbnailUrl = React.useMemo(() => {
+    return getEnhancedImageUrl(image.url, "400", "85");
+  }, [image.url]);
+
+  const lightboxUrl = React.useMemo(() => {
+    return getEnhancedImageUrl(image.url, "1200", "90");
+  }, [image.url]);
+
   // Load image dimensions to determine if it's horizontal
   React.useEffect(() => {
     if (!api) return; // Add conditional check inside async function
@@ -108,8 +168,8 @@ export function SortableGalleryItem({
         height: img.naturalHeight,
       });
     };
-    img.src = image.url;
-  }, [image.url, image.filename, api]);
+    img.src = thumbnailUrl; // Use the enhanced URL for loading dimensions
+  }, [thumbnailUrl, image.filename, api]);
 
   // Authentication guard moved to the end
   if (!api) {
@@ -259,8 +319,8 @@ export function SortableGalleryItem({
                 )}
               >
                 <Image
-                  key={image.url}
-                  src={image.url}
+                  key={thumbnailUrl}
+                  src={thumbnailUrl}
                   alt={image.filename || "Gallery image"}
                   fill
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -270,78 +330,90 @@ export function SortableGalleryItem({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
 
-                {/* Top row buttons - hide in batch mode */}
+                {/* Action buttons (top right, visible on hover) - hide in batch mode */}
                 {!isBatchMode && (
-                  <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <div className="absolute top-2 right-2 z-20 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    {/* Drag handle */}
                     <button
                       {...attributes}
                       {...listeners}
-                      className="p-1.5 bg-background/80 rounded-full hover:bg-background shadow-sm hover:shadow-md transition-all duration-200"
+                      className="p-1 bg-background/80 rounded-full hover:bg-primary/80 hover:text-white transition-colors focus:outline-none"
+                      aria-label="Drag to reorder"
+                      title="Drag to reorder"
                     >
-                      <GripVertical className="h-4 w-4 text-foreground" />
+                      <GripVertical className="h-4 w-4" />
                     </button>
-                    <button
-                      onClick={handleCopyUrl}
-                      className="p-1.5 bg-background/80 rounded-full hover:bg-background shadow-sm hover:shadow-md transition-all duration-200"
-                    >
-                      {isCopied ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <Copy className="h-4 w-4 text-foreground" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => onDelete(image)}
-                      className="p-1.5 bg-background/80 rounded-full hover:bg-destructive/90 shadow-sm hover:shadow-md transition-all duration-200"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive hover:text-destructive-foreground" />
-                    </button>
-                  </div>
-                )}
 
-                {/* Processing buttons - show for all images in non-batch mode */}
-                {!isBatchMode && (
-                  <div className="absolute top-2 left-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                     {/* Restore button for processed images */}
                     {canRestore && (
                       <button
                         onClick={handleRestore}
                         disabled={isRestoring}
-                        className="p-1.5 bg-orange-500/80 rounded-full hover:bg-orange-500 shadow-sm hover:shadow-md transition-all duration-200"
-                        title="Restore Original Image"
+                        className="p-1 bg-background/80 rounded-full hover:bg-orange-600/80 hover:text-white transition-colors focus:outline-none"
+                        aria-label="Restore original image"
+                        title="Restore original image"
                       >
-                        <RotateCcw className="h-4 w-4 text-white" />
+                        <RotateCcw className="h-4 w-4" />
                       </button>
                     )}
 
                     {/* Crop button for all images */}
                     <button
                       onClick={handleCrop}
-                      className="p-1.5 bg-green-500/80 rounded-full hover:bg-green-500 shadow-sm hover:shadow-md transition-all duration-200"
-                      title="Crop Image"
+                      className="p-1 bg-background/80 rounded-full hover:bg-green-600/80 hover:text-white transition-colors focus:outline-none"
+                      aria-label="Crop image"
+                      title="Crop image"
                     >
-                      <Crop className="h-4 w-4 text-white" />
+                      <Crop className="h-4 w-4" />
                     </button>
 
-                    {/* Canvas extension and matte buttons for horizontal images */}
+                    {/* Canvas extension button for horizontal images */}
                     {isHorizontal && (
-                      <>
-                        <button
-                          onClick={handleCanvasExtension}
-                          className="p-1.5 bg-blue-500/80 rounded-full hover:bg-blue-500 shadow-sm hover:shadow-md transition-all duration-200"
-                          title="Extend Canvas"
-                        >
-                          <Expand className="h-4 w-4 text-white" />
-                        </button>
-                        <button
-                          onClick={handleImageMatte}
-                          className="p-1.5 bg-purple-500/80 rounded-full hover:bg-purple-500 shadow-sm hover:shadow-md transition-all duration-200"
-                          title="Create Matte"
-                        >
-                          <Palette className="h-4 w-4 text-white" />
-                        </button>
-                      </>
+                      <button
+                        onClick={handleCanvasExtension}
+                        className="p-1 bg-background/80 rounded-full hover:bg-primary/80 hover:text-white transition-colors focus:outline-none"
+                        aria-label="Extend canvas"
+                        title="Extend canvas"
+                      >
+                        <Expand className="h-4 w-4" />
+                      </button>
                     )}
+
+                    {/* Image matte button for horizontal images */}
+                    {isHorizontal && (
+                      <button
+                        onClick={handleImageMatte}
+                        className="p-1 bg-background/80 rounded-full hover:bg-purple-600/80 hover:text-white transition-colors focus:outline-none"
+                        aria-label="Create image matte"
+                        title="Create image matte"
+                      >
+                        <Palette className="h-4 w-4" />
+                      </button>
+                    )}
+
+                    {/* Copy URL button */}
+                    <button
+                      onClick={handleCopyUrl}
+                      className="p-1 bg-background/80 rounded-full hover:bg-blue-600/80 hover:text-white transition-colors focus:outline-none"
+                      aria-label="Copy URL"
+                      title="Copy URL"
+                    >
+                      {isCopied ? (
+                        <Check className="h-4 w-4 text-green-400" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </button>
+
+                    {/* Delete button */}
+                    <button
+                      onClick={() => onDelete(image)}
+                      className="p-1 bg-background/80 rounded-full hover:bg-destructive/80 hover:text-white transition-colors focus:outline-none"
+                      aria-label="Delete image"
+                      title="Delete image"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 )}
 
@@ -380,8 +452,8 @@ export function SortableGalleryItem({
         <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 overflow-hidden">
           <div className="relative w-full h-[80vh]">
             <Image
-              key={image.url}
-              src={image.url}
+              key={lightboxUrl}
+              src={lightboxUrl}
               alt={image.filename || "Gallery image"}
               fill
               className="object-contain"
@@ -405,10 +477,11 @@ export function SortableGalleryItem({
 
       {/* Canvas Extension Modal */}
       {galleryId && (
-        <GalleryCanvasExtensionModal
+        <CanvasExtensionModal
           isOpen={isCanvasExtensionOpen}
           onClose={() => setIsCanvasExtensionOpen(false)}
           image={imageData}
+          enablePreview={true}
           galleryId={galleryId}
           onImageReplaced={onImageProcessed}
         />
@@ -416,10 +489,11 @@ export function SortableGalleryItem({
 
       {/* Image Matte Modal */}
       {galleryId && (
-        <GalleryImageMatteModal
+        <ImageMatteModal
           isOpen={isImageMatteOpen}
           onClose={() => setIsImageMatteOpen(false)}
           image={imageData}
+          enablePreview={true}
           galleryId={galleryId}
           onImageReplaced={onImageProcessed}
         />
@@ -427,12 +501,13 @@ export function SortableGalleryItem({
 
       {/* Crop Modal */}
       {galleryId && (
-        <GalleryCropModal
+        <ImageCropModal
           isOpen={isCropOpen}
           onClose={() => setIsCropOpen(false)}
           image={imageData}
+          enablePreview={true}
           galleryId={galleryId}
-          onImageProcessed={onImageProcessed}
+          onImageReplaced={onImageProcessed}
         />
       )}
     </>

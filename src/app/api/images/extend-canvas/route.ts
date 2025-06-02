@@ -312,17 +312,16 @@ export async function POST(request: NextRequest) {
               throw new Error(`Cloud Run service failed: ${errorText}`);
             }
 
-            console.log("⚠️ Falling back to local binary...");
+            console.log(
+              "⚠️ Remote service failed, falling back to local processing"
+            );
+            console.log("Remote service error:", errorText);
           }
         } catch (remoteError) {
-          console.log("⚠️ Remote service error:", remoteError);
-
-          // If user explicitly chose cloud but it failed, don't fall back to local
-          if (processingMethod === "cloud") {
-            throw remoteError;
-          }
-
-          console.log("⚠️ Trying local binary...");
+          console.log(
+            "⚠️ Remote service error, falling back to local processing"
+          );
+          console.error("Remote service error details:", remoteError);
         }
       } else if (processingMethod === "local") {
         console.log(
@@ -372,32 +371,59 @@ export async function POST(request: NextRequest) {
       const imageBuffer = await imageResponse.arrayBuffer();
       await fs.writeFile(inputPath, Buffer.from(imageBuffer));
 
-      // Check if extend_canvas executable exists
+      // Local binary processing
+      console.log("🔧 Attempting local binary processing...");
+
+      // Determine the correct binary path based on platform
       const platform = process.platform;
-      const executableName =
-        platform === "darwin" ? "extend_canvas_macos" : "extend_canvas";
-      const executablePath = path.join(process.cwd(), executableName);
+      const binaryName =
+        platform === "darwin"
+          ? "extend_canvas_macos"
+          : platform === "linux"
+            ? "extend_canvas_linux"
+            : "extend_canvas";
+
+      let binaryPath = path.join(process.cwd(), binaryName);
+
+      console.log("🔍 Platform detected:", platform);
+      console.log("🔍 Binary name:", binaryName);
+      console.log("🔍 Binary path:", binaryPath);
 
       try {
-        await fs.access(executablePath);
-      } catch {
-        // Check if we're in a production environment
-        const isProduction = process.env.NODE_ENV === "production";
-        const errorMessage = isProduction
-          ? "Canvas extension feature is currently unavailable in production. The C++ processing program could not be compiled during deployment."
-          : `Canvas extension program not found. Please ensure ${executableName} is compiled and available in the project root.`;
+        await fs.access(binaryPath);
+        console.log("✅ Binary found at:", binaryPath);
+      } catch (accessError) {
+        console.error("❌ Binary not found at:", binaryPath);
+        console.error("Access error:", accessError);
 
-        return NextResponse.json(
-          {
-            error: errorMessage,
-            details: isProduction
-              ? "This feature requires OpenCV to be installed during the build process. Please check the deployment logs for compilation errors."
-              : platform === "darwin"
-                ? "Run: g++ -std=c++17 -O2 -Wall -o extend_canvas_macos extend_canvas.cpp `pkg-config --cflags --libs opencv4`"
-                : "Run: g++ -std=c++17 -O2 -Wall -o extend_canvas extend_canvas.cpp `pkg-config --cflags --libs opencv4`",
-          },
-          { status: 503 } // Service Unavailable
-        );
+        // Try alternative names in the current directory
+        const altBinaries = [
+          path.join(process.cwd(), "extend_canvas"),
+          path.join(process.cwd(), "extend_canvas_macos"),
+          path.join(process.cwd(), "extend_canvas_linux"),
+        ];
+
+        let foundBinary = null;
+        for (const altPath of altBinaries) {
+          try {
+            await fs.access(altPath);
+            console.log("✅ Alternative binary found at:", altPath);
+            foundBinary = altPath;
+            break;
+          } catch (e) {
+            console.log("❌ Binary not found at:", altPath);
+          }
+        }
+
+        if (!foundBinary) {
+          throw new Error(
+            `extend-canvas binary not found. Expected: ${binaryPath}`
+          );
+        }
+
+        // Update binaryPath to the found binary
+        binaryPath = foundBinary;
+        console.log("Using found binary:", binaryPath);
       }
 
       // Build command arguments
@@ -410,7 +436,7 @@ export async function POST(request: NextRequest) {
       ];
 
       // Execute the C++ program
-      const command = `${executablePath} ${args.join(" ")}`;
+      const command = `${binaryPath} ${args.join(" ")}`;
       console.log("Executing command:", command);
 
       try {

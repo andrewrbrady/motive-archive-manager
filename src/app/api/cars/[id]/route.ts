@@ -1,8 +1,8 @@
 import { MongoClient, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
-import { ImageMetadata, getFormattedImageUrl } from "@/lib/cloudflare";
 import { StandardizedCar } from "@/types/routes/cars";
 import { cleanAiAnalysis, convertToPlainObject } from "@/utils/car-helpers";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
@@ -34,6 +34,92 @@ interface Car {
     };
     businessType: string;
   };
+  make: string;
+  model: string;
+  year?: number;
+  vin?: string;
+  color?: string;
+  mileage?: {
+    value: number;
+    unit: string;
+  };
+  price?: any;
+  description?: string;
+  status?: string;
+  condition?: string;
+  location?: string;
+  type?: string;
+  doors?: number;
+  interior_color?: string;
+  engine?: {
+    type?: string;
+    displacement?: {
+      value: number;
+      unit: string;
+    };
+    power?: {
+      hp: number;
+      kW: number;
+      ps: number;
+    };
+    torque?: {
+      "lb-ft": number;
+      Nm: number;
+    };
+    features?: string[];
+    configuration?: string;
+    cylinders?: number;
+    fuelType?: string;
+    manufacturer?: string;
+  };
+  transmission?: {
+    type: string;
+    speeds?: number;
+  };
+  dimensions?: {
+    length?: { value: number; unit: string };
+    width?: { value: number; unit: string };
+    height?: { value: number; unit: string };
+    wheelbase?: { value: number; unit: string };
+    trackWidth?: { value: number; unit: string };
+    weight?: { value: number; unit: string };
+    gvwr?: { value: number; unit: string };
+  };
+  manufacturing?: {
+    plant?: {
+      city?: string;
+      country?: string;
+      company?: string;
+    };
+    series?: string;
+    trim?: string;
+    bodyClass?: string;
+  };
+  performance?: {
+    "0_to_60_mph"?: { value: number; unit: string };
+    top_speed?: { value: number; unit: string };
+  };
+  interior_features?: {
+    seats?: number;
+    upholstery?: string;
+    features?: string[];
+  };
+  safety?: {
+    tpms?: {
+      type: string;
+      present: boolean;
+    };
+    [key: string]: any;
+  };
+  aiAnalysis?: {
+    [key: string]: {
+      value: string;
+      confidence: "confirmed" | "inferred" | "suggested";
+      source: string;
+    };
+  };
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 }
 
 interface Image {
@@ -41,7 +127,7 @@ interface Image {
   cloudflareId: string;
   url: string;
   filename: string;
-  metadata: ImageMetadata;
+  metadata: any;
   carId: ObjectId;
   createdAt: string;
   updatedAt: string;
@@ -368,7 +454,7 @@ export async function GET(request: Request) {
               if (thumbnailImage) {
                 gallery.thumbnailImage = {
                   _id: thumbnailImage._id.toString(),
-                  url: getFormattedImageUrl(thumbnailImage.url, "thumbnail"),
+                  url: fixCloudflareImageUrl(thumbnailImage.url),
                 };
               }
             }
@@ -447,7 +533,7 @@ export async function GET(request: Request) {
           ...img,
           _id: img._id?.toString() || "",
           car_id: img.carId?.toString() || img.car_id?.toString() || "",
-          url: getFormattedImageUrl(img.url), // Use our new utility function
+          url: fixCloudflareImageUrl(img.url),
           metadata: {
             ...img.metadata,
             // Set isPrimary flag based on primaryImageId
@@ -473,10 +559,7 @@ export async function GET(request: Request) {
           thumbnailImage: gallery.thumbnailImage
             ? {
                 _id: gallery.thumbnailImage._id?.toString() || "",
-                url: getFormattedImageUrl(
-                  gallery.thumbnailImage.url,
-                  "thumbnail"
-                ),
+                url: fixCloudflareImageUrl(gallery.thumbnailImage.url),
               }
             : undefined,
           createdAt: gallery.createdAt || "",
@@ -502,6 +585,61 @@ export async function GET(request: Request) {
       car.updatedAt instanceof Date
         ? car.updatedAt.toISOString()
         : car.updatedAt || new Date().toISOString();
+
+    // Add detailed specifications that the copywriter needs
+    // These fields are used by the copywriter for generating captions
+    if (car.engine) {
+      (standardizedCar as any).engine = car.engine;
+    }
+
+    if (car.transmission) {
+      (standardizedCar as any).transmission = car.transmission;
+    }
+
+    if (car.dimensions) {
+      (standardizedCar as any).dimensions = car.dimensions;
+    }
+
+    if (car.manufacturing) {
+      (standardizedCar as any).manufacturing = car.manufacturing;
+    }
+
+    if (car.performance) {
+      (standardizedCar as any).performance = car.performance;
+    }
+
+    if (car.interior_features) {
+      (standardizedCar as any).interior_features = car.interior_features;
+    }
+
+    if (car.interior_color) {
+      (standardizedCar as any).interior_color = car.interior_color;
+    }
+
+    if (car.condition) {
+      (standardizedCar as any).condition = car.condition;
+    }
+
+    if (car.location) {
+      (standardizedCar as any).location = car.location;
+    }
+
+    if (car.doors) {
+      (standardizedCar as any).doors = car.doors;
+    }
+
+    if (car.safety) {
+      (standardizedCar as any).safety = car.safety;
+    }
+
+    if (car.type) {
+      (standardizedCar as any).type = car.type;
+    }
+
+    // Include aiAnalysis if it exists (for enriched data)
+    if (car.aiAnalysis) {
+      (standardizedCar as any).aiAnalysis = car.aiAnalysis;
+    }
 
     // Generate a unique ETag based on updatedAt timestamp
     const etag = `"${standardizedCar.updatedAt || new Date().toISOString()}"`;

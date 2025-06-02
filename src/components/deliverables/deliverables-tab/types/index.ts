@@ -36,6 +36,7 @@ export interface DeliverableActions {
   onDelete: (deliverableId: string) => void;
   onDuplicate: (deliverable: Deliverable) => void;
   onStatusChange: (deliverableId: string, newStatus: DeliverableStatus) => void;
+  onRefresh: () => void;
 }
 
 export interface BatchModeState {

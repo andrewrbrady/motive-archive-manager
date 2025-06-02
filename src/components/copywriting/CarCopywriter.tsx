@@ -186,6 +186,19 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
           status: carData.status || "available",
           primaryImageId: carData.primaryImageId,
           createdAt: new Date().toISOString(),
+          engine: carData.engine,
+          transmission: carData.transmission,
+          dimensions: carData.dimensions,
+          manufacturing: carData.manufacturing,
+          performance: carData.performance,
+          interior_features: carData.interior_features,
+          interior_color: carData.interior_color,
+          condition: carData.condition,
+          location: carData.location,
+          doors: carData.doors,
+          safety: carData.safety,
+          description: carData.description,
+          mileage: carData.mileage,
         };
 
         // Convert events to project format
@@ -195,14 +208,14 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
 
         const projectEvents: ProjectEvent[] = eventsToDisplay
           .filter((event: any) => {
-            if (!event._id) {
+            if (!event.id) {
               console.warn("🚨 Event without ID found:", event);
               return false;
             }
             return true;
           })
           .map((event: any) => ({
-            id: event._id,
+            id: event.id,
             car_id: carId,
             type: event.type,
             title: event.title,

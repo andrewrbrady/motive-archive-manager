@@ -5,6 +5,10 @@ import { useSession, useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { useRouter, useParams } from "next/navigation";
 import { Project, ProjectStatus } from "@/types/project";
 import { toast } from "@/components/ui/use-toast";
+import {
+  useProject,
+  useUpdateProjectStatus,
+} from "@/lib/hooks/query/useProjects";
 import { useAPI } from "@/hooks/useAPI";
 import { Loader2 } from "lucide-react";
 
@@ -91,11 +95,18 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const projectId = params?.id as string;
   const api = useAPI();
-  const [project, setProject] = useState<Project | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // Use the new React Query hooks
+  const {
+    data: project,
+    isLoading,
+    error,
+    refetch: refreshProject,
+  } = useProject(projectId);
+
+  const updateStatusMutation = useUpdateProjectStatus();
+
   const [invitingUser, setInvitingUser] = useState(false);
-  const initialLoadRef = useRef(false);
   const retryAttemptRef = useRef(0);
   const maxRetries = 2;
 
@@ -195,141 +206,17 @@ export default function ProjectDetailPage() {
     window.history.pushState({}, "", url.toString());
   };
 
-  // ✅ Enhanced authentication and load effect with defensive handling
+  // Fetch member details when project is loaded
   useEffect(() => {
-    console.log("ProjectDetailPage: Auth useEffect triggered", {
-      status,
-      sessionExists: !!session,
-      userExists: !!user,
-      isAuthenticated,
-      authLoading,
-      apiReady: !!api,
-      initialLoadDone: initialLoadRef.current,
-    });
-
-    // ✅ Enhanced loading state management
-    if (status === "loading" || authLoading) {
-      console.log("ProjectDetailPage: Authentication still loading...");
-      return;
-    }
-
-    // ✅ Defensive authentication check with graceful fallback
-    if (status === "unauthenticated" || !isAuthenticated) {
+    if (project?.members && project.members.length > 0) {
       console.log(
-        "ProjectDetailPage: User not authenticated, redirecting to signin"
+        "👥 Fetching member details for",
+        project.members.length,
+        "members"
       );
-      router.push("/auth/signin");
-      return;
+      fetchMemberDetails(project.members.map((m: any) => m.userId));
     }
-
-    // ✅ Wait for both session and Firebase user (defensive)
-    if (!session?.user || !user) {
-      console.log(
-        "ProjectDetailPage: Authentication incomplete - session or user missing",
-        { hasSession: !!session?.user, hasUser: !!user }
-      );
-      return;
-    }
-
-    // ✅ Ensure API client is ready before proceeding
-    if (!api) {
-      console.log("ProjectDetailPage: API client not ready yet, waiting...");
-      return;
-    }
-
-    if (!initialLoadRef.current) {
-      console.log(
-        "ProjectDetailPage: Initial load - authentication complete, fetching project"
-      );
-      initialLoadRef.current = true;
-      fetchProject();
-    }
-  }, [session, status, user, isAuthenticated, authLoading, api, projectId]);
-
-  // ✅ Enhanced fetchProject with comprehensive error handling
-  const fetchProject = async () => {
-    console.log("🔄 Fetching project data...");
-    try {
-      setLoading(true);
-      setError(null); // Clear previous errors
-
-      // ✅ Defensive API client check
-      if (!api) {
-        console.log("ProjectDetailPage: No API client available");
-        throw new Error("Authentication required - please refresh the page");
-      }
-
-      console.log("🌐 Making request to:", `/api/projects/${projectId}`);
-
-      // ✅ Enhanced error handling with specific error types
-      try {
-        const response = await api.get(`projects/${projectId}`);
-        const data = response as any;
-
-        console.log("📦 Project data received:", {
-          projectId: data.project?._id,
-          projectTitle: data.project?.title,
-          deliverablesCount: data.project?.deliverables?.length || 0,
-        });
-
-        if (!data.project) {
-          throw new Error("Project data not found in response");
-        }
-
-        setProject(data.project);
-        console.log("✅ Project state updated");
-
-        // Fetch member details after setting project
-        if (data.project?.members?.length > 0) {
-          console.log(
-            "👥 Fetching member details for",
-            data.project.members.length,
-            "members"
-          );
-          await fetchMemberDetails(
-            data.project.members.map((m: any) => m.userId)
-          );
-        }
-
-        // Reset retry counter on success
-        retryAttemptRef.current = 0;
-      } catch (apiError: any) {
-        console.error("💥 API Error details:", {
-          message: apiError.message,
-          status: apiError.status,
-          code: apiError.code,
-          retryAttempt: retryAttemptRef.current,
-        });
-
-        // ✅ Enhanced error handling based on error type
-        if (apiError.status === 401) {
-          throw new Error("Authentication failed - please sign in again");
-        } else if (apiError.status === 403) {
-          throw new Error(
-            "Access denied - you don't have permission to view this project"
-          );
-        } else if (apiError.status === 404) {
-          throw new Error(
-            "Project not found - it may have been deleted or you don't have access"
-          );
-        } else if (apiError.message?.includes("Failed to fetch")) {
-          throw new Error(
-            "Network error - please check your connection and try again"
-          );
-        } else {
-          throw new Error(apiError.message || "Failed to load project");
-        }
-      }
-    } catch (err) {
-      console.error("💥 Error fetching project:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : "An unexpected error occurred";
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-      console.log("🏁 Project fetch completed");
-    }
-  };
+  }, [project?.members]);
 
   // ✅ Enhanced retry functionality
   const handleRetry = () => {
@@ -338,7 +225,7 @@ export default function ProjectDetailPage() {
       console.log(
         `🔄 Retrying project fetch (attempt ${retryAttemptRef.current}/${maxRetries})`
       );
-      fetchProject();
+      refreshProject();
     } else {
       console.log("❌ Max retry attempts reached");
       toast({
@@ -397,21 +284,20 @@ export default function ProjectDetailPage() {
   };
 
   const handleStatusChange = async (newStatus: ProjectStatus) => {
-    if (!project || !api) return;
+    if (!project) return;
 
     try {
-      const response = await api.put(`projects/${project._id}`, {
+      await updateStatusMutation.mutateAsync({
+        projectId: project._id!,
         status: newStatus,
       });
-      const updatedProject = response as any;
-
-      setProject(updatedProject.project);
 
       toast({
         title: "Success",
         description: "Project status updated successfully",
       });
     } catch (error) {
+      console.error("Error updating project status:", error);
       toast({
         title: "Error",
         description: "Failed to update project status",
@@ -448,17 +334,13 @@ export default function ProjectDetailPage() {
         description: `User invited to project successfully`,
       });
 
-      // Refresh the project data to show the new user
-      if (project) {
-        await fetchProject();
-      }
-    } catch (error: any) {
+      // Refresh project to show new member
+      refreshProject();
+    } catch (error) {
       console.error("Error inviting user:", error);
-      const errorMessage = error.message || "Failed to invite user";
-
       toast({
         title: "Error",
-        description: errorMessage,
+        description: "Failed to invite user to project",
         variant: "destructive",
       });
     } finally {
@@ -466,47 +348,79 @@ export default function ProjectDetailPage() {
     }
   };
 
-  // ✅ Enhanced loading state with better context
-  if (status === "loading" || authLoading || loading) {
-    const authMessage =
-      status === "loading"
-        ? "Authenticating..."
-        : authLoading
-          ? "Verifying credentials..."
-          : loading
-            ? "Loading project..."
-            : undefined;
-
-    return <PageSkeleton authMessage={authMessage} />;
+  // ✅ Show loading while checking authentication
+  if (status === "loading" || authLoading) {
+    return <PageSkeleton authMessage="Checking authentication..." />;
   }
 
-  // ✅ Enhanced error handling with retry capability
+  // ✅ Show loading while fetching project data
+  if (isLoading) {
+    return <PageSkeleton authMessage="Loading project data..." />;
+  }
+
+  // ✅ Enhanced error handling with better UX
   if (error) {
+    const errorMessage = error?.message || "Failed to load project";
+
+    // Special handling for different error types
+    if (errorMessage.includes("404") || errorMessage.includes("not found")) {
+      return (
+        <ProjectError
+          error="Project not found. It may have been deleted or you don't have access."
+          onBack={handleBack}
+        />
+      );
+    }
+
+    if (
+      errorMessage.includes("403") ||
+      errorMessage.includes("access denied")
+    ) {
+      return (
+        <ProjectError
+          error="Access denied. You don't have permission to view this project."
+          onBack={handleBack}
+        />
+      );
+    }
+
+    if (
+      errorMessage.includes("401") ||
+      errorMessage.includes("authentication")
+    ) {
+      return (
+        <ProjectError
+          error="Authentication failed. Please sign in again."
+          onBack={handleBack}
+        />
+      );
+    }
+
     return (
       <ProjectError
-        error={error}
+        error={errorMessage}
         onRetry={retryAttemptRef.current < maxRetries ? handleRetry : undefined}
         onBack={handleBack}
       />
     );
   }
 
-  // ✅ Enhanced project not found handling
+  // ✅ Show error if project data is missing
   if (!project) {
     return (
       <ProjectError
-        error="Project not found or still loading"
+        error="Project data not found"
         onRetry={handleRetry}
         onBack={handleBack}
       />
     );
   }
 
+  // ✅ Main render with all data available
   return (
     <div className="min-h-screen bg-background">
       <main className="container-wide px-6 py-8">
-        <div>
-          {/* Header */}
+        <div className="space-y-6">
           <Suspense fallback={<PageSkeleton />}>
             <ProjectHeader
               project={project}
@@ -515,14 +429,13 @@ export default function ProjectDetailPage() {
             />
           </Suspense>
 
-          {/* Main Content Tabs */}
           <Suspense fallback={<PageSkeleton />}>
             <ProjectTabs
               project={project}
               activeTab={activeTab}
               onTabChange={handleTabChange}
               memberDetails={memberDetails}
-              onProjectUpdate={fetchProject}
+              onProjectUpdate={refreshProject}
             />
           </Suspense>
         </div>

@@ -40,7 +40,7 @@ export function BaseEvents({
 }: BaseEventsProps) {
   const api = useAPI();
 
-  // Use optimized query hook - non-blocking, cached data fetching
+  // Use optimized query hook - only when no events are provided from parent
   const {
     data: eventsData,
     isLoading: localLoading,
@@ -74,28 +74,33 @@ export function BaseEvents({
   }, [sortedEvents]);
 
   /**
-   * Optimized delete operation - uses callback to prevent re-renders
+   * Optimized delete operation - delegates to parent component for proper cache handling
    */
   const handleDelete = useCallback(
     async (eventId: string) => {
+      // Delegate to parent component which uses React Query mutations
+      if (onDelete) {
+        onDelete(eventId);
+        return;
+      }
+
+      // Fallback for when no parent handler is provided (standalone usage)
       if (!api) return;
 
       try {
         await api.delete(`cars/${carId}/events/${eventId}`);
 
-        // Refresh data after successful delete
-        refreshEvents();
-        toast.success("Event deleted successfully");
-
-        if (onDelete) {
-          onDelete(eventId);
+        // Only refresh if this component is managing its own data
+        if (!providedEvents) {
+          refreshEvents();
         }
+        toast.success("Event deleted successfully");
       } catch (error) {
         console.error("Error deleting event:", error);
         toast.error("Failed to delete event");
       }
     },
-    [api, carId, onDelete, refreshEvents]
+    [api, carId, onDelete, refreshEvents, providedEvents]
   );
 
   // Handle error state without blocking UI
