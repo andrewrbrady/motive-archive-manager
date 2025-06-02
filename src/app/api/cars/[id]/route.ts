@@ -17,6 +17,7 @@ interface Car {
   _id: ObjectId;
   documents: string[];
   imageIds: ObjectId[];
+  primaryImageId?: ObjectId;
   galleryIds?: ObjectId[];
   client?: string;
   clientInfo?: {
@@ -386,6 +387,7 @@ export async function GET(request: Request) {
       make: car.make || "Unknown",
       model: car.model || "Unknown",
       documents: Array.isArray(car.documents) ? car.documents : [],
+      primaryImageId: car.primaryImageId?.toString() || undefined,
       price: {
         listPrice:
           typeof car.price === "object"

@@ -131,11 +131,11 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("files", file);
         formData.append("carId", carId);
 
         if (vehicleInfo) {
-          formData.append("vehicleInfo", JSON.stringify(vehicleInfo));
+          formData.append("metadata", JSON.stringify(vehicleInfo));
         }
 
         // Create progress tracking object with detailed step tracking
@@ -163,20 +163,70 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
         }
 
         try {
-          const result = await api.upload<{ image: ImageType }>(
-            "/cloudflare/images",
-            formData
-          );
+          const response = await fetch("/api/images/upload", {
+            method: "POST",
+            body: formData,
+          });
 
-          // Add the new image to our uploadedImages array
-          uploadedImages.push(result.image);
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(
+              errorData.error || `Upload failed: ${response.statusText}`
+            );
+          }
+
+          const data = await response.json();
+
+          if (!data.success || !data.images || data.images.length === 0) {
+            throw new Error(
+              data.error || "No images were uploaded successfully"
+            );
+          }
+
+          const uploadedImage = data.images[0];
+          let imageUrl = uploadedImage.url;
+
+          if (
+            imageUrl &&
+            imageUrl.includes("imagedelivery.net") &&
+            !imageUrl.match(
+              /\/(public|thumbnail|avatar|medium|large|webp|preview|original|w=\d+)$/
+            )
+          ) {
+            imageUrl = `${imageUrl}/w=200,h=200,fit=cover`;
+          }
+
+          // Create ImageType object matching expected format
+          const processedImage: ImageType = {
+            id: uploadedImage._id || uploadedImage.id,
+            url: imageUrl,
+            filename: uploadedImage.filename || file.name,
+            metadata: uploadedImage.metadata || {},
+            variants: uploadedImage.variants || {},
+            createdAt: uploadedImage.createdAt || new Date().toISOString(),
+            updatedAt: uploadedImage.updatedAt || new Date().toISOString(),
+          };
+
+          uploadedImages.push(processedImage);
 
           progress[i] = {
             ...progress[i],
             progress: 100,
             status: "complete",
-            imageUrl: result.image.url,
-            metadata: result.image.metadata,
+            imageUrl: imageUrl,
+            metadata: processedImage.metadata,
+            stepProgress: {
+              cloudflare: {
+                status: "complete",
+                progress: 100,
+                message: "Upload complete",
+              },
+              openai: {
+                status: "complete",
+                progress: 100,
+                message: "Analysis complete",
+              },
+            },
           };
 
           if (onProgress) {
@@ -188,6 +238,18 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
             ...progress[i],
             status: "error",
             error: error instanceof Error ? error.message : "Upload failed",
+            stepProgress: {
+              cloudflare: {
+                status: "error",
+                progress: 0,
+                message: "Upload failed",
+              },
+              openai: {
+                status: "error",
+                progress: 0,
+                message: "Analysis failed",
+              },
+            },
           };
           if (onProgress) {
             onProgress([...progress]);
@@ -199,11 +261,9 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
       return uploadedImages;
     },
     onSuccess: (newImages) => {
-      // Update the cache with the new images
       queryClient.setQueryData(
         ["carImages", carId],
         (old: ImageType[] = []) => {
-          // Filter out any duplicates and merge with existing images
           const existingIds = new Set(old.map((img) => img.id));
           const uniqueNewImages = newImages.filter(
             (img) => !existingIds.has(img.id)

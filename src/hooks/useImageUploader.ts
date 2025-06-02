@@ -34,23 +34,12 @@ export function useImageUploader({
   selectedPromptId,
   selectedModelId,
 }: UseImageUploaderOptions) {
+  // ✅ All hooks must be called before any conditional returns
   const [progress, setProgress] = useState<UploadProgress[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const api = useAPI();
-
-  // Authentication readiness check
-  if (!api) {
-    return {
-      uploadImages: async () => {},
-      progress: [],
-      isUploading: false,
-      abort: () => {},
-      error: "Loading...",
-      resetProgress: () => {},
-    };
-  }
 
   // Helper to generate a stable ID for a file
   const getFileId = (file: File) => `${file.name}-${file.lastModified}`;
@@ -92,6 +81,12 @@ export function useImageUploader({
   // Main upload function
   const uploadImages = useCallback(
     async (files: File[]) => {
+      // ✅ Guard against api being null inside the callback
+      if (!api) {
+        setError("API not available");
+        return;
+      }
+
       setError(null);
       setIsUploading(true);
       abortControllerRef.current = new AbortController();
@@ -187,10 +182,9 @@ export function useImageUploader({
 
       const uploadBatch = async (batch: File[]) => {
         const formData = new FormData();
-        batch.forEach((file, i) => {
-          formData.append(`file${i}`, file);
+        batch.forEach((file) => {
+          formData.append("files", file);
         });
-        formData.append("fileCount", batch.length.toString());
         formData.append("carId", carId);
         if (selectedPromptId) {
           formData.append("selectedPromptId", selectedPromptId);
@@ -209,104 +203,112 @@ export function useImageUploader({
         });
 
         try {
-          // Get authentication token for manual fetch call (needed for streaming)
-          const token = await getValidToken();
-
-          const response = await fetch("/api/cloudflare/images", {
+          const response = await fetch("/api/images/upload", {
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
             body: formData,
             signal: controller.signal,
           });
 
-          if (!response.ok || !response.body) {
-            throw new Error("Upload failed");
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(
+              errorData.error || `Upload failed: ${response.statusText}`
+            );
           }
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value);
-            const lines = chunk.split("\n\n");
-            for (const line of lines) {
-              if (!line.startsWith("data: ")) continue;
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.fileName && data.status === "complete") {
-                  const file = batch.find((f) => f.name === data.fileName);
-                  if (file) {
-                    updateProgress(file, {
-                      progress: 100,
-                      status: "complete",
-                      currentStep: "Complete",
-                    });
+
+          const data = await response.json();
+
+          if (!data.success || !data.images || data.images.length === 0) {
+            throw new Error(
+              data.error || "No images were uploaded successfully"
+            );
+          }
+
+          // ✅ Now analyze each uploaded image
+          for (let i = 0; i < data.images.length; i++) {
+            const uploadedImage = data.images[i];
+            const file = batch[i];
+
+            try {
+              // Update progress to analyzing
+              updateProgress(file, {
+                progress: 75,
+                status: "analyzing",
+                currentStep: "Analyzing image with AI...",
+              });
+
+              // Call analysis API
+              const analysisResponse = await fetch(
+                "/api/openai/analyze-image",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    imageUrl: uploadedImage.url,
+                    promptId: selectedPromptId,
+                    modelId: selectedModelId,
+                  }),
+                  signal: controller.signal,
+                }
+              );
+
+              if (analysisResponse.ok) {
+                const analysisData = await analysisResponse.json();
+                console.log(
+                  "✅ Image analysis completed:",
+                  analysisData.analysis
+                );
+
+                // Update the image metadata in MongoDB
+                if (uploadedImage.cloudflareId) {
+                  try {
+                    await fetch(
+                      `/api/cloudflare/metadata/${uploadedImage.cloudflareId}`,
+                      {
+                        method: "PATCH",
+                        headers: {
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                          metadata: {
+                            ...uploadedImage.metadata,
+                            ...analysisData.analysis,
+                            aiAnalysis: analysisData.analysis,
+                          },
+                        }),
+                      }
+                    );
+                    console.log(
+                      "✅ Metadata updated in database for",
+                      file.name
+                    );
+                  } catch (metadataError) {
+                    console.warn(
+                      "Failed to update metadata in database:",
+                      metadataError
+                    );
                   }
                 }
-                if (data.fileName) {
-                  const file = batch.find((f) => f.name === data.fileName);
-                  if (!file) continue;
-                  const current = progress.find(
-                    (p) => p.id === getFileId(file)
-                  );
-                  if (
-                    current &&
-                    (current.status === "complete" ||
-                      current.status === "error" ||
-                      current.progress === 100)
-                  ) {
-                    continue; // Ignore further updates for completed/errored files
-                  }
-                  if (data.status === "error") {
-                    updateProgress(file, {
-                      status: "error",
-                      currentStep: "Failed",
-                      error: data.error || "Failed to upload",
-                    });
-                    hasError = true;
-                  } else if (data.status === "analyzing") {
-                    updateProgress(file, {
-                      progress: data.progress ?? 70,
-                      status: "analyzing",
-                      currentStep: data.currentStep || "Analyzing...",
-                    });
-                  } else if (data.status === "uploading") {
-                    updateProgress(file, {
-                      progress: data.progress ?? 10,
-                      status: "uploading",
-                      currentStep: data.currentStep || "Uploading...",
-                    });
-                  } else if (data.progress) {
-                    updateProgress(file, {
-                      progress: data.progress,
-                      currentStep: data.currentStep,
-                    });
-                  }
-                }
-                if (data.type === "error") {
-                  batch.forEach((file) => {
-                    updateProgress(file, {
-                      status: "error",
-                      currentStep: "Failed",
-                      error: data.error || "Unknown server error",
-                    });
-                  });
-                  hasError = true;
-                }
-              } catch (e) {
-                batch.forEach((file) => {
-                  updateProgress(file, {
-                    status: "error",
-                    currentStep: "Failed",
-                    error: `Parse error: ${e}`,
-                  });
-                });
-                hasError = true;
+              } else {
+                console.warn("Image analysis failed for", file.name);
               }
+            } catch (analysisError) {
+              console.error("Error analyzing image:", analysisError);
             }
           }
+
+          // Update progress for successful uploads
+          batch.forEach((file, index) => {
+            if (data.images[index]) {
+              updateProgress(file, {
+                progress: 100,
+                status: "complete",
+                currentStep: "Upload and analysis complete",
+              });
+            }
+          });
         } catch (err: any) {
           if (err.name === "AbortError") {
             batch.forEach((file) => {
@@ -351,6 +353,7 @@ export function useImageUploader({
       }
     },
     [
+      api,
       carId,
       actions,
       toast,

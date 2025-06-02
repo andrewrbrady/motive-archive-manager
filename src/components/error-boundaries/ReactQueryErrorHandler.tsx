@@ -39,21 +39,38 @@ export function ReactQueryErrorHandler({
       }
     };
 
-    // Set up global error handling for React Query
-    // This will catch errors that aren't handled by individual queries
+    // ✅ Enhanced error handling - be more specific about what we intercept
     const originalConsoleError = console.error;
     console.error = (...args) => {
-      // Check if the error is from React Query and contains auth keywords
+      // Only intercept specific React Query error patterns
       const errorMessage = args.join(" ");
+
+      // ✅ Skip image loading errors and other component errors
       if (
-        errorMessage.includes("Query failed") ||
-        errorMessage.includes("Mutation failed")
+        errorMessage.includes("Image failed to load") ||
+        errorMessage.includes("ProjectAvatar:") ||
+        errorMessage.includes("CarAvatar:") ||
+        errorMessage.includes("createConsoleError") ||
+        errorMessage.includes("React error boundary")
+      ) {
+        // Let these pass through without intervention
+        originalConsoleError(...args);
+        return;
+      }
+
+      // Only handle actual React Query errors
+      if (
+        (errorMessage.includes("Query failed") ||
+          errorMessage.includes("Mutation failed") ||
+          errorMessage.includes("React Query")) &&
+        !errorMessage.includes("Avatar") // Extra safety for avatar components
       ) {
         const error = args.find((arg) => arg instanceof Error);
         if (error && isAuthenticationError(error)) {
           handleQueryError(error);
         }
       }
+
       originalConsoleError(...args);
     };
 

@@ -148,11 +148,47 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   });
 
   // Derive length from selected prompt template
-  const derivedLength = promptHandlers.selectedPrompt
-    ? memoizedData.lengthSettings.find(
-        (l) => l.key === promptHandlers.selectedPrompt?.length
-      ) || null
-    : null;
+  const derivedLength = useMemo(() => {
+    if (!promptHandlers.selectedPrompt) return null;
+
+    // Try to find matching length setting
+    const matchedLength = memoizedData.lengthSettings.find(
+      (l) => l.key === promptHandlers.selectedPrompt?.length
+    );
+
+    if (matchedLength) return matchedLength;
+
+    // Fallback: try to find "standard" as default
+    const standardLength = memoizedData.lengthSettings.find(
+      (l) => l.key === "standard"
+    );
+
+    if (standardLength) {
+      console.warn(
+        `🚨 BaseCopywriter: Prompt template "${promptHandlers.selectedPrompt.name}" has invalid length "${promptHandlers.selectedPrompt.length}". Falling back to "standard".`
+      );
+      return standardLength;
+    }
+
+    // Last resort: use first available length setting
+    if (memoizedData.lengthSettings.length > 0) {
+      console.warn(
+        `🚨 BaseCopywriter: No "standard" length found. Using first available: "${memoizedData.lengthSettings[0].key}"`
+      );
+      return memoizedData.lengthSettings[0];
+    }
+
+    // Ultimate fallback: create a default length setting
+    console.error(
+      "🚨 BaseCopywriter: No length settings available. Using hardcoded default."
+    );
+    return {
+      key: "standard",
+      name: "Standard",
+      description: "2-3 lines",
+      instructions: "Write a standard length caption of 2-3 lines.",
+    };
+  }, [promptHandlers.selectedPrompt, memoizedData.lengthSettings]);
 
   // Generation handlers - must be called before any early returns
   const { generationState, generateCaption, updateGeneratedCaption } =

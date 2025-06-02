@@ -68,6 +68,20 @@ export async function verifyFirebaseToken(
         }
       );
 
+      // ✅ Enhanced token validation - check if token is expired
+      if (firebaseError.code === "auth/id-token-expired") {
+        console.log(
+          "🔒 verifyFirebaseToken: Token expired, returning null for refresh"
+        );
+        return null;
+      }
+
+      // ✅ Enhanced token validation - check if token is invalid format
+      if (firebaseError.code === "auth/argument-error") {
+        console.log("🔒 verifyFirebaseToken: Invalid token format");
+        return null;
+      }
+
       // If Firebase Auth verification fails, check if it's an API token
       // Only check API tokens if the token is reasonably short (not a JWT)
       if (token.length < 500) {
@@ -75,38 +89,49 @@ export async function verifyFirebaseToken(
           "🔒 verifyFirebaseToken: Attempting API token verification..."
         );
 
-        const tokensSnapshot = await adminDb
-          .collection("api_tokens")
-          .where("token", "==", token)
-          .where("expiresAt", ">", new Date())
-          .limit(1)
-          .get();
+        try {
+          const tokensSnapshot = await adminDb
+            .collection("api_tokens")
+            .where("token", "==", token)
+            .where("expiresAt", ">", new Date())
+            .limit(1)
+            .get();
 
-        if (!tokensSnapshot.empty) {
-          const tokenDoc = tokensSnapshot.docs[0];
-          console.log(
-            "✅ verifyFirebaseToken: API token verified successfully",
-            {
+          if (!tokensSnapshot.empty) {
+            const tokenDoc = tokensSnapshot.docs[0];
+            console.log(
+              "✅ verifyFirebaseToken: API token verified successfully",
+              {
+                userId: tokenDoc.data().userId,
+                userEmail: tokenDoc.data().userEmail,
+              }
+            );
+
+            // Update last used
+            await tokenDoc.ref.update({ lastUsed: new Date() });
+
+            return {
               userId: tokenDoc.data().userId,
               userEmail: tokenDoc.data().userEmail,
+              tokenType: "api_token",
+            };
+          } else {
+            console.log(
+              "❌ verifyFirebaseToken: API token not found or expired"
+            );
+          }
+        } catch (apiTokenError: any) {
+          console.log(
+            "⚠️ verifyFirebaseToken: API token verification failed:",
+            {
+              error: apiTokenError.message,
             }
           );
-
-          // Update last used
-          await tokenDoc.ref.update({ lastUsed: new Date() });
-
-          return {
-            userId: tokenDoc.data().userId,
-            userEmail: tokenDoc.data().userEmail,
-            tokenType: "api_token",
-          };
-        } else {
-          console.log("❌ verifyFirebaseToken: API token not found or expired");
         }
       }
 
-      // If both Firebase Auth and API token verification fail, throw the original error
-      throw firebaseError;
+      // If both Firebase Auth and API token verification fail, return null
+      return null;
     }
   } catch (error: any) {
     console.error("💥 verifyFirebaseToken: Error verifying token:", {
@@ -143,7 +168,8 @@ export async function verifyAuthMiddleware(
     return NextResponse.json(
       {
         error: "Authentication required",
-        details: "Missing or invalid authorization token",
+        details:
+          "Missing or invalid authorization token. Please sign in and try again.",
         code: "MISSING_AUTH_HEADER",
       },
       { status: 401 }
@@ -156,6 +182,7 @@ export async function verifyAuthMiddleware(
     tokenLength: token?.length || 0,
   });
 
+  // ✅ Enhanced token validation with better error handling
   const tokenData = await verifyFirebaseToken(token);
 
   if (!tokenData) {
@@ -163,7 +190,8 @@ export async function verifyAuthMiddleware(
     return NextResponse.json(
       {
         error: "Authentication failed",
-        details: "Invalid or expired token",
+        details:
+          "Your session has expired or is invalid. Please sign in again.",
         code: "INVALID_TOKEN",
       },
       { status: 401 }
@@ -201,7 +229,8 @@ export async function verifyAuthMiddleware(
             return NextResponse.json(
               {
                 error: "Access denied",
-                details: "Insufficient permissions",
+                details:
+                  "You don't have sufficient permissions to access this resource.",
                 code: "INSUFFICIENT_PERMISSIONS",
               },
               { status: 403 }
@@ -212,7 +241,8 @@ export async function verifyAuthMiddleware(
           return NextResponse.json(
             {
               error: "User not found",
-              details: "User data not found in database",
+              details:
+                "User data not found in database. Please contact support.",
               code: "USER_NOT_FOUND",
             },
             { status: 404 }
@@ -226,7 +256,7 @@ export async function verifyAuthMiddleware(
         return NextResponse.json(
           {
             error: "Internal server error",
-            details: "Failed to verify user permissions",
+            details: "Failed to verify user permissions. Please try again.",
             code: "INTERNAL_ERROR",
           },
           { status: 500 }
@@ -247,7 +277,8 @@ export async function verifyAuthMiddleware(
         return NextResponse.json(
           {
             error: "Access denied",
-            details: "Insufficient permissions",
+            details:
+              "You don't have sufficient permissions to access this resource.",
             code: "INSUFFICIENT_PERMISSIONS",
           },
           { status: 403 }
@@ -281,27 +312,41 @@ export function withFirebaseAuth<T = any>(
       requiredRoles,
     });
 
-    const authResult = await verifyAuthMiddleware(request, requiredRoles);
-    if (authResult) {
-      console.log(
-        "❌ withFirebaseAuth: Authentication failed, returning error response"
-      );
-      return authResult as NextResponse<AuthErrorResponse>;
-    }
-
-    console.log(
-      "✅ withFirebaseAuth: Authentication successful, calling handler"
-    );
-    // Authentication succeeded, call the handler with the context if provided
+    // ✅ Enhanced authentication with graceful error handling
     try {
-      return await handler(request, context);
-    } catch (error: any) {
-      console.error("💥 withFirebaseAuth: Handler error:", error);
+      const authResult = await verifyAuthMiddleware(request, requiredRoles);
+      if (authResult) {
+        console.log(
+          "❌ withFirebaseAuth: Authentication failed, returning error response"
+        );
+        return authResult as NextResponse<AuthErrorResponse>;
+      }
+
+      console.log(
+        "✅ withFirebaseAuth: Authentication successful, calling handler"
+      );
+      // Authentication succeeded, call the handler with the context if provided
+      try {
+        return await handler(request, context);
+      } catch (handlerError: any) {
+        console.error("💥 withFirebaseAuth: Handler error:", handlerError);
+        return NextResponse.json(
+          {
+            error: "Internal server error",
+            details: handlerError.message || "An unexpected error occurred.",
+            code: "HANDLER_ERROR",
+          },
+          { status: 500 }
+        ) as NextResponse<AuthErrorResponse>;
+      }
+    } catch (authError: any) {
+      console.error("💥 withFirebaseAuth: Authentication error:", authError);
       return NextResponse.json(
         {
-          error: "Internal server error",
-          details: error.message,
-          code: "HANDLER_ERROR",
+          error: "Authentication error",
+          details:
+            "An unexpected error occurred during authentication. Please try again.",
+          code: "AUTH_ERROR",
         },
         { status: 500 }
       ) as NextResponse<AuthErrorResponse>;

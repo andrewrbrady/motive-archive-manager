@@ -195,6 +195,7 @@ export interface StandardizedCar {
   specifications?: Car["specifications"];
   features?: string[];
   imageIds: string[];
+  primaryImageId?: string;
   images: Array<{
     _id: string;
     car_id: string;

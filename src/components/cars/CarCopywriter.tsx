@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { CarSelection } from "../projects/caption-generator/CarSelection";
 import { EventSelection } from "../projects/caption-generator/EventSelection";
@@ -101,11 +101,45 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
   });
 
   // Derive length from selected prompt template (using promptHandlers state)
-  const derivedLength = promptHandlers.selectedPrompt
-    ? lengthSettings.find(
-        (l) => l.key === promptHandlers.selectedPrompt?.length
-      ) || null
-    : null;
+  const derivedLength = useMemo(() => {
+    if (!promptHandlers.selectedPrompt) return null;
+
+    // Try to find matching length setting
+    const matchedLength = lengthSettings.find(
+      (l) => l.key === promptHandlers.selectedPrompt?.length
+    );
+
+    if (matchedLength) return matchedLength;
+
+    // Fallback: try to find "standard" as default
+    const standardLength = lengthSettings.find((l) => l.key === "standard");
+
+    if (standardLength) {
+      console.warn(
+        `🚨 CarCopywriter: Prompt template "${promptHandlers.selectedPrompt.name}" has invalid length "${promptHandlers.selectedPrompt.length}". Falling back to "standard".`
+      );
+      return standardLength;
+    }
+
+    // Last resort: use first available length setting
+    if (lengthSettings.length > 0) {
+      console.warn(
+        `🚨 CarCopywriter: No "standard" length found. Using first available: "${lengthSettings[0].key}"`
+      );
+      return lengthSettings[0];
+    }
+
+    // Ultimate fallback: create a default length setting
+    console.error(
+      "🚨 CarCopywriter: No length settings available. Using hardcoded default."
+    );
+    return {
+      key: "standard",
+      name: "Standard",
+      description: "2-3 lines",
+      instructions: "Write a standard length caption of 2-3 lines.",
+    };
+  }, [promptHandlers.selectedPrompt, lengthSettings]);
 
   // Generation handlers - must be called before any early returns
   const { generationState, generateCaption, updateGeneratedCaption } =
@@ -446,6 +480,7 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
           color: carDetails.color,
           vin: carDetails.vin,
           status: "available", // Default status for individual car
+          primaryImageId: (carDetails as any).primaryImageId,
           createdAt: new Date().toISOString(), // Default createdAt
         },
       ]

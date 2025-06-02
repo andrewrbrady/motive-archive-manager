@@ -53,7 +53,9 @@ export function useGenerationHandlers() {
       }
 
       if (!context.derivedLength) {
-        return "Selected prompt template does not have a valid length setting";
+        console.warn(
+          "🚨 Car Copywriter: Selected prompt template does not have a valid length setting. Using fallback default."
+        );
       }
 
       if (!formState.context.trim()) {
@@ -144,7 +146,7 @@ export function useGenerationHandlers() {
           temperature: formState.temperature,
           tone: formState.tone,
           style: formState.style,
-          length: context.derivedLength!.key,
+          length: context.derivedLength?.key || "standard",
           template: formState.context, // This might need adjustment based on your API
           aiModel: formState.model,
           projectId: context.projectId,

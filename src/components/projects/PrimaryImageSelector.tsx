@@ -142,6 +142,36 @@ function Pagination({
   );
 }
 
+// Helper function to format Cloudflare URLs for avatars/thumbnails
+function formatImageUrlForPreview(url: string): string {
+  if (
+    url &&
+    url.includes("imagedelivery.net") &&
+    !url.match(
+      /\/(public|thumbnail|avatar|medium|large|webp|preview|original|w=\d+)$/
+    )
+  ) {
+    // Use flexible variants for dynamic resizing for thumbnails/previews
+    return `${url}/w=300,h=300,fit=cover`;
+  }
+  return url;
+}
+
+// Helper function to format Cloudflare URLs for selected image display
+function formatImageUrlForSelected(url: string): string {
+  if (
+    url &&
+    url.includes("imagedelivery.net") &&
+    !url.match(
+      /\/(public|thumbnail|avatar|medium|large|webp|preview|original|w=\d+)$/
+    )
+  ) {
+    // Use smaller size for the selected image thumbnail
+    return `${url}/w=64,h=64,fit=cover`;
+  }
+  return url;
+}
+
 export function PrimaryImageSelector({
   selectedImageId,
   onImageSelect,
@@ -496,7 +526,7 @@ export function PrimaryImageSelector({
                         >
                           <div className="relative flex-1 flex items-center justify-center bg-background">
                             <img
-                              src={image.url}
+                              src={formatImageUrlForPreview(image.url)}
                               alt={image.filename}
                               className="max-w-full max-h-[300px] w-auto h-auto object-contain"
                               loading="lazy"
@@ -545,7 +575,7 @@ export function PrimaryImageSelector({
             <div className="flex items-center gap-3">
               {selectedImageInfo && (
                 <img
-                  src={selectedImageInfo.url}
+                  src={formatImageUrlForSelected(selectedImageInfo.url)}
                   alt={selectedImageInfo.filename}
                   className="w-16 h-16 object-cover rounded"
                 />

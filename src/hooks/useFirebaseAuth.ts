@@ -91,20 +91,33 @@ export function useFirebaseAuth() {
         }
         return true;
       } catch (apiError: any) {
-        // API validation failed, but Firebase token is valid
-        // Only log warnings in development to reduce console noise
-        if (process.env.NODE_ENV === "development") {
+        // ✅ Enhanced API validation error handling
+        if (apiError.status === 401) {
           console.warn(
-            "⚠️ useFirebaseAuth: API validation failed, but Firebase token is valid:",
-            {
-              message: apiError?.message,
-              status: apiError?.status,
-            }
+            "⚠️ useFirebaseAuth: API validation failed - token may be expired"
           );
+          return false; // Token needs refresh
+        } else if (apiError.message?.includes("Failed to fetch")) {
+          // Network error - trust Firebase validation
+          if (process.env.NODE_ENV === "development") {
+            console.warn(
+              "⚠️ useFirebaseAuth: Network error during API validation, trusting Firebase token"
+            );
+          }
+          return true;
+        } else {
+          // Other API errors - trust Firebase validation for progressive auth
+          if (process.env.NODE_ENV === "development") {
+            console.warn(
+              "⚠️ useFirebaseAuth: API validation failed, but Firebase token is valid:",
+              {
+                message: apiError?.message,
+                status: apiError?.status,
+              }
+            );
+          }
+          return true;
         }
-
-        // For progressive auth, trust Firebase validation
-        return true;
       }
     } catch (error: any) {
       console.error("💥 useFirebaseAuth: Token validation error:", {
@@ -112,8 +125,16 @@ export function useFirebaseAuth() {
         status: error?.status,
         code: error?.code,
         details: error?.details,
-        fullError: error,
       });
+
+      // ✅ Enhanced Firebase token validation fallback
+      if (
+        error.code === "auth/user-token-expired" ||
+        error.code === "auth/id-token-expired"
+      ) {
+        console.log("🔄 useFirebaseAuth: Token expired, needs refresh");
+        return false;
+      }
 
       // If Firebase token validation fails, fall back to basic token check
       try {

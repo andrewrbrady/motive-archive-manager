@@ -184,6 +184,7 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
           color: carData.color,
           vin: carData.vin,
           status: carData.status || "available",
+          primaryImageId: carData.primaryImageId,
           createdAt: new Date().toISOString(),
         };
 

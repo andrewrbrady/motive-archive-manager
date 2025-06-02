@@ -47,7 +47,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const uploadFile = async (file: File): Promise<UploadResponse> => {
     return new Promise(async (resolve, reject) => {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("files", file);
       formData.append("metadata", JSON.stringify(metadata));
       if (carId) {
         formData.append("carId", carId);
@@ -60,49 +60,41 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       });
 
       try {
-        // Get auth token for XMLHttpRequest
-        const token = await getValidToken();
-
-        const xhr = new XMLHttpRequest();
-
-        // Track upload progress
-        xhr.upload.addEventListener("progress", (event) => {
-          if (event.lengthComputable) {
-            // Scale progress to 0-75% during upload
-            const uploadProgress = Math.round(
-              (event.loaded * 75) / event.total
-            );
-            onImageProgress?.({
-              fileName: file.name,
-              progress: uploadProgress,
-              status: "uploading",
-            });
-          }
+        const response = await fetch("/api/images/upload", {
+          method: "POST",
+          body: formData,
         });
 
-        xhr.onload = async () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const response = JSON.parse(xhr.responseText);
-              resolve({
-                imageUrl: response.imageUrl,
-                metadata: response.metadata,
-              });
-            } catch (error) {
-              reject(new Error("Failed to parse upload response"));
-            }
-          } else {
-            reject(new Error("Upload failed"));
-          }
-        };
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.error || `Upload failed: ${response.statusText}`
+          );
+        }
 
-        xhr.onerror = () => {
-          reject(new Error("Upload failed"));
-        };
+        const data = await response.json();
 
-        xhr.open("POST", "/api/cloudflare/images");
-        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-        xhr.send(formData);
+        if (!data.success || !data.images || data.images.length === 0) {
+          throw new Error(data.error || "No images were uploaded successfully");
+        }
+
+        const uploadedImage = data.images[0];
+        let imageUrl = uploadedImage.url;
+
+        if (
+          imageUrl &&
+          imageUrl.includes("imagedelivery.net") &&
+          !imageUrl.match(
+            /\/(public|thumbnail|avatar|medium|large|webp|preview|original|w=\d+)$/
+          )
+        ) {
+          imageUrl = `${imageUrl}/w=200,h=200,fit=cover`;
+        }
+
+        resolve({
+          imageUrl: imageUrl,
+          metadata: uploadedImage.metadata || {},
+        });
       } catch (error) {
         reject(error);
       }
@@ -131,7 +123,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       const { imageUrl, metadata: uploadMetadata } =
         await uploadFile(firstFile);
 
-      // Update progress to 75% when starting analysis
       onImageProgress?.({
         fileName: firstFile.name,
         progress: 75,
@@ -145,7 +136,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           vehicleInfo: metadata?.vehicleInfo,
         })) as { analysis: any };
 
-        // Update to 100% only after analysis is complete
         onImageProgress?.({
           fileName: firstFile.name,
           progress: 100,
@@ -157,10 +147,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           },
         });
 
-        // Show first image immediately
         onUploadComplete?.([imageUrl]);
 
-        // Upload remaining files in the background
         if (files.length > 1) {
           const remainingFiles = files.slice(1);
           const uploadRemainingFiles = async () => {
@@ -229,7 +217,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             }
           };
 
-          // Start background upload
           uploadRemainingFiles();
         }
       } catch (error) {

@@ -176,7 +176,7 @@ class APIClient {
         },
       });
 
-      // Handle 401 errors with automatic token refresh and retry
+      // ✅ Enhanced 401 error handling with better retry logic
       if (response.status === 401 && !skipAuth && this.retryAttempts > 0) {
         console.log(
           "🔄 APIClient: Got 401, attempting token refresh and retry..."
@@ -201,18 +201,15 @@ class APIClient {
           }
 
           return this.handleResponse<T>(retryResponse);
-        } catch (refreshError) {
+        } catch (refreshError: any) {
           console.error("💥 APIClient: Token refresh failed:", refreshError);
-          throw new Error("Authentication failed - please sign in again");
+          throw new Error("Session expired - please sign in again");
         }
       }
 
       return this.handleResponse<T>(response);
     } catch (error: any) {
-      console.error(
-        `💥 APIClient: ${requestOptions.method || "GET"} ${url} failed:`,
-        error
-      );
+      console.error(`💥 APIClient: Request failed for ${url}:`, error);
       throw this.createAPIError(error, url);
     }
   }
