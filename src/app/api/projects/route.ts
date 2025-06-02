@@ -16,7 +16,6 @@ import {
 import { ObjectId } from "mongodb";
 import { ProjectTemplate } from "@/models/ProjectTemplate";
 import { convertProjectForFrontend } from "@/utils/objectId";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
 
 async function createProject(request: NextRequest) {
   console.log("🔒 POST /api/projects: Starting request");
@@ -303,12 +302,9 @@ async function createProject(request: NextRequest) {
 }
 
 async function getProjects(request: NextRequest) {
-  console.log("🔒 GET /api/projects: Starting request");
-
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
   if (authResult) {
-    console.log("❌ GET /api/projects: Authentication failed");
     return authResult;
   }
 
@@ -327,13 +323,7 @@ async function getProjects(request: NextRequest) {
 
     const userId = getUserIdFromToken(tokenData);
 
-    console.log("Projects API: Session check", {
-      hasSession: true,
-      userId: userId,
-    });
-
     const db = await getDatabase();
-    console.log("Projects API: Database connection established");
 
     const { searchParams } = new URL(request.url);
 
@@ -341,77 +331,83 @@ async function getProjects(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const sort = searchParams.get("sort") || "createdAt_desc";
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const pageSize = Math.min(
+      parseInt(
+        searchParams.get("pageSize") || searchParams.get("limit") || "20"
+      ),
+      50 // Maximum page size for performance (projects are more complex than events)
+    );
     const status = searchParams.get("status");
     const type = searchParams.get("type");
     const clientId = searchParams.get("clientId");
     const ownerId = searchParams.get("ownerId");
     const includeImages = searchParams.get("includeImages") === "true";
 
-    console.log("Projects API: Query parameters", {
-      search,
-      sort,
-      page,
-      limit,
-      status,
-      type,
-      clientId,
-      ownerId,
-      includeImages,
-    });
-
-    // Build query
-    const query: any = {
+    // Build base match query
+    const matchQuery: any = {
       $or: [{ ownerId: userId }, { "members.userId": userId }],
     };
 
-    // Add search
-    if (search) {
-      query.$and = query.$and || [];
-      query.$and.push({
-        $or: [
-          { title: { $regex: search, $options: "i" } },
-          { description: { $regex: search, $options: "i" } },
-          { tags: { $in: [new RegExp(search, "i")] } },
-        ],
-      });
+    // Enhanced search implementation following cars/deliverables pattern
+    if (search && search.trim()) {
+      const searchTerms = search.trim().split(/\s+/).filter(Boolean);
+
+      if (searchTerms.length > 0) {
+        const searchConditions: any[] = [];
+
+        searchTerms.forEach((term) => {
+          // Escape special regex characters to prevent errors
+          const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const searchRegex = new RegExp(escapedTerm, "i");
+
+          // Apply search to primary fields
+          searchConditions.push(
+            { title: searchRegex },
+            { description: searchRegex },
+            { tags: { $in: [searchRegex] } }
+          );
+        });
+
+        // For multi-word searches, also try to match the full search term
+        if (searchTerms.length > 1) {
+          const fullSearchRegex = new RegExp(
+            search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+            "i"
+          );
+          searchConditions.push(
+            { title: fullSearchRegex },
+            { description: fullSearchRegex },
+            { tags: { $in: [fullSearchRegex] } }
+          );
+        }
+
+        // Combine with existing $and conditions or create new ones
+        if (matchQuery.$and) {
+          matchQuery.$and.push({ $or: searchConditions });
+        } else {
+          matchQuery.$and = [{ $or: searchConditions }];
+        }
+      }
     }
 
     // Add filters
     if (status) {
       const statusArray = status.split(",");
-      query.status = { $in: statusArray };
+      matchQuery.status = { $in: statusArray };
     }
 
     if (type) {
       const typeArray = type.split(",");
-      query.type = { $in: typeArray };
+      matchQuery.type = { $in: typeArray };
     }
 
     if (clientId) {
-      query.clientId = clientId;
+      matchQuery.clientId = clientId;
     }
 
     if (ownerId) {
-      query.ownerId = ownerId;
+      matchQuery.ownerId = ownerId;
     }
-
-    console.log("Projects API: Final query", JSON.stringify(query, null, 2));
-
-    // Debug: Check all projects in database vs user-accessible projects
-    const allProjects = await db.collection("projects").find({}).toArray();
-    console.log("Projects API: All projects in database:", {
-      totalProjects: allProjects.length,
-      projects: allProjects.map((p) => ({
-        id: p._id,
-        title: p.title,
-        ownerId: p.ownerId,
-        members:
-          p.members?.map((m: any) => ({ userId: m.userId, role: m.role })) ||
-          [],
-        currentUserId: userId,
-      })),
-    });
 
     // Parse sort parameter
     const [sortField, sortOrder] = sort.split("_");
@@ -420,140 +416,151 @@ async function getProjects(request: NextRequest) {
         sortOrder === "desc" ? -1 : 1,
     } as const;
 
-    console.log("Projects API: Sort options", sortOptions);
-
     // Calculate pagination
-    const skip = (page - 1) * limit;
+    const skip = (page - 1) * pageSize;
 
-    // Execute query
-    console.log("Projects API: Executing database query...");
-    const [projects, total] = await Promise.all([
-      db
-        .collection("projects")
-        .find(query)
-        .sort(sortOptions)
-        .skip(skip)
-        .limit(limit)
-        .toArray(),
-      db.collection("projects").countDocuments(query),
-    ]);
+    // Build aggregation pipeline similar to cars API
+    const pipeline: any[] = [{ $match: matchQuery }];
 
-    console.log("Projects API: Query results", {
-      projectsFound: projects.length,
-      totalCount: total,
-      firstProjectTitle: projects[0]?.title || "No projects",
-    });
-
-    // Debug: Log primary image IDs from projects
-    console.log(
-      "Projects API: Primary image IDs in projects:",
-      projects.map((p) => ({
-        id: p._id,
-        title: p.title,
-        primaryImageId: p.primaryImageId,
-        primaryImageIdString: p.primaryImageId?.toString(),
-        hasPrimaryImageId: !!p.primaryImageId,
-      }))
-    );
-
-    // ✅ Fetch primary image URLs if requested
-    let projectsWithImages = projects;
+    // Add image lookup if requested - using exact working pattern from cars/list API
     if (includeImages) {
-      console.log("Projects API: Fetching primary image URLs...");
-
-      // Get all unique image IDs
-      const imageIds = projects
-        .map((p) => p.primaryImageId)
-        .filter(Boolean)
-        .map((id) => new ObjectId(id));
-
-      console.log(
-        "Projects API: Image IDs to fetch:",
-        imageIds.map((id) => id.toString())
+      console.log("🔍 [DEBUG] Adding image lookup to projects pipeline");
+      pipeline.push(
+        // First, look up the primary image if set (exact copy from cars/list API)
+        {
+          $lookup: {
+            from: "images",
+            let: {
+              primaryId: {
+                $cond: [
+                  { $ifNull: ["$primaryImageId", false] },
+                  { $toObjectId: "$primaryImageId" },
+                  null,
+                ],
+              },
+            },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [{ $eq: ["$_id", "$$primaryId"] }],
+                  },
+                },
+              },
+              { $limit: 1 },
+            ],
+            as: "primaryImageData",
+          },
+        },
+        // Add the primaryImageUrl field using corrected logic
+        {
+          $addFields: {
+            primaryImageUrl: {
+              $cond: {
+                if: { $gt: [{ $size: "$primaryImageData" }, 0] },
+                then: { $arrayElemAt: ["$primaryImageData.url", 0] },
+                else: null,
+              },
+            },
+          },
+        },
+        // Remove the temporary primaryImageData field
+        {
+          $unset: "primaryImageData",
+        }
       );
-
-      if (imageIds.length > 0) {
-        // Batch fetch all images
-        const images = await db
-          .collection("images")
-          .find({
-            _id: { $in: imageIds },
-          })
-          .toArray();
-
-        console.log(
-          "Projects API: Found images:",
-          images.map((img) => ({
-            id: img._id.toString(),
-            url: img.url,
-            filename: img.filename,
-          }))
-        );
-
-        // Create a map of imageId -> imageUrl
-        const imageUrlMap = new Map();
-        images.forEach((img) => {
-          // Format the image URL with the proper variant for display in project cards
-          const formattedUrl = getFormattedImageUrl(img.url, "public");
-          imageUrlMap.set(img._id.toString(), formattedUrl);
-        });
-
-        console.log(
-          "Projects API: Image URL map:",
-          Array.from(imageUrlMap.entries())
-        );
-
-        // Add image URLs to projects
-        projectsWithImages = projects.map((project) => ({
-          ...project,
-          primaryImageUrl: project.primaryImageId
-            ? imageUrlMap.get(project.primaryImageId.toString())
-            : null,
-        }));
-
-        console.log(
-          "Projects API: Projects with images:",
-          projectsWithImages.map((p) => ({
-            id: p._id,
-            title: p.title,
-            primaryImageId: p.primaryImageId,
-            primaryImageIdString: p.primaryImageId?.toString(),
-            primaryImageUrl: p.primaryImageUrl,
-            lookupKey: p.primaryImageId?.toString(),
-            foundInMap: p.primaryImageId
-              ? imageUrlMap.has(p.primaryImageId.toString())
-              : false,
-          }))
-        );
-
-        console.log("Projects API: Added image URLs", {
-          imagesFound: images.length,
-          projectsWithImages: projectsWithImages.filter(
-            (p) => p.primaryImageUrl
-          ).length,
-        });
-      } else {
-        console.log("Projects API: No image IDs to fetch");
-      }
     }
 
-    const response: ProjectListResponse = {
-      projects: projectsWithImages.map((project) =>
-        convertProjectForFrontend(project)
-      ) as IProject[],
-      total,
-      page,
-      limit,
-    };
+    // Add sorting and pagination
+    pipeline.push(
+      { $sort: sortOptions },
+      { $skip: skip },
+      { $limit: pageSize }
+    );
 
-    console.log("✅ GET /api/projects: Successfully fetched projects", {
-      projectsCount: response.projects.length,
-      total: response.total,
-    });
+    try {
+      // Execute aggregation and count with enhanced error handling
+      const [projects, totalResult] = await Promise.all([
+        db.collection("projects").aggregate(pipeline).toArray(),
+        db
+          .collection("projects")
+          .aggregate([{ $match: matchQuery }, { $count: "total" }])
+          .toArray(),
+      ]);
 
-    return NextResponse.json(response);
+      const total = totalResult[0]?.total || 0;
+      const totalPages = Math.ceil(total / pageSize);
+
+      console.log("🔍 [DEBUG] Raw projects from aggregation:", projects.length);
+
+      // Process images with simple URL fixing (direct approach)
+      const processedProjects = projects.map((project) => {
+        if (includeImages && project.primaryImageUrl) {
+          console.log(
+            "🔍 [DEBUG] Processing project image URL:",
+            project.primaryImageUrl
+          );
+
+          // Simple fix: ensure Cloudflare URLs have /public variant
+          let finalUrl = project.primaryImageUrl;
+          if (
+            finalUrl.includes("imagedelivery.net") &&
+            !finalUrl.includes("/public")
+          ) {
+            finalUrl = `${finalUrl}/public`;
+          }
+
+          console.log("🔍 [DEBUG] Final URL:", finalUrl);
+
+          return {
+            ...project,
+            primaryImageUrl: finalUrl,
+          };
+        }
+        return project;
+      });
+
+      // Enhanced response following cars/deliverables pattern
+      const response = NextResponse.json({
+        projects: processedProjects.map((project) =>
+          convertProjectForFrontend(project)
+        ) as IProject[],
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalCount: total,
+          pageSize,
+          // Legacy support
+          total,
+          page,
+          limit: pageSize,
+        },
+      });
+
+      // Add cache headers for better performance following cars/deliverables pattern
+      response.headers.set(
+        "Cache-Control",
+        "public, s-maxage=60, stale-while-revalidate=300"
+      );
+      response.headers.set("ETag", `"projects-${total}-${page}-${pageSize}"`);
+
+      return response;
+    } catch (dbError) {
+      console.error("Database operation error:", dbError);
+      console.error(
+        "Error stack:",
+        dbError instanceof Error ? dbError.stack : "No stack trace"
+      );
+      return NextResponse.json(
+        {
+          error: "Database operation failed",
+          details: dbError instanceof Error ? dbError.message : "Unknown error",
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error("💥 GET /api/projects: Error fetching projects:", error);
+    console.error("Error fetching projects:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
