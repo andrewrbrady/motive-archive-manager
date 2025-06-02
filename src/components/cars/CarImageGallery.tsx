@@ -7,9 +7,10 @@ import { ImageViewer } from "./gallery/ImageViewer";
 import { ImageThumbnails } from "./gallery/ImageThumbnails";
 import { ImageModal } from "./gallery/ImageModal";
 import { UploadDialog } from "./gallery/UploadDialog";
-import { EditModeControls } from "./gallery/EditModeControls";
+import EditModeToggle from "./EditModeToggle";
 import { NoResultsFound } from "./gallery/NoResultsFound";
 import { useToast } from "@/components/ui/use-toast";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface CarImageGalleryProps {
   carId: string;
@@ -29,6 +30,8 @@ export function CarImageGallery({
   onUploadEnded,
 }: CarImageGalleryProps) {
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const lastCopyTimeRef = useRef<number>(0);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -76,10 +79,25 @@ export function CarImageGallery({
     setShowImageInfo,
     handleUploadComplete,
     handleDeleteSelected,
+    handleDeleteSingle,
+    handleClearSelection,
+    handleSelectAll,
+    handleSelectNone,
     reanalyzeImage,
     handleSetPrimaryImage,
     loadMoreImages,
   } = useImageGallery(carId, vehicleInfo);
+
+  // Function to toggle edit mode via URL parameters
+  const toggleEditMode = useCallback(() => {
+    const params = new URLSearchParams(searchParams?.toString() || "");
+    if (isEditMode) {
+      params.delete("mode");
+    } else {
+      params.set("mode", "edit");
+    }
+    router.push(`?${params.toString()}`);
+  }, [isEditMode, searchParams, router]);
 
   // Enhanced URL copying with support for highest quality
   const copyImageUrl = useCallback(
@@ -149,7 +167,22 @@ export function CarImageGallery({
       }
 
       const isShiftPressed = event.shiftKey;
+      const isCtrlPressed = event.ctrlKey || event.metaKey; // Support both Ctrl and Cmd
       const key = event.key;
+
+      // Handle Ctrl/Cmd + Key combinations
+      if (isCtrlPressed) {
+        switch (key.toLowerCase()) {
+          case "a":
+            event.preventDefault();
+            // Select all images in edit mode
+            if (isEditMode && filteredImages.length > 0) {
+              handleSelectAll();
+            }
+            break;
+        }
+        return;
+      }
 
       // Handle Shift + Key combinations
       if (isShiftPressed) {
@@ -214,11 +247,17 @@ export function CarImageGallery({
               setCurrentPage(currentPage + 1);
             }
             break;
+
+          case "e":
+            event.preventDefault();
+            // Toggle edit mode
+            toggleEditMode();
+            break;
         }
         return;
       }
 
-      // Handle non-shift key combinations
+      // Handle non-modifier key combinations
       switch (key) {
         case "ArrowLeft":
           event.preventDefault();
@@ -234,6 +273,18 @@ export function CarImageGallery({
           event.preventDefault();
           if (isModalOpen) {
             setIsModalOpen(false);
+          } else if (isEditMode && selectedImages.size > 0) {
+            // Clear selection in edit mode when Escape is pressed
+            handleSelectNone();
+          }
+          break;
+
+        case "Delete":
+        case "Backspace":
+          event.preventDefault();
+          // Trigger batch delete when images are selected in edit mode
+          if (isEditMode && selectedImages.size > 0) {
+            handleDeleteSelected();
           }
           break;
       }
@@ -251,6 +302,12 @@ export function CarImageGallery({
       serverPagination,
       setCurrentPage,
       filteredImages,
+      isEditMode,
+      selectedImages.size,
+      handleSelectAll,
+      handleSelectNone,
+      handleDeleteSelected,
+      toggleEditMode,
     ]
   );
 
@@ -296,8 +353,16 @@ export function CarImageGallery({
   const hasExplicitSearch = hasActiveSearch && searchQuery.trim().length > 0;
   const shouldShowNoResults = hasExplicitFilters || hasExplicitSearch;
 
-  // SIMPLIFIED: Just use a clean spinner for all loading states
-  if (isLoading) {
+  // IMPROVED: Comprehensive loading check to prevent "Page 1 of 0" flash
+  // Show loading when:
+  // 1. Explicitly loading (isLoading)
+  // 2. Initial load not complete (isInitialLoad)
+  // 3. No data available yet and no active filters (prevents flash during initial data fetch)
+  if (
+    isLoading ||
+    isInitialLoad ||
+    (!hasImages && images.length === 0 && !hasActiveFilters && !hasActiveSearch)
+  ) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="flex flex-col items-center gap-3">
@@ -324,7 +389,12 @@ export function CarImageGallery({
   const hasActiveFiltersOrSearch = hasActiveFilters || hasActiveSearch;
 
   // Show upload dialog only when truly empty AND no active filters/search AND loading is complete
-  if (isTrulyEmpty && !hasActiveFiltersOrSearch && !isLoading) {
+  if (
+    isTrulyEmpty &&
+    !hasActiveFiltersOrSearch &&
+    !isLoading &&
+    !isInitialLoad
+  ) {
     return (
       <UploadDialog
         isOpen={isUploadDialogOpen}
@@ -337,27 +407,32 @@ export function CarImageGallery({
     );
   }
 
-  // SIMPLIFIED: Just show the normal gallery layout when loading is complete
-  // NoResultsFound will be handled within the gallery components if needed
-
   // Normal gallery view when we have filtered results
   return (
     <div className="space-y-4">
       {/* Filters */}
       {showFilters && (
-        <ImageFilters
-          filters={filters}
-          searchQuery={searchQuery}
-          filterOptions={filterOptions}
-          onFiltersChange={setFilters}
-          onSearchChange={setSearchQuery}
-          onUploadClick={() => setIsUploadDialogOpen(true)}
-        />
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1">
+            <ImageFilters
+              filters={filters}
+              searchQuery={searchQuery}
+              filterOptions={filterOptions}
+              onFiltersChange={setFilters}
+              onSearchChange={setSearchQuery}
+              onUploadClick={() => setIsUploadDialogOpen(true)}
+            />
+          </div>
+          <div className="flex-shrink-0">
+            <EditModeToggle isEditMode={isEditMode} />
+          </div>
+        </div>
       )}
 
       {/* Upload button when filters are hidden */}
       {!showFilters && (
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-2">
+          <EditModeToggle isEditMode={isEditMode} />
           <UploadDialog
             isOpen={isUploadDialogOpen}
             onOpenChange={setIsUploadDialogOpen}
@@ -367,14 +442,6 @@ export function CarImageGallery({
             showAsButton={true}
           />
         </div>
-      )}
-
-      {/* Edit Mode Controls */}
-      {isEditMode && selectedImages.size > 0 && (
-        <EditModeControls
-          selectedCount={selectedImages.size}
-          onDelete={handleDeleteSelected}
-        />
       )}
 
       {/* Main Gallery Layout */}
@@ -417,6 +484,10 @@ export function CarImageGallery({
             onReanalyze={reanalyzeImage}
             onSetPrimary={handleSetPrimaryImage}
             onLoadMore={loadMoreImages}
+            onDeleteSingle={handleDeleteSingle}
+            onSelectAll={handleSelectAll}
+            onSelectNone={handleSelectNone}
+            onDeleteSelected={handleDeleteSelected}
             serverPagination={serverPagination}
           />
         </div>

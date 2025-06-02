@@ -6,11 +6,38 @@ import React, {
   useState,
 } from "react";
 import { CloudflareImage } from "@/components/ui/CloudflareImage";
-import { CheckCircle, Star, Loader2 } from "lucide-react";
+import {
+  CheckCircle,
+  Star,
+  Loader2,
+  Trash2,
+  MoreVertical,
+  CheckSquare,
+  Square,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageInfoPanel } from "./ImageInfoPanel";
 import { ExtendedImageType } from "@/types/gallery";
 import { preloadImages } from "@/lib/imageLoader";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { AlertTriangle } from "lucide-react";
 
 interface ImageThumbnailsProps {
   images: ExtendedImageType[];
@@ -29,6 +56,13 @@ interface ImageThumbnailsProps {
   onReanalyze: (imageId: string) => void;
   onSetPrimary?: (imageId: string) => void;
   onLoadMore?: () => void;
+  onDeleteSingle?: (
+    imageId: string,
+    deleteFromStorage?: boolean
+  ) => Promise<void>;
+  onSelectAll?: () => void;
+  onSelectNone?: () => void;
+  onDeleteSelected?: (deleteFromStorage?: boolean) => Promise<void>;
   filters?: Record<string, any>;
   searchQuery?: string;
   serverPagination?: {
@@ -63,6 +97,10 @@ export function ImageThumbnails({
   onReanalyze,
   onSetPrimary,
   onLoadMore,
+  onDeleteSingle,
+  onSelectAll,
+  onSelectNone,
+  onDeleteSelected,
   filters,
   searchQuery,
   serverPagination,
@@ -73,6 +111,30 @@ export function ImageThumbnails({
   const [containerHeight, setContainerHeight] = useState(400);
   const preloadedPagesRef = useRef<Set<number | string>>(new Set());
   const preloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Early return if no images and no active filters/search
+  // This prevents the "Page 1 of 0" flash during initial load
+  const hasActiveFilters = Object.keys(filters || {}).length > 0;
+  const hasActiveSearch = searchQuery?.trim();
+  if (
+    images.length === 0 &&
+    !hasActiveFilters &&
+    !hasActiveSearch &&
+    !isLoadingMore
+  ) {
+    return (
+      <div className="w-full h-full flex flex-col">
+        <div className="bg-background rounded-lg p-4 flex flex-col flex-1 min-h-0">
+          <div className="flex items-center justify-center h-64">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-muted-foreground">Loading images...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Calculate page information based on server pagination or filtered results
   const displayPagination = useMemo(() => {
@@ -558,6 +620,49 @@ export function ImageThumbnails({
                   ({totalImagesAvailable} total)
                 </span>
               )}
+
+            {/* Edit Mode Selection Controls */}
+            {isEditMode && (
+              <div className="flex items-center gap-1 ml-4">
+                {onSelectAll && images.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onSelectAll}
+                    disabled={selectedImages.size === images.length}
+                    title="Select all images"
+                    className="h-7 w-7 p-0"
+                  >
+                    <CheckSquare className="w-3 h-3" />
+                  </Button>
+                )}
+
+                {onSelectNone && selectedImages.size > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onSelectNone}
+                    title="Clear selection"
+                    className="h-7 w-7 p-0"
+                  >
+                    <Square className="w-3 h-3" />
+                  </Button>
+                )}
+
+                {onDeleteSelected && selectedImages.size > 0 && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => onDeleteSelected()}
+                    title={`Delete ${selectedImages.size} selected image${selectedImages.size !== 1 ? "s" : ""}`}
+                    className="h-7 px-2"
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    {selectedImages.size}
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -590,6 +695,9 @@ export function ImageThumbnails({
                       selectedImages={selectedImages}
                       onImageSelect={onImageSelect}
                       onToggleSelection={onToggleSelection}
+                      onDeleteSingle={onDeleteSingle}
+                      onSetPrimary={onSetPrimary}
+                      onReanalyze={onReanalyze}
                     />
                   );
                 }
@@ -641,6 +749,9 @@ export function ImageThumbnails({
                           selectedImages={selectedImages}
                           onImageSelect={onImageSelect}
                           onToggleSelection={onToggleSelection}
+                          onDeleteSingle={onDeleteSingle}
+                          onSetPrimary={onSetPrimary}
+                          onReanalyze={onReanalyze}
                         />
                       </div>
                     );
@@ -668,6 +779,12 @@ const ThumbnailItem = React.memo<{
   selectedImages: Set<string>;
   onImageSelect: (imageId: string) => void;
   onToggleSelection: (imageId: string) => void;
+  onDeleteSingle?: (
+    imageId: string,
+    deleteFromStorage?: boolean
+  ) => Promise<void>;
+  onSetPrimary?: (imageId: string) => void;
+  onReanalyze?: (imageId: string) => void;
 }>(
   ({
     image,
@@ -678,76 +795,265 @@ const ThumbnailItem = React.memo<{
     selectedImages,
     onImageSelect,
     onToggleSelection,
+    onDeleteSingle,
+    onSetPrimary,
+    onReanalyze,
   }) => {
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const imageId = image.id || image._id;
+
+    const handleDeleteClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setShowDeleteDialog(true);
+    };
+
+    const handleConfirmDelete = async (deleteFromStorage: boolean) => {
+      if (!onDeleteSingle) return;
+
+      setIsDeleting(true);
+      try {
+        await onDeleteSingle(imageId, deleteFromStorage);
+        setShowDeleteDialog(false);
+      } catch (error) {
+        console.error("Error deleting image:", error);
+      } finally {
+        setIsDeleting(false);
+      }
+    };
+
+    const handleSetPrimary = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (onSetPrimary) {
+        onSetPrimary(imageId);
+      }
+    };
+
+    const handleReanalyze = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (onReanalyze) {
+        onReanalyze(imageId);
+      }
+    };
+
     return (
-      <div
-        className={cn(
-          "relative rounded-md overflow-hidden cursor-pointer group transition-all duration-300",
-          isCurrentImage
-            ? "!border-2 !border-white ring-2 ring-white/20 !opacity-100"
-            : isSelectedInEditMode
-              ? "!border-2 !border-blue-500 !opacity-100"
-              : "!border-0 !opacity-60 hover:!opacity-100"
-        )}
-        style={{
-          border: isCurrentImage
-            ? "2px solid white"
-            : isSelectedInEditMode
-              ? "2px solid #3b82f6"
-              : "none",
-          opacity: isCurrentImage || isSelectedInEditMode ? 1 : 0.6,
-        }}
-        onMouseEnter={(e) => {
-          if (!isCurrentImage && !isSelectedInEditMode) {
-            e.currentTarget.style.opacity = "1";
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!isCurrentImage && !isSelectedInEditMode) {
-            e.currentTarget.style.opacity = "0.6";
-          }
-        }}
-        onClick={() => onImageSelect(image.id || image._id)}
-      >
-        <div className="relative overflow-hidden">
-          <CloudflareImage
-            src={image.url}
-            alt={image.metadata?.description || "Thumbnail"}
-            width={140}
-            height={105}
-            className="object-cover transition-transform duration-300 group-hover:scale-110 w-full h-auto"
-            sizes="140px"
-            variant="thumbnail"
-            isAboveFold={isAboveFold}
-            useIntersectionLazyLoad={!isAboveFold}
-          />
+      <>
+        <div
+          className={cn(
+            "relative rounded-md overflow-hidden cursor-pointer group transition-all duration-300 ease-out transform",
+            isCurrentImage
+              ? "!border-2 !border-white ring-2 ring-white/20 !opacity-100 scale-105 shadow-lg"
+              : isSelectedInEditMode
+                ? "!border-2 !border-blue-500 !opacity-100 scale-102 shadow-md ring-1 ring-blue-300/30"
+                : "!border-0 !opacity-60 hover:!opacity-100 hover:scale-102 hover:shadow-md"
+          )}
+          style={{
+            border: isCurrentImage
+              ? "2px solid white"
+              : isSelectedInEditMode
+                ? "2px solid #3b82f6"
+                : "none",
+            opacity: isCurrentImage || isSelectedInEditMode ? 1 : 0.6,
+            transform: isCurrentImage
+              ? "scale(1.05)"
+              : isSelectedInEditMode
+                ? "scale(1.02)"
+                : "scale(1)",
+          }}
+          onMouseEnter={(e) => {
+            if (!isCurrentImage && !isSelectedInEditMode) {
+              e.currentTarget.style.opacity = "1";
+              e.currentTarget.style.transform = "scale(1.02)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isCurrentImage && !isSelectedInEditMode) {
+              e.currentTarget.style.opacity = "0.6";
+              e.currentTarget.style.transform = "scale(1)";
+            }
+          }}
+          onClick={() => onImageSelect(imageId)}
+        >
+          <div className="relative overflow-hidden">
+            <CloudflareImage
+              src={image.url}
+              alt={image.metadata?.description || "Thumbnail"}
+              width={140}
+              height={105}
+              className="object-cover transition-transform duration-500 group-hover:scale-110 w-full h-auto"
+              sizes="140px"
+              variant="thumbnail"
+              isAboveFold={isAboveFold}
+              useIntersectionLazyLoad={!isAboveFold}
+            />
+
+            {/* Subtle gradient overlay for better readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          </div>
+
+          {/* Enhanced selection overlay for edit mode */}
+          {isEditMode && (
+            <div
+              className={cn(
+                "absolute inset-0 flex items-center justify-center transition-all duration-300 ease-out",
+                selectedImages.has(imageId)
+                  ? "opacity-100 bg-blue-500/40 backdrop-blur-sm scale-100"
+                  : "opacity-0 bg-black/0 group-hover:opacity-100 group-hover:bg-black/30 scale-95 group-hover:scale-100"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelection(imageId);
+              }}
+            >
+              <div
+                className={cn(
+                  "transition-all duration-300 ease-out",
+                  selectedImages.has(imageId)
+                    ? "scale-100 text-white drop-shadow-lg"
+                    : "scale-75 group-hover:scale-90 text-white/80"
+                )}
+              >
+                <CheckCircle className="w-6 h-6" />
+              </div>
+            </div>
+          )}
+
+          {/* Animated selection indicator badge */}
+          {isEditMode && selectedImages.has(imageId) && (
+            <div className="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full p-1 shadow-lg animate-in zoom-in-50 duration-300">
+              <CheckCircle className="w-3 h-3" />
+            </div>
+          )}
+
+          {/* Primary image indicator */}
+          {image.metadata?.isPrimary && (
+            <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full p-1">
+              <Star className="w-3 h-3" />
+            </div>
+          )}
+
+          {/* Action Menu (visible on hover when not in edit mode) */}
+          {!isEditMode && (
+            <div className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-7 w-7 p-0 bg-white/90 hover:bg-white"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreVertical className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  {onSetPrimary && !image.metadata?.isPrimary && (
+                    <DropdownMenuItem onClick={handleSetPrimary}>
+                      <Star className="w-4 h-4 mr-2" />
+                      Set as Primary
+                    </DropdownMenuItem>
+                  )}
+                  {onReanalyze && (
+                    <DropdownMenuItem onClick={handleReanalyze}>
+                      <Star className="w-4 h-4 mr-2" />
+                      Re-analyze
+                    </DropdownMenuItem>
+                  )}
+                  {(onSetPrimary || onReanalyze) && onDeleteSingle && (
+                    <DropdownMenuSeparator />
+                  )}
+                  {onDeleteSingle && (
+                    <DropdownMenuItem
+                      onClick={handleDeleteClick}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Image
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
+
+          {/* Quick delete button (visible on hover in edit mode) */}
+          {isEditMode && onDeleteSingle && (
+            <div className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-7 w-7 p-0"
+                onClick={handleDeleteClick}
+                disabled={isDeleting}
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            </div>
+          )}
         </div>
 
-        {/* Selection overlay for edit mode */}
-        {isEditMode && (
-          <div
-            className={cn(
-              "absolute inset-0 flex items-center justify-center transition-opacity",
-              selectedImages.has(image.id || image._id)
-                ? "opacity-100 bg-black/50"
-                : "opacity-0 bg-black/0 group-hover:opacity-100 group-hover:bg-black/30"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleSelection(image.id || image._id);
-            }}
-          >
-            <CheckCircle className="w-6 h-6 text-white" />
-          </div>
-        )}
+        {/* Single Image Deletion Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+                Delete Image?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Choose how you want to delete this image:
+              </AlertDialogDescription>
+            </AlertDialogHeader>
 
-        {/* Primary image indicator */}
-        {image.metadata?.isPrimary && (
-          <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full p-1">
-            <Star className="w-3 h-3" />
-          </div>
-        )}
-      </div>
+            <div className="space-y-3 px-6">
+              <div className="p-3 border rounded-md bg-muted/30">
+                <div className="font-medium text-sm mb-1">Database Only</div>
+                <div className="text-xs text-muted-foreground">
+                  Remove from your gallery but keep file in cloud storage. Image
+                  can be recovered if needed.
+                </div>
+              </div>
+
+              <div className="p-3 border rounded-md bg-destructive/10 border-destructive/20">
+                <div className="font-medium text-sm mb-1 text-destructive">
+                  Database + Cloud Storage
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Permanently delete from both gallery and cloud storage. This
+                  action cannot be undone.
+                </div>
+              </div>
+            </div>
+
+            <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:gap-2">
+              <AlertDialogCancel
+                onClick={() => setShowDeleteDialog(false)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </AlertDialogCancel>
+
+              <Button
+                variant="outline"
+                onClick={() => handleConfirmDelete(false)}
+                disabled={isDeleting}
+                className="w-full sm:w-auto"
+              >
+                Database Only
+              </Button>
+
+              <AlertDialogAction
+                onClick={() => handleConfirmDelete(true)}
+                disabled={isDeleting}
+                className="w-full sm:w-auto bg-destructive hover:bg-destructive/90"
+              >
+                {isDeleting ? "Deleting..." : "Database + Storage"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     );
   }
 );
