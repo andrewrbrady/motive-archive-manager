@@ -169,6 +169,17 @@ export default function NewDeliverableForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Form submission started");
+    console.log("Form data:", {
+      title,
+      selectedPlatforms,
+      type,
+      editor,
+      editDeadline,
+      releaseDate,
+      deliverableCarId: carId || selectedCarId,
+    });
+
     if (
       !title ||
       selectedPlatforms.length === 0 ||
@@ -177,11 +188,13 @@ export default function NewDeliverableForm({
       !editDeadline ||
       !releaseDate
     ) {
+      console.log("Validation failed - missing required fields");
       toast.error("Please fill in all required fields");
       return;
     }
 
     if (!api) {
+      console.log("API not available");
       toast.error("Authentication required");
       return;
     }
@@ -191,10 +204,12 @@ export default function NewDeliverableForm({
     // Find the selected user to get both name and firebase_uid
     const selectedUser = users.find((user) => user.uid === editor);
     if (!selectedUser) {
+      console.log("Selected user not found:", editor);
       toast.error("Please select a valid editor");
       return;
     }
 
+    console.log("Starting API call...");
     setIsLoading(true);
     try {
       // Determine which API endpoint to use based on whether we have a car
@@ -222,8 +237,12 @@ export default function NewDeliverableForm({
         requestBody.car_id = deliverableCarId;
       }
 
+      console.log("API URL:", apiUrl);
+      console.log("Request body:", requestBody);
+
       await api.post(apiUrl, requestBody);
 
+      console.log("Deliverable created successfully");
       toast.success("Deliverable created successfully!");
       resetForm();
       setIsOpen(false);
@@ -580,12 +599,7 @@ export default function NewDeliverableForm({
           >
             Cancel
           </Button>
-          <Button
-            type="submit"
-            disabled={isLoading}
-            size="sm"
-            onClick={handleSubmit}
-          >
+          <Button type="submit" disabled={isLoading} size="sm">
             {isLoading ? "Creating..." : "Create"}
           </Button>
         </div>
