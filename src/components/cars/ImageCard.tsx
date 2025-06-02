@@ -24,6 +24,28 @@ interface ImageCardProps {
   onImageView?: (image: ImageData) => void;
 }
 
+// Helper function to build enhanced Cloudflare URL for thumbnails
+const getThumbnailImageUrl = (baseUrl: string) => {
+  // Use medium resolution for gallery thumbnails (600px width, high quality)
+  const width = "600";
+  const quality = "85";
+
+  if (!baseUrl.includes("imagedelivery.net")) {
+    return baseUrl;
+  }
+
+  // Check if URL already has transformations (contains variant like 'public')
+  if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
+    // Replace the last segment (usually 'public') with thumbnail parameters
+    const urlParts = baseUrl.split("/");
+    urlParts[urlParts.length - 1] = `w=${width},q=${quality}`;
+    return urlParts.join("/");
+  } else {
+    // URL doesn't have a variant, append transformations
+    return `${baseUrl}/w=${width},q=${quality}`;
+  }
+};
+
 export function ImageCard({
   image,
   onSelect,
@@ -183,7 +205,7 @@ export function ImageCard({
         )}
       </div>
       <Image
-        src={image.url}
+        src={getThumbnailImageUrl(image.url)}
         alt={image.filename || "Car image"}
         width={0}
         height={0}

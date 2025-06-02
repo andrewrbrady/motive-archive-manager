@@ -12,6 +12,39 @@ import { LoadingSpinner } from "@/components/ui/loading";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { useAPI } from "@/hooks/useAPI";
 
+// Helper function to build enhanced Cloudflare URL for car card thumbnails
+const getEnhancedImageUrl = (
+  baseUrl: string,
+  width?: string,
+  quality?: string
+) => {
+  let params = [];
+  // Always check for truthy values and non-empty strings
+  if (width && width.trim() !== "") params.push(`w=${width}`);
+  if (quality && quality.trim() !== "") params.push(`q=${quality}`);
+
+  if (params.length === 0) return baseUrl;
+
+  // Handle different Cloudflare URL formats
+  // Format: https://imagedelivery.net/account/image-id/public
+  // Should become: https://imagedelivery.net/account/image-id/w=400,q=85
+  if (baseUrl.includes("imagedelivery.net")) {
+    // Check if URL already has transformations (contains variant like 'public')
+    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
+      // Replace the last segment (usually 'public') with our parameters
+      const urlParts = baseUrl.split("/");
+      urlParts[urlParts.length - 1] = params.join(",");
+      return urlParts.join("/");
+    } else {
+      // URL doesn't have a variant, append transformations
+      return `${baseUrl}/${params.join(",")}`;
+    }
+  }
+
+  // Fallback for other URL formats - try to replace /public if it exists
+  return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
+};
+
 interface CarCardProps {
   car: Car;
   currentSearchParams?: string;
@@ -45,19 +78,43 @@ const CarCard = memo(function CarCard({
   useEffect(() => {
     // Simplified image selection logic
     const findPrimaryImage = () => {
+      console.log("[CarCard] URL transformation:", {
+        carId: car._id,
+        primaryImageId: car.primaryImageId,
+        imagesCount: car.images?.length || 0,
+      });
+
       // Case 1: We have loaded images with URLs
       if (car.images && car.images.length > 0) {
         const primary = car.images.find((img) => img.metadata?.isPrimary);
         if (primary) {
+          const baseUrl = getFormattedImageUrl(primary.url);
+          const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
+
+          console.log("[CarCard] URL transformation:", {
+            baseUrl,
+            transformedUrl: enhancedUrl,
+            params: "w=400,q=85",
+          });
+
           setPrimaryImage({
             id: primary._id,
-            url: getFormattedImageUrl(primary.url),
+            url: enhancedUrl,
           });
         } else {
           // Use first image if no primary is marked
+          const baseUrl = getFormattedImageUrl(car.images[0].url);
+          const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
+
+          console.log("[CarCard] URL transformation (first image):", {
+            baseUrl,
+            transformedUrl: enhancedUrl,
+            params: "w=400,q=85",
+          });
+
           setPrimaryImage({
             id: car.images[0]._id,
-            url: getFormattedImageUrl(car.images[0].url),
+            url: enhancedUrl,
           });
         }
         setLoading(false);
@@ -70,9 +127,18 @@ const CarCard = memo(function CarCard({
         const fetchImage = async () => {
           try {
             const imageData = await api.get(`images/${car.primaryImageId}`);
+            const baseUrl = getFormattedImageUrl((imageData as any).url);
+            const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
+
+            console.log("[CarCard] URL transformation (API fetch):", {
+              baseUrl,
+              transformedUrl: enhancedUrl,
+              params: "w=400,q=85",
+            });
+
             setPrimaryImage({
               id: (imageData as any)._id,
-              url: getFormattedImageUrl((imageData as any).url),
+              url: enhancedUrl,
             });
           } catch (error) {
             // If primary image fetch fails, try the first image
@@ -85,9 +151,20 @@ const CarCard = memo(function CarCard({
                 const fallbackImageData = await api.get(
                   `images/${car.imageIds[0]}`
                 );
+                const baseUrl = getFormattedImageUrl(
+                  (fallbackImageData as any).url
+                );
+                const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
+
+                console.log("[CarCard] URL transformation (fallback):", {
+                  baseUrl,
+                  transformedUrl: enhancedUrl,
+                  params: "w=400,q=85",
+                });
+
                 setPrimaryImage({
                   id: (fallbackImageData as any)._id,
-                  url: getFormattedImageUrl((fallbackImageData as any).url),
+                  url: enhancedUrl,
                 });
               } catch (fallbackError) {
                 console.error("Error fetching fallback image:", fallbackError);

@@ -80,6 +80,39 @@ const VIRTUAL_ITEM_HEIGHT = 105 + 8; // Thumbnail height + gap
 const VIRTUAL_ITEMS_PER_ROW = 3;
 const OVERSCAN = 3; // Render 3 extra rows above and below visible area
 
+// Helper function to build enhanced Cloudflare URL for thumbnails
+const getEnhancedImageUrl = (
+  baseUrl: string,
+  width?: string,
+  quality?: string
+) => {
+  let params = [];
+  // Always check for truthy values and non-empty strings
+  if (width && width.trim() !== "") params.push(`w=${width}`);
+  if (quality && quality.trim() !== "") params.push(`q=${quality}`);
+
+  if (params.length === 0) return baseUrl;
+
+  // Handle different Cloudflare URL formats
+  // Format: https://imagedelivery.net/account/image-id/public
+  // Should become: https://imagedelivery.net/account/image-id/w=400,q=85
+  if (baseUrl.includes("imagedelivery.net")) {
+    // Check if URL already has transformations (contains variant like 'public')
+    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
+      // Replace the last segment (usually 'public') with our parameters
+      const urlParts = baseUrl.split("/");
+      urlParts[urlParts.length - 1] = params.join(",");
+      return urlParts.join("/");
+    } else {
+      // URL doesn't have a variant, append transformations
+      return `${baseUrl}/${params.join(",")}`;
+    }
+  }
+
+  // Fallback for other URL formats - try to replace /public if it exists
+  return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
+};
+
 export function ImageThumbnails({
   images,
   currentImage,
@@ -804,6 +837,18 @@ const ThumbnailItem = React.memo<{
 
     const imageId = image.id || image._id;
 
+    // Add debugging for URL transformation in thumbnails
+    const enhancedThumbnailUrl = useMemo(() => {
+      const transformed = getEnhancedImageUrl(image.url, "400", "85");
+      console.log("ImageThumbnails URL transformation:", {
+        original: image.url,
+        transformed: transformed,
+        imageId: imageId,
+        filename: image.filename,
+      });
+      return transformed;
+    }, [image.url, imageId, image.filename]);
+
     const handleDeleteClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       setShowDeleteDialog(true);
@@ -877,7 +922,7 @@ const ThumbnailItem = React.memo<{
         >
           <div className="relative overflow-hidden">
             <CloudflareImage
-              src={image.url}
+              src={enhancedThumbnailUrl}
               alt={image.metadata?.description || "Thumbnail"}
               width={140}
               height={105}

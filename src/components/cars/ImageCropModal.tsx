@@ -384,13 +384,24 @@ export function ImageCropModal({
 
     if (params.length === 0) return baseUrl;
 
+    // Handle different Cloudflare URL formats
+    // Format: https://imagedelivery.net/account/image-id/public
+    // Should become: https://imagedelivery.net/account/image-id/w=1080,q=100
     if (baseUrl.includes("imagedelivery.net")) {
-      const urlParts = baseUrl.split("/");
-      urlParts[urlParts.length - 1] = params.join(",");
-      return urlParts.join("/");
+      // Check if URL already has transformations (contains variant like 'public')
+      if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
+        // Replace the last segment (usually 'public') with our parameters
+        const urlParts = baseUrl.split("/");
+        urlParts[urlParts.length - 1] = params.join(",");
+        return urlParts.join("/");
+      } else {
+        // URL doesn't have a variant, append transformations
+        return `${baseUrl}/${params.join(",")}`;
+      }
     }
 
-    return baseUrl;
+    // Fallback for other URL formats - try to replace /public if it exists
+    return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
   };
 
   // Memoize the enhanced image URL

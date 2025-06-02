@@ -14,13 +14,17 @@ export function cloudflareImageLoader({
     src.includes("imagedelivery.net") ||
     src.includes("cloudflareimages.com")
   ) {
-    // Parse the Cloudflare Images URL to extract components
+    // Enhanced URL parsing to handle multiple formats
+    // Format 1: https://imagedelivery.net/account/image-id/public
+    // Format 2: https://imagedelivery.net/account/image-id (no variant)
+    // Format 3: https://imagedelivery.net/account/image-id/existing-params
+
     const urlPattern =
       /https:\/\/imagedelivery\.net\/([^\/]+)\/([^\/]+)(?:\/(.+))?$/;
     const match = src.match(urlPattern);
 
     if (match) {
-      const [, accountHash, imageId] = match;
+      const [, accountHash, imageId, existingVariant] = match;
 
       // Cap the maximum width to 1200px for performance
       const cappedWidth = Math.min(width, 1200);
@@ -32,12 +36,39 @@ export function cloudflareImageLoader({
         transformations.push(`q=${quality}`);
       }
 
-      // Build the URL with transformations
-      return `https://imagedelivery.net/${accountHash}/${imageId}/${transformations.join(",")}`;
+      // Apply the same URL transformation logic from fixed modals
+      const transformationString = transformations.join(",");
+
+      // Check if URL already has transformations (contains variant like 'public')
+      if (
+        existingVariant &&
+        (existingVariant === "public" || existingVariant.match(/^[a-zA-Z]+$/))
+      ) {
+        // Replace the last segment (usually 'public') with our parameters
+        return `https://imagedelivery.net/${accountHash}/${imageId}/${transformationString}`;
+      } else if (existingVariant) {
+        // URL has existing transformations, replace them
+        return `https://imagedelivery.net/${accountHash}/${imageId}/${transformationString}`;
+      } else {
+        // URL doesn't have a variant, append transformations
+        return `https://imagedelivery.net/${accountHash}/${imageId}/${transformationString}`;
+      }
     }
 
-    // If URL doesn't match expected pattern, return as-is
-    return src;
+    // If URL doesn't match expected pattern, try to append transformations
+    const transformations = [`w=${Math.min(width, 1200)}`];
+    if (quality !== 85) {
+      transformations.push(`q=${quality}`);
+    }
+
+    // Handle URLs that might not follow standard format
+    if (src.endsWith("/public") || src.match(/\/[a-zA-Z]+$/)) {
+      const urlParts = src.split("/");
+      urlParts[urlParts.length - 1] = transformations.join(",");
+      return urlParts.join("/");
+    } else {
+      return `${src}/${transformations.join(",")}`;
+    }
   }
 
   // For non-Cloudflare URLs, return as-is (Next.js will handle them)

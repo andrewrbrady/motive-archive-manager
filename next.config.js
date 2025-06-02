@@ -19,9 +19,9 @@ const nextConfig = {
     return `build-${Date.now()}`;
   },
   images: {
-    // Use custom Cloudflare loader to handle Cloudflare Images URLs
-    loader: "custom",
-    loaderFile: "./src/lib/cloudflare-image-loader.ts",
+    // Temporarily disable custom loader for debugging
+    // loader: "custom",
+    // loaderFile: "./src/lib/cloudflare-image-loader.ts",
 
     // Cloudflare Images domains
     domains: ["localhost", "imagedelivery.net", "cloudflareimages.com"],

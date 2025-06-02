@@ -33,6 +33,57 @@ interface ImageAnalysisPrompt {
   isActive?: boolean;
 }
 
+// URL transformation function - copied from ImageThumbnails.tsx lines 84-110
+const getEnhancedImageUrl = (
+  baseUrl: string,
+  width?: string,
+  quality?: string
+) => {
+  let params = [];
+  // Always check for truthy values and non-empty strings
+  if (width && width.trim() !== "") params.push(`w=${width}`);
+  if (quality && quality.trim() !== "") params.push(`q=${quality}`);
+
+  if (params.length === 0) return baseUrl;
+
+  // Handle different Cloudflare URL formats
+  // Format: https://imagedelivery.net/account/image-id/public
+  // Should become: https://imagedelivery.net/account/image-id/w=400,q=85
+  if (baseUrl.includes("imagedelivery.net")) {
+    // Check if URL already has transformations (contains variant like 'public')
+    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
+      // Replace the last segment (usually 'public') with our parameters
+      const urlParts = baseUrl.split("/");
+      urlParts[urlParts.length - 1] = params.join(",");
+      const transformedUrl = urlParts.join("/");
+      console.log("ImageInfoPanel URL transformation:", {
+        baseUrl,
+        transformedUrl,
+        params,
+      });
+      return transformedUrl;
+    } else {
+      // URL doesn't have a variant, append transformations
+      const transformedUrl = `${baseUrl}/${params.join(",")}`;
+      console.log("ImageInfoPanel URL transformation:", {
+        baseUrl,
+        transformedUrl,
+        params,
+      });
+      return transformedUrl;
+    }
+  }
+
+  // Fallback for other URL formats - try to replace /public if it exists
+  const transformedUrl = baseUrl.replace(/\/public$/, `/${params.join(",")}`);
+  console.log("ImageInfoPanel URL transformation (fallback):", {
+    baseUrl,
+    transformedUrl,
+    params,
+  });
+  return transformedUrl;
+};
+
 // Keyboard Shortcuts Component
 function KeyboardShortcuts() {
   return (
@@ -154,14 +205,29 @@ export function ImageInfoPanel({
     loadPrompts();
   }, [showReanalysisOptions, api]);
 
-  // Create URL options for different transformations
+  // Create URL options for different transformations using proper URL transformation
   const urlOptions = [
     { label: "Original", url: currentImage.url },
-    { label: "Small (400px)", url: `${currentImage.url}/w=400` },
-    { label: "Medium (800px)", url: `${currentImage.url}/w=800` },
-    { label: "Large (1200px)", url: `${currentImage.url}/w=1200` },
-    { label: "Extra Large (1600px)", url: `${currentImage.url}/w=1600` },
-    { label: "High Quality", url: `${currentImage.url}/q=100` },
+    {
+      label: "Small (400px)",
+      url: getEnhancedImageUrl(currentImage.url, "400"),
+    },
+    {
+      label: "Medium (800px)",
+      url: getEnhancedImageUrl(currentImage.url, "800"),
+    },
+    {
+      label: "Large (1200px)",
+      url: getEnhancedImageUrl(currentImage.url, "1200"),
+    },
+    {
+      label: "Extra Large (1600px)",
+      url: getEnhancedImageUrl(currentImage.url, "1600"),
+    },
+    {
+      label: "High Quality",
+      url: getEnhancedImageUrl(currentImage.url, undefined, "100"),
+    },
   ];
 
   const selectedOption =

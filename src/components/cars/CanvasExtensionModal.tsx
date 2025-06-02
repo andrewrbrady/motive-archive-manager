@@ -72,6 +72,13 @@ export function CanvasExtensionModal({
   onClose,
   image,
 }: CanvasExtensionModalProps) {
+  // Early return if modal is not open - must be before ALL hooks
+  if (!isOpen) {
+    return null;
+  }
+
+  // All hooks must come after the early return check and BEFORE any other conditional returns
+  const api = useAPI();
   const [desiredHeight, setDesiredHeight] = useState<string>("1200");
   const [paddingPct, setPaddingPct] = useState<string>("0.05");
   const [whiteThresh, setWhiteThresh] = useState<string>("90");
@@ -100,7 +107,10 @@ export function CanvasExtensionModal({
   const [processingStatus, setProcessingStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [remoteServiceUsed, setRemoteServiceUsed] = useState<boolean>(false);
-  const api = useAPI();
+  const [imageLoadError, setImageLoadError] = useState<boolean>(false);
+  const [processedImageLoadError, setProcessedImageLoadError] =
+    useState<boolean>(false);
+  const [useTestImage, setUseTestImage] = useState(false);
 
   // Load processing method preference from localStorage
   useEffect(() => {
@@ -111,12 +121,6 @@ export function CanvasExtensionModal({
       setProcessingMethod(savedMethod);
     }
   }, []);
-
-  // Save processing method preference to localStorage
-  const handleProcessingMethodChange = (method: ProcessingMethod) => {
-    setProcessingMethod(method);
-    localStorage.setItem("canvasExtensionMethod", method);
-  };
 
   // Helper function to build enhanced Cloudflare URL
   const getEnhancedImageUrl = (
@@ -135,13 +139,19 @@ export function CanvasExtensionModal({
     // Format: https://imagedelivery.net/account/image-id/public
     // Should become: https://imagedelivery.net/account/image-id/w=1080,q=100
     if (baseUrl.includes("imagedelivery.net")) {
-      // Replace the last segment (usually 'public') with our parameters
-      const urlParts = baseUrl.split("/");
-      urlParts[urlParts.length - 1] = params.join(",");
-      return urlParts.join("/");
+      // Check if URL already has transformations (contains variant like 'public')
+      if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
+        // Replace the last segment (usually 'public') with our parameters
+        const urlParts = baseUrl.split("/");
+        urlParts[urlParts.length - 1] = params.join(",");
+        return urlParts.join("/");
+      } else {
+        // URL doesn't have a variant, append transformations
+        return `${baseUrl}/${params.join(",")}`;
+      }
     }
 
-    // Fallback for other URL formats
+    // Fallback for other URL formats - try to replace /public if it exists
     return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
   };
 
@@ -162,6 +172,120 @@ export function CanvasExtensionModal({
     return enhanced;
   }, [image?.url, cloudflareWidth, cloudflareQuality]);
 
+  // Add debugging for the current image URL
+  useEffect(() => {
+    if (enhancedImageUrl) {
+      console.log("Current image URL for display:", {
+        currentImageUrl: enhancedImageUrl,
+        isCloudflare: enhancedImageUrl.includes("imagedelivery.net"),
+        hasTransforms: enhancedImageUrl.includes(","),
+      });
+    }
+  }, [enhancedImageUrl]);
+
+  // PHASE 1 DEBUGGING: Complete image data structure investigation
+  useEffect(() => {
+    console.log("=== CANVAS EXTENSION MODAL - PHASE 1 DEBUG START ===");
+    console.log("Image prop object (complete):", image);
+    console.log("Image data structure breakdown:", {
+      hasImage: !!image,
+      imageId: image?._id,
+      cloudflareId: image?.cloudflareId,
+      originalUrl: image?.url,
+      filename: image?.filename,
+      width: image?.width,
+      height: image?.height,
+      carId: image?.carId,
+      metadata: image?.metadata,
+      createdAt: image?.createdAt,
+      updatedAt: image?.updatedAt,
+    });
+
+    // Test URL accessibility
+    if (image?.url) {
+      console.log("Testing original URL accessibility:", image.url);
+      fetch(image.url, { method: "HEAD", mode: "no-cors" })
+        .then((response) => {
+          console.log("Original URL fetch test result:", {
+            url: image.url,
+            status: response.status,
+            statusText: response.statusText,
+            type: response.type,
+            note: "no-cors mode - limited response info available",
+          });
+        })
+        .catch((error) => {
+          console.log("Original URL fetch test (expected CORS limitation):", {
+            url: image.url,
+            error: error.message,
+            note: "CORS errors are normal for cross-origin image requests",
+          });
+        });
+    }
+
+    // Enhanced URL transformation debugging
+    if (image?.url) {
+      const originalUrl = image.url;
+      const enhanced = getEnhancedImageUrl(
+        originalUrl,
+        cloudflareWidth,
+        cloudflareQuality
+      );
+
+      console.log("URL transformation chain:", {
+        step1_original: originalUrl,
+        step2_enhanced: enhanced,
+        step3_params: {
+          width: cloudflareWidth,
+          quality: cloudflareQuality,
+        },
+        step4_validation: {
+          originalIsString: typeof originalUrl === "string",
+          enhancedIsString: typeof enhanced === "string",
+          originalLength: originalUrl?.length,
+          enhancedLength: enhanced?.length,
+          containsImageDelivery: enhanced?.includes("imagedelivery.net"),
+          hasTransformations: enhanced?.includes(","),
+          preservesImageId: enhanced?.includes(
+            originalUrl.split("/").slice(-1)[0]?.split("?")[0]
+          ),
+        },
+      });
+
+      // Test enhanced URL accessibility
+      console.log("Testing enhanced URL accessibility:", enhanced);
+      fetch(enhanced, { method: "HEAD", mode: "no-cors" })
+        .then((response) => {
+          console.log("Enhanced URL fetch test result:", {
+            url: enhanced,
+            status: response.status,
+            statusText: response.statusText,
+            type: response.type,
+            note: "no-cors mode - limited response info available",
+          });
+        })
+        .catch((error) => {
+          console.log("Enhanced URL fetch test (expected CORS limitation):", {
+            url: enhanced,
+            error: error.message,
+            note: "CORS errors are normal for cross-origin image requests",
+          });
+        });
+    }
+
+    console.log("=== CANVAS EXTENSION MODAL - PHASE 1 DEBUG END ===");
+  }, [image, cloudflareWidth, cloudflareQuality]);
+
+  // PHASE 1 TESTING: Hardcoded test image URL
+  const testImageUrl =
+    "https://placehold.co/800x600/000000/FFFFFF?text=Test+Canvas+Extension";
+
+  // Reset error states when image changes
+  useEffect(() => {
+    setImageLoadError(false);
+    setProcessedImageLoadError(false);
+  }, [image?.url]);
+
   // Load original image dimensions
   useEffect(() => {
     if (enhancedImageUrl) {
@@ -175,9 +299,6 @@ export function CanvasExtensionModal({
       img.src = enhancedImageUrl;
     }
   }, [enhancedImageUrl]);
-
-  // Get the current enhanced image URL for display
-  const currentImageUrl = enhancedImageUrl;
 
   // Load processed image dimensions when processed image changes
   useEffect(() => {
@@ -210,6 +331,29 @@ export function CanvasExtensionModal({
       setHighResDimensions(null);
     }
   }, [highResImageUrl]);
+
+  // Authentication check after ALL hooks are declared
+  if (!api) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Loading...</DialogTitle>
+            <DialogDescription>Authenticating...</DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Save processing method preference to localStorage
+  const handleProcessingMethodChange = (method: ProcessingMethod) => {
+    setProcessingMethod(method);
+    localStorage.setItem("canvasExtensionMethod", method);
+  };
+
+  // Get the current enhanced image URL for display
+  const currentImageUrl = useTestImage ? testImageUrl : enhancedImageUrl;
 
   const handleProcess = async () => {
     if (!image || !enhancedImageUrl || !api) return;
@@ -470,6 +614,9 @@ export function CanvasExtensionModal({
     setWhiteThresh("90");
     setCloudflareWidth("2000");
     setCloudflareQuality("100");
+    setImageLoadError(false);
+    setProcessedImageLoadError(false);
+    setUseTestImage(false);
   };
 
   const handleClose = () => {
@@ -477,20 +624,6 @@ export function CanvasExtensionModal({
     setOriginalDimensions(null);
     onClose();
   };
-
-  // Authentication readiness check
-  if (!api && isOpen) {
-    return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Loading...</DialogTitle>
-            <DialogDescription>Authenticating...</DialogDescription>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
-    );
-  }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -540,6 +673,29 @@ export function CanvasExtensionModal({
                 <Label className="text-sm font-medium mb-2 block">
                   Original Image Quality
                 </Label>
+
+                {/* PHASE 1 DEBUG: Test Image Toggle */}
+                <div className="mb-3 p-2 border border-dashed border-blue-300 rounded bg-blue-50">
+                  <div className="flex items-center gap-2 mb-1">
+                    <input
+                      type="checkbox"
+                      id="useTestImageCanvas"
+                      checked={useTestImage}
+                      onChange={(e) => setUseTestImage(e.target.checked)}
+                      className="rounded"
+                    />
+                    <Label
+                      htmlFor="useTestImageCanvas"
+                      className="text-xs text-blue-700 font-medium"
+                    >
+                      🧪 Use Test Image (Debug Mode)
+                    </Label>
+                  </div>
+                  <p className="text-xs text-blue-600">
+                    Toggle to test with a known-good placeholder image
+                  </p>
+                </div>
+
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label htmlFor="cloudflareWidth" className="text-xs">
@@ -882,16 +1038,127 @@ export function CanvasExtensionModal({
               {currentImageUrl && (
                 <div className="mt-2 border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
                   <div className="relative max-w-full max-h-[600px]">
-                    <Image
-                      src={currentImageUrl}
-                      alt={image?.filename || "Original image"}
-                      width={0}
-                      height={0}
-                      sizes="100vw"
-                      className="w-auto h-auto max-w-full max-h-[600px] object-contain"
-                      style={{ width: "auto", height: "auto" }}
-                      key={currentImageUrl} // Force reload when URL changes
-                    />
+                    {!imageLoadError ? (
+                      <Image
+                        src={currentImageUrl}
+                        alt={image?.filename || "Original image"}
+                        width={0}
+                        height={0}
+                        sizes="100vw"
+                        className="w-auto h-auto max-w-full max-h-[600px] object-contain"
+                        style={{ width: "auto", height: "auto" }}
+                        key={currentImageUrl} // Force reload when URL changes
+                        onError={(e) => {
+                          console.error(
+                            "🚨 DETAILED IMAGE LOAD ERROR ANALYSIS:",
+                            {
+                              errorType: "Next.js Image component",
+                              attemptedSrc: currentImageUrl,
+                              imageObject: image,
+                              errorEvent: e,
+                              errorEventType: e.type,
+                              errorEventTarget: e.currentTarget,
+                              targetSrc: e.currentTarget.src,
+                              targetComplete: e.currentTarget.complete,
+                              targetNaturalWidth: e.currentTarget.naturalWidth,
+                              targetNaturalHeight:
+                                e.currentTarget.naturalHeight,
+                              currentImageUrl,
+                              enhancedImageUrl,
+                              useTestImage,
+                              isTestImage: currentImageUrl === testImageUrl,
+                              urlValidation: {
+                                isString: typeof currentImageUrl === "string",
+                                isNotEmpty:
+                                  !!currentImageUrl &&
+                                  currentImageUrl.length > 0,
+                                startsWithHttp:
+                                  currentImageUrl?.startsWith("http"),
+                                containsImageDelivery:
+                                  currentImageUrl?.includes(
+                                    "imagedelivery.net"
+                                  ),
+                                containsPlaceholder:
+                                  currentImageUrl?.includes("placehold.co"),
+                              },
+                            }
+                          );
+                          setImageLoadError(true);
+                          // Try to fallback to original URL without transformations
+                          if (currentImageUrl !== image?.url && image?.url) {
+                            console.log(
+                              "🔄 Attempting fallback to original URL:",
+                              image.url
+                            );
+                            e.currentTarget.src = image.url;
+                          }
+                        }}
+                        onLoad={(e) => {
+                          console.log("✅ SUCCESSFUL IMAGE LOAD ANALYSIS:", {
+                            src: currentImageUrl,
+                            naturalWidth: e.currentTarget.naturalWidth,
+                            naturalHeight: e.currentTarget.naturalHeight,
+                            isTestImage: currentImageUrl === testImageUrl,
+                            loadedSuccessfully: true,
+                            useTestImage,
+                            imageObject: image,
+                          });
+                          setImageLoadError(false);
+                        }}
+                        unoptimized={
+                          !currentImageUrl.includes("imagedelivery.net")
+                        }
+                      />
+                    ) : (
+                      <img
+                        src={image?.url || currentImageUrl}
+                        alt={image?.filename || "Original image"}
+                        className="w-auto h-auto max-w-full max-h-[600px] object-contain"
+                        style={{ width: "auto", height: "auto" }}
+                        onError={(e) => {
+                          console.error("🚨 FALLBACK IMG TAG ERROR ANALYSIS:", {
+                            errorType: "HTML img tag fallback",
+                            attemptedSrc: e.currentTarget.src,
+                            imageObject: image,
+                            originalSrc: image?.url,
+                            currentImageUrl,
+                            fallbackAttempted: true,
+                            urlValidation: {
+                              isString: typeof e.currentTarget.src === "string",
+                              isNotEmpty:
+                                !!e.currentTarget.src &&
+                                e.currentTarget.src.length > 0,
+                              startsWithHttp:
+                                e.currentTarget.src?.startsWith("http"),
+                              containsImageDelivery:
+                                e.currentTarget.src?.includes(
+                                  "imagedelivery.net"
+                                ),
+                            },
+                          });
+                        }}
+                        onLoad={(e) => {
+                          console.log("✅ FALLBACK IMG TAG SUCCESS:", {
+                            src: e.currentTarget.src,
+                            naturalWidth: e.currentTarget.naturalWidth,
+                            naturalHeight: e.currentTarget.naturalHeight,
+                            fallbackWorked: true,
+                            imageObject: image,
+                          });
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+              {!currentImageUrl && (
+                <div className="mt-2 border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
+                  <div className="text-center text-muted-foreground">
+                    <Eye className="h-8 w-8 mx-auto mb-2" />
+                    <p className="text-sm">No image URL available</p>
+                    {image?.url && (
+                      <p className="text-xs mt-1">Original: {image.url}</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -920,19 +1187,82 @@ export function CanvasExtensionModal({
               <div className="mt-2 border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
                 {highResImageUrl || processedImageUrl ? (
                   <div className="relative max-w-full max-h-[600px]">
-                    <Image
-                      src={(highResImageUrl || processedImageUrl)!}
-                      alt={
-                        highResImageUrl
-                          ? "High-resolution processed image"
-                          : "Processed image"
-                      }
-                      width={0}
-                      height={0}
-                      sizes="100vw"
-                      className="w-auto h-auto max-w-full max-h-[600px] object-contain"
-                      style={{ width: "auto", height: "auto" }}
-                    />
+                    {!processedImageLoadError ? (
+                      <Image
+                        src={(highResImageUrl || processedImageUrl)!}
+                        alt={
+                          highResImageUrl
+                            ? "High-resolution processed image"
+                            : "Processed image"
+                        }
+                        width={0}
+                        height={0}
+                        sizes="100vw"
+                        className="w-auto h-auto max-w-full max-h-[600px] object-contain"
+                        style={{ width: "auto", height: "auto" }}
+                        onError={(e) => {
+                          const src = (highResImageUrl || processedImageUrl)!;
+                          console.error("Processed image failed to load:", {
+                            src: src,
+                            isHighRes: !!highResImageUrl,
+                            error: e,
+                          });
+                          setProcessedImageLoadError(true);
+                        }}
+                        onLoad={(e) => {
+                          console.log("Processed image loaded successfully:", {
+                            src: (highResImageUrl || processedImageUrl)!,
+                            naturalWidth: e.currentTarget.naturalWidth,
+                            naturalHeight: e.currentTarget.naturalHeight,
+                            isHighRes: !!highResImageUrl,
+                          });
+                          setProcessedImageLoadError(false);
+                        }}
+                        unoptimized={true} // Processed images are likely data URLs or local files
+                      />
+                    ) : (
+                      <img
+                        src={(highResImageUrl || processedImageUrl)!}
+                        alt={
+                          highResImageUrl
+                            ? "High-resolution processed image"
+                            : "Processed image"
+                        }
+                        className="w-auto h-auto max-w-full max-h-[600px] object-contain"
+                        style={{ width: "auto", height: "auto" }}
+                        onError={(e) => {
+                          console.error("🚨 FALLBACK IMG TAG ERROR ANALYSIS:", {
+                            errorType: "HTML img tag fallback",
+                            attemptedSrc: e.currentTarget.src,
+                            imageObject: image,
+                            originalSrc: image?.url,
+                            currentImageUrl,
+                            fallbackAttempted: true,
+                            urlValidation: {
+                              isString: typeof e.currentTarget.src === "string",
+                              isNotEmpty:
+                                !!e.currentTarget.src &&
+                                e.currentTarget.src.length > 0,
+                              startsWithHttp:
+                                e.currentTarget.src?.startsWith("http"),
+                              containsImageDelivery:
+                                e.currentTarget.src?.includes(
+                                  "imagedelivery.net"
+                                ),
+                            },
+                          });
+                        }}
+                        onLoad={(e) => {
+                          console.log("✅ FALLBACK IMG TAG SUCCESS:", {
+                            src: e.currentTarget.src,
+                            naturalWidth: e.currentTarget.naturalWidth,
+                            naturalHeight: e.currentTarget.naturalHeight,
+                            fallbackWorked: true,
+                            imageObject: image,
+                          });
+                        }}
+                      />
+                    )}
                     {highResImageUrl && (
                       <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
                         {highResMultiplier}x High-Res

@@ -112,18 +112,39 @@ export function CloudflareImage({
       error: e,
       isAboveFold,
       useIntersectionLazyLoad,
+      variant,
+      alt,
     });
     setImageError(true);
     setIsLoading(false);
 
-    if (fallback) {
+    // Enhanced fallback logic
+    if (fallback && target.src !== fallback) {
+      console.log("Attempting fallback URL:", fallback);
       target.src = fallback;
+      return; // Don't mark as error yet, let fallback attempt load
+    }
+
+    // If src includes Cloudflare transformations, try original without transforms
+    if (src.includes("imagedelivery.net") && src.includes(",")) {
+      const originalUrl = src.split("/").slice(0, -1).join("/") + "/public";
+      if (target.src !== originalUrl) {
+        console.log("Attempting original Cloudflare URL:", originalUrl);
+        target.src = originalUrl;
+        return; // Don't mark as error yet, let original attempt load
+      }
     }
 
     props.onError?.(e);
   };
 
   const handleLoad = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    console.log("CloudflareImage loaded successfully:", {
+      src: optimizedSrc,
+      variant,
+      naturalWidth: (e.target as HTMLImageElement).naturalWidth,
+      naturalHeight: (e.target as HTMLImageElement).naturalHeight,
+    });
     setIsLoading(false);
     setImageError(false);
     props.onLoad?.(e);

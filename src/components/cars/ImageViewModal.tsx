@@ -63,14 +63,16 @@ export function ImageViewModal({
   const getOriginalImageUrl = (url: string) => {
     // If it's a Cloudflare URL, request maximum resolution
     if (url.includes("imagedelivery.net")) {
-      // Instead of using /public, use explicit high-resolution parameters
-      // This ensures we get the largest possible version
-      const parts = url.split("/");
-
-      // Replace the last part with high-resolution parameters
-      // w=5000 requests up to 5000px width, q=100 requests maximum quality
-      parts[parts.length - 1] = "w=5000,q=100";
-      return parts.join("/");
+      // Check if URL already has transformations (contains variant like 'public')
+      if (url.endsWith("/public") || url.match(/\/[a-zA-Z]+$/)) {
+        // Replace the last segment (usually 'public') with high-resolution parameters
+        const parts = url.split("/");
+        parts[parts.length - 1] = "w=5000,q=100";
+        return parts.join("/");
+      } else {
+        // URL doesn't have a variant, append transformations
+        return `${url}/w=5000,q=100`;
+      }
     }
 
     return url;

@@ -7,7 +7,7 @@ export const revalidate = 3600;
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("🚗 /api/cars/makes - Starting request");
+    console.log("🚗 /api/cars/makes - Starting optimized request");
     console.log("🚗 /api/cars/makes - Request headers:", {
       authorization: request.headers.get("authorization") || "MISSING",
       "user-agent": request.headers.get("user-agent"),
@@ -28,45 +28,87 @@ export async function GET(request: NextRequest) {
     const db = await getDatabase();
     console.log("🚗 /api/cars/makes - Database connection successful");
 
-    // Use aggregation pipeline instead of distinct (API Version 1 compatible)
-    const pipeline = [
-      {
-        $match: {
-          make: {
-            $exists: true,
-            $ne: null,
-            $not: { $eq: "" },
-          },
-        },
-      },
-      {
-        $group: {
-          _id: "$make",
-        },
-      },
-      {
-        $sort: {
-          _id: 1,
-        },
-      },
-    ];
+    // Parse query parameters for enhanced functionality
+    const { searchParams } = new URL(request.url);
+    const includeCounts = searchParams.get("counts") === "true";
 
-    const result = await db.collection("cars").aggregate(pipeline).toArray();
-    const makes = result.map((doc) => doc._id).filter(Boolean);
+    // ✅ CORRECTED: Source from curated makes database, not car inventory
+    console.log("🚗 /api/cars/makes - Fetching from curated makes database");
+
+    // Get all active makes from the makes collection (curated database)
+    const makes = await db
+      .collection("makes")
+      .find({ active: true })
+      .sort({ name: 1 })
+      .toArray();
 
     console.log(
-      "🚗 /api/cars/makes - Successfully fetched makes:",
+      "🚗 /api/cars/makes - Successfully fetched makes from database:",
       makes.length
     );
 
-    const response = NextResponse.json({ makes });
+    // ✅ BACKWARD COMPATIBILITY: Default to simple string array for existing consumers
+    if (!includeCounts) {
+      // Return simple string array format (existing behavior)
+      const makeNames = makes.map((make) => make.name).filter(Boolean);
 
-    // Add cache headers for better performance
+      const response = NextResponse.json({ makes: makeNames });
+
+      // Add optimized cache headers
+      response.headers.set(
+        "Cache-Control",
+        "public, s-maxage=3600, stale-while-revalidate=7200"
+      );
+      response.headers.set("ETag", `"makes-simple-${makeNames.length}"`);
+
+      return response;
+    }
+
+    // ✅ ENHANCED FUNCTIONALITY: Include car counts when requested
+    console.log("🚗 /api/cars/makes - Enhanced mode with car counts");
+
+    // If counts are requested, get car counts for each make
+    const makesWithCounts = await Promise.all(
+      makes.map(async (make) => {
+        const carCount = await db
+          .collection("cars")
+          .countDocuments({ make: make.name });
+
+        return {
+          name: make.name,
+          carCount,
+        };
+      })
+    );
+
+    const totalCars = makesWithCounts.reduce(
+      (sum, make) => sum + make.carCount,
+      0
+    );
+
+    // Build enhanced response
+    const enhancedResponse = {
+      makes: makesWithCounts,
+      totalCars,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    console.log(
+      "🚗 /api/cars/makes - Successfully fetched enhanced makes with counts:",
+      makesWithCounts.length
+    );
+
+    const response = NextResponse.json(enhancedResponse);
+
+    // Add cache headers with feature-specific ETag
     response.headers.set(
       "Cache-Control",
       "public, s-maxage=3600, stale-while-revalidate=7200"
     );
-    response.headers.set("ETag", `"makes-${makes.length}"`);
+    response.headers.set(
+      "ETag",
+      `"makes-enhanced-counts-${makesWithCounts.length}"`
+    );
 
     return response;
   } catch (error) {

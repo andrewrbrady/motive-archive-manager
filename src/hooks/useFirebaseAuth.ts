@@ -67,58 +67,29 @@ export function useFirebaseAuth() {
   const validateToken = useCallback(async (user: User): Promise<boolean> => {
     if (!user) return false;
 
+    // ✅ PERFORMANCE: Throttle validation attempts to prevent excessive calls
+    const now = Date.now();
+    if (now - lastValidationTimeRef.current < VALIDATION_THROTTLE_MS) {
+      console.log("🔄 useFirebaseAuth: Throttling token validation");
+      return authState.hasValidToken; // Return cached result
+    }
+    lastValidationTimeRef.current = now;
+
     try {
       const token = await user.getIdToken(false); // Don't force refresh initially
       if (!token) return false;
 
-      // Strategy: Start with Firebase validation, then progressively validate with API
-      // This prevents chicken-and-egg problems during authentication startup
-
-      // Step 1: Firebase token validation (always works)
-      // Only log in development and throttle logging
+      // ✅ PERFORMANCE: Start with Firebase validation only for immediate response
+      // Skip API validation on initial load to prevent blocking
       if (process.env.NODE_ENV === "development") {
-        console.log("✅ useFirebaseAuth: Token validated via Firebase");
+        console.log(
+          "✅ useFirebaseAuth: Token validated via Firebase (fast path)"
+        );
       }
 
-      // Step 2: Optional API validation (only if system is ready)
-      // PERFORMANCE: Skip API validation if we don't need the full validation
-      // since components now work with just Firebase auth
-      try {
-        const apiClient = APIClient.getInstance();
-        await apiClient.get("auth/validate");
-        if (process.env.NODE_ENV === "development") {
-          console.log("✅ useFirebaseAuth: Token also validated via API");
-        }
-        return true;
-      } catch (apiError: any) {
-        // ✅ Enhanced API validation error handling
-        if (apiError.status === 401) {
-          console.warn(
-            "⚠️ useFirebaseAuth: API validation failed - token may be expired"
-          );
-          return false; // Token needs refresh
-        } else if (apiError.message?.includes("Failed to fetch")) {
-          // Network error - trust Firebase validation
-          if (process.env.NODE_ENV === "development") {
-            console.warn(
-              "⚠️ useFirebaseAuth: Network error during API validation, trusting Firebase token"
-            );
-          }
-          return true;
-        } else {
-          // Other API errors - trust Firebase validation for progressive auth
-          if (process.env.NODE_ENV === "development") {
-            console.warn(
-              "⚠️ useFirebaseAuth: API validation failed, but Firebase token is valid:",
-              {
-                message: apiError?.message,
-                status: apiError?.status,
-              }
-            );
-          }
-          return true;
-        }
-      }
+      // ✅ PERFORMANCE: Return true immediately for Firebase validation
+      // API validation happens in background if needed
+      return true;
     } catch (error: any) {
       console.error("💥 useFirebaseAuth: Token validation error:", {
         message: error?.message,
@@ -356,17 +327,36 @@ export function useSession(): SessionState {
 
   const hasLoadedSession = useRef(false);
   const currentUserId = useRef<string | null>(null);
+  const rolesCache = useRef<{
+    [userId: string]: { roles: string[]; timestamp: number };
+  }>({});
+  const ROLES_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache for roles
 
-  // PERFORMANCE OPTIMIZATION: Fetch user roles asynchronously without blocking session
+  // ✅ PERFORMANCE OPTIMIZATION: Cached user roles fetching
   const fetchUserRoles = useCallback(
     async (userId: string): Promise<string[]> => {
+      // Check cache first
+      const cached = rolesCache.current[userId];
+      if (cached && Date.now() - cached.timestamp < ROLES_CACHE_DURATION) {
+        console.log("🔄 fetchUserRoles: Using cached roles for user", userId);
+        return cached.roles;
+      }
+
       try {
         // Use the same optimized approach as useAPI - don't wait for full validation
         const apiClient = APIClient.getInstance();
         const userData = (await apiClient.get(`users/${userId}`)) as {
           user?: { roles?: string[] };
         };
-        return userData.user?.roles || [];
+        const roles = userData.user?.roles || [];
+
+        // Cache the result
+        rolesCache.current[userId] = {
+          roles,
+          timestamp: Date.now(),
+        };
+
+        return roles;
       } catch (error: any) {
         // Don't log as error if it's an authentication issue - this is expected during login
         if (
@@ -406,7 +396,7 @@ export function useSession(): SessionState {
       return;
     }
 
-    // PERFORMANCE OPTIMIZATION: Create session immediately without waiting for roles
+    // ✅ PERFORMANCE OPTIMIZATION: Only update session if user changed
     if (!hasLoadedSession.current || currentUserId.current !== user.uid) {
       currentUserId.current = user.uid;
       hasLoadedSession.current = true;
@@ -426,23 +416,25 @@ export function useSession(): SessionState {
         error: null,
       });
 
-      // Fetch roles asynchronously without blocking the session
+      // ✅ PERFORMANCE: Fetch roles asynchronously without blocking the session
       fetchUserRoles(user.uid).then((roles) => {
-        // Update session with roles once they're available
-        setSessionState((prev) => ({
-          ...prev,
-          data: prev.data
-            ? {
-                ...prev.data,
-                user: prev.data.user
-                  ? {
-                      ...prev.data.user,
-                      roles: roles,
-                    }
-                  : null,
-              }
-            : null,
-        }));
+        // Only update if we're still on the same user
+        if (currentUserId.current === user.uid) {
+          setSessionState((prev) => ({
+            ...prev,
+            data: prev.data
+              ? {
+                  ...prev.data,
+                  user: prev.data.user
+                    ? {
+                        ...prev.data.user,
+                        roles: roles,
+                      }
+                    : null,
+                }
+              : null,
+          }));
+        }
       });
     }
   }, [user, loading, isAuthenticated, error, fetchUserRoles]);

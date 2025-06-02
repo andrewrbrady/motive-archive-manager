@@ -194,22 +194,27 @@ export default function ImagesClient() {
   });
 
   // Handle search with debounce
-  const [debouncedSetSearch] = useDebounce((value: string) => {
-    const params = new URLSearchParams(searchParams?.toString() || "");
-    params.set("page", "1"); // Reset to first page on new search
-    if (value) {
-      params.set("search", value);
-    } else {
-      params.delete("search");
+  const [debouncedSearchValue] = useDebounce(searchInput, 500);
+
+  // Handle debounced search changes in useEffect
+  useEffect(() => {
+    // Only update URL if this is not the initial load
+    if (debouncedSearchValue !== searchQuery) {
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("page", "1"); // Reset to first page on new search
+      if (debouncedSearchValue) {
+        params.set("search", debouncedSearchValue);
+      } else {
+        params.delete("search");
+      }
+      router.push(`${pathname}?${params.toString()}`);
     }
-    router.push(`${pathname}?${params.toString()}`);
-  }, 500);
+  }, [debouncedSearchValue, searchQuery, searchParams, pathname, router]);
 
   // Handle search input change
   const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchInput(value);
-    debouncedSetSearch(value);
   };
 
   // Update URL with new filter value
