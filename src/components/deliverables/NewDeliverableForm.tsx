@@ -275,7 +275,11 @@ export default function NewDeliverableForm({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4">
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-3"
+            id="deliverable-form"
+          >
             {/* Basic Information Section */}
             <div className="space-y-2">
               <div className="flex items-center gap-1">
@@ -599,7 +603,12 @@ export default function NewDeliverableForm({
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={isLoading} size="sm">
+          <Button
+            type="submit"
+            form="deliverable-form"
+            disabled={isLoading}
+            size="sm"
+          >
             {isLoading ? "Creating..." : "Create"}
           </Button>
         </div>
