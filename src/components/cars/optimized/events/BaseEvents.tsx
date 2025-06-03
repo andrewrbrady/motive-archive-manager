@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { EventsSkeleton } from "./EventsSkeleton";
 import { CalendarDays, Clock, Pencil, Trash2, Loader2 } from "lucide-react";
+import { formatEventDateCalendar } from "@/lib/dateUtils";
 
 interface BaseEventsProps {
   carId: string;
@@ -210,11 +211,7 @@ const EventDisplay = memo(
     }, []);
 
     const formatDate = useCallback((dateString: string) => {
-      try {
-        return format(new Date(dateString), "MMM d, yyyy 'at' h:mm a");
-      } catch {
-        return "Invalid date";
-      }
+      return formatEventDateCalendar(dateString);
     }, []);
 
     const getEventTypeColor = useCallback((type: EventType) => {

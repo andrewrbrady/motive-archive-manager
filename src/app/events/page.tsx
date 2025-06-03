@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format } from "date-fns";
+import { formatEventDateTime } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import Link from "next/link";
 import { PageTitle } from "@/components/ui/PageTitle";
@@ -58,18 +58,7 @@ export default function EventsPage() {
   };
 
   const formatDate = (dateString: string | undefined | null) => {
-    if (!dateString) return "-";
-    try {
-      const date = new Date(dateString);
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        return "-";
-      }
-      return format(date, "PPp");
-    } catch (error) {
-      console.error("Error formatting date:", dateString, error);
-      return "-";
-    }
+    return formatEventDateTime(dateString);
   };
 
   // Helper function to safely extract car ID

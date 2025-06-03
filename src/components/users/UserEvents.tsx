@@ -32,6 +32,7 @@ import { EventType } from "@/types/event";
 import { RefreshCw } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading";
 import Link from "next/link";
+import { formatEventDateTime } from "@/lib/dateUtils";
 
 interface Event {
   _id: string;
@@ -85,17 +86,7 @@ export default function UserEvents({ userId }: UserEventsProps) {
   };
 
   const formatDate = (dateString: string | undefined | null) => {
-    if (!dateString) return "-";
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return "-";
-      }
-      return format(date, "PPp");
-    } catch (error) {
-      console.error("Error formatting date:", dateString, error);
-      return "-";
-    }
+    return formatEventDateTime(dateString);
   };
 
   const fetchEvents = useCallback(async () => {

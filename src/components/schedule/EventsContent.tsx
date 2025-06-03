@@ -26,6 +26,7 @@ import EventBatchTemplates from "@/components/events/EventBatchTemplates";
 import EventBatchManager from "@/components/events/EventBatchManager";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { ObjectId } from "mongodb";
+import { formatEventDateTime } from "@/lib/dateUtils";
 
 interface Car {
   _id: string;
@@ -58,18 +59,7 @@ export default function EventsContent() {
   };
 
   const formatDate = (dateString: string | undefined | null) => {
-    if (!dateString) return "-";
-    try {
-      const date = new Date(dateString);
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        return "-";
-      }
-      return format(date, "PPp");
-    } catch (error) {
-      console.error("Error formatting date:", dateString, error);
-      return "-";
-    }
+    return formatEventDateTime(dateString);
   };
 
   // Helper function to check if an ID is a valid MongoDB ObjectId

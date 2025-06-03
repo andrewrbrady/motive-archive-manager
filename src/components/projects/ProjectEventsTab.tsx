@@ -81,6 +81,7 @@ import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { EventTypeSelector } from "@/components/events/EventTypeSelector";
 import { LoadingContainer } from "@/components/ui/loading";
 import { useAPI } from "@/hooks/useAPI";
+import { formatEventDateTime } from "@/lib/dateUtils";
 
 interface ProjectEventsTabProps {
   projectId: string;
@@ -804,15 +805,7 @@ function AttachEventDialog({
   };
 
   const formatDate = (dateString: string | undefined | null) => {
-    if (!dateString) return "-";
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return "-";
-      return format(date, "PPp");
-    } catch (error) {
-      console.error("Error formatting date:", dateString, error);
-      return "-";
-    }
+    return formatEventDateTime(dateString);
   };
 
   const fetchAvailableEvents = async () => {
