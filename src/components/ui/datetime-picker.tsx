@@ -67,10 +67,8 @@ export function DateTimePicker({
     }
 
     if (isAllDay) {
-      // For all-day events, set to start of day
-      const newDate = new Date(selectedDate);
-      newDate.setHours(0, 0, 0, 0);
-      onChange(format(newDate, "yyyy-MM-dd'T'HH:mm"));
+      // For all-day events, output date-only format (YYYY-MM-DD)
+      onChange(format(selectedDate, "yyyy-MM-dd"));
     } else {
       // Preserve the current time or use default
       const [hours, minutes] = currentTime.split(":").map(Number);
@@ -95,11 +93,12 @@ export function DateTimePicker({
 
   const handleTimeSelect = (hours: number, minutes: number) => {
     if (!currentDate) {
-      // If no date is selected, use today
+      // If no date is selected, use today with the selected time
       const newDate = new Date();
       newDate.setHours(hours, minutes, 0, 0);
       onChange(format(newDate, "yyyy-MM-dd'T'HH:mm"));
     } else {
+      // Use the current date with the new time
       const newDate = new Date(currentDate);
       newDate.setHours(hours, minutes, 0, 0);
       onChange(format(newDate, "yyyy-MM-dd'T'HH:mm"));

@@ -108,47 +108,71 @@ export default function EditEventDialog({
     }
 
     try {
+      // Debug logging to understand the form data
+      console.log("EditEventDialog handleSubmit - Form data:", {
+        title: formData.title,
+        start: formData.start,
+        end: formData.end,
+        isAllDay: formData.isAllDay,
+        startType: typeof formData.start,
+        endType: typeof formData.end,
+      });
+
       // Create dates in UTC to match what we display and store
       const createUTCDate = (dateTimeString: string) => {
+        // Handle empty or whitespace-only strings
+        if (!dateTimeString || !dateTimeString.trim()) {
+          throw new Error("Date/time string is empty");
+        }
+
+        const trimmedString = dateTimeString.trim();
+
         if (formData.isAllDay) {
-          // For all-day events, treat the date as UTC
-          const [year, month, day] = dateTimeString.split("-").map(Number);
-          // Validate that all components are valid numbers
-          if (isNaN(year) || isNaN(month) || isNaN(day)) {
-            throw new Error("Invalid date format");
-          }
-          const date = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+          // For all-day events, expect format: YYYY-MM-DD
+          // Handle both YYYY-MM-DD and YYYY-MM-DDTHH:MM formats
+          const dateOnly = trimmedString.split("T")[0]; // Extract date part
+          const date = new Date(dateOnly + "T00:00:00.000Z"); // Parse as UTC
+
           // Check if the date is valid
           if (isNaN(date.getTime())) {
-            throw new Error("Invalid date value");
+            console.error(
+              "Created invalid all-day date:",
+              date,
+              "from:",
+              trimmedString
+            );
+            throw new Error(`Invalid all-day date: ${trimmedString}`);
           }
           return date;
         } else {
-          // For timed events, parse the datetime-local value as UTC
-          const [datePart, timePart] = dateTimeString.split("T");
-          if (!datePart || !timePart) {
-            throw new Error("Invalid datetime format");
-          }
-          const [year, month, day] = datePart.split("-").map(Number);
-          const [hours, minutes] = timePart.split(":").map(Number);
-          // Validate that all components are valid numbers
-          if (
-            isNaN(year) ||
-            isNaN(month) ||
-            isNaN(day) ||
-            isNaN(hours) ||
-            isNaN(minutes)
-          ) {
-            throw new Error("Invalid datetime format");
-          }
-          const date = new Date(
-            Date.UTC(year, month - 1, day, hours, minutes, 0, 0)
-          );
+          // For timed events, expect format: YYYY-MM-DDTHH:MM
+          // Parse as local time first, then convert to UTC to preserve the intended time
+          const date = new Date(trimmedString);
+
           // Check if the date is valid
           if (isNaN(date.getTime())) {
-            throw new Error("Invalid datetime value");
+            console.error(
+              "Created invalid datetime:",
+              date,
+              "from:",
+              trimmedString
+            );
+            throw new Error(`Invalid datetime: ${trimmedString}`);
           }
-          return date;
+
+          // Convert to UTC by creating a new date with UTC methods using local time components
+          const utcDate = new Date(
+            Date.UTC(
+              date.getFullYear(),
+              date.getMonth(),
+              date.getDate(),
+              date.getHours(),
+              date.getMinutes(),
+              date.getSeconds()
+            )
+          );
+
+          return utcDate;
         }
       };
 
@@ -180,7 +204,32 @@ export default function EditEventDialog({
       handleClose();
     } catch (error) {
       console.error("Error updating event:", error);
-      toast.error("Failed to update event");
+
+      // Provide specific error messages for validation errors
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+
+      if (errorMessage.includes("Date/time string is empty")) {
+        toast.error("Please select a valid start date/time");
+      } else if (
+        errorMessage.includes("Invalid") &&
+        errorMessage.includes("format")
+      ) {
+        toast.error(
+          "Invalid date/time format. Please select a valid date and time."
+        );
+      } else if (
+        errorMessage.includes("Invalid") &&
+        errorMessage.includes("components")
+      ) {
+        toast.error(
+          "Invalid date/time values. Please check your date and time selection."
+        );
+      } else {
+        toast.error(
+          "Failed to update event. Please check your input and try again."
+        );
+      }
     }
   };
 
