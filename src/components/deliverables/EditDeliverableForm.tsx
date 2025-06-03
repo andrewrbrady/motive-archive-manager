@@ -244,31 +244,27 @@ export default function EditDeliverableForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      !title ||
-      !selectedPlatforms.length ||
-      !type ||
-      !editDeadline ||
-      !releaseDate
-    ) {
-      toast.error("Please fill in all required fields");
+
+    // Only require title - make everything else optional
+    if (!title || title.trim() === "") {
+      toast.error("Please enter a title");
       return;
     }
 
     setIsLoading(true);
     try {
       const updateData: UpdateDeliverableData = {
-        title,
-        platforms: selectedPlatforms.map((p) => p.value),
-        type,
-        duration: type === "Photo Gallery" ? 0 : duration,
-        aspect_ratio: aspectRatio,
-        editor: editorName,
+        title: title.trim(),
+        platforms: selectedPlatforms.map((p) => p.value), // Can be empty array
+        type: type || deliverable.type, // Use existing type if not specified
+        duration: type === "Photo Gallery" ? 0 : duration || 0,
+        aspect_ratio: aspectRatio || "",
+        editor: editorName || "",
         firebase_uid: editorId,
-        edit_deadline: new Date(editDeadline).toISOString(),
-        release_date: new Date(releaseDate).toISOString(),
-        dropbox_link: dropboxLink,
-        social_media_link: socialMediaLink,
+        edit_deadline: editDeadline ? new Date(editDeadline).toISOString() : "",
+        release_date: releaseDate ? new Date(releaseDate).toISOString() : "",
+        dropbox_link: dropboxLink || "",
+        social_media_link: socialMediaLink || "",
       };
 
       const response = await api.put<UpdateDeliverableResponse>(
@@ -437,7 +433,6 @@ export default function EditDeliverableForm({
                       value={type === "Photo Gallery" ? "N/A" : duration}
                       onChange={(e) => setDuration(parseInt(e.target.value))}
                       min={0}
-                      required={type !== "Photo Gallery"}
                       disabled={type === "Photo Gallery"}
                       placeholder={type === "Photo Gallery" ? "N/A" : undefined}
                       className="text-sm"
