@@ -180,16 +180,10 @@ export default function NewDeliverableForm({
       deliverableCarId: carId || selectedCarId,
     });
 
-    if (
-      !title ||
-      selectedPlatforms.length === 0 ||
-      !type ||
-      !editor ||
-      !editDeadline ||
-      !releaseDate
-    ) {
-      console.log("Validation failed - missing required fields");
-      toast.error("Please fill in all required fields");
+    // Only require title - make everything else optional
+    if (!title || title.trim() === "") {
+      console.log("Validation failed - title is required");
+      toast.error("Please enter a title");
       return;
     }
 
@@ -201,12 +195,15 @@ export default function NewDeliverableForm({
 
     const deliverableCarId = carId || selectedCarId;
 
-    // Find the selected user to get both name and firebase_uid
-    const selectedUser = users.find((user) => user.uid === editor);
-    if (!selectedUser) {
-      console.log("Selected user not found:", editor);
-      toast.error("Please select a valid editor");
-      return;
+    // Only validate editor if one was selected
+    let selectedUser = null;
+    if (editor) {
+      selectedUser = users.find((user) => user.uid === editor);
+      if (!selectedUser) {
+        console.log("Selected user not found:", editor);
+        toast.error("Please select a valid editor");
+        return;
+      }
     }
 
     console.log("Starting API call...");
@@ -218,19 +215,35 @@ export default function NewDeliverableForm({
         : `deliverables`;
 
       const requestBody: any = {
-        title,
-        platforms: selectedPlatforms.map((p) => p.value), // Send array of platform IDs
-        type,
-        duration,
-        aspect_ratio: aspectRatio,
-        editor: selectedUser.name, // Store the name for display
-        firebase_uid: selectedUser.uid, // Store the UID for filtering
+        title: title.trim(),
+        platforms: selectedPlatforms.map((p) => p.value), // Send array of platform IDs (can be empty)
+        type: type || undefined, // Optional
+        duration: duration || 0,
+        aspect_ratio: aspectRatio || undefined, // Optional
         status: "not_started", // Default status
-        edit_deadline: new Date(editDeadline),
-        release_date: new Date(releaseDate),
-        dropbox_link: dropboxLink || undefined,
-        social_media_link: socialMediaLink || undefined,
       };
+
+      // Only add editor fields if an editor was selected
+      if (selectedUser) {
+        requestBody.editor = selectedUser.name;
+        requestBody.firebase_uid = selectedUser.uid;
+      }
+
+      // Only add dates if they were provided
+      if (editDeadline) {
+        requestBody.edit_deadline = new Date(editDeadline);
+      }
+      if (releaseDate) {
+        requestBody.release_date = new Date(releaseDate);
+      }
+
+      // Only add links if they were provided
+      if (dropboxLink && dropboxLink.trim()) {
+        requestBody.dropbox_link = dropboxLink.trim();
+      }
+      if (socialMediaLink && socialMediaLink.trim()) {
+        requestBody.social_media_link = socialMediaLink.trim();
+      }
 
       // Only add car_id if we have one
       if (deliverableCarId) {
@@ -432,7 +445,6 @@ export default function NewDeliverableForm({
                         setDuration(isNaN(value) ? 0 : value);
                       }}
                       min={0}
-                      required
                       className="text-sm"
                     />
                   </div>
