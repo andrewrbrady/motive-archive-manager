@@ -26,10 +26,14 @@ export function PlatformBadges({
 }: PlatformBadgesProps) {
   const [platformData, setPlatformData] = useState<DeliverablePlatform[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const api = useAPI();
 
   useEffect(() => {
     const fetchPlatforms = async () => {
+      // Reset error state
+      setHasError(false);
+
       if (!api || (!platforms?.length && !platform)) {
         setPlatformData([]);
         return;
@@ -60,6 +64,7 @@ export function PlatformBadges({
         setPlatformData(relevantPlatforms);
       } catch (error) {
         console.error("Error fetching platforms:", error);
+        setHasError(true);
         setPlatformData([]);
       } finally {
         setIsLoading(false);
@@ -80,7 +85,57 @@ export function PlatformBadges({
     );
   }
 
-  // Handle legacy single platform string fallback
+  // Handle error state with graceful fallback to raw platform data
+  if (hasError || (!platformData.length && (platform || platforms?.length))) {
+    // Fallback to displaying raw platform data
+    const fallbackPlatforms = platforms?.length
+      ? platforms
+      : platform
+        ? [platform]
+        : [];
+
+    if (fallbackPlatforms.length === 0) {
+      return (
+        <div className={className}>
+          <Badge
+            variant="outline"
+            className={size === "sm" ? "text-xs h-5" : ""}
+          >
+            No platforms
+          </Badge>
+        </div>
+      );
+    }
+
+    const visibleFallbacks = fallbackPlatforms.slice(0, maxVisible);
+    const remainingCount = fallbackPlatforms.length - maxVisible;
+
+    return (
+      <div className={`flex flex-wrap gap-1 ${className || ""}`}>
+        {visibleFallbacks.map((platformName, index) => (
+          <Badge
+            key={`${platformName}-${index}`}
+            variant="secondary"
+            className={size === "sm" ? "text-xs h-5" : ""}
+            title={platformName}
+          >
+            {platformName}
+          </Badge>
+        ))}
+        {remainingCount > 0 && (
+          <Badge
+            variant="outline"
+            className={size === "sm" ? "text-xs h-5" : ""}
+            title={`${remainingCount} more platform${remainingCount === 1 ? "" : "s"}`}
+          >
+            +{remainingCount}
+          </Badge>
+        )}
+      </div>
+    );
+  }
+
+  // Handle legacy single platform string fallback when no API data
   if (!platformData.length && platform) {
     return (
       <div className={className}>

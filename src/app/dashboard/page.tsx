@@ -30,10 +30,15 @@ import { PlatformBadges } from "@/components/deliverables/PlatformBadges";
 interface DeliverableResponse {
   deliverables: (Deliverable & { car?: Car })[];
   pagination: {
+    // New pagination structure from Phase 3E optimization
+    currentPage: number;
+    totalPages: number;
+    totalCount: number;
+    pageSize: number;
+    // Legacy pagination support for backward compatibility
     total: number;
     page: number;
     limit: number;
-    totalPages: number;
   };
 }
 
@@ -79,11 +84,8 @@ function DashboardInner() {
   });
 
   const fetchUserDeliverables = async () => {
-    // [REMOVED] // [REMOVED] console.log("Dashboard: fetchUserDeliverables - checking session");
-    // [REMOVED] // [REMOVED] console.log("Dashboard: session?.user?.id =", session?.user?.id);
-
     if (!session?.user?.id) {
-      // [REMOVED] // [REMOVED] console.log("Dashboard: No session user ID, returning early");
+      console.log("Dashboard: No session user ID, skipping fetch");
       return;
     }
 
@@ -91,11 +93,6 @@ function DashboardInner() {
       "Dashboard: fetchUserDeliverables called with user ID:",
       session.user.id
     );
-    console.log("Dashboard: user details:", {
-      id: session.user.id,
-      email: session.user.email,
-      name: session.user.name,
-    });
 
     setIsLoading(true);
     try {
@@ -105,29 +102,77 @@ function DashboardInner() {
       url.searchParams.append("sortDirection", "desc");
       url.searchParams.append("limit", "100");
 
-      // [REMOVED] // [REMOVED] console.log("Dashboard: API URL:", url.toString());
+      console.log("Dashboard: Fetching from URL:", url.toString());
 
       const response = await fetch(url.toString());
+
+      console.log("Dashboard: Response status:", response.status);
+      console.log(
+        "Dashboard: Response headers:",
+        Object.fromEntries(response.headers)
+      );
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Dashboard: API error response:", errorText);
         throw new Error(
-          `Failed to fetch deliverables: ${response.status} ${response.statusText}`
+          `Failed to fetch deliverables: ${response.status} ${response.statusText} - ${errorText}`
         );
       }
 
       const data: DeliverableResponse = await response.json();
-      console.log("Dashboard: API response:", {
+
+      console.log("Dashboard: API response structure:", {
+        hasDeliverables: !!data.deliverables,
         deliverableCount: data.deliverables?.length || 0,
+        hasPagination: !!data.pagination,
+        paginationKeys: data.pagination ? Object.keys(data.pagination) : [],
         pagination: data.pagination,
       });
-      // [REMOVED] // [REMOVED] console.log("Dashboard: Full API response data:", data);
-      console.log(
-        "Dashboard: First few deliverables:",
-        data.deliverables?.slice(0, 3)
-      );
-      setDeliverables(data.deliverables);
+
+      // Validate response structure
+      if (!data.deliverables) {
+        console.warn(
+          "Dashboard: No deliverables array in response, using empty array"
+        );
+        setDeliverables([]);
+      } else {
+        console.log(
+          "Dashboard: Successfully loaded",
+          data.deliverables.length,
+          "deliverables"
+        );
+        console.log(
+          "Dashboard: First deliverable sample:",
+          data.deliverables[0]
+        );
+        setDeliverables(data.deliverables);
+      }
     } catch (error) {
-      console.error("Error in fetchUserDeliverables:", error);
-      toast.error("Failed to load deliverables. Please try again later.");
+      console.error("Dashboard: Error in fetchUserDeliverables:", error);
+      console.error(
+        "Dashboard: Error stack:",
+        error instanceof Error ? error.stack : "No stack"
+      );
+
+      // Provide user-friendly error message
+      if (error instanceof Error) {
+        if (error.message.includes("401")) {
+          toast.error("Authentication required. Please sign in again.");
+        } else if (error.message.includes("403")) {
+          toast.error(
+            "Access denied. You may not have permission to view deliverables."
+          );
+        } else if (error.message.includes("500")) {
+          toast.error("Server error. Please try again later.");
+        } else {
+          toast.error(
+            "Failed to load deliverables. Please try refreshing the page."
+          );
+        }
+      } else {
+        toast.error("An unexpected error occurred. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -135,17 +180,28 @@ function DashboardInner() {
 
   useEffect(() => {
     console.log("Dashboard: useEffect triggered", {
+      hasSession: !!session,
+      hasUser: !!session?.user,
       hasSessionUserId: !!session?.user?.id,
       sessionUserId: session?.user?.id,
+      userEmail: session?.user?.email,
     });
 
     if (session?.user?.id) {
-      // [REMOVED] // [REMOVED] console.log("Dashboard: Calling fetchUserDeliverables");
+      console.log("Dashboard: Session is valid, calling fetchUserDeliverables");
       fetchUserDeliverables();
+    } else if (session === null) {
+      console.log(
+        "Dashboard: Session is explicitly null (not loading), clearing deliverables"
+      );
+      setDeliverables([]);
+      setIsLoading(false);
     } else {
-      // [REMOVED] // [REMOVED] console.log("Dashboard: Not calling fetchUserDeliverables - no user ID");
+      console.log(
+        "Dashboard: Session is undefined (still loading), waiting..."
+      );
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, session]);
 
   const handleStatusChange = (
     deliverableId: string,
