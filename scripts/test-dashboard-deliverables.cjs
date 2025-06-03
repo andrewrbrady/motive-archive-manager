@@ -191,7 +191,7 @@ class DashboardDeliverablesValidator {
       this.test("Has comprehensive logging for debugging", () => {
         return (
           content.includes("Dashboard: API response structure") &&
-          content.includes("Dashboard: Response status")
+          content.includes("Dashboard: Fetching deliverables with params")
         );
       });
 

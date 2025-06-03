@@ -26,6 +26,7 @@ import Link from "next/link";
 import { Calendar, Clock } from "lucide-react";
 import { ExternalLink } from "lucide-react";
 import { PlatformBadges } from "@/components/deliverables/PlatformBadges";
+import { useAPI } from "@/hooks/useAPI";
 
 interface DeliverableResponse {
   deliverables: (Deliverable & { car?: Car })[];
@@ -68,12 +69,12 @@ function DashboardContent() {
 
 function DashboardInner() {
   const { data: session } = useSession();
+  const api = useAPI();
   const [deliverables, setDeliverables] = useState<
     (Deliverable & { car?: Car })[]
   >([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // [REMOVED] // [REMOVED] console.log("Dashboard: Component mounted/updated");
   console.log("Dashboard: Session status:", {
     hasSession: !!session,
     hasUser: !!session?.user,
@@ -81,11 +82,17 @@ function DashboardInner() {
     userId: session?.user?.id,
     userEmail: session?.user?.email,
     userName: session?.user?.name,
+    hasAPI: !!api,
   });
 
   const fetchUserDeliverables = async () => {
     if (!session?.user?.id) {
       console.log("Dashboard: No session user ID, skipping fetch");
+      return;
+    }
+
+    if (!api) {
+      console.log("Dashboard: API client not available yet, skipping fetch");
       return;
     }
 
@@ -96,31 +103,21 @@ function DashboardInner() {
 
     setIsLoading(true);
     try {
-      const url = new URL("/api/deliverables", window.location.origin);
-      url.searchParams.append("firebase_uid", session.user.id);
-      url.searchParams.append("sortField", "updated_at");
-      url.searchParams.append("sortDirection", "desc");
-      url.searchParams.append("limit", "100");
+      const queryParams = new URLSearchParams({
+        firebase_uid: session.user.id,
+        sortField: "updated_at",
+        sortDirection: "desc",
+        limit: "100",
+      });
 
-      console.log("Dashboard: Fetching from URL:", url.toString());
-
-      const response = await fetch(url.toString());
-
-      console.log("Dashboard: Response status:", response.status);
       console.log(
-        "Dashboard: Response headers:",
-        Object.fromEntries(response.headers)
+        "Dashboard: Fetching deliverables with params:",
+        queryParams.toString()
       );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Dashboard: API error response:", errorText);
-        throw new Error(
-          `Failed to fetch deliverables: ${response.status} ${response.statusText} - ${errorText}`
-        );
-      }
-
-      const data: DeliverableResponse = await response.json();
+      const data: DeliverableResponse = await api.get(
+        `/api/deliverables?${queryParams.toString()}`
+      );
 
       console.log("Dashboard: API response structure:", {
         hasDeliverables: !!data.deliverables,
@@ -185,10 +182,13 @@ function DashboardInner() {
       hasSessionUserId: !!session?.user?.id,
       sessionUserId: session?.user?.id,
       userEmail: session?.user?.email,
+      hasAPI: !!api,
     });
 
-    if (session?.user?.id) {
-      console.log("Dashboard: Session is valid, calling fetchUserDeliverables");
+    if (session?.user?.id && api) {
+      console.log(
+        "Dashboard: Session and API are ready, calling fetchUserDeliverables"
+      );
       fetchUserDeliverables();
     } else if (session === null) {
       console.log(
@@ -196,12 +196,16 @@ function DashboardInner() {
       );
       setDeliverables([]);
       setIsLoading(false);
+    } else if (!api) {
+      console.log("Dashboard: API client not ready yet, waiting...");
+      setIsLoading(true);
     } else {
       console.log(
         "Dashboard: Session is undefined (still loading), waiting..."
       );
+      setIsLoading(true);
     }
-  }, [session?.user?.id, session]);
+  }, [session?.user?.id, session, api]);
 
   const handleStatusChange = (
     deliverableId: string,
@@ -246,6 +250,22 @@ function DashboardInner() {
 
   if (!session?.user) {
     return null;
+  }
+
+  // Show loading state while API client is initializing
+  if (!api) {
+    return (
+      <div className="container mx-auto px-2 max-w-7xl pt-12">
+        <div className="flex justify-center py-8">
+          <div className="text-center">
+            <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-2"></div>
+            <p className="text-xs text-muted-foreground">
+              Initializing authentication...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const groupedActiveDeliverables = groupDeliverablesByCar(
