@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { useSession } from "@/hooks/useFirebaseAuth";
 import { useAPI } from "@/hooks/useAPI";
 import { Event, EventType } from "@/types/event";
@@ -16,7 +16,7 @@ import { LoadingContainer } from "@/components/ui/loading-container";
 import EventBatchTemplates from "@/components/events/EventBatchTemplates";
 import EventBatchManager from "@/components/events/EventBatchManager";
 import ListView from "@/components/events/ListView";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +47,8 @@ import {
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { EventTypeSelector } from "@/components/events/EventTypeSelector";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
+import { Loader2 } from "lucide-react";
 
 interface EventsTabProps {
   carId: string;
@@ -54,14 +56,18 @@ interface EventsTabProps {
 
 export default function EventsTab({ carId }: EventsTabProps) {
   const { data: session, status } = useSession();
-  const api = useAPI();
-  const { toast } = useToast();
 
-  // Simple loading guard - don't render anything until auth is ready
-  if (status === "loading" || !api) {
+  // Show consistent loading state during authentication
+  if (status === "loading") {
     return (
-      <div className="flex items-center justify-center p-8">
-        <LoadingContainer />
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading events...</p>
+          <p className="text-xs text-muted-foreground">
+            You can switch tabs while this loads
+          </p>
+        </div>
       </div>
     );
   }
@@ -80,170 +86,168 @@ export default function EventsTab({ carId }: EventsTabProps) {
   return <EventsTabContent carId={carId} />;
 }
 
-// Move the main component logic to a separate component
 function EventsTabContent({ carId }: EventsTabProps) {
-  const { data: session, status } = useSession();
   const api = useAPI();
-  const { toast } = useToast();
-  const [events, setEvents] = useState<Event[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showBatchManager, setShowBatchManager] = useState(false);
-  const [showBatchTemplates, setShowBatchTemplates] = useState(false);
+
+  // Phase 3A optimization: Convert blocking useEffect + await api.get to non-blocking useAPIQuery
+  const {
+    data: events = [],
+    isLoading,
+    error,
+    refetch: fetchEvents,
+  } = useAPIQuery<Event[]>(`cars/${carId}/events`, {
+    staleTime: 3 * 60 * 1000, // 3 minutes cache for events data
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+    // Handle API response variations
+    select: (data: any) => {
+      return Array.isArray(data) ? data : [];
+    },
+  });
+
+  // State management for UI features
+  const [isEditMode, setIsEditMode] = useState(false);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
   const [showJsonUpload, setShowJsonUpload] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [showBatchManager, setShowBatchManager] = useState(false);
+  const [showBatchTemplates, setShowBatchTemplates] = useState(false);
   const [isSubmittingJson, setIsSubmittingJson] = useState(false);
 
-  const fetchEvents = async () => {
-    // Check authentication first
-    if (status !== "authenticated" || !session?.user || !api) {
-      console.log(
-        "EventsTab: No authenticated session available for fetchEvents"
-      );
-      setIsLoading(false);
-      return;
-    }
+  // Non-blocking error handling
+  if (error) {
+    console.error("Error fetching events:", error);
+  }
 
-    try {
-      setIsLoading(true);
-      const data = (await api.get(`cars/${carId}/events`)) as Event[];
-      setEvents(data);
-    } catch (error) {
-      console.error("Error fetching events:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch events",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Memoized event handlers for better performance
+  const handleUpdateEvent = useCallback(
+    async (eventId: string, updates: Partial<Event>) => {
+      if (!api) return;
 
-  useEffect(() => {
-    if (status === "authenticated" && session?.user && carId && api) {
-      fetchEvents();
-    }
-  }, [carId, status, session, api]);
+      try {
+        await api.put(`cars/${carId}/events/${eventId}`, updates);
 
-  const handleUpdateEvent = async (
-    eventId: string,
-    updates: Partial<Event>
-  ) => {
-    if (!api) return;
+        // Refresh events data
+        await fetchEvents();
 
-    try {
-      // Optimistically update local state
-      setEvents((currentEvents) =>
-        currentEvents.map((event) =>
-          event.id === eventId ? { ...event, ...updates } : event
-        )
-      );
+        toast.success("Event updated successfully");
+      } catch (error) {
+        console.error("Error updating event:", error);
+        toast.error("Failed to update event");
+        throw error;
+      }
+    },
+    [api, carId, fetchEvents]
+  );
 
-      await api.put(`cars/${carId}/events/${eventId}`, updates);
+  const handleDeleteEvent = useCallback(
+    async (eventId: string) => {
+      if (!api) return;
 
-      toast({
-        title: "Success",
-        description: "Event updated successfully",
-      });
-    } catch (error) {
-      // Revert the optimistic update on error
-      fetchEvents();
-      console.error("Error updating event:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update event",
-        variant: "destructive",
-      });
-      throw error;
-    }
-  };
+      try {
+        await api.delete(`cars/${carId}/events/${eventId}`);
 
-  const handleDeleteEvent = async (eventId: string) => {
-    if (!api) return;
+        // Refresh events data
+        await fetchEvents();
 
-    try {
-      // Optimistically update local state
-      setEvents((currentEvents) =>
-        currentEvents.filter((event) => event.id !== eventId)
-      );
+        toast.success("Event deleted successfully");
+      } catch (error) {
+        console.error("Error deleting event:", error);
+        toast.error("Failed to delete event");
+        throw error;
+      }
+    },
+    [api, carId, fetchEvents]
+  );
 
-      await api.delete(`cars/${carId}/events/${eventId}`);
+  const handleCreateEvent = useCallback(
+    async (eventData: Partial<Event>) => {
+      if (!api) return;
 
-      toast({
-        title: "Success",
-        description: "Event deleted successfully",
-      });
-    } catch (error) {
-      // Revert the optimistic update on error
-      fetchEvents();
-      console.error("Error deleting event:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete event",
-        variant: "destructive",
-      });
-      throw error;
-    }
-  };
+      try {
+        await api.post(`cars/${carId}/events`, eventData);
 
-  const handleCreateEvent = async (eventData: Partial<Event>) => {
-    if (!api) return;
+        // Refresh events data and close modal
+        await fetchEvents();
+        setShowCreateEvent(false);
 
-    try {
-      const result = await api.post(`cars/${carId}/events`, eventData);
-      toast({
-        title: "Success",
-        description: "Event created successfully",
-      });
+        toast.success("Event created successfully");
+      } catch (error) {
+        console.error("Error creating event:", error);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to create event"
+        );
+        throw error;
+      }
+    },
+    [api, carId, fetchEvents]
+  );
 
-      // Close the modal and refresh events
-      setShowCreateEvent(false);
-      fetchEvents();
-    } catch (error) {
-      console.error("Error creating event:", error);
-      toast({
-        title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to create event",
-        variant: "destructive",
-      });
-      throw error; // Re-throw so the modal knows there was an error
-    }
-  };
+  const handleJsonSubmit = useCallback(
+    async (jsonData: any[]) => {
+      if (!api) return;
 
-  const handleJsonSubmit = async (jsonData: any[]) => {
-    if (!api) return;
+      try {
+        setIsSubmittingJson(true);
 
-    try {
-      setIsSubmittingJson(true);
+        const result = (await api.post(`cars/${carId}/events/batch`, {
+          events: jsonData,
+        })) as { count: number };
 
-      const result = (await api.post(`cars/${carId}/events/batch`, {
-        events: jsonData,
-      })) as { count: number };
-      toast({
-        title: "Success",
-        description: `Successfully created ${result.count} events`,
-      });
+        // Refresh events data
+        await fetchEvents();
 
-      // Refresh the events list
-      fetchEvents();
-    } catch (error) {
-      console.error("Error creating events from JSON:", error);
-      toast({
-        title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to create events",
-        variant: "destructive",
-      });
-      throw error; // Re-throw to prevent modal from closing
-    } finally {
-      setIsSubmittingJson(false);
-    }
-  };
+        toast.success(`Successfully created ${result.count} events`);
+      } catch (error) {
+        console.error("Error creating events from JSON:", error);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to create events"
+        );
+        throw error;
+      } finally {
+        setIsSubmittingJson(false);
+      }
+    },
+    [api, carId, fetchEvents]
+  );
 
+  // Phase 3A improvement: Non-blocking loading state with tab switching message
   if (isLoading) {
-    return <LoadingContainer />;
+    return (
+      <div className="space-y-4">
+        <div className="bg-muted/30 border border-muted rounded-md p-4">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm text-muted-foreground">
+              Loading events...
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            You can switch tabs while this loads
+          </p>
+        </div>
+        <LoadingContainer />
+      </div>
+    );
+  }
+
+  // Non-blocking error display
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-destructive/15 border border-destructive/20 rounded-md p-3">
+          <p className="text-destructive text-sm">
+            Failed to load events. Tab switching is still available.
+          </p>
+          <button
+            onClick={() => fetchEvents()}
+            className="text-xs underline text-destructive hover:no-underline mt-2"
+          >
+            Retry Events
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -364,7 +368,6 @@ function CreateEventDialog({
   onCreate: (data: Partial<Event>) => void;
   carId: string;
 }) {
-  const { toast } = useToast();
   const [formData, setFormData] = useState({
     type: EventType.DETAIL,
     title: "",
@@ -382,20 +385,12 @@ function CreateEventDialog({
 
     // Validate required fields
     if (!formData.title.trim()) {
-      toast({
-        title: "Error",
-        description: "Title is required",
-        variant: "destructive",
-      });
+      toast.error("Title is required");
       return;
     }
 
     if (!formData.start) {
-      toast({
-        title: "Error",
-        description: "Start date is required",
-        variant: "destructive",
-      });
+      toast.error("Start date is required");
       return;
     }
 

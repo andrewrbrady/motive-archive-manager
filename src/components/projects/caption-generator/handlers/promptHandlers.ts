@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { useAPI } from "@/hooks/useAPI";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 import type { PromptTemplate, Tone, Style, Platform } from "../types";
 
 // Core prompt state interface
@@ -45,13 +46,40 @@ export interface PromptHandlerCallbacks {
 // Main hook for prompt management
 export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
   const api = useAPI();
-  // Internal state - initialize with sensible defaults
+
+  // OPTIMIZATION: Replace blocking fetchPrompts with non-blocking useAPIQuery
+  const {
+    data: promptsFromAPI,
+    isLoading: promptLoading,
+    error: promptQueryError,
+    refetch: refetchPrompts,
+  } = useAPIQuery<PromptTemplate[]>("caption-prompts", {
+    staleTime: 3 * 60 * 1000, // 3 minutes cache
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Internal state - initialize with API data
   const [promptList, setPromptList] = useState<PromptTemplate[]>([]);
   const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(
     null
   );
-  const [promptLoading, setPromptLoading] = useState(false);
-  const [promptError, setPromptError] = useState<string | null>(null);
+
+  // Sync local state with API data
+  React.useEffect(() => {
+    if (promptsFromAPI) {
+      console.log("promptHandlers: Received prompts from API:", promptsFromAPI);
+      setPromptList(promptsFromAPI);
+    }
+  }, [promptsFromAPI]);
+
+  // Convert query error to string for consistency
+  const promptError = promptQueryError
+    ? promptQueryError instanceof Error
+      ? promptQueryError.message
+      : "Failed to fetch prompts"
+    : null;
 
   // Update callbacks when state changes
   const updatePromptList = useCallback((newList: PromptTemplate[]) => {
@@ -63,42 +91,36 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
   }, []);
 
   const updatePromptError = useCallback((error: string | null) => {
-    setPromptError(error);
+    // Error is now handled by useAPIQuery, but keep for compatibility
+    if (error) {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive",
+      });
+    }
   }, []);
 
   const updatePromptLoading = useCallback((loading: boolean) => {
-    setPromptLoading(loading);
+    // Loading is now handled by useAPIQuery, but keep for compatibility
   }, []);
 
-  // Fetch prompts
+  // NON-BLOCKING: fetchPrompts now just triggers a refetch of cached data
   const fetchPrompts = useCallback(async () => {
-    if (!api) {
-      console.log("promptHandlers: API not available for fetching prompts");
-      return;
-    }
-
-    console.log("promptHandlers: Starting to fetch caption prompts...");
-    updatePromptLoading(true);
-    updatePromptError(null);
-
+    console.log("promptHandlers: Non-blocking refetch prompts...");
     try {
-      const prompts = (await api.get("caption-prompts")) as PromptTemplate[];
-      console.log("promptHandlers: Successfully fetched prompts:", prompts);
-      updatePromptList(prompts);
+      await refetchPrompts();
     } catch (error) {
-      console.error("promptHandlers: Error fetching prompts:", error);
+      console.error("promptHandlers: Error refetching prompts:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Failed to fetch prompts";
-      updatePromptError(errorMessage);
       toast({
         title: "Error",
         description: errorMessage,
         variant: "destructive",
       });
-    } finally {
-      updatePromptLoading(false);
     }
-  }, [api, updatePromptList, updatePromptError, updatePromptLoading]);
+  }, [refetchPrompts]);
 
   // Select prompt and update form values
   const selectPrompt = useCallback(
@@ -147,44 +169,72 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
       if (!api) return null;
 
       try {
-        let savedPrompt: PromptTemplate;
-
-        if (isCreating) {
-          // Create a clean payload without any _id fields
-          const { _id, id, ...cleanData } = promptData;
-          savedPrompt = (await api.post(
-            "caption-prompts",
-            cleanData
-          )) as PromptTemplate;
-        } else {
-          // For updates, include the ID in the request body
-          const payload = { ...promptData, id: selectedPrompt?._id };
-          savedPrompt = (await api.patch(
-            "caption-prompts",
-            payload
-          )) as PromptTemplate;
-        }
-
-        // Update local state
-        if (isCreating) {
-          updatePromptList([savedPrompt, ...promptList]);
-        } else {
-          updatePromptList(
-            promptList.map((p) =>
-              p._id === selectedPrompt?._id ? savedPrompt : p
-            )
-          );
-        }
-
-        // Use selectPrompt to update both the selected prompt and form values
-        selectPrompt(savedPrompt);
-
+        // Phase 3C FIX: Convert blocking await to non-blocking pattern
         toast({
-          title: "Success",
-          description: `Prompt ${isCreating ? "created" : "updated"} successfully`,
+          title: isCreating ? "Creating..." : "Updating...",
+          description: "Prompt is being saved in background",
         });
 
-        return savedPrompt;
+        // Execute save operation in background - truly non-blocking
+        const saveOperation = () => {
+          const performSave = async () => {
+            if (isCreating) {
+              // Create a clean payload without any _id fields
+              const { _id, id, ...cleanData } = promptData;
+              return api.post(
+                "caption-prompts",
+                cleanData
+              ) as Promise<PromptTemplate>;
+            } else {
+              // For updates, include the ID in the request body
+              const payload = { ...promptData, id: selectedPrompt?._id };
+              return api.patch(
+                "caption-prompts",
+                payload
+              ) as Promise<PromptTemplate>;
+            }
+          };
+
+          performSave()
+            .then((savedPrompt) => {
+              // Update local state
+              if (isCreating) {
+                updatePromptList([savedPrompt, ...promptList]);
+              } else {
+                updatePromptList(
+                  promptList.map((p) =>
+                    p._id === selectedPrompt?._id ? savedPrompt : p
+                  )
+                );
+              }
+
+              // Use selectPrompt to update both the selected prompt and form values
+              selectPrompt(savedPrompt);
+
+              toast({
+                title: "Success",
+                description: `Prompt ${isCreating ? "created" : "updated"} successfully`,
+              });
+            })
+            .catch((error) => {
+              const errorMessage =
+                error instanceof Error
+                  ? error.message
+                  : `Failed to ${isCreating ? "create" : "update"} prompt`;
+              updatePromptError(errorMessage);
+              toast({
+                title: "Error",
+                description: errorMessage,
+                variant: "destructive",
+              });
+            });
+        };
+
+        // Start background operation
+        setTimeout(saveOperation, 0);
+
+        // Return immediately with optimistic result
+        return promptData;
       } catch (error) {
         const errorMessage =
           error instanceof Error
@@ -215,32 +265,47 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
     async (promptId: string): Promise<boolean> => {
       if (!api) return false;
 
-      try {
-        await api.deleteWithBody("caption-prompts", { id: promptId });
+      // Phase 3C FIX: Convert blocking await to non-blocking pattern
+      toast({
+        title: "Deleting...",
+        description: "Prompt is being deleted in background",
+      });
 
-        updatePromptList(promptList.filter((p) => p._id !== promptId));
+      // Execute delete operation in background - truly non-blocking
+      const deleteOperation = () => {
+        api
+          .deleteWithBody("caption-prompts", { id: promptId })
+          .then(() => {
+            updatePromptList(promptList.filter((p) => p._id !== promptId));
 
-        if (selectedPrompt?._id === promptId) {
-          updateSelectedPrompt(null);
-        }
+            if (selectedPrompt?._id === promptId) {
+              updateSelectedPrompt(null);
+            }
 
-        toast({
-          title: "Success",
-          description: "Prompt deleted successfully",
-        });
+            toast({
+              title: "Success",
+              description: "Prompt deleted successfully",
+            });
+          })
+          .catch((error) => {
+            const errorMessage =
+              error instanceof Error
+                ? error.message
+                : "Failed to delete prompt";
+            updatePromptError(errorMessage);
+            toast({
+              title: "Error",
+              description: errorMessage,
+              variant: "destructive",
+            });
+          });
+      };
 
-        return true;
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Failed to delete prompt";
-        updatePromptError(errorMessage);
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-        return false;
-      }
+      // Start background operation
+      setTimeout(deleteOperation, 0);
+
+      // Return immediately with optimistic success
+      return true;
     },
     [
       api,

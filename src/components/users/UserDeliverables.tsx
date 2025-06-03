@@ -27,6 +27,8 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { useAPI } from "@/hooks/useAPI";
+import { Badge } from "@/components/ui/badge";
 
 interface Car {
   _id: string;
@@ -81,12 +83,26 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
   const [platform, setPlatform] = useState("all");
   const [type, setType] = useState("all");
 
+  const api = useAPI();
+
+  if (!api) {
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-2">
+          <LoadingSpinner size="sm" />
+          <span>Loading...</span>
+        </CardContent>
+      </Card>
+    );
+  }
+
   useEffect(() => {
     const fetchDeliverables = async () => {
+      setIsLoading(true);
       try {
         const params = new URLSearchParams({
-          editor: userName,
-          sortField: "edit_deadline",
+          firebase_uid: userName,
+          sortField: "updated_at",
           sortDirection: "asc",
         });
 
@@ -95,11 +111,9 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
         if (platform && platform !== "all") params.append("platform", platform);
         if (type && type !== "all") params.append("type", type);
 
-        const response = await fetch(`/api/deliverables?${params}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch deliverables");
-        }
-        const data = await response.json();
+        const data = (await api.get(`/api/deliverables?${params}`)) as {
+          deliverables: Deliverable[];
+        };
         setDeliverables(data.deliverables);
       } catch (error) {
         console.error("Error fetching deliverables:", error);
@@ -116,7 +130,7 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
     if (userName) {
       fetchDeliverables();
     }
-  }, [userName, search, status, platform, type]);
+  }, [userName, search, status, platform, type, api]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

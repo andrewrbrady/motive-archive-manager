@@ -1,6 +1,10 @@
 import { APIClient } from "@/lib/api-client";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
+// Global state to track authentication readiness
+let globalAuthReady = false;
+let globalAuthPromise: Promise<void> | null = null;
+
 /**
  * Nuclear Authentication useAPI Hook
  *
@@ -11,6 +15,7 @@ import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
  * - Components handle loading states properly
  * - No API calls can be made without authentication
  * - OPTIMIZED: Returns API client as soon as Firebase auth is ready (doesn't wait for API validation)
+ * - PERFORMANCE: Global auth state prevents thundering herd problem
  *
  * Usage:
  * ```typescript

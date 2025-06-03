@@ -245,6 +245,92 @@ class AuthViolationScanner {
 
     return this.violations.length === 0;
   }
+
+  printAllFileNames() {
+    logSection("Complete File Lists");
+
+    if (this.violations.length > 0) {
+      log(
+        `\n${COLORS.RED}${COLORS.BOLD}❌ CRITICAL VIOLATIONS (${this.violations.length} files):${COLORS.RESET}`
+      );
+      this.violations.forEach(({ file }) => {
+        log(`${file}`);
+      });
+    }
+
+    if (this.warnings.length > 0) {
+      log(
+        `\n${COLORS.YELLOW}${COLORS.BOLD}⚠️  WARNINGS (${this.warnings.length} files):${COLORS.RESET}`
+      );
+      this.warnings.forEach(({ file }) => {
+        log(`${file}`);
+      });
+    }
+
+    if (this.clean.length > 0) {
+      log(
+        `\n${COLORS.GREEN}${COLORS.BOLD}✅ CLEAN FILES (${this.clean.length} files):${COLORS.RESET}`
+      );
+      this.clean.forEach((file) => {
+        log(`${file}`);
+      });
+    }
+
+    // Print copy-paste friendly lists
+    logSection("Copy-Paste Friendly Lists");
+
+    if (this.violations.length > 0) {
+      log(
+        `\n${COLORS.BOLD}Critical Violations Files (space-separated):${COLORS.RESET}`
+      );
+      log(this.violations.map(({ file }) => file).join(" "));
+
+      log(
+        `\n${COLORS.BOLD}Critical Violations Files (one per line):${COLORS.RESET}`
+      );
+      this.violations.forEach(({ file }) => {
+        log(file);
+      });
+    }
+
+    if (this.warnings.length > 0) {
+      log(`\n${COLORS.BOLD}Warning Files (space-separated):${COLORS.RESET}`);
+      log(this.warnings.map(({ file }) => file).join(" "));
+    }
+
+    // Print file type statistics
+    logSection("File Type Statistics");
+
+    const getFileStats = (files) => {
+      const stats = {};
+      files.forEach((file) => {
+        const dir = file.split("/")[1] || "root";
+        stats[dir] = (stats[dir] || 0) + 1;
+      });
+      return stats;
+    };
+
+    if (this.violations.length > 0) {
+      log(`\n${COLORS.BOLD}Violations by Directory:${COLORS.RESET}`);
+      const violationFiles = this.violations.map(({ file }) => file);
+      const violationStats = getFileStats(violationFiles);
+      Object.entries(violationStats)
+        .sort(([, a], [, b]) => b - a)
+        .forEach(([dir, count]) => {
+          log(`  ${dir}: ${count} files`);
+        });
+    }
+
+    if (this.clean.length > 0) {
+      log(`\n${COLORS.BOLD}Clean Files by Directory:${COLORS.RESET}`);
+      const cleanStats = getFileStats(this.clean);
+      Object.entries(cleanStats)
+        .sort(([, a], [, b]) => b - a)
+        .forEach(([dir, count]) => {
+          log(`  ${dir}: ${count} files`);
+        });
+    }
+  }
 }
 
 // Main execution
@@ -268,6 +354,9 @@ if (require.main === module) {
     });
 
     const isClean = scanner.generateReport();
+
+    // Print complete file lists for easy reference
+    scanner.printAllFileNames();
 
     // Exit with error code if violations found
     process.exit(isClean ? 0 : 1);

@@ -2,6 +2,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronUpIcon, ChevronDownIcon } from "@heroicons/react/20/solid";
 import { Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useAPI } from "@/hooks/useAPI";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface ListViewProps {
   cars: any[];
@@ -23,8 +25,18 @@ type SortField =
 type SortDirection = "asc" | "desc";
 
 export default function ListView({ cars, currentSearchParams }: ListViewProps) {
+  const api = useAPI();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Early return if API not ready
+  if (!api) {
+    return (
+      <div className="w-full flex items-center justify-center py-8">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   const handleSort = (field: SortField) => {
     const params = new URLSearchParams(searchParams?.toString() || "");
@@ -53,13 +65,7 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
     }
 
     try {
-      const response = await fetch(`/api/cars/${carId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete car");
-      }
+      await api.delete(`/api/cars/${carId}`);
 
       // Refresh the page to update the list
       window.location.reload();

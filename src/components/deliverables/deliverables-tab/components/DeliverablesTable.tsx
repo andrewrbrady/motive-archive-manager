@@ -16,6 +16,7 @@ import { StatusSelector } from "../../StatusSelector";
 import YouTubeUploadHelper from "../../YouTubeUploadHelper";
 import EditDeliverableForm from "../../EditDeliverableForm";
 import { PlatformBadges } from "../../PlatformBadges";
+import { useCarDetails } from "@/contexts/CarDetailsContext";
 
 interface DeliverablesTableProps {
   deliverables: Deliverable[];
@@ -23,11 +24,6 @@ interface DeliverablesTableProps {
   actions: DeliverableActions;
   batchMode: BatchModeState;
   showCarColumn?: boolean;
-  getCarInfo?: (deliverable: Deliverable) => {
-    make: string;
-    model: string;
-    year: number;
-  } | null;
 }
 
 export default function DeliverablesTable({
@@ -36,8 +32,9 @@ export default function DeliverablesTable({
   actions,
   batchMode,
   showCarColumn = false,
-  getCarInfo,
 }: DeliverablesTableProps) {
+  const { getCarDetails } = useCarDetails();
+
   const {
     isBatchMode,
     selectedDeliverables,
@@ -100,7 +97,7 @@ export default function DeliverablesTable({
                   onClick={toggleAllDeliverables}
                   className="p-0"
                 >
-                  {selectedDeliverables.length === deliverables.length ? (
+                  {isBatchMode ? (
                     <CheckSquare className="h-4 w-4" />
                   ) : (
                     <Square className="h-4 w-4" />
@@ -160,7 +157,10 @@ export default function DeliverablesTable({
             </TableRow>
           ) : (
             deliverables.map((deliverable) => {
-              const carInfo = getCarInfo?.(deliverable);
+              const carInfo =
+                showCarColumn && deliverable.car_id
+                  ? getCarDetails(deliverable.car_id.toString())
+                  : null;
 
               return (
                 <TableRow key={deliverable._id?.toString()}>

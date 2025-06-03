@@ -70,18 +70,29 @@ export default function BaseDocumentation({
       if (!api) return;
       setIsDeletingFile(fileId);
 
-      try {
-        await api.deleteWithBody("documentation/delete", { fileId, carId });
+      // Phase 3D FIX: Remove blocking await from background operations
+      const deleteOperation = () => {
+        api
+          .deleteWithBody("documentation/delete", { fileId, carId })
+          .then(() => {
+            // Refresh data after successful delete
+            refreshFiles();
+            toast.success("File deleted successfully");
+          })
+          .catch((error) => {
+            console.error("Error deleting file:", error);
+            toast.error("Failed to delete file");
+          })
+          .finally(() => {
+            setIsDeletingFile(null);
+          });
+      };
 
-        // Refresh data after successful delete
-        refreshFiles();
-        toast.success("File deleted successfully");
-      } catch (error) {
-        console.error("Error deleting file:", error);
-        toast.error("Failed to delete file");
-      } finally {
-        setIsDeletingFile(null);
-      }
+      // Execute delete operation in background - truly non-blocking
+      setTimeout(deleteOperation, 0);
+
+      // Immediate optimistic feedback
+      toast.success("Deleting file in background...");
     },
     [api, carId, refreshFiles]
   );

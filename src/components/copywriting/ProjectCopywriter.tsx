@@ -2,6 +2,9 @@
 
 import React from "react";
 import { toast } from "@/components/ui/use-toast";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   BaseCopywriter,
   CopywriterConfig,
@@ -21,6 +24,11 @@ interface ProjectCopywriterProps {
   onProjectUpdate: () => void;
 }
 
+/**
+ * ProjectCopywriter - Non-blocking copywriter for projects
+ * Part of Phase 1 optimization - uses useAPIQuery for all data fetching
+ * Users can switch tabs while data loads in background
+ */
 export function ProjectCopywriter({
   project,
   onProjectUpdate,
@@ -31,6 +39,86 @@ export function ProjectCopywriter({
     return (
       <div className="text-center py-8 text-[hsl(var(--foreground-muted))]">
         <p>Project ID is required to generate content.</p>
+      </div>
+    );
+  }
+
+  // Use optimized query hooks for project data - non-blocking, cached
+  const {
+    data: carsData,
+    isLoading: isLoadingCars,
+    error: carsError,
+  } = useAPIQuery<any[]>(`projects/${project._id}/cars`, {
+    staleTime: 3 * 60 * 1000, // 3 minutes cache for project data
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const {
+    data: eventsData,
+    isLoading: isLoadingEvents,
+    error: eventsError,
+  } = useAPIQuery<any[]>(`projects/${project._id}/events`, {
+    staleTime: 3 * 60 * 1000, // 3 minutes cache for project data
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const {
+    data: captionsData,
+    isLoading: isLoadingCaptions,
+    error: captionsError,
+    refetch: refetchCaptions,
+  } = useAPIQuery<any[]>(`projects/${project._id}/captions`, {
+    staleTime: 1 * 60 * 1000, // 1 minute cache for user data
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Determine overall loading state - only entity-specific data
+  const isLoading = isLoadingCars || isLoadingEvents;
+
+  const hasError = carsError || eventsError || captionsError;
+
+  // Show non-blocking loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">
+            Loading project copywriter...
+          </p>
+          <p className="text-xs text-muted-foreground text-center">
+            You can switch tabs while this loads
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show non-blocking error state
+  if (hasError && !carsData) {
+    return (
+      <div className="py-8">
+        <div className="bg-destructive/15 border border-destructive/20 rounded-md p-4 max-w-md mx-auto">
+          <p className="text-destructive text-sm text-center mb-3">
+            Failed to load project copywriter data. Tab switching is still
+            available.
+          </p>
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -55,13 +143,8 @@ export function ProjectCopywriter({
   const callbacks: CopywriterCallbacks = {
     onDataFetch: async (): Promise<CopywriterData> => {
       try {
-        // Fetch project cars
-        const carsResponse = await fetch(`/api/projects/${project._id}/cars`);
-        if (!carsResponse.ok) throw new Error("Failed to fetch project cars");
-        const carsData = await carsResponse.json();
-
         // Convert to project car format
-        const projectCars: ProjectCar[] = carsData.map((car: any) => ({
+        const projectCars: ProjectCar[] = (carsData || []).map((car: any) => ({
           _id: car._id,
           year: car.year || 0,
           make: car.make || "",
@@ -74,14 +157,9 @@ export function ProjectCopywriter({
           createdAt: car.createdAt || new Date().toISOString(),
         }));
 
-        // Fetch project events
-        const eventsResponse = await fetch(
-          `/api/projects/${project._id}/events`
-        );
-        let projectEvents: ProjectEvent[] = [];
-        if (eventsResponse.ok) {
-          const events = await eventsResponse.json();
-          projectEvents = events.map((event: any) => ({
+        // Convert events to project format
+        const projectEvents: ProjectEvent[] = (eventsData || []).map(
+          (event: any) => ({
             id: event._id,
             project_id: project._id,
             type: event.type,
@@ -96,31 +174,11 @@ export function ProjectCopywriter({
             imageIds: event.imageIds || [],
             createdAt: event.createdAt,
             updatedAt: event.updatedAt,
-          }));
-        }
-
-        // Fetch system prompts
-        const systemPromptsResponse = await fetch(`/api/system-prompts/active`);
-        if (!systemPromptsResponse.ok)
-          throw new Error("Failed to fetch system prompts");
-        const systemPrompts = await systemPromptsResponse.json();
-
-        // Fetch length settings
-        const lengthResponse = await fetch(`/api/admin/length-settings`);
-        const lengthSettings = lengthResponse.ok
-          ? await lengthResponse.json()
-          : [];
-
-        // Fetch saved captions
-        const captionsResponse = await fetch(
-          `/api/projects/${project._id}/captions`
+          })
         );
-        const savedCaptionsData = captionsResponse.ok
-          ? await captionsResponse.json()
-          : [];
 
-        // Convert to project caption format (already in correct format for projects)
-        const savedCaptions = savedCaptionsData.map((caption: any) => ({
+        // Convert captions to project caption format
+        const savedCaptions = (captionsData || []).map((caption: any) => ({
           _id: caption._id,
           platform: caption.platform,
           context: caption.context,
@@ -134,13 +192,13 @@ export function ProjectCopywriter({
         return {
           cars: projectCars,
           events: projectEvents,
-          systemPrompts,
-          lengthSettings,
+          systemPrompts: [], // Now handled by shared cache in BaseCopywriter
+          lengthSettings: [], // Now handled by shared cache in BaseCopywriter
           savedCaptions,
           clientHandle: null, // Projects don't typically have client handles
         };
       } catch (error) {
-        console.error("Error fetching project copywriter data:", error);
+        console.error("Error processing project copywriter data:", error);
         throw error;
       }
     },
@@ -275,8 +333,8 @@ export function ProjectCopywriter({
     },
 
     onRefresh: async (): Promise<void> => {
-      // Refresh project data
-      onProjectUpdate();
+      // Refresh captions data with optimized cache invalidation
+      await refetchCaptions();
     },
   };
 

@@ -14,60 +14,174 @@ import type {
   CreateEventRequest,
 } from "@/types/api-endpoints";
 
-/**
- * Gets a valid authentication token from Firebase
- * This is exported so it can be used independently or by the APIClient
- */
-export async function getValidToken(): Promise<string> {
-  try {
-    const currentUser = auth.currentUser;
+// Global variables for token management
+let cachedToken: string | null = null;
+let lastTokenTime = 0;
+const TOKEN_CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
 
-    if (!currentUser) {
-      throw new Error("Authentication required - no user logged in");
-    }
+// Global variables for throttling refresh requests
+let isRefreshing = false;
+let refreshPromise: Promise<string> | null = null;
 
-    const token = await getIdToken(currentUser, false); // false = use cached token if valid
+// Global token request state to prevent multiple simultaneous token requests
+let isGettingToken = false;
+let tokenPromise: Promise<string> | null = null;
+const TOKEN_CACHE_MS = 120000; // ✅ PHASE 4E: Extended cache to 2 minutes to reduce token requests
 
-    if (!token) {
-      throw new Error("Authentication required - failed to get token");
-    }
+// ✅ PHASE 4E: Add console logging throttle to prevent spam
+let lastConsoleLogTime = 0;
+const CONSOLE_LOG_THROTTLE_MS = 120000; // Only log every 2 minutes
 
-    return token;
-  } catch (error: any) {
-    console.error(
-      "💥 getValidToken: Failed to get authentication token:",
-      error
-    );
-    throw new Error("Authentication required - please sign in");
+// ✅ PHASE 4F: Add console throttling to prevent massive api-client spam
+const apiClientThrottleCache: { [messageType: string]: number } = {};
+const API_CLIENT_THROTTLE_MS = 120000; // Only log each message type every 2 minutes
+
+// Helper function for throttled console logging in api-client
+function throttledLog(messageType: string, message: string, ...args: any[]) {
+  const now = Date.now();
+  const lastLogTime = apiClientThrottleCache[messageType] || 0;
+
+  if (now - lastLogTime > API_CLIENT_THROTTLE_MS) {
+    console.log(message, ...args);
+    apiClientThrottleCache[messageType] = now;
+  }
+}
+
+function throttledError(messageType: string, message: string, ...args: any[]) {
+  const now = Date.now();
+  const lastLogTime = apiClientThrottleCache[messageType] || 0;
+
+  if (now - lastLogTime > API_CLIENT_THROTTLE_MS) {
+    console.error(message, ...args);
+    apiClientThrottleCache[messageType] = now;
   }
 }
 
 /**
- * Refreshes the authentication token by forcing a new token request
- * This is exported so it can be used independently or by the APIClient
+ * Gets a valid authentication token
+ * This is the SINGLE source of truth for authentication tokens across the entire app
+ * Now includes enhanced caching and throttling to prevent excessive Firebase calls
+ */
+export async function getValidToken(): Promise<string> {
+  const now = Date.now();
+
+  // Return cached token if it's still fresh
+  if (cachedToken && now - lastTokenTime < TOKEN_CACHE_MS) {
+    return cachedToken;
+  }
+
+  // If a token request is already in progress, wait for it
+  if (isGettingToken && tokenPromise) {
+    // ✅ PHASE 4E: Throttle console logging
+    if (
+      process.env.NODE_ENV === "development" &&
+      now - lastConsoleLogTime > CONSOLE_LOG_THROTTLE_MS
+    ) {
+      console.log("🔄 getValidToken: Waiting for existing token request...");
+      lastConsoleLogTime = now;
+    }
+    return tokenPromise;
+  }
+
+  // Start a new token request
+  isGettingToken = true;
+  tokenPromise = (async () => {
+    try {
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        throw new Error("Authentication required - no user logged in");
+      }
+
+      const token = await getIdToken(currentUser, false); // Don't force refresh unless needed
+
+      if (!token) {
+        throw new Error("Authentication required - failed to get token");
+      }
+
+      // Cache the token
+      cachedToken = token;
+      lastTokenTime = now;
+
+      return token;
+    } catch (error: any) {
+      // ✅ PHASE 4E: Throttle error logging to reduce console spam
+      if (now - lastConsoleLogTime > CONSOLE_LOG_THROTTLE_MS) {
+        console.error(
+          "💥 getValidToken: Failed to get authentication token:",
+          error
+        );
+        lastConsoleLogTime = now;
+      }
+      throw new Error("Authentication required - please sign in");
+    } finally {
+      // Reset request state
+      isGettingToken = false;
+      tokenPromise = null;
+    }
+  })();
+
+  return tokenPromise;
+}
+
+/**
+ * Throttled token refresh that prevents multiple simultaneous refresh requests
+ * This solves the "thundering herd" problem when many components call useAPI() at once
  */
 export async function refreshToken(): Promise<string> {
-  try {
-    const currentUser = auth.currentUser;
-
-    if (!currentUser) {
-      throw new Error("Authentication required - no user logged in");
-    }
-
-    const token = await getIdToken(currentUser, true); // true = force refresh
-
-    if (!token) {
-      throw new Error("Authentication required - failed to refresh token");
-    }
-
-    return token;
-  } catch (error: any) {
-    console.error(
-      "💥 refreshToken: Failed to refresh authentication token:",
-      error
+  // If a refresh is already in progress, wait for it instead of starting a new one
+  if (isRefreshing && refreshPromise) {
+    // ✅ PHASE 4F: Use throttled logging to prevent massive console spam
+    throttledLog(
+      "refresh-waiting",
+      "🔄 refreshToken: Waiting for existing refresh to complete..."
     );
-    throw new Error("Authentication required - please sign in again");
+    return refreshPromise;
   }
+
+  // Start a new refresh
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        throw new Error("Authentication required - no user logged in");
+      }
+
+      const token = await getIdToken(currentUser, true); // true = force refresh
+
+      if (!token) {
+        throw new Error("Authentication required - failed to refresh token");
+      }
+
+      // ✅ PHASE 4F: Use throttled logging to prevent massive console spam
+      throttledLog(
+        "refresh-success",
+        "✅ refreshToken: Successfully refreshed token"
+      );
+
+      // Clear any cached token since we just refreshed
+      cachedToken = null;
+      lastTokenTime = 0;
+
+      return token;
+    } catch (error: any) {
+      // ✅ PHASE 4F: Use throttled error logging to prevent massive console spam
+      throttledError(
+        "refresh-error",
+        "💥 refreshToken: Failed to refresh authentication token:",
+        error
+      );
+      throw new Error("Authentication required - please sign in again");
+    } finally {
+      // Reset refresh state
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 /**
@@ -178,7 +292,9 @@ class APIClient {
 
       // ✅ Enhanced 401 error handling with better retry logic
       if (response.status === 401 && !skipAuth && this.retryAttempts > 0) {
-        console.log(
+        // ✅ PHASE 4F: Use throttled logging to prevent massive console spam
+        throttledLog(
+          "401-retry",
           "🔄 APIClient: Got 401, attempting token refresh and retry..."
         );
 
@@ -202,14 +318,24 @@ class APIClient {
 
           return this.handleResponse<T>(retryResponse);
         } catch (refreshError: any) {
-          console.error("💥 APIClient: Token refresh failed:", refreshError);
+          // ✅ PHASE 4F: Use throttled error logging to prevent massive console spam
+          throttledError(
+            "401-refresh-failed",
+            "💥 APIClient: Token refresh failed:",
+            refreshError
+          );
           throw new Error("Session expired - please sign in again");
         }
       }
 
       return this.handleResponse<T>(response);
     } catch (error: any) {
-      console.error(`💥 APIClient: Request failed for ${url}:`, error);
+      // ✅ PHASE 4F: Use throttled error logging to prevent massive console spam
+      throttledError(
+        "request-failed",
+        `💥 APIClient: Request failed for ${url}:`,
+        error
+      );
       throw this.createAPIError(error, url);
     }
   }
@@ -398,6 +524,38 @@ class APIClient {
         Authorization, // Only include auth header, not Content-Type
       },
       skipAuth: true, // We manually added auth header above
+    });
+  }
+
+  /**
+   * Public GET request without authentication
+   * Use this for static/reference data like platforms, system data, etc.
+   */
+  async getPublic<T>(
+    endpoint: string,
+    options?: Omit<RequestOptions, "method" | "body" | "skipAuth">
+  ): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: "GET",
+      skipAuth: true, // Skip authentication for public endpoints
+    });
+  }
+
+  /**
+   * Public POST request without authentication
+   * Use this for signup, public forms, etc.
+   */
+  async postPublic<T>(
+    endpoint: string,
+    data?: any,
+    options?: Omit<RequestOptions, "method" | "body" | "skipAuth">
+  ): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: "POST",
+      body: data ? JSON.stringify(data) : undefined,
+      skipAuth: true, // Skip authentication for public endpoints
     });
   }
 

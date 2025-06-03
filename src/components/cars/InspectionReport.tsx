@@ -31,6 +31,8 @@ import {
 } from "lucide-react";
 import { Inspection } from "@/types/inspection";
 import { toast } from "sonner";
+import { useAPI } from "@/hooks/useAPI";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface InspectionReportProps {
   inspection: Inspection;
@@ -56,6 +58,12 @@ export default function InspectionReport({
     includeImages: true,
     message: "",
   });
+
+  const api = useAPI();
+
+  if (!api) {
+    return <LoadingSpinner />;
+  }
 
   const formatDate = (date: Date | string) => {
     return new Date(date).toLocaleDateString("en-US", {
@@ -87,41 +95,38 @@ export default function InspectionReport({
 
   const handleDeleteConfirm = async () => {
     setIsDeleting(true);
-    try {
-      const response = await fetch(`/api/inspections/${inspection._id}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          deleteImages,
-        }),
-      });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to delete inspection");
-      }
+    toast.success("Deleting inspection in background...");
+    setShowDeleteDialog(false);
 
-      const result = await response.json();
+    const deleteOperation = () => {
+      api
+        .deleteWithBody(`inspections/${inspection._id}`, { deleteImages })
+        .then((result: any) => {
+          let message = "Inspection deleted successfully";
+          if (
+            deleteImages &&
+            result.imagesDeleted &&
+            result.imagesDeleted > 0
+          ) {
+            message += ` and ${result.imagesDeleted} image(s) removed from storage`;
+          }
 
-      let message = "Inspection deleted successfully";
-      if (deleteImages && result.imagesDeleted > 0) {
-        message += ` and ${result.imagesDeleted} image(s) removed from storage`;
-      }
+          toast.success(message);
+          onDelete();
+        })
+        .catch((error: any) => {
+          console.error("Error deleting inspection:", error);
+          toast.error(error?.message || "Failed to delete inspection");
+          setShowDeleteDialog(true);
+        })
+        .finally(() => {
+          setIsDeleting(false);
+          setDeleteImages(false);
+        });
+    };
 
-      toast.success(message);
-      onDelete();
-    } catch (error) {
-      console.error("Error deleting inspection:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to delete inspection"
-      );
-    } finally {
-      setIsDeleting(false);
-      setShowDeleteDialog(false);
-      setDeleteImages(false);
-    }
+    setTimeout(deleteOperation, 0);
   };
 
   const handleDeleteCancel = () => {
@@ -135,7 +140,6 @@ export default function InspectionReport({
       return;
     }
 
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailForm.to)) {
       toast.error("Please enter a valid email address");
@@ -143,39 +147,42 @@ export default function InspectionReport({
     }
 
     setIsSendingEmail(true);
-    try {
-      const response = await fetch(`/api/inspections/${inspection._id}/email`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(emailForm),
-      });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to send email");
-      }
+    toast.success("Sending inspection report in background...");
+    setShowEmailModal(false);
 
-      const result = await response.json();
-      toast.success("Inspection report sent successfully!");
-      setShowEmailModal(false);
+    const currentEmailForm = { ...emailForm };
 
-      // Reset form
-      setEmailForm({
-        to: "",
-        subject: `Inspection Report - ${inspection.title}`,
-        includeImages: true,
-        message: "",
-      });
-    } catch (error) {
-      console.error("Error sending email:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to send email"
-      );
-    } finally {
-      setIsSendingEmail(false);
-    }
+    setEmailForm({
+      to: "",
+      subject: `Inspection Report - ${inspection.title}`,
+      includeImages: true,
+      message: "",
+    });
+
+    const emailOperation = () => {
+      api
+        .post(`inspections/${inspection._id}/email`, currentEmailForm)
+        .then(() => {
+          toast.success("Inspection report sent successfully!");
+        })
+        .catch((error: any) => {
+          console.error("Error sending email:", error);
+          toast.error(error?.message || "Failed to send email");
+          setShowEmailModal(true);
+          setEmailForm({
+            to: currentEmailForm.to,
+            subject: currentEmailForm.subject,
+            includeImages: currentEmailForm.includeImages,
+            message: currentEmailForm.message,
+          });
+        })
+        .finally(() => {
+          setIsSendingEmail(false);
+        });
+    };
+
+    setTimeout(emailOperation, 0);
   };
 
   const handleEmailFormChange = (field: string, value: any) => {
@@ -187,7 +194,6 @@ export default function InspectionReport({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="sm" onClick={onBack}>
@@ -237,7 +243,6 @@ export default function InspectionReport({
         </div>
       </div>
 
-      {/* Main Content */}
       <Card className="border-0">
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -264,7 +269,6 @@ export default function InspectionReport({
           </div>
         </CardHeader>
         <CardContent className="space-y-6 mt-4">
-          {/* Description */}
           {inspection.description && (
             <div>
               <h3 className="font-semibold mb-2">Notes</h3>
@@ -274,7 +278,6 @@ export default function InspectionReport({
             </div>
           )}
 
-          {/* Checklist Items */}
           {inspection.checklistItems &&
             inspection.checklistItems.length > 0 && (
               <div>
@@ -316,7 +319,6 @@ export default function InspectionReport({
               </div>
             )}
 
-          {/* Images */}
           {inspection.inspectionImageIds &&
             inspection.inspectionImageIds.length > 0 && (
               <div>
@@ -338,7 +340,6 @@ export default function InspectionReport({
               </div>
             )}
 
-          {/* Dropbox Links */}
           {(inspection.dropboxVideoFolderUrl ||
             inspection.dropboxImageFolderUrl) && (
             <div>
@@ -376,7 +377,6 @@ export default function InspectionReport({
         </CardContent>
       </Card>
 
-      {/* Email Modal */}
       <Dialog open={showEmailModal} onOpenChange={setShowEmailModal}>
         <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -480,7 +480,6 @@ export default function InspectionReport({
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="w-[95vw] max-w-[425px]">
           <DialogHeader>

@@ -10,7 +10,12 @@ import DeliverablesTable from "./deliverables-tab/components/DeliverablesTable";
 import DeliverableModal from "./deliverables-tab/components/DeliverableModal";
 import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
+/**
+ * DeliverablesTab - Phase 2 optimized deliverables component
+ * Implements non-blocking loading states and error handling following Phase 1 patterns
+ */
 export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   const [selectedDeliverable, setSelectedDeliverable] =
     useState<Deliverable | null>(null);
@@ -24,7 +29,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   // Initialize API client
   const api = useAPI();
 
-  // Use our custom hooks
+  // Use our optimized custom hooks - now non-blocking
   const {
     deliverables,
     isLoading,
@@ -98,18 +103,24 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         onShowJsonUpload={() => setShowJsonUpload(true)}
       />
 
+      {/* Phase 2 improvement: Non-blocking loading state with tab switching message */}
+      {isLoading && (
+        <div className="bg-muted/30 border border-muted rounded-md p-4">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm text-muted-foreground">
+              Loading deliverables...
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            You can switch tabs while this loads
+          </p>
+        </div>
+      )}
+
       {/* Mobile View - Cards */}
       <div className="block md:hidden space-y-3">
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <div className="text-center">
-              <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-2"></div>
-              <p className="text-sm text-muted-foreground">
-                Loading deliverables...
-              </p>
-            </div>
-          </div>
-        ) : deliverables.length === 0 ? (
+        {!isLoading && deliverables.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-sm text-muted-foreground">
               No deliverables found. Create your first one!

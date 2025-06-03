@@ -16,6 +16,8 @@ import { Edit, Trash2, Mail, Phone } from "lucide-react";
 import EditContactDialog from "./EditContactDialog";
 import DeleteConfirmationDialog from "@/components/DeleteConfirmationDialog";
 import { toast } from "sonner";
+import { useAPI } from "@/hooks/useAPI";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface ContactsTableProps {
   filters: {
@@ -32,6 +34,16 @@ export default function ContactsTable({ filters }: ContactsTableProps) {
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [deletingContact, setDeletingContact] = useState<Contact | null>(null);
 
+  const api = useAPI();
+
+  if (!api) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
   const fetchContacts = async () => {
     try {
       setLoading(true);
@@ -42,10 +54,9 @@ export default function ContactsTable({ filters }: ContactsTableProps) {
       if (filters.company) params.append("company", filters.company);
       if (filters.role) params.append("role", filters.role);
 
-      const response = await fetch(`/api/contacts?${params.toString()}`);
-      if (!response.ok) throw new Error("Failed to fetch contacts");
-
-      const data = await response.json();
+      const data = (await api.get(`/api/contacts?${params.toString()}`)) as {
+        contacts: Contact[];
+      };
       setContacts(data.contacts || []);
     } catch (error) {
       console.error("Error fetching contacts:", error);
@@ -65,14 +76,7 @@ export default function ContactsTable({ filters }: ContactsTableProps) {
 
   const handleDelete = async (contact: Contact) => {
     try {
-      const response = await fetch(`/api/contacts/${contact._id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to delete contact");
-      }
+      await api.delete(`/api/contacts/${contact._id}`);
 
       toast.success("Contact deleted successfully");
       fetchContacts();

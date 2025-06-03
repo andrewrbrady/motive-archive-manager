@@ -5,6 +5,7 @@ import { Car } from "@/types/car";
 import { Search, X } from "lucide-react";
 import _ from "lodash";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { useAPI } from "@/hooks/useAPI";
 
 interface CarSelectorProps {
   selectedCars: Car[];
@@ -15,6 +16,7 @@ export default function CarSelector({
   selectedCars,
   onSelect,
 }: CarSelectorProps) {
+  const api = useAPI();
   const [searchTerm, setSearchTerm] = useState("");
   const [suggestions, setSuggestions] = useState<Car[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -24,6 +26,80 @@ export default function CarSelector({
   const [recentSearchCache, setRecentSearchCache] = useState<
     Record<string, Car[]>
   >({});
+
+  // Define searchCars function first
+  const searchCars = async (query: string) => {
+    if (!query) {
+      setSuggestions([]);
+      return;
+    }
+
+    if (!api) return; // Guard against null api
+
+    if (recentSearchCache[query]) {
+      const cachedResults = recentSearchCache[query].filter(
+        (car: Car) => !selectedCars.some((selected) => selected._id === car._id)
+      );
+      setSuggestions(cachedResults);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const data = (await api.get(
+        `/api/cars?search=${encodeURIComponent(
+          query
+        )}&sort=createdAt_desc&fields=_id,year,make,model,manufacturing,color`
+      )) as { cars: Car[] };
+
+      setRecentSearchCache((prev) => ({
+        ...prev,
+        [query]: data.cars,
+      }));
+
+      setSuggestions(
+        data.cars.filter(
+          (car: Car) =>
+            !selectedCars.some((selected) => selected._id === car._id)
+        )
+      );
+    } catch (error) {
+      console.error("Error searching cars:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Now define debounced version
+  const debouncedSearch = _.debounce(searchCars, 300);
+
+  useEffect(() => {
+    if (!api) return; // Guard clause
+    debouncedSearch(searchTerm);
+    return () => debouncedSearch.cancel();
+  }, [searchTerm, api]); // Include api in dependencies
+
+  useEffect(() => {
+    // Reset selected index when suggestions change
+    setSelectedIndex(-1);
+  }, [suggestions]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        searchRef.current &&
+        !searchRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Early return if API not ready (AFTER all hooks)
+  if (!api) return <LoadingSpinner size="sm" />;
 
   // Utility function for consistent car display formatting
   const formatCarDisplay = (car: Car): string => {
@@ -57,74 +133,6 @@ export default function CarSelector({
     // If we don't have make/model data, use a more user-friendly car ID format
     return `Car ${formatCarId(car._id)}`;
   };
-
-  const searchCars = async (query: string) => {
-    if (!query) {
-      setSuggestions([]);
-      return;
-    }
-
-    if (recentSearchCache[query]) {
-      const cachedResults = recentSearchCache[query].filter(
-        (car: Car) => !selectedCars.some((selected) => selected._id === car._id)
-      );
-      setSuggestions(cachedResults);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `/api/cars?search=${encodeURIComponent(
-          query
-        )}&sort=createdAt_desc&fields=_id,year,make,model,manufacturing,color`
-      );
-      if (!response.ok) throw new Error("Failed to fetch cars");
-      const data = await response.json();
-
-      setRecentSearchCache((prev) => ({
-        ...prev,
-        [query]: data.cars,
-      }));
-
-      setSuggestions(
-        data.cars.filter(
-          (car: Car) =>
-            !selectedCars.some((selected) => selected._id === car._id)
-        )
-      );
-    } catch (error) {
-      console.error("Error searching cars:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const debouncedSearch = _.debounce(searchCars, 300);
-
-  useEffect(() => {
-    debouncedSearch(searchTerm);
-    return () => debouncedSearch.cancel();
-  }, [searchTerm]);
-
-  useEffect(() => {
-    // Reset selected index when suggestions change
-    setSelectedIndex(-1);
-  }, [suggestions]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        searchRef.current &&
-        !searchRef.current.contains(event.target as Node)
-      ) {
-        setShowSuggestions(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   const handleSelect = (car: Car) => {
     console.log("Selected car:", {

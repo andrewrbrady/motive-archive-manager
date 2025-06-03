@@ -75,12 +75,30 @@ interface CarTabsProps {
   vehicleInfo?: any;
 }
 
-// Memoized loading fallback component - simple spinner to match gallery
+// Improved loading fallback component with immediate feedback
 const TabLoadingFallback = React.memo(() => (
-  <div className="flex items-center justify-center h-96">
-    <div className="flex flex-col items-center gap-3">
-      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      <p className="text-sm text-muted-foreground">Loading...</p>
+  <div className="space-y-4">
+    {/* Immediate feedback that tab switch happened */}
+    <div className="bg-muted/20 border border-muted rounded-md p-3">
+      <div className="flex items-center space-x-2">
+        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm text-muted-foreground">
+          Loading tab content...
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground mt-1">
+        ✅ Tab switched successfully - Content loading in background
+      </p>
+    </div>
+
+    {/* Skeleton content to show structure immediately */}
+    <div className="space-y-3">
+      <div className="h-8 bg-muted/30 rounded animate-pulse" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="h-32 bg-muted/20 rounded animate-pulse" />
+        <div className="h-32 bg-muted/20 rounded animate-pulse" />
+      </div>
+      <div className="h-24 bg-muted/15 rounded animate-pulse" />
     </div>
   </div>
 ));
@@ -212,6 +230,12 @@ MemoizedCalendarTab.displayName = "MemoizedCalendarTab";
 export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
   const { prefetch } = usePrefetchAPI();
 
+  // Performance optimization: Memoize vehicleInfo to prevent unnecessary re-renders
+  const memoizedVehicleInfo = useMemo(
+    () => vehicleInfo,
+    [vehicleInfo?.updatedAt]
+  );
+
   // Optimized prefetch function with debouncing to prevent excessive calls
   const prefetchTabData = useCallback(
     async (tabValue: string) => {
@@ -242,7 +266,8 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
     [carId, prefetch]
   );
 
-  // Simplified tab items with minimal dependencies
+  // PERFORMANCE CRITICAL: Simplified tab items with minimal dependencies
+  // Memoized with stable dependency to prevent re-creation on every render
   const tabItems = useMemo(
     () => [
       {
@@ -250,7 +275,10 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
         label: "Image Gallery",
         content: (
           <Suspense fallback={<TabLoadingFallback />}>
-            <MemoizedCarImageGallery carId={carId} vehicleInfo={vehicleInfo} />
+            <MemoizedCarImageGallery
+              carId={carId}
+              vehicleInfo={memoizedVehicleInfo}
+            />
           </Suspense>
         ),
       },
@@ -268,7 +296,10 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
         label: "Specifications",
         content: (
           <Suspense fallback={<TabLoadingFallback />}>
-            <SpecificationsWrapper carId={carId} vehicleInfo={vehicleInfo} />
+            <SpecificationsWrapper
+              carId={carId}
+              vehicleInfo={memoizedVehicleInfo}
+            />
           </Suspense>
         ),
       },
@@ -327,7 +358,7 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
         ),
       },
     ],
-    [carId] // Only recreate when carId changes, not vehicleInfo
+    [carId, memoizedVehicleInfo] // Only recreate when carId or vehicleInfo actually changes
   );
 
   return (

@@ -29,6 +29,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/components/ui/use-toast";
 import { Client } from "@/types/contact";
+import { useAPI } from "@/hooks/useAPI";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 const BUSINESS_TYPES = [
   "Dealership",
@@ -73,6 +75,12 @@ export default function EditClientDialog({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  const api = useAPI();
+
+  if (!api) {
+    return <LoadingSpinner />;
+  }
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -103,15 +111,7 @@ export default function EditClientDialog({
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/clients/${client._id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      });
-
-      if (!response.ok) throw new Error("Failed to update client");
+      await api.put(`clients/${client._id}`, values);
 
       toast({
         title: "Success",
@@ -120,7 +120,7 @@ export default function EditClientDialog({
 
       onSuccess?.();
       onOpenChange(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating client:", error);
       toast({
         title: "Error",

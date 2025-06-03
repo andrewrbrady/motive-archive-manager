@@ -60,19 +60,14 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       });
 
       try {
-        const response = await fetch("/api/images/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData.error || `Upload failed: ${response.statusText}`
-          );
-        }
-
-        const data = await response.json();
+        const data = (await api.upload("/api/images/upload", formData)) as {
+          success: boolean;
+          images: Array<{
+            url: string;
+            metadata?: CarImage["metadata"];
+          }>;
+          error?: string;
+        };
 
         if (!data.success || !data.images || data.images.length === 0) {
           throw new Error(data.error || "No images were uploaded successfully");

@@ -151,43 +151,70 @@ export function SimpleImageGallery({
     );
   }
 
-  const handleDelete = async (image: ImageData) => {
-    if (!api) return;
+  // Phase 3C optimization: Convert blocking handleDelete to non-blocking background operation
+  const handleDelete = useCallback(
+    async (image: ImageData) => {
+      if (!api) return;
 
-    // Try to use cloudflareId, else extract from URL
-    const cloudflareId = image.cloudflareId || extractCloudflareId(image.url);
-    if (!cloudflareId) {
-      toast({
-        title: "Error",
-        description: "No Cloudflare ID found for this image.",
-        variant: "destructive",
-      });
-      return;
-    }
-    try {
-      const payload = { cloudflareIds: [cloudflareId] };
-      // [REMOVED] // [REMOVED] console.log("Sending DELETE payload to /api/cloudflare/images:", payload);
-      const result = (await api.deleteWithBody(
-        "cloudflare/images",
-        payload
-      )) as DeleteImageResponse;
-      // [REMOVED] // [REMOVED] console.log("Delete response from /api/cloudflare/images:", result);
-      if (!result.success) {
-        throw new Error(result.error || JSON.stringify(result));
+      // Try to use cloudflareId, else extract from URL
+      const cloudflareId = image.cloudflareId || extractCloudflareId(image.url);
+      if (!cloudflareId) {
+        toast({
+          title: "Error",
+          description: "No Cloudflare ID found for this image.",
+          variant: "destructive",
+        });
+        return;
       }
-      toast({ title: "Deleted!", description: "Image deleted successfully" });
-      if (mutate) {
-        mutate();
-      }
-    } catch (err) {
+
+      // Phase 3C: Immediate optimistic feedback, then background processing
       toast({
-        title: "Error",
-        description:
-          err instanceof Error ? err.message : "Failed to delete image",
-        variant: "destructive",
+        title: "Processing...",
+        description: "Image deletion starting - you can continue browsing",
+        duration: 2000,
       });
-    }
-  };
+
+      // Background async operation to prevent blocking
+      setTimeout(async () => {
+        try {
+          const payload = { cloudflareIds: [cloudflareId] };
+          console.log(
+            "Sending DELETE payload to /api/cloudflare/images:",
+            payload
+          );
+
+          const result = (await api.deleteWithBody(
+            "cloudflare/images",
+            payload
+          )) as DeleteImageResponse;
+
+          console.log("Delete response from /api/cloudflare/images:", result);
+
+          if (!result.success) {
+            throw new Error(result.error || JSON.stringify(result));
+          }
+
+          toast({
+            title: "Deleted!",
+            description: "Image deleted successfully",
+          });
+
+          if (mutate) {
+            mutate();
+          }
+        } catch (err) {
+          console.error("Background image deletion failed:", err);
+          toast({
+            title: "Error",
+            description:
+              err instanceof Error ? err.message : "Failed to delete image",
+            variant: "destructive",
+          });
+        }
+      }, 100); // Small delay to ensure immediate feedback shows first
+    },
+    [api, mutate]
+  );
 
   return (
     <div className={getGridClasses()}>

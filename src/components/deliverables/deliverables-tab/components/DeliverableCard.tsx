@@ -8,17 +8,13 @@ import { StatusSelector } from "../../StatusSelector";
 import YouTubeUploadHelper from "../../YouTubeUploadHelper";
 import EditDeliverableForm from "../../EditDeliverableForm";
 import { PlatformBadges } from "../../PlatformBadges";
+import { useCarDetails } from "@/contexts/CarDetailsContext";
 
 interface DeliverableCardProps {
   deliverable: Deliverable;
   actions: DeliverableActions;
   onOpenModal: (deliverable: Deliverable) => void;
   showCarInfo?: boolean;
-  carInfo?: {
-    make: string;
-    model: string;
-    year: number;
-  };
 }
 
 export default function DeliverableCard({
@@ -26,8 +22,15 @@ export default function DeliverableCard({
   actions,
   onOpenModal,
   showCarInfo = false,
-  carInfo,
 }: DeliverableCardProps) {
+  const { getCarDetails } = useCarDetails();
+
+  // Get car details from context if needed
+  const carInfo =
+    showCarInfo && deliverable.car_id
+      ? getCarDetails(deliverable.car_id.toString())
+      : null;
+
   return (
     <div
       className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors cursor-pointer"
@@ -51,6 +54,11 @@ export default function DeliverableCard({
           {showCarInfo && carInfo && (
             <p className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mt-1">
               {carInfo.year} {carInfo.make} {carInfo.model}
+            </p>
+          )}
+          {showCarInfo && !carInfo && deliverable.car_id && (
+            <p className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mt-1">
+              Loading car details...
             </p>
           )}
         </div>

@@ -113,13 +113,42 @@ export default function EditEventDialog({
         if (formData.isAllDay) {
           // For all-day events, treat the date as UTC
           const [year, month, day] = dateTimeString.split("-").map(Number);
-          return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+          // Validate that all components are valid numbers
+          if (isNaN(year) || isNaN(month) || isNaN(day)) {
+            throw new Error("Invalid date format");
+          }
+          const date = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+          // Check if the date is valid
+          if (isNaN(date.getTime())) {
+            throw new Error("Invalid date value");
+          }
+          return date;
         } else {
           // For timed events, parse the datetime-local value as UTC
           const [datePart, timePart] = dateTimeString.split("T");
+          if (!datePart || !timePart) {
+            throw new Error("Invalid datetime format");
+          }
           const [year, month, day] = datePart.split("-").map(Number);
           const [hours, minutes] = timePart.split(":").map(Number);
-          return new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
+          // Validate that all components are valid numbers
+          if (
+            isNaN(year) ||
+            isNaN(month) ||
+            isNaN(day) ||
+            isNaN(hours) ||
+            isNaN(minutes)
+          ) {
+            throw new Error("Invalid datetime format");
+          }
+          const date = new Date(
+            Date.UTC(year, month - 1, day, hours, minutes, 0, 0)
+          );
+          // Check if the date is valid
+          if (isNaN(date.getTime())) {
+            throw new Error("Invalid datetime value");
+          }
+          return date;
         }
       };
 

@@ -78,7 +78,7 @@ export function BaseEvents({
    */
   const handleDelete = useCallback(
     async (eventId: string) => {
-      // Delegate to parent component which uses React Query mutations
+      // First check if parent component wants to handle deletion
       if (onDelete) {
         onDelete(eventId);
         return;
@@ -87,18 +87,28 @@ export function BaseEvents({
       // Fallback for when no parent handler is provided (standalone usage)
       if (!api) return;
 
-      try {
-        await api.delete(`cars/${carId}/events/${eventId}`);
+      // Phase 3D FIX: Remove blocking await from background operations
+      const deleteOperation = () => {
+        api
+          .delete(`cars/${carId}/events/${eventId}`)
+          .then(() => {
+            // Only refresh if this component is managing its own data
+            if (!providedEvents) {
+              refreshEvents();
+            }
+            toast.success("Event deleted successfully");
+          })
+          .catch((error) => {
+            console.error("Error deleting event:", error);
+            toast.error("Failed to delete event");
+          });
+      };
 
-        // Only refresh if this component is managing its own data
-        if (!providedEvents) {
-          refreshEvents();
-        }
-        toast.success("Event deleted successfully");
-      } catch (error) {
-        console.error("Error deleting event:", error);
-        toast.error("Failed to delete event");
-      }
+      // Execute delete operation in background - truly non-blocking
+      setTimeout(deleteOperation, 0);
+
+      // Immediate optimistic feedback
+      toast.success("Deleting event in background...");
     },
     [api, carId, onDelete, refreshEvents, providedEvents]
   );

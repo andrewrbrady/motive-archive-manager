@@ -1,63 +1,76 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Event } from "@/types/event";
 import { Deliverable } from "@/types/deliverable";
 import { toast } from "sonner";
 import { MotiveCalendar } from "@/components/calendar";
 import { Loader2 } from "lucide-react";
 import { LoadingContainer } from "@/components/ui/loading";
-import { useAPI } from "@/hooks/useAPI";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 
 interface CalendarTabProps {
   carId: string;
 }
 
+/**
+ * CalendarTab - Phase 2 optimized calendar component
+ * Converted from blocking useEffect pattern to non-blocking useAPIQuery pattern
+ * Following successful Phase 1 and 2 optimization patterns
+ */
 export default function CalendarTab({ carId }: CalendarTabProps) {
-  const api = useAPI();
-  const [events, setEvents] = useState<Event[]>([]);
-  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Phase 2 optimization: Use non-blocking useAPIQuery instead of blocking useEffect + Promise.all
+  const {
+    data: eventsData,
+    isLoading: isLoadingEvents,
+    error: eventsError,
+    refetch: refetchEvents,
+  } = useAPIQuery<Event[]>(`cars/${carId}/events`, {
+    staleTime: 3 * 60 * 1000, // 3 minutes cache for events data
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+    // Handle API response variations
+    select: (data: any) => {
+      return Array.isArray(data) ? data : [];
+    },
+  });
 
-  useEffect(() => {
-    const fetchCalendarData = async () => {
-      if (!api) return;
+  const {
+    data: deliverablesData,
+    isLoading: isLoadingDeliverables,
+    error: deliverablesError,
+    refetch: refetchDeliverables,
+  } = useAPIQuery<Deliverable[]>(`cars/${carId}/deliverables`, {
+    staleTime: 3 * 60 * 1000, // 3 minutes cache for deliverables data
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+    // Handle API response variations
+    select: (data: any) => {
+      return Array.isArray(data) ? data : [];
+    },
+  });
 
-      try {
-        setIsLoading(true);
+  // Process data safely
+  const events = eventsData || [];
+  const deliverables = deliverablesData || [];
 
-        // Fetch events and deliverables in parallel using authenticated API
-        const [eventsData, deliverablesData] = await Promise.all([
-          api.get(`cars/${carId}/events`) as Promise<Event[]>,
-          api.get(`cars/${carId}/deliverables`) as Promise<Deliverable[]>,
-        ]);
+  // Combined loading state
+  const isLoading = isLoadingEvents || isLoadingDeliverables;
 
-        setEvents(eventsData || []);
-        setDeliverables(deliverablesData || []);
-      } catch (error) {
-        console.error("Error fetching calendar data:", error);
-        toast.error("Failed to load calendar data");
-        setEvents([]);
-        setDeliverables([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchCalendarData();
-  }, [carId, api]);
+  // Non-blocking error handling
+  if (eventsError) {
+    console.error("Error fetching calendar events:", eventsError);
+  }
+  if (deliverablesError) {
+    console.error("Error fetching calendar deliverables:", deliverablesError);
+  }
 
   const handleEventDrop = async (args: any) => {
     // After the MotiveCalendar component handles the event drop, refresh the data
-    if (!api) return;
-
     try {
-      const [eventsData, deliverablesData] = await Promise.all([
-        api.get(`cars/${carId}/events`) as Promise<Event[]>,
-        api.get(`cars/${carId}/deliverables`) as Promise<Deliverable[]>,
-      ]);
-      setEvents(eventsData || []);
-      setDeliverables(deliverablesData || []);
+      await Promise.all([refetchEvents(), refetchDeliverables()]);
     } catch (error) {
       console.error("Error refreshing calendar data:", error);
     }
@@ -65,15 +78,8 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
 
   const handleEventResize = async (args: any) => {
     // After the MotiveCalendar component handles the event resize, refresh the data
-    if (!api) return;
-
     try {
-      const [eventsData, deliverablesData] = await Promise.all([
-        api.get(`cars/${carId}/events`) as Promise<Event[]>,
-        api.get(`cars/${carId}/deliverables`) as Promise<Deliverable[]>,
-      ]);
-      setEvents(eventsData || []);
-      setDeliverables(deliverablesData || []);
+      await Promise.all([refetchEvents(), refetchDeliverables()]);
     } catch (error) {
       console.error("Error refreshing calendar data:", error);
     }
@@ -84,8 +90,51 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
     // [REMOVED] // [REMOVED] console.log("Event selected:", event);
   };
 
-  if (!api || isLoading) {
-    return <LoadingContainer />;
+  // Phase 2 improvement: Non-blocking loading state with tab switching message
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-muted/30 border border-muted rounded-md p-4">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm text-muted-foreground">
+              Loading calendar data...
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            You can switch tabs while this loads
+          </p>
+        </div>
+        <LoadingContainer />
+      </div>
+    );
+  }
+
+  // Non-blocking error display
+  if (eventsError || deliverablesError) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-destructive/15 border border-destructive/20 rounded-md p-3">
+          <p className="text-destructive text-sm">
+            Failed to load calendar data. Tab switching is still available.
+          </p>
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={() => refetchEvents()}
+              className="text-xs underline text-destructive hover:no-underline"
+            >
+              Retry Events
+            </button>
+            <button
+              onClick={() => refetchDeliverables()}
+              className="text-xs underline text-destructive hover:no-underline"
+            >
+              Retry Deliverables
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

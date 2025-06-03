@@ -54,30 +54,6 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     refetchOnWindowFocus: false,
   });
 
-  // Use optimized query hook for system prompts - non-blocking, cached
-  const {
-    data: systemPromptsData,
-    isLoading: isLoadingSystemPrompts,
-    error: systemPromptsError,
-  } = useAPIQuery<any[]>(`system-prompts/list`, {
-    staleTime: 5 * 60 * 1000, // 5 minutes cache for static data
-    retry: 2,
-    retryDelay: 1000,
-    refetchOnWindowFocus: false,
-  });
-
-  // Use optimized query hook for length settings - non-blocking, cached
-  const {
-    data: lengthSettingsData,
-    isLoading: isLoadingLengthSettings,
-    error: lengthSettingsError,
-  } = useAPIQuery<any[]>(`length-settings`, {
-    staleTime: 5 * 60 * 1000, // 5 minutes cache for static data
-    retry: 2,
-    retryDelay: 1000,
-    refetchOnWindowFocus: false,
-  });
-
   // Use optimized query hook for saved captions - non-blocking, cached
   const {
     data: captionsData,
@@ -91,18 +67,9 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     refetchOnWindowFocus: false,
   });
 
-  // Determine overall loading state
-  const isLoading =
-    isLoadingCar ||
-    isLoadingEvents ||
-    isLoadingSystemPrompts ||
-    isLoadingLengthSettings;
-  const hasError =
-    carError ||
-    eventsError ||
-    systemPromptsError ||
-    lengthSettingsError ||
-    captionsError;
+  // Determine overall loading state - only entity-specific data
+  const isLoading = isLoadingCar || isLoadingEvents;
+  const hasError = carError || eventsError || captionsError;
 
   // Show non-blocking loading state
   if (isLoading) {
@@ -250,8 +217,8 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
         return {
           cars: [projectCar],
           events: projectEvents,
-          systemPrompts: systemPromptsData || [],
-          lengthSettings: lengthSettingsData || [],
+          systemPrompts: [], // Now handled by shared cache in BaseCopywriter
+          lengthSettings: [], // Now handled by shared cache in BaseCopywriter
           savedCaptions: savedCaptions,
           clientHandle: null, // TODO: Implement client handle fetching if needed
           hasMoreEvents: hasMoreEventsAvailable,
@@ -264,81 +231,137 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     },
 
     onSaveCaption: async (captionData: any): Promise<boolean> => {
-      try {
-        await api.post("captions", {
-          platform: captionData.platform,
-          carId: carId,
-          context: captionData.context,
-          caption: captionData.caption,
-        });
+      // Phase 3C FIX: Remove blocking await from background operations
+      const saveOperation = () => {
+        api
+          .post("captions", {
+            platform: captionData.platform,
+            carId: carId,
+            context: captionData.context,
+            caption: captionData.caption,
+          })
+          .then(() => {
+            toast({
+              title: "Success",
+              description: "Caption saved successfully",
+            });
 
-        toast({
-          title: "Success",
-          description: "Caption saved successfully",
-        });
+            // Refresh captions in background - non-blocking
+            setTimeout(() => {
+              refetchCaptions().catch((error) => {
+                console.error("Error refreshing captions:", error);
+              });
+            }, 100);
+          })
+          .catch((error) => {
+            console.error("Error saving caption:", error);
+            toast({
+              title: "Error",
+              description: "Failed to save caption",
+              variant: "destructive",
+            });
+          });
+      };
 
-        return true;
-      } catch (error) {
-        console.error("Error saving caption:", error);
-        toast({
-          title: "Error",
-          description: "Failed to save caption",
-          variant: "destructive",
-        });
-        return false;
-      }
+      // Execute save operation in background - truly non-blocking
+      setTimeout(saveOperation, 0);
+
+      // Return immediately with optimistic success
+      toast({
+        title: "Saving...",
+        description: "Caption is being saved in background",
+      });
+      return true;
     },
 
     onDeleteCaption: async (captionId: string): Promise<boolean> => {
-      try {
-        await api.delete(`captions?id=${captionId}&carId=${carId}`);
+      // Phase 3C FIX: Remove blocking await from background operations
+      const deleteOperation = () => {
+        api
+          .delete(`captions?id=${captionId}&carId=${carId}`)
+          .then(() => {
+            toast({
+              title: "Success",
+              description: "Caption deleted successfully",
+            });
 
-        toast({
-          title: "Success",
-          description: "Caption deleted successfully",
-        });
+            // Refresh captions in background - non-blocking
+            setTimeout(() => {
+              refetchCaptions().catch((error) => {
+                console.error("Error refreshing captions:", error);
+              });
+            }, 100);
+          })
+          .catch((error) => {
+            console.error("Error deleting caption:", error);
+            toast({
+              title: "Error",
+              description: "Failed to delete caption",
+              variant: "destructive",
+            });
+          });
+      };
 
-        return true;
-      } catch (error) {
-        console.error("Error deleting caption:", error);
-        toast({
-          title: "Error",
-          description: "Failed to delete caption",
-          variant: "destructive",
-        });
-        return false;
-      }
+      // Execute delete operation in background - truly non-blocking
+      setTimeout(deleteOperation, 0);
+
+      // Return immediately with optimistic success
+      toast({
+        title: "Deleting...",
+        description: "Caption is being deleted in background",
+      });
+      return true;
     },
 
     onUpdateCaption: async (
       captionId: string,
       newText: string
     ): Promise<boolean> => {
-      try {
-        await api.patch(`captions?id=${captionId}`, {
-          caption: newText,
-        });
+      // Phase 3C FIX: Remove blocking await from background operations
+      const updateOperation = () => {
+        api
+          .patch(`captions?id=${captionId}`, {
+            caption: newText,
+          })
+          .then(() => {
+            toast({
+              title: "Success",
+              description: "Caption updated successfully",
+            });
 
-        toast({
-          title: "Success",
-          description: "Caption updated successfully",
-        });
+            // Refresh captions in background - non-blocking
+            setTimeout(() => {
+              refetchCaptions().catch((error) => {
+                console.error("Error refreshing captions:", error);
+              });
+            }, 100);
+          })
+          .catch((error) => {
+            console.error("Error updating caption:", error);
+            toast({
+              title: "Error",
+              description: "Failed to update caption",
+              variant: "destructive",
+            });
+          });
+      };
 
-        return true;
-      } catch (error) {
-        console.error("Error updating caption:", error);
-        toast({
-          title: "Error",
-          description: "Failed to update caption",
-          variant: "destructive",
-        });
-        return false;
-      }
+      // Execute update operation in background - truly non-blocking
+      setTimeout(updateOperation, 0);
+
+      // Return immediately with optimistic success
+      toast({
+        title: "Updating...",
+        description: "Caption is being updated in background",
+      });
+      return true;
     },
 
     onRefresh: async (): Promise<void> => {
-      // Refresh captions data
-      await refetchCaptions();
+      // Phase 3C FIX: Make refresh non-blocking
+      refetchCaptions().catch((error) => {
+        console.error("Error refreshing captions:", error);
+      });
     },
   };
 

@@ -28,6 +28,7 @@ import {
 import { FirestoreUser } from "@/types/firebase";
 import { useAPI } from "@/hooks/useAPI";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
+import { usePlatforms } from "@/contexts/PlatformContext";
 
 interface Car {
   _id: string;
@@ -52,9 +53,6 @@ export default function NewDeliverableForm({
   const [selectedPlatforms, setSelectedPlatforms] = useState<
     { label: string; value: string }[]
   >([]);
-  const [availablePlatforms, setAvailablePlatforms] = useState<
-    DeliverablePlatform[]
-  >([]);
   const [type, setType] = useState<DeliverableType>();
   const [duration, setDuration] = useState(0);
   const [aspectRatio, setAspectRatio] = useState("");
@@ -68,6 +66,8 @@ export default function NewDeliverableForm({
   const [selectedCarId, setSelectedCarId] = useState(carId || "");
   const [openSelects, setOpenSelects] = useState<Record<string, boolean>>({});
 
+  const { platforms: availablePlatforms } = usePlatforms();
+
   const handleSelectOpenChange = (selectId: string, open: boolean) => {
     setOpenSelects((prev) => ({ ...prev, [selectId]: open }));
   };
@@ -75,23 +75,6 @@ export default function NewDeliverableForm({
   const isAnySelectOpen = Object.values(openSelects).some(Boolean);
 
   useEffect(() => {
-    const fetchPlatforms = async () => {
-      if (!api) {
-        console.log("API client not available for fetching platforms");
-        return;
-      }
-
-      try {
-        const response = await api.get("platforms");
-        const data = response as DeliverablePlatform[];
-        console.log("NewDeliverableForm: Fetched platforms:", data);
-        setAvailablePlatforms(data);
-      } catch (error) {
-        console.error("Error fetching platforms:", error);
-        toast.error("Failed to fetch platforms");
-      }
-    };
-
     const fetchUsers = async () => {
       if (!api) {
         console.log("API client not available for fetching users");
@@ -99,7 +82,6 @@ export default function NewDeliverableForm({
       }
 
       try {
-        // Use the new editors endpoint that doesn't require admin access
         const response = await api.get("users/editors");
         const data = response as any;
 
@@ -107,7 +89,6 @@ export default function NewDeliverableForm({
         console.log("NewDeliverableForm: Data is array:", Array.isArray(data));
 
         if (Array.isArray(data)) {
-          // Filter to only active users
           const activeUsers = data.filter(
             (user: FirestoreUser) => user.status === "active"
           );
@@ -124,15 +105,10 @@ export default function NewDeliverableForm({
       }
     };
 
-    // Only fetch platforms and users if we don't already have them
-    if (availablePlatforms.length === 0 && api) {
-      fetchPlatforms();
-    }
     if (users.length === 0 && api) {
       fetchUsers();
     }
 
-    // Only fetch cars if no carId was provided
     if (!carId && api) {
       const fetchCars = async () => {
         try {
@@ -149,7 +125,7 @@ export default function NewDeliverableForm({
         fetchCars();
       }
     }
-  }, [api]); // Add api as dependency
+  }, [api]);
 
   const resetForm = () => {
     setTitle("");
@@ -180,7 +156,6 @@ export default function NewDeliverableForm({
       deliverableCarId: carId || selectedCarId,
     });
 
-    // Only require title - make everything else optional
     if (!title || title.trim() === "") {
       console.log("Validation failed - title is required");
       toast.error("Please enter a title");
@@ -195,7 +170,6 @@ export default function NewDeliverableForm({
 
     const deliverableCarId = carId || selectedCarId;
 
-    // Only validate editor if one was selected
     let selectedUser = null;
     if (editor) {
       selectedUser = users.find((user) => user.uid === editor);
@@ -209,27 +183,24 @@ export default function NewDeliverableForm({
     console.log("Starting API call...");
     setIsLoading(true);
     try {
-      // Determine which API endpoint to use based on whether we have a car
       const apiUrl = deliverableCarId
         ? `cars/${deliverableCarId}/deliverables`
         : `deliverables`;
 
       const requestBody: any = {
         title: title.trim(),
-        platforms: selectedPlatforms.map((p) => p.value), // Send array of platform IDs (can be empty)
-        type: type || undefined, // Optional
+        platforms: selectedPlatforms.map((p) => p.value),
+        type: type || undefined,
         duration: duration || 0,
-        aspect_ratio: aspectRatio || undefined, // Optional
-        status: "not_started", // Default status
+        aspect_ratio: aspectRatio || undefined,
+        status: "not_started",
       };
 
-      // Only add editor fields if an editor was selected
       if (selectedUser) {
         requestBody.editor = selectedUser.name;
         requestBody.firebase_uid = selectedUser.uid;
       }
 
-      // Only add dates if they were provided
       if (editDeadline) {
         requestBody.edit_deadline = new Date(editDeadline);
       }
@@ -237,7 +208,6 @@ export default function NewDeliverableForm({
         requestBody.release_date = new Date(releaseDate);
       }
 
-      // Only add links if they were provided
       if (dropboxLink && dropboxLink.trim()) {
         requestBody.dropbox_link = dropboxLink.trim();
       }
@@ -245,7 +215,6 @@ export default function NewDeliverableForm({
         requestBody.social_media_link = socialMediaLink.trim();
       }
 
-      // Only add car_id if we have one
       if (deliverableCarId) {
         requestBody.car_id = deliverableCarId;
       }
@@ -293,7 +262,6 @@ export default function NewDeliverableForm({
             className="space-y-3"
             id="deliverable-form"
           >
-            {/* Basic Information Section */}
             <div className="space-y-2">
               <div className="flex items-center gap-1">
                 <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
@@ -487,7 +455,6 @@ export default function NewDeliverableForm({
               </div>
             </div>
 
-            {/* Assignment & Dates Section */}
             <div className="space-y-2">
               <div className="flex items-center gap-1">
                 <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
@@ -558,7 +525,6 @@ export default function NewDeliverableForm({
               </div>
             </div>
 
-            {/* Links Section */}
             <div className="space-y-2">
               <div className="flex items-center gap-1">
                 <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
@@ -605,7 +571,6 @@ export default function NewDeliverableForm({
           </form>
         </div>
 
-        {/* Actions Footer */}
         <div className="flex-shrink-0 flex justify-end gap-3 pt-4 border-t border-[hsl(var(--border-subtle))]">
           <Button
             type="button"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "@/hooks/useFirebaseAuth";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -75,15 +75,9 @@ function DashboardInner() {
   >([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  console.log("Dashboard: Session status:", {
-    hasSession: !!session,
-    hasUser: !!session?.user,
-    hasUserId: !!session?.user?.id,
-    userId: session?.user?.id,
-    userEmail: session?.user?.email,
-    userName: session?.user?.name,
-    hasAPI: !!api,
-  });
+  // ✅ PHASE 4F: Session change debouncing to prevent excessive API calls
+  const fetchDeliverablesTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const DEBOUNCE_MS = 300; // Wait 300ms after session changes before fetching
 
   const fetchUserDeliverables = async () => {
     if (!session?.user?.id) {
@@ -176,21 +170,22 @@ function DashboardInner() {
   };
 
   useEffect(() => {
-    console.log("Dashboard: useEffect triggered", {
+    // Clear any existing timeout
+    if (fetchDeliverablesTimeoutRef.current) {
+      clearTimeout(fetchDeliverablesTimeoutRef.current);
+    }
+
+    // ✅ PHASE 4F: Throttled useEffect logging (only log on state changes)
+    const currentLogState = {
       hasSession: !!session,
       hasUser: !!session?.user,
       hasSessionUserId: !!session?.user?.id,
       sessionUserId: session?.user?.id,
-      userEmail: session?.user?.email,
       hasAPI: !!api,
-    });
+    };
 
-    if (session?.user?.id && api) {
-      console.log(
-        "Dashboard: Session and API are ready, calling fetchUserDeliverables"
-      );
-      fetchUserDeliverables();
-    } else if (session === null) {
+    // Only log significant state changes
+    if (session === null) {
       console.log(
         "Dashboard: Session is explicitly null (not loading), clearing deliverables"
       );
@@ -199,13 +194,30 @@ function DashboardInner() {
     } else if (!api) {
       console.log("Dashboard: API client not ready yet, waiting...");
       setIsLoading(true);
+    } else if (session?.user?.id && api) {
+      // ✅ PHASE 4F: Debounce API calls to prevent excessive requests
+      console.log(
+        "Dashboard: Session and API are ready, debouncing fetchUserDeliverables call"
+      );
+
+      fetchDeliverablesTimeoutRef.current = setTimeout(() => {
+        console.log("Dashboard: Executing debounced fetchUserDeliverables");
+        fetchUserDeliverables();
+      }, DEBOUNCE_MS);
     } else {
       console.log(
         "Dashboard: Session is undefined (still loading), waiting..."
       );
       setIsLoading(true);
     }
-  }, [session?.user?.id, session, api]);
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (fetchDeliverablesTimeoutRef.current) {
+        clearTimeout(fetchDeliverablesTimeoutRef.current);
+      }
+    };
+  }, [session?.user?.id, api]);
 
   const handleStatusChange = (
     deliverableId: string,

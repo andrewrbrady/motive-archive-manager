@@ -46,9 +46,7 @@ export function GalleriesEditor({
 }: GalleriesEditorProps) {
   const api = useAPI();
   const router = useRouter();
-  const [availableGalleries, setAvailableGalleries] = useState<Gallery[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [operationInProgress, setOperationInProgress] = useState<Set<string>>(
     new Set()
@@ -68,8 +66,30 @@ export function GalleriesEditor({
     enabled: open, // Only fetch when dialog is open
   });
 
+  // Phase 3C optimization: Convert blocking fetchAvailableGalleries to non-blocking useAPIQuery
+  const searchParams = searchTerm
+    ? `?search=${encodeURIComponent(searchTerm)}`
+    : "";
+  const {
+    data: availableGalleriesData,
+    isLoading: isLoadingAvailable,
+    error: availableGalleriesError,
+  } = useAPIQuery<{ galleries?: Gallery[] }>(`galleries${searchParams}`, {
+    staleTime: 5 * 60 * 1000, // 5 minutes cache for static gallery data
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+    enabled: open, // Only fetch when dialog is open
+    // Handle API response variations and limit to 50 for performance
+    select: (data: any) => {
+      const galleries = data?.galleries || [];
+      return { galleries: galleries.slice(0, 50) };
+    },
+  });
+
   // Memoize attached galleries for performance
   const attachedGalleries = carData?.galleries || [];
+  const availableGalleries = availableGalleriesData?.galleries || [];
 
   // Navigate to gallery page
   const navigateToGallery = useCallback(
@@ -86,42 +106,6 @@ export function GalleriesEditor({
       setSearchTerm(value);
     },
     []
-  );
-
-  // Fetch available galleries for management
-  const fetchAvailableGalleries = useCallback(
-    async (search = "") => {
-      if (!api) return;
-
-      // Only fetch if dialog is open
-      if (!open && !search) {
-        return;
-      }
-
-      console.time("GalleriesEditor-fetchAvailableGalleries");
-      try {
-        setIsLoading(true);
-        const searchParams = search
-          ? `?search=${encodeURIComponent(search)}`
-          : "";
-        const data = (await api.get(`galleries${searchParams}`)) as {
-          galleries?: Gallery[];
-        };
-        // Limit to first 50 galleries for faster loading
-        setAvailableGalleries((data.galleries || []).slice(0, 50));
-      } catch (error: any) {
-        console.error(
-          "[GalleriesEditor] Error fetching available galleries:",
-          error
-        );
-        toast.error("Failed to fetch available galleries");
-        setAvailableGalleries([]);
-      } finally {
-        setIsLoading(false);
-        console.timeEnd("GalleriesEditor-fetchAvailableGalleries");
-      }
-    },
-    [api, open]
   );
 
   // Update gallery attachments with proper state management
@@ -298,24 +282,6 @@ export function GalleriesEditor({
     return availableGalleries.filter((g) => !attachedIds.has(g._id));
   }, [attachedGalleries, availableGalleries]);
 
-  // Handle search with debouncing
-  useEffect(() => {
-    if (!api || !open) return;
-
-    const timeoutId = setTimeout(() => {
-      fetchAvailableGalleries(searchTerm);
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm, api, open, fetchAvailableGalleries]);
-
-  // Fetch available galleries when dialog opens
-  useEffect(() => {
-    if (open && availableGalleries.length === 0) {
-      fetchAvailableGalleries();
-    }
-  }, [open, availableGalleries.length, fetchAvailableGalleries]);
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -335,13 +301,30 @@ export function GalleriesEditor({
           </DialogDescription>
         </DialogHeader>
 
-        {isLoading ? (
+        {isLoadingAvailable ? (
           <div className="flex items-center justify-center h-96">
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               <p className="text-sm text-muted-foreground">
                 Loading galleries...
               </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                You can close this dialog while galleries load
+              </p>
+            </div>
+          </div>
+        ) : availableGalleriesError ? (
+          <div className="flex items-center justify-center h-96">
+            <div className="flex flex-col items-center gap-3">
+              <p className="text-sm text-destructive">
+                Failed to load galleries. Dialog can still be used.
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="text-xs underline text-destructive hover:no-underline"
+              >
+                Retry Loading Galleries
+              </button>
             </div>
           </div>
         ) : (

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Badge } from "@/components/ui/badge";
-import { useAPI } from "@/hooks/useAPI";
 import { DeliverablePlatform, Platform } from "@/types/deliverable";
+import { usePlatforms } from "@/contexts/PlatformContext";
 
 interface PlatformBadgesProps {
   /** Legacy single platform string */
@@ -24,57 +24,15 @@ export function PlatformBadges({
   size = "sm",
   className,
 }: PlatformBadgesProps) {
-  const [platformData, setPlatformData] = useState<DeliverablePlatform[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasError, setHasError] = useState(false);
-  const api = useAPI();
+  const {
+    platforms: allPlatforms,
+    isLoading,
+    error,
+    getPlatformByName,
+    getPlatformsByIds,
+  } = usePlatforms();
 
-  useEffect(() => {
-    const fetchPlatforms = async () => {
-      // Reset error state
-      setHasError(false);
-
-      if (!api || (!platforms?.length && !platform)) {
-        setPlatformData([]);
-        return;
-      }
-
-      setIsLoading(true);
-      try {
-        const response = await api.get("/api/platforms");
-        const allPlatforms: DeliverablePlatform[] = Array.isArray(response)
-          ? response
-          : (response as any)?.platforms || [];
-
-        let relevantPlatforms: DeliverablePlatform[] = [];
-
-        if (platforms?.length) {
-          // Filter platforms by IDs
-          relevantPlatforms = allPlatforms.filter((p) =>
-            platforms.includes(p._id)
-          );
-        } else if (platform) {
-          // Find platform by name for backward compatibility
-          const foundPlatform = allPlatforms.find((p) => p.name === platform);
-          if (foundPlatform) {
-            relevantPlatforms = [foundPlatform];
-          }
-        }
-
-        setPlatformData(relevantPlatforms);
-      } catch (error) {
-        console.error("Error fetching platforms:", error);
-        setHasError(true);
-        setPlatformData([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchPlatforms();
-  }, [platforms, platform, api]);
-
-  // Handle loading state
+  // Handle loading state (only shows briefly during initial app load)
   if (isLoading) {
     return (
       <div className={className}>
@@ -85,8 +43,22 @@ export function PlatformBadges({
     );
   }
 
+  // Get platform data from context (no API calls!)
+  let platformData: DeliverablePlatform[] = [];
+
+  if (platforms?.length) {
+    // Get platforms by IDs using context helper
+    platformData = getPlatformsByIds(platforms);
+  } else if (platform) {
+    // Find platform by name for backward compatibility
+    const foundPlatform = getPlatformByName(platform);
+    if (foundPlatform) {
+      platformData = [foundPlatform];
+    }
+  }
+
   // Handle error state with graceful fallback to raw platform data
-  if (hasError || (!platformData.length && (platform || platforms?.length))) {
+  if (error || (!platformData.length && (platform || platforms?.length))) {
     // Fallback to displaying raw platform data
     const fallbackPlatforms = platforms?.length
       ? platforms

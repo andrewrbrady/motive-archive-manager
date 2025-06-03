@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useAPI } from "@/hooks/useAPI";
-import { FileText, Trash2, Upload, Loader2 } from "lucide-react";
+import React, { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
+import { useAPI } from "@/hooks/useAPI";
+import { Upload, FileText, Trash2, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 interface DocumentationFile {
   _id: string;
@@ -23,36 +24,33 @@ interface DocumentationFilesProps {
 
 export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
   const api = useAPI();
-  const [files, setFiles] = useState<DocumentationFile[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isLoadingFiles, setIsLoadingFiles] = useState(true);
-  const [uploadProgress, setUploadProgress] = useState<{
-    [key: string]: number;
-  }>({});
-  const [isDeletingFile, setIsDeletingFile] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchFiles();
-  }, [carId, api]);
-
-  const fetchFiles = async () => {
-    if (!api) return;
-    setIsLoadingFiles(true);
-    try {
-      const data = (await api.get(`cars/${carId}/documentation`)) as {
-        files: DocumentationFile[];
-      };
-      setFiles(data.files || []);
-    } catch (error) {
-      console.error("Error fetching documentation files:", error);
-      setError("Failed to load documentation files");
-    } finally {
-      setIsLoadingFiles(false);
+  // Phase 3D FIX: Convert blocking useEffect+fetchFiles to non-blocking useAPIQuery
+  const {
+    data: filesData,
+    isLoading: isLoadingFiles,
+    error: filesError,
+    refetch: refetchFiles,
+  } = useAPIQuery<{ files: DocumentationFile[] }>(
+    `cars/${carId}/documentation`,
+    {
+      staleTime: 3 * 60 * 1000, // 3 minutes cache
+      retry: 2,
+      retryDelay: 1000,
+      refetchOnWindowFocus: false,
     }
-  };
+  );
+
+  const files = useMemo(() => filesData?.files || [], [filesData?.files]);
+  const error = filesError ? "Failed to load documentation files" : null;
+
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
+    {}
+  );
+  const [isDeletingFile, setIsDeletingFile] = useState<string | null>(null);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -78,7 +76,6 @@ export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
 
     const droppedFiles = Array.from(e.dataTransfer.files);
     setSelectedFiles((prev) => [...prev, ...droppedFiles]);
-    setError(null);
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,7 +83,6 @@ export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
     if (fileList) {
       const newFiles = Array.from(fileList);
       setSelectedFiles((prev) => [...prev, ...newFiles]);
-      setError(null);
     }
   };
 
@@ -95,7 +91,6 @@ export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
-    setError(null);
     setUploadProgress({});
 
     try {
@@ -160,7 +155,7 @@ export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
 
       const results = await Promise.allSettled(uploadPromises);
 
-      // Process successful uploads and add them to the files list
+      // Process successful uploads
       const successfulUploads = results
         .filter(
           (result): result is PromiseFulfilledResult<DocumentationFile> =>
@@ -168,14 +163,10 @@ export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
         )
         .map((result) => result.value);
 
-      if (successfulUploads.length > 0) {
-        setFiles((prev) => [...successfulUploads, ...prev]);
-      }
-
       // Check for failures
       const failures = results.filter((result) => result.status === "rejected");
       if (failures.length > 0) {
-        setError(`${failures.length} file(s) failed to upload`);
+        toast.error(`${failures.length} file(s) failed to upload`);
       }
 
       // Clear all selected files after upload attempt
@@ -186,10 +177,12 @@ export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
         toast.success(
           `Successfully uploaded ${successfulUploads.length} file(s)`
         );
+        // Refresh the files list
+        refetchFiles();
       }
     } catch (error) {
       console.error("Error in upload process:", error);
-      setError(
+      toast.error(
         error instanceof Error ? error.message : "Failed to upload files"
       );
     } finally {
@@ -199,20 +192,33 @@ export default function DocumentationFiles({ carId }: DocumentationFilesProps) {
     }
   };
 
+  // Phase 3D FIX: Convert blocking handleDelete to non-blocking
   const handleDelete = async (fileId: string) => {
     if (!api) return;
     setIsDeletingFile(fileId);
-    try {
-      await api.deleteWithBody("documentation/delete", { fileId, carId });
 
-      setFiles((prev) => prev.filter((file) => file._id !== fileId));
-      toast.success("File deleted successfully");
-    } catch (error) {
-      console.error("Error deleting file:", error);
-      toast.error("Failed to delete file");
-    } finally {
-      setIsDeletingFile(null);
-    }
+    // Execute delete operation in background - truly non-blocking
+    const deleteOperation = () => {
+      api
+        .deleteWithBody("documentation/delete", { fileId, carId })
+        .then(() => {
+          // Refresh the files list
+          refetchFiles();
+          toast.success("File deleted successfully");
+        })
+        .catch((error) => {
+          console.error("Error deleting file:", error);
+          toast.error("Failed to delete file");
+        })
+        .finally(() => {
+          setIsDeletingFile(null);
+        });
+    };
+
+    setTimeout(deleteOperation, 0);
+
+    // Immediate optimistic feedback
+    toast.success("Deleting file in background...");
   };
 
   const formatFileSize = (bytes: number) => {

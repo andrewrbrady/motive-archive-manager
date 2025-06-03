@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Components, EventProps } from "react-big-calendar";
 import BaseCalendar, { BaseCalendarEvent } from "./BaseCalendar";
 import { Event } from "@/types/event";
@@ -32,6 +32,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { useAPI } from "@/hooks/useAPI";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 // Define EventInteractionArgs interface
 interface EventInteractionArgs<TEvent> {
@@ -86,6 +88,7 @@ export function MotiveCalendar({
   isFullscreen = false,
   calendarRef,
 }: MotiveCalendarProps) {
+  const api = useAPI();
   const [showEvents, setShowEvents] = useState(true);
   const [showDeliverables, setShowDeliverables] = useState(true);
   const [showMilestones, setShowMilestones] = useState(true);
@@ -106,73 +109,67 @@ export function MotiveCalendar({
     (Event & { car?: { make: string; model: string; year: number } })[]
   >([]);
 
-  // Fetch car information for events when in project context
+  // Use caching strategy for car data to reduce blocking fetches
+  const [carCache, setCarCache] = useState<
+    Map<string, { make: string; model: string; year: number }>
+  >(new Map());
+
+  // Non-blocking car data fetching
+  const fetchCarData = useCallback(
+    async (carId: string) => {
+      if (!api || !carId) return undefined;
+
+      // Check cache first
+      if (carCache.has(carId)) {
+        return carCache.get(carId);
+      }
+
+      try {
+        const car = (await api.get(`/api/cars/${carId}`)) as {
+          make: string;
+          model: string;
+          year: number;
+        };
+
+        // Cache the result
+        setCarCache((prev) => new Map(prev).set(carId, car));
+        return { make: car.make, model: car.model, year: car.year };
+      } catch (error) {
+        console.error("Error fetching car:", error);
+        return undefined;
+      }
+    },
+    [api, carCache]
+  );
+
+  // Update eventsWithCars when events change, with optimized car fetching
   useEffect(() => {
+    if (!api) {
+      setEventsWithCars(events);
+      return;
+    }
+
     if (projectId && events.length > 0) {
-      const fetchCarsForEvents = async () => {
+      // Phase 3A: Optimized non-blocking car data fetching
+      const updateEventsWithCarData = async () => {
         const eventsWithCarData = await Promise.all(
           events.map(async (event) => {
             if (event.car_id) {
-              try {
-                const carResponse = await fetch(`/api/cars/${event.car_id}`);
-                if (carResponse.ok) {
-                  const car = await carResponse.json();
-                  return {
-                    ...event,
-                    car: { make: car.make, model: car.model, year: car.year },
-                  };
-                }
-              } catch (error) {
-                console.error("Error fetching car:", error);
-              }
+              const car = await fetchCarData(event.car_id);
+              return car ? { ...event, car } : event;
             }
             return event;
           })
         );
         setEventsWithCars(eventsWithCarData);
       };
-      fetchCarsForEvents();
+
+      // Run asynchronously to avoid blocking the UI
+      updateEventsWithCarData();
     } else {
       setEventsWithCars(events);
     }
-  }, [events, projectId]);
-
-  // Helper function to format event title for project calendar
-  const formatEventTitle = (
-    event: Event & { car?: { make: string; model: string; year: number } }
-  ) => {
-    const eventType = event.type
-      .replace(/_/g, " ")
-      .toLowerCase()
-      .replace(/\b\w/g, (l) => l.toUpperCase());
-
-    // Check if title is just a formatted version of the event type
-    const normalizedTitle = event.title
-      ?.trim()
-      .toLowerCase()
-      .replace(/\s+/g, " ");
-    const normalizedEventType = eventType.toLowerCase().replace(/\s+/g, " ");
-    const titleMatchesEventType = normalizedTitle === normalizedEventType;
-
-    if (projectId && event.car) {
-      const carInfo = `${event.car.year} ${event.car.make} ${event.car.model}`;
-
-      if (titleMatchesEventType || !event.title?.trim()) {
-        // If title matches event type or is empty, show: "SOLD | CAR"
-        return `${eventType} | ${carInfo}`;
-      } else {
-        // If title is different from event type, show: "SOLD | TITLE | CAR"
-        return `${eventType} | ${event.title.trim()} | ${carInfo}`;
-      }
-    }
-
-    // For non-project calendars, return title if it's different from event type, otherwise just event type
-    if (titleMatchesEventType || !event.title?.trim()) {
-      return eventType;
-    }
-
-    return event.title.trim();
-  };
+  }, [events, projectId, api, fetchCarData]); // Include fetchCarData in dependencies
 
   // Get unique event types
   const uniqueEventTypes = useMemo(() => {
@@ -206,7 +203,51 @@ export function MotiveCalendar({
     setMilestoneStatusFilters([...milestoneStatusCategories]);
   }, [uniqueEventTypes, uniqueDeliverableTypes, uniqueDeliverablePlatforms]);
 
+  // Helper function to format event title for project calendar
+  const formatEventTitle = useCallback(
+    (
+      event: Event & { car?: { make: string; model: string; year: number } }
+    ) => {
+      const eventType = event.type
+        .replace(/_/g, " ")
+        .toLowerCase()
+        .replace(/\b\w/g, (l) => l.toUpperCase());
+
+      // Check if title is just a formatted version of the event type
+      const normalizedTitle = event.title
+        ?.trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
+      const normalizedEventType = eventType.toLowerCase().replace(/\s+/g, " ");
+      const titleMatchesEventType = normalizedTitle === normalizedEventType;
+
+      if (projectId && event.car) {
+        const carInfo = `${event.car.year} ${event.car.make} ${event.car.model}`;
+
+        if (titleMatchesEventType || !event.title?.trim()) {
+          // If title matches event type or is empty, show: "SOLD | CAR"
+          return `${eventType} | ${carInfo}`;
+        } else {
+          // If title is different from event type, show: "SOLD | TITLE | CAR"
+          return `${eventType} | ${event.title.trim()} | ${carInfo}`;
+        }
+      }
+
+      // For non-project calendars, return title if it's different from event type, otherwise just event type
+      if (titleMatchesEventType || !event.title?.trim()) {
+        return eventType;
+      }
+
+      return event.title.trim();
+    },
+    [projectId]
+  );
+
+  // FIXED: Move useMemo hooks BEFORE early return to fix hooks ordering issue
   const calendarEvents = useMemo(() => {
+    // Return empty array if API is not ready yet
+    if (!api) return [];
+
     const eventItems: MotiveCalendarEvent[] = showEvents
       ? eventsWithCars
           .filter(
@@ -312,6 +353,7 @@ export function MotiveCalendar({
       (a, b) => a.start.getTime() - b.start.getTime()
     );
   }, [
+    api, // Add api dependency
     eventsWithCars,
     deliverables,
     milestones,
@@ -323,7 +365,11 @@ export function MotiveCalendar({
     showEvents,
     showDeliverables,
     showMilestones,
+    formatEventTitle,
   ]);
+
+  // FIXED: Early return AFTER all hooks - this fixes the hooks ordering issue
+  if (!api) return <LoadingSpinner size="sm" />;
 
   // Event style getter
   const eventPropGetter = (event: MotiveCalendarEvent) => {
@@ -782,29 +828,11 @@ export function MotiveCalendar({
           ? `/api/cars/${carId}/events/${event.id}`
           : `/api/projects/${projectId}/events/${event.id}`;
 
-        const response = await fetch(apiEndpoint, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            start: start.toISOString(),
-            end: adjustedEnd.toISOString(),
-            isAllDay: isAllDay,
-          }),
+        await api.put(apiEndpoint, {
+          start: start.toISOString(),
+          end: adjustedEnd.toISOString(),
+          isAllDay: isAllDay,
         });
-
-        if (!response.ok) {
-          let errorMessage = "Failed to update event";
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.message || errorMessage;
-          } catch (e) {
-            // If response is not JSON, use status text
-            errorMessage = response.statusText || errorMessage;
-          }
-          throw new Error(errorMessage);
-        }
 
         toast.success("Event updated successfully");
       } else if (event.type === "deliverable") {
@@ -820,33 +848,16 @@ export function MotiveCalendar({
           ? `/api/cars/${carId}/deliverables/${deliverableId}`
           : `/api/projects/${projectId}/deliverables/${deliverableId}`;
 
-        const response = await fetch(apiEndpoint, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(
-            isDeadline
-              ? {
-                  edit_deadline: start.toISOString(),
-                }
-              : {
-                  release_date: start.toISOString(),
-                }
-          ),
-        });
-
-        if (!response.ok) {
-          let errorMessage = "Failed to update deliverable";
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.message || errorMessage;
-          } catch (e) {
-            // If response is not JSON, use status text
-            errorMessage = response.statusText || errorMessage;
-          }
-          throw new Error(errorMessage);
-        }
+        await api.put(
+          apiEndpoint,
+          isDeadline
+            ? {
+                edit_deadline: start.toISOString(),
+              }
+            : {
+                release_date: start.toISOString(),
+              }
+        );
 
         toast.success(
           `${
@@ -885,28 +896,10 @@ export function MotiveCalendar({
           ? `/api/cars/${carId}/events/${event.id}`
           : `/api/projects/${projectId}/events/${event.id}`;
 
-        const response = await fetch(apiEndpoint, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            start: start.toISOString(),
-            end: end.toISOString(),
-          }),
+        await api.put(apiEndpoint, {
+          start: start.toISOString(),
+          end: end.toISOString(),
         });
-
-        if (!response.ok) {
-          let errorMessage = "Failed to update event";
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.message || errorMessage;
-          } catch (e) {
-            // If response is not JSON, use status text
-            errorMessage = response.statusText || errorMessage;
-          }
-          throw new Error(errorMessage);
-        }
 
         toast.success("Event updated successfully");
       } else if (event.type === "deliverable") {

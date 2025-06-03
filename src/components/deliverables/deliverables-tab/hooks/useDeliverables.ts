@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { toast } from "react-hot-toast";
 import { useSession } from "@/hooks/useFirebaseAuth";
 import { useAPI } from "@/hooks/useAPI";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { Deliverable, DeliverableStatus } from "@/types/deliverable";
 import { User } from "../types";
 
@@ -24,102 +25,119 @@ interface UseDeliverablesReturn {
   ) => Promise<void>;
 }
 
+/**
+ * useDeliverables - Phase 2 optimized deliverables hook
+ * Converted from blocking useEffect pattern to non-blocking useAPIQuery pattern
+ * Following successful Phase 1 copywriter optimization patterns
+ */
 export function useDeliverables({
   carId,
   apiEndpoint,
 }: UseDeliverablesProps = {}): UseDeliverablesReturn {
-  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [users, setUsers] = useState<User[]>([]);
-  const [allUsers, setAllUsers] = useState<User[]>([]);
   const { data: session, status } = useSession();
   const api = useAPI();
 
+  // Build API endpoint with validation
+  const deliverablesEndpoint =
+    apiEndpoint || (carId ? `cars/${carId}/deliverables` : null);
+
+  // Validate carId format before making API calls
+  const isValidCarId = carId ? /^[0-9a-fA-F]{24}$/.test(carId) : true;
+
+  // Phase 2 optimization: Use non-blocking useAPIQuery instead of blocking useEffect + fetch
+  const {
+    data: deliverablesData,
+    isLoading: isLoadingDeliverables,
+    error: deliverablesError,
+    refetch: refetchDeliverables,
+  } = useAPIQuery<Deliverable[]>(deliverablesEndpoint!, {
+    enabled: !!(
+      deliverablesEndpoint &&
+      status === "authenticated" &&
+      session?.user &&
+      isValidCarId
+    ),
+    staleTime: 3 * 60 * 1000, // 3 minutes cache for deliverables data
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+    // Handle API response variations
+    select: (data: any) => {
+      if (Array.isArray(data)) {
+        return data;
+      }
+      return data?.deliverables || [];
+    },
+  });
+
+  // Shared cache for users data (used across multiple deliverable instances)
+  const {
+    data: usersData,
+    isLoading: isLoadingUsers,
+    error: usersError,
+  } = useAPIQuery<any>(`users`, {
+    queryKey: ["shared-users-data"], // Shared cache key
+    enabled: !!(status === "authenticated" && session?.user),
+    staleTime: 5 * 60 * 1000, // 5 minutes cache for users (static-ish data)
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Process deliverables data safely
+  const deliverables = deliverablesData || [];
+
+  // Process users data safely following Phase 1 patterns
+  const processedUsers = (() => {
+    if (!usersData) return { users: [], allUsers: [] };
+
+    // Handle different API response structures
+    let usersArray;
+    if (usersData.users && Array.isArray(usersData.users)) {
+      usersArray = usersData.users;
+    } else if (Array.isArray(usersData)) {
+      usersArray = usersData;
+    } else {
+      console.error("Unexpected users API response structure:", usersData);
+      return { users: [], allUsers: [] };
+    }
+
+    const activeUsers = usersArray.filter(
+      (user: User) => user.status === "active"
+    );
+    const editors = activeUsers.filter((user: User) =>
+      user.creativeRoles?.includes("video_editor")
+    );
+
+    return {
+      users: editors,
+      allUsers: activeUsers,
+    };
+  })();
+
+  // Combined loading state
+  const isLoading = isLoadingDeliverables || isLoadingUsers;
+
+  // Non-blocking error handling
+  if (deliverablesError && !isValidCarId) {
+    console.error("Invalid carId format:", carId);
+  }
+  if (deliverablesError) {
+    console.error("Error fetching deliverables:", deliverablesError);
+  }
+  if (usersError) {
+    console.error("Error fetching users:", usersError);
+  }
+
+  // Optimized refresh function
   const fetchDeliverables = useCallback(async () => {
-    // Only fetch when authenticated
-    if (status !== "authenticated" || !session?.user || !api) {
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      let url = apiEndpoint;
-
-      if (!url && carId) {
-        // Check if carId is a valid MongoDB ObjectId before making the request
-        if (!/^[0-9a-fA-F]{24}$/.test(carId)) {
-          console.error("Invalid carId format:", carId);
-          setDeliverables([]);
-          setIsLoading(false);
-          return;
-        }
-        url = `/api/cars/${carId}/deliverables`;
-      }
-
-      if (!url) {
-        throw new Error("No API endpoint provided");
-      }
-
-      try {
-        const data = (await api.get(url)) as any;
-        // Handle both array responses and empty responses correctly
-        setDeliverables(Array.isArray(data) ? data : data.deliverables || []);
-      } catch (error: any) {
-        console.error(`API returned error:`, error);
-        // Only show error for actual API errors, not empty results
-        if (error.status !== 404) {
-          throw new Error("Failed to fetch deliverables");
-        }
-        // If 404, just set empty array and don't show error
-        setDeliverables([]);
-      }
+      await refetchDeliverables();
     } catch (error) {
-      console.error("Error fetching deliverables:", error);
-      toast.error("Failed to fetch deliverables");
-      setDeliverables([]);
-    } finally {
-      setIsLoading(false);
+      console.error("Error refreshing deliverables:", error);
+      toast.error("Failed to refresh deliverables");
     }
-  }, [carId, apiEndpoint, status, session, api]);
-
-  const fetchUsers = useCallback(async () => {
-    // Only fetch when authenticated
-    if (status !== "authenticated" || !session?.user || !api) {
-      return;
-    }
-
-    try {
-      const data = (await api.get("/api/users")) as any;
-
-      // Handle the correct API response structure: { users: [...], total: number }
-      let usersArray;
-      if (data.users && Array.isArray(data.users)) {
-        usersArray = data.users;
-      } else if (Array.isArray(data)) {
-        // Fallback for legacy API responses that return array directly
-        usersArray = data;
-      } else {
-        console.error("Unexpected API response structure:", data);
-        toast.error("Failed to load users properly");
-        return;
-      }
-
-      // Store all users
-      const activeUsers = usersArray.filter(
-        (user: User) => user.status === "active"
-      );
-      setAllUsers(activeUsers);
-
-      // For backward compatibility, still set the editors list
-      const editors = activeUsers.filter((user: User) =>
-        user.creativeRoles.includes("video_editor")
-      );
-      setUsers(editors);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      toast.error("Failed to fetch users");
-    }
-  }, [status, session, api]);
+  }, [refetchDeliverables]);
 
   const handleDelete = useCallback(
     async (deliverableId: string, deliverableCarId?: string) => {
@@ -214,17 +232,11 @@ export function useDeliverables({
     [carId, deliverables, fetchDeliverables, api]
   );
 
-  // Initial data fetch
-  useEffect(() => {
-    fetchDeliverables();
-    fetchUsers();
-  }, [fetchDeliverables, fetchUsers]);
-
   return {
     deliverables,
     isLoading,
-    users,
-    allUsers,
+    users: processedUsers.users,
+    allUsers: processedUsers.allUsers,
     fetchDeliverables,
     handleDelete,
     handleDuplicate,

@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -74,42 +75,90 @@ interface BaseCopywriterProps {
 }
 
 /**
- * BaseCopywriter - Non-blocking copywriter component
- * Part of Phase 3F optimization - converted from blocking useEffect to useQuery
- * Users can switch tabs while data loads in background
+ * BaseCopywriter - Non-blocking copywriter component with shared cache strategy
+ * Part of Phase 1 optimization - uses shared useAPIQuery for system data
+ * Prevents duplicate API calls between car and project copywriters
  */
 export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   const { user } = useFirebaseAuth();
 
-  // Use optimized query hook - non-blocking, cached data fetching
+  // Shared cache strategy - Use direct useAPIQuery for system data that's common across all copywriters
   const {
-    data,
-    isLoading,
-    error,
-    refetch: refreshData,
-  } = useQuery<CopywriterData>({
-    queryKey: [`copywriter-data-${config.entityId}`],
-    queryFn: callbacks.onDataFetch,
-    staleTime: 3 * 60 * 1000, // 3 minutes cache
+    data: sharedSystemPrompts,
+    isLoading: isLoadingSharedSystemPrompts,
+    error: sharedSystemPromptsError,
+  } = useAPIQuery<any[]>(`system-prompts/active`, {
+    queryKey: ["shared-system-prompts"], // Shared cache key
+    staleTime: 5 * 60 * 1000, // 5 minutes cache for system data
     retry: 2,
     retryDelay: 1000,
-    // This ensures the query is enabled and won't block tab switching
     refetchOnWindowFocus: false,
   });
 
-  // Memoize data with fallbacks for performance
+  const {
+    data: sharedLengthSettings,
+    isLoading: isLoadingSharedLengthSettings,
+    error: sharedLengthSettingsError,
+  } = useAPIQuery<any[]>(`admin/length-settings`, {
+    queryKey: ["shared-length-settings"], // Shared cache key
+    staleTime: 5 * 60 * 1000, // 5 minutes cache for system data
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Entity-specific data query - calls onDataFetch for cars/events/captions
+  const {
+    data: entityData,
+    isLoading: isLoadingEntityData,
+    error: entityDataError,
+    refetch: refreshData,
+  } = useQuery<CopywriterData>({
+    queryKey: [`copywriter-entity-data-${config.entityId}`],
+    queryFn: callbacks.onDataFetch,
+    staleTime: 3 * 60 * 1000, // 3 minutes cache for entity data
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Combine shared and entity-specific data with proper type safety
   const memoizedData = useMemo(() => {
+    // Ensure arrays are properly initialized to prevent .map() errors
+    const safeSystemPrompts = Array.isArray(sharedSystemPrompts)
+      ? sharedSystemPrompts
+      : [];
+    const safeLengthSettings = Array.isArray(sharedLengthSettings)
+      ? sharedLengthSettings
+      : [];
+    const safeCars = Array.isArray(entityData?.cars) ? entityData.cars : [];
+    const safeEvents = Array.isArray(entityData?.events)
+      ? entityData.events
+      : [];
+    const safeSavedCaptions = Array.isArray(entityData?.savedCaptions)
+      ? entityData.savedCaptions
+      : [];
+
     return {
-      cars: data?.cars || [],
-      events: data?.events || [],
-      systemPrompts: data?.systemPrompts || [],
-      lengthSettings: data?.lengthSettings || [],
-      savedCaptions: data?.savedCaptions || [],
-      clientHandle: data?.clientHandle || null,
-      hasMoreEvents: data?.hasMoreEvents || false,
-      hasMoreCaptions: data?.hasMoreCaptions || false,
+      cars: safeCars,
+      events: safeEvents,
+      systemPrompts: safeSystemPrompts, // Always ensure this is an array
+      lengthSettings: safeLengthSettings, // Always ensure this is an array
+      savedCaptions: safeSavedCaptions,
+      clientHandle: entityData?.clientHandle || null,
+      hasMoreEvents: entityData?.hasMoreEvents || false,
+      hasMoreCaptions: entityData?.hasMoreCaptions || false,
     };
-  }, [data]);
+  }, [entityData, sharedSystemPrompts, sharedLengthSettings]);
+
+  // Combined loading state - must wait for both shared and entity data
+  const isLoading =
+    isLoadingSharedSystemPrompts ||
+    isLoadingSharedLengthSettings ||
+    isLoadingEntityData;
+
+  const hasError =
+    sharedSystemPromptsError || sharedLengthSettingsError || entityDataError;
 
   // Selection states
   const [selectedCarIds, setSelectedCarIds] = useState<string[]>([]);
@@ -215,15 +264,26 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     promptHandlers.fetchPrompts();
   }, [promptHandlers.fetchPrompts]);
 
-  // Debug logging for system prompts
+  // Debug logging for system prompts with enhanced data checking
   React.useEffect(() => {
     console.log("BaseCopywriter: System prompts data updated:", {
-      count: memoizedData.systemPrompts.length,
-      prompts: memoizedData.systemPrompts,
+      sharedSystemPrompts: {
+        value: sharedSystemPrompts,
+        isArray: Array.isArray(sharedSystemPrompts),
+        type: typeof sharedSystemPrompts,
+        length: Array.isArray(sharedSystemPrompts)
+          ? sharedSystemPrompts.length
+          : "N/A",
+      },
+      memoizedSystemPrompts: {
+        value: memoizedData.systemPrompts,
+        isArray: Array.isArray(memoizedData.systemPrompts),
+        length: memoizedData.systemPrompts.length,
+      },
       loading: isLoading,
-      error,
+      error: hasError,
     });
-  }, [memoizedData.systemPrompts, isLoading, error]);
+  }, [memoizedData.systemPrompts, sharedSystemPrompts, isLoading, hasError]);
 
   // Event selection handlers
   const handleEventSelection = useCallback(
@@ -574,7 +634,22 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
       clientHandle: memoizedData.clientHandle || null,
     };
 
-    await generateCaption(context, formState);
+    // Phase 3C FIX: Remove blocking await from background operations
+    const generateOperation = () => {
+      generateCaption(context, formState).catch((error) => {
+        console.error("Error generating caption:", error);
+        // Error handling is already in generateCaption
+      });
+    };
+
+    // Execute generation in background - truly non-blocking
+    setTimeout(generateOperation, 0);
+
+    // Immediate feedback for better UX
+    toast({
+      title: "Generating...",
+      description: "Caption is being generated in background",
+    });
   };
 
   const handleSaveContent = async () => {
@@ -592,26 +667,102 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
       }),
     };
 
-    const success = await callbacks.onSaveCaption(captionData);
-    if (success) {
-      await callbacks.onRefresh();
-      setContentViewMode("saved");
-    }
+    // Phase 3C FIX: Remove blocking await from background operations
+    const saveOperation = () => {
+      callbacks
+        .onSaveCaption(captionData)
+        .then((success) => {
+          if (success) {
+            callbacks.onRefresh().catch((error) => {
+              console.error("Error refreshing after save:", error);
+            });
+            setContentViewMode("saved");
+            toast({
+              title: "Success",
+              description: "Caption saved and refreshed successfully",
+            });
+          }
+        })
+        .catch((error) => {
+          console.error("Error saving caption:", error);
+          // Error handling is already in callbacks
+        });
+    };
+
+    // Execute save operation in background - truly non-blocking
+    setTimeout(saveOperation, 0);
+
+    // Immediate optimistic feedback
+    toast({
+      title: "Saving...",
+      description: "Caption is being saved in background",
+    });
   };
 
   const handleDeleteContent = async (contentId: string) => {
-    const success = await callbacks.onDeleteCaption(contentId);
-    if (success) {
-      await callbacks.onRefresh();
-    }
+    // Phase 3C FIX: Remove blocking await from background operations
+    const deleteOperation = () => {
+      callbacks
+        .onDeleteCaption(contentId)
+        .then((success) => {
+          if (success) {
+            callbacks.onRefresh().catch((error) => {
+              console.error("Error refreshing after delete:", error);
+            });
+            toast({
+              title: "Success",
+              description: "Caption deleted and refreshed successfully",
+            });
+          }
+        })
+        .catch((error) => {
+          console.error("Error deleting caption:", error);
+          // Error handling is already in callbacks
+        });
+    };
+
+    // Execute delete operation in background - truly non-blocking
+    setTimeout(deleteOperation, 0);
+
+    // Immediate optimistic feedback
+    toast({
+      title: "Deleting...",
+      description: "Caption is being deleted in background",
+    });
   };
 
   const handleSaveEdit = async (contentId: string) => {
-    const success = await callbacks.onUpdateCaption(contentId, editingText);
-    if (success) {
-      await callbacks.onRefresh();
-      handleCancelEdit();
-    }
+    // Phase 3C FIX: Remove blocking await from background operations
+    const saveEditOperation = () => {
+      callbacks
+        .onUpdateCaption(contentId, editingText)
+        .then((success) => {
+          if (success) {
+            callbacks.onRefresh().catch((error) => {
+              console.error("Error refreshing after update:", error);
+            });
+            handleCancelEdit();
+            toast({
+              title: "Success",
+              description: "Caption updated and refreshed successfully",
+            });
+          }
+        })
+        .catch((error) => {
+          console.error("Error updating caption:", error);
+          // Error handling is already in callbacks
+        });
+    };
+
+    // Execute update operation in background - truly non-blocking
+    setTimeout(saveEditOperation, 0);
+
+    // Immediate optimistic feedback and close edit mode
+    handleCancelEdit();
+    toast({
+      title: "Updating...",
+      description: "Caption is being updated in background",
+    });
   };
 
   const handleUpdatePreviewContent = (newContent: string) => {
@@ -661,8 +812,8 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   }, [loadingMoreCaptions, memoizedData.hasMoreCaptions]);
 
   // Handle error state without blocking UI
-  if (error) {
-    console.error("Error fetching copywriter data:", error);
+  if (hasError) {
+    console.error("Error fetching copywriter data:", hasError);
   }
 
   // Non-blocking loading state
@@ -681,7 +832,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   }
 
   // Error display - non-blocking
-  if (error) {
+  if (hasError) {
     return (
       <div className="py-8">
         <div className="bg-destructive/15 border border-destructive/20 rounded-md p-4 max-w-md mx-auto">
@@ -730,7 +881,9 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
             systemPrompts={memoizedData.systemPrompts}
             selectedSystemPromptId={selectedSystemPromptId}
             loadingSystemPrompts={isLoading}
-            systemPromptError={error ? String(error) : null}
+            systemPromptError={
+              sharedSystemPromptsError ? String(sharedSystemPromptsError) : null
+            }
             onSystemPromptChange={handleSystemPromptChange}
           />
 

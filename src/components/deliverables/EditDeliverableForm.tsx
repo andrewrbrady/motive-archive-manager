@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,6 +32,7 @@ import { useEditors } from "@/hooks/useEditors";
 import { useAPI } from "@/hooks/useAPI";
 import { FirestoreUser } from "@/types/firebase";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
+import { usePlatforms } from "@/contexts/PlatformContext";
 
 interface EditDeliverableFormProps {
   deliverable: Deliverable;
@@ -64,157 +65,63 @@ export default function EditDeliverableForm({
   onDeliverableUpdated,
   onClose,
 }: EditDeliverableFormProps) {
-  const { data: editors = [] } = useEditors();
-  const api = useAPI();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState(deliverable.title);
   const [selectedPlatforms, setSelectedPlatforms] = useState<
     { label: string; value: string }[]
   >([]);
-  const [availablePlatforms, setAvailablePlatforms] = useState<
-    DeliverablePlatform[]
-  >([]);
   const [type, setType] = useState<DeliverableType>(deliverable.type);
   const [duration, setDuration] = useState(deliverable.duration);
   const [aspectRatio, setAspectRatio] = useState(deliverable.aspect_ratio);
-  const [editor, setEditor] = useState(deliverable.firebase_uid || "");
-  const [editDeadline, setEditDeadline] = useState(
-    deliverable.edit_deadline
-      ? (() => {
-          const date = new Date(deliverable.edit_deadline);
-          // Return ISO datetime string in format expected by DateTimePicker
-          return (
-            date.getFullYear() +
-            "-" +
-            String(date.getMonth() + 1).padStart(2, "0") +
-            "-" +
-            String(date.getDate()).padStart(2, "0") +
-            "T" +
-            String(date.getHours()).padStart(2, "0") +
-            ":" +
-            String(date.getMinutes()).padStart(2, "0")
-          );
-        })()
-      : ""
-  );
-  const [releaseDate, setReleaseDate] = useState(
-    deliverable.release_date
-      ? (() => {
-          const date = new Date(deliverable.release_date);
-          // Return ISO datetime string in format expected by DateTimePicker
-          return (
-            date.getFullYear() +
-            "-" +
-            String(date.getMonth() + 1).padStart(2, "0") +
-            "-" +
-            String(date.getDate()).padStart(2, "0") +
-            "T" +
-            String(date.getHours()).padStart(2, "0") +
-            ":" +
-            String(date.getMinutes()).padStart(2, "0")
-          );
-        })()
-      : ""
-  );
-  const [dropboxLink, setDropboxLink] = useState(
-    deliverable.dropbox_link || ""
-  );
-  const [socialMediaLink, setSocialMediaLink] = useState(
-    deliverable.social_media_link || ""
-  );
-  const [openSelects, setOpenSelects] = useState<Record<string, boolean>>({});
+  const [editorId, setEditorId] = useState<string | null>(null);
+  const [editorName, setEditorName] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
+  const [releaseDate, setReleaseDate] = useState("");
+  const [dropboxLink, setDropboxLink] = useState("");
+  const [socialMediaLink, setSocialMediaLink] = useState("");
 
-  const [editorId, setEditorId] = useState<string | null>(
-    deliverable.firebase_uid || null
-  );
-  const [editorName, setEditorName] = useState(deliverable.editor || "");
+  const { platforms: availablePlatforms, isLoading: platformsLoading } =
+    usePlatforms();
 
-  // Helper function to safely format date with better datetime handling
+  const api = useAPI();
+  const { data: editors = [] } = useEditors();
+
+  const [openSelects, setOpenSelects] = useState<{ [key: string]: boolean }>(
+    {}
+  );
+
   const safeFormatDate = (date: any): string => {
     if (!date) return "";
+
     try {
-      const parsedDate = new Date(date);
-      if (isNaN(parsedDate.getTime())) return "";
-      // Return ISO datetime string in format expected by DateTimePicker
-      return (
-        parsedDate.getFullYear() +
-        "-" +
-        String(parsedDate.getMonth() + 1).padStart(2, "0") +
-        "-" +
-        String(parsedDate.getDate()).padStart(2, "0") +
-        "T" +
-        String(parsedDate.getHours()).padStart(2, "0") +
-        ":" +
-        String(parsedDate.getMinutes()).padStart(2, "0")
-      );
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return "";
+
+      // Format as YYYY-MM-DD for date input
+      return d.toISOString().split("T")[0];
     } catch (error) {
-      console.error("Error formatting date:", error);
+      console.warn("Invalid date format:", date);
       return "";
     }
   };
 
-  // Helper function to find user UID from name (for legacy data)
   const findUserUidFromName = (editorName: string): string | null => {
-    if (!editorName || !editors.length) return null;
-    const user = editors.find((u) => u.name === editorName);
+    const user = editors.find((u: any) => u.name === editorName);
     return user ? user.uid : null;
   };
 
-  // Reset form data when deliverable changes
   useEffect(() => {
-    if (!api || !deliverable) return;
-
-    const fetchPlatforms = async () => {
-      if (!api) {
-        console.log("API client not available for fetching platforms");
-        return;
-      }
-
-      try {
-        const response = await api.get("platforms");
-        const data = response as DeliverablePlatform[];
-        console.log("EditDeliverableForm: Fetched platforms:", data);
-        setAvailablePlatforms(data);
-
-        // Initialize selected platforms based on deliverable data
-        if (deliverable.platforms && deliverable.platforms.length > 0) {
-          // New format: platforms array with IDs
-          const selectedPlatformOptions = deliverable.platforms
-            .map((platformId) => {
-              const platform = data.find((p) => p._id === platformId);
-              return platform
-                ? { label: platform.name, value: platform._id }
-                : null;
-            })
-            .filter(Boolean) as { label: string; value: string }[];
-          setSelectedPlatforms(selectedPlatformOptions);
-        } else if (deliverable.platform) {
-          // Legacy format: single platform string
-          const platform = data.find((p) => p.name === deliverable.platform);
-          if (platform) {
-            setSelectedPlatforms([
-              { label: platform.name, value: platform._id },
-            ]);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching platforms:", error);
-        toast.error("Failed to fetch platforms");
-      }
-    };
-
     setTitle(deliverable.title);
     setType(deliverable.type);
     setDuration(deliverable.duration);
     setAspectRatio(deliverable.aspect_ratio);
 
-    // Initialize editor data - try firebase_uid first, then try to find UID from name
     let initialEditorId: string | null = null;
     if (deliverable.firebase_uid) {
       initialEditorId = deliverable.firebase_uid;
     } else if (deliverable.editor && editors.length) {
-      const user = editors.find((u) => u.name === deliverable.editor);
+      const user = editors.find((u: any) => u.name === deliverable.editor);
       initialEditorId = user ? user.uid : null;
     }
     setEditorId(initialEditorId);
@@ -225,13 +132,30 @@ export default function EditDeliverableForm({
     setDropboxLink(deliverable.dropbox_link || "");
     setSocialMediaLink(deliverable.social_media_link || "");
 
-    // Fetch platforms if not already loaded
-    if (availablePlatforms.length === 0) {
-      fetchPlatforms();
+    if (availablePlatforms.length > 0) {
+      if (deliverable.platforms && deliverable.platforms.length > 0) {
+        const selectedPlatformOptions = deliverable.platforms
+          .map((platformId) => {
+            const platform = availablePlatforms.find(
+              (p) => p._id === platformId
+            );
+            return platform
+              ? { label: platform.name, value: platform._id }
+              : null;
+          })
+          .filter(Boolean) as { label: string; value: string }[];
+        setSelectedPlatforms(selectedPlatformOptions);
+      } else if (deliverable.platform) {
+        const platform = availablePlatforms.find(
+          (p) => p.name === deliverable.platform
+        );
+        if (platform) {
+          setSelectedPlatforms([{ label: platform.name, value: platform._id }]);
+        }
+      }
     }
-  }, [deliverable, editors, api, availablePlatforms.length]);
+  }, [deliverable, editors, availablePlatforms]);
 
-  // Authentication check - don't render if not authenticated
   if (!api) {
     return null;
   }
@@ -245,7 +169,6 @@ export default function EditDeliverableForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Only require title - make everything else optional
     if (!title || title.trim() === "") {
       toast.error("Please enter a title");
       return;
@@ -255,8 +178,8 @@ export default function EditDeliverableForm({
     try {
       const updateData: UpdateDeliverableData = {
         title: title.trim(),
-        platforms: selectedPlatforms.map((p) => p.value), // Can be empty array
-        type: type || deliverable.type, // Use existing type if not specified
+        platforms: selectedPlatforms.map((p) => p.value),
+        type: type,
         duration: type === "Photo Gallery" ? 0 : duration || 0,
         aspect_ratio: aspectRatio || "",
         editor: editorName || "",
@@ -307,7 +230,6 @@ export default function EditDeliverableForm({
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden py-4">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Basic Information Section */}
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
@@ -411,11 +333,20 @@ export default function EditDeliverableForm({
                         <SelectValue placeholder="Select aspect ratio" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="16:9">16:9</SelectItem>
-                        <SelectItem value="9:16">9:16</SelectItem>
-                        <SelectItem value="1:1">1:1</SelectItem>
-                        <SelectItem value="4:3">4:3</SelectItem>
-                        <SelectItem value="4:5">4:5</SelectItem>
+                        {[
+                          "16:9",
+                          "9:16",
+                          "1:1",
+                          "4:5",
+                          "5:4",
+                          "3:2",
+                          "2:3",
+                          "custom",
+                        ].map((ratio) => (
+                          <SelectItem key={ratio} value={ratio}>
+                            {ratio}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

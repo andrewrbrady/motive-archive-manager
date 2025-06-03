@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MeasurementValue } from "@/types/measurements";
@@ -179,30 +179,33 @@ export function BaseSpecifications({
 }: BaseSpecificationsProps): JSX.Element {
   // Data state
   const [carData, setCarData] = useState<CarData | null>(initialData || null);
-  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
   const [enriching, setEnriching] = useState(false);
 
-  // Initialize data - load all specs immediately
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        if (!initialData) {
-          setLoading(true);
-          setError(null);
-          const data = await callbacks.onDataFetch();
-          setCarData(data.basicSpecs);
-        }
-      } catch (err) {
-        console.error("Error fetching specifications:", err);
-        setError(err instanceof Error ? err.message : "Failed to load data");
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Phase 2 improvement: Non-blocking data initialization
+  // Only call onDataFetch if we don't have initialData and it's truly needed
+  const [hasTriedFetch, setHasTriedFetch] = useState(!!initialData);
 
-    fetchData();
-  }, [config.carId, initialData, callbacks]);
+  // Update carData when initialData prop changes
+  useEffect(() => {
+    if (initialData) {
+      setCarData(initialData);
+      setHasTriedFetch(true);
+    }
+  }, [initialData]);
+
+  // Non-blocking fallback data fetch only when absolutely necessary
+  const handleManualRefresh = useCallback(async () => {
+    try {
+      setError(null);
+      const data = await callbacks.onDataFetch();
+      setCarData(data.basicSpecs);
+      setHasTriedFetch(true);
+    } catch (err) {
+      console.error("Error fetching specifications:", err);
+      setError(err instanceof Error ? err.message : "Failed to load data");
+    }
+  }, [callbacks]);
 
   const handleEnrichment = async () => {
     if (!callbacks.onEnrichment) return;
@@ -221,21 +224,68 @@ export function BaseSpecifications({
     }
   };
 
-  // Show skeleton while loading critical data
-  if (loading || !carData) {
-    return <SpecificationsSkeleton />;
+  // Phase 2 improvement: Show data immediately if available, or provide non-blocking load option
+  if (!carData && !hasTriedFetch) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-muted/30 border border-muted rounded-md p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Specifications data not loaded
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Tab switching is available while data loads
+              </p>
+            </div>
+            <button
+              onClick={handleManualRefresh}
+              className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
+            >
+              Load Specs
+            </button>
+          </div>
+        </div>
+        <SpecificationsSkeleton />
+      </div>
+    );
   }
 
-  // Show error state
-  if (error) {
+  // Show error state with non-blocking retry
+  if (error && !carData) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <p className="text-red-500 mb-4">{error}</p>
-          <Button variant="outline" onClick={() => window.location.reload()}>
+      <div className="space-y-4">
+        <div className="bg-destructive/15 border border-destructive/20 rounded-md p-3">
+          <p className="text-destructive text-sm">
+            {error}. Tab switching is still available.
+          </p>
+          <button
+            onClick={handleManualRefresh}
+            className="text-xs underline text-destructive hover:no-underline mt-2"
+          >
             Retry
-          </Button>
+          </button>
         </div>
+      </div>
+    );
+  }
+
+  // Show skeleton while loading but allow tab switching
+  if (!carData) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-muted/30 border border-muted rounded-md p-4">
+          <div className="flex items-center space-x-2">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-muted-foreground">
+              Loading specifications...
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            You can switch tabs while this loads
+          </p>
+        </div>
+        <SpecificationsSkeleton />
       </div>
     );
   }

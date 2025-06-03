@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, Suspense, lazy } from "react";
+import React, { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { toast } from "sonner";
 import { useAPI } from "@/hooks/useAPI";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 import {
   BaseSpecifications,
   BaseSpecificationsConfig,
@@ -35,6 +36,11 @@ interface SpecificationsOptimizedProps {
   onRefresh?: () => void;
 }
 
+/**
+ * SpecificationsOptimized - Phase 2 optimized specifications component
+ * Converted from blocking onDataFetch pattern to non-blocking useAPIQuery pattern
+ * Following successful Phase 1 and 2 optimization patterns
+ */
 export function SpecificationsOptimized({
   carId,
   vehicleInfo,
@@ -45,23 +51,35 @@ export function SpecificationsOptimized({
   onRefresh,
 }: SpecificationsOptimizedProps) {
   const api = useAPI();
-  const [currentCarData, setCurrentCarData] = useState<CarData | null>(
-    vehicleInfo || null
-  );
   const [editMode, setEditMode] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
 
-  // Update car data when vehicleInfo prop changes
-  useEffect(() => {
-    if (vehicleInfo) {
-      setCurrentCarData(vehicleInfo);
-    }
-  }, [vehicleInfo]);
+  // Phase 2 optimization: Use non-blocking useAPIQuery instead of blocking onDataFetch
+  const {
+    data: carData,
+    isLoading,
+    error: apiError,
+    refetch: refetchCarData,
+  } = useAPIQuery<CarData>(`cars/${carId}`, {
+    enabled: !vehicleInfo, // Only fetch if vehicleInfo is not provided
+    staleTime: 3 * 60 * 1000, // 3 minutes cache for car data
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Use vehicleInfo if provided, otherwise use fetched carData
+  const currentCarData = vehicleInfo || carData;
 
   // Update edit mode when prop changes
   useEffect(() => {
     setEditMode(isEditMode);
   }, [isEditMode]);
+
+  // Handle API errors
+  if (apiError) {
+    console.error("Error fetching car specifications:", apiError);
+  }
 
   if (!api) {
     return <SpecificationsSkeleton />;
@@ -73,35 +91,33 @@ export function SpecificationsOptimized({
       setEditMode(true);
       if (onEdit) onEdit();
     },
-    onRefresh,
+    onRefresh: () => {
+      if (onRefresh) {
+        onRefresh();
+      }
+      // Also refetch our local data if needed
+      if (!vehicleInfo) {
+        refetchCarData();
+      }
+    },
     showEnrichment: true,
   };
 
+  // Phase 2 improvement: Non-blocking callbacks that don't make API calls
   const callbacks: BaseSpecificationsCallbacks = {
     onDataFetch: async () => {
-      try {
-        // Use vehicleInfo if available to avoid redundant API call
-        if (vehicleInfo) {
-          return {
-            basicSpecs: vehicleInfo,
-            advancedSpecs: vehicleInfo, // All specs are now in the same object
-            clientData: null,
-          };
-        }
-
-        // If no vehicleInfo, fetch car data directly
-        const carData = (await api.get(`cars/${carId}`)) as CarData;
-        setCurrentCarData(carData);
-
+      // Since we're using useAPIQuery, we already have the data
+      // This callback should not make blocking API calls
+      if (currentCarData) {
         return {
-          basicSpecs: carData,
-          advancedSpecs: carData, // All specs are in the same object
+          basicSpecs: currentCarData,
+          advancedSpecs: currentCarData, // All specs are now in the same object
           clientData: null,
         };
-      } catch (err) {
-        console.error("Error fetching specifications data:", err);
-        throw err;
       }
+
+      // Fallback: if no data available, throw error to show loading state
+      throw new Error("Car data not available");
     },
 
     onEnrichment: async (carId: string) => {
@@ -113,29 +129,36 @@ export function SpecificationsOptimized({
   };
 
   const handleSave = async (editedSpecs: Partial<CarData>) => {
-    try {
-      if (!api) {
-        toast.error("Authentication not ready");
-        return;
-      }
-
-      const updatedCar = (await api.patch(
-        `cars/${carId}`,
-        editedSpecs
-      )) as CarData;
-      setCurrentCarData(updatedCar);
-      setEditMode(false);
-
-      if (onSave) {
-        onSave(editedSpecs);
-      }
-
-      toast.success("Specifications saved successfully");
-    } catch (error) {
-      console.error("Error saving specifications:", error);
-      toast.error("Failed to save specifications");
-      throw error;
+    if (!api) {
+      toast.error("Authentication not ready");
+      return;
     }
+
+    // Phase 3D FIX: Remove blocking await from background operations
+    const saveOperation = () => {
+      api
+        .patch(`cars/${carId}`, editedSpecs)
+        .then((updatedCar) => {
+          setEditMode(false);
+
+          if (onSave) {
+            onSave(editedSpecs);
+          }
+
+          toast.success("Specifications saved successfully");
+        })
+        .catch((error) => {
+          console.error("Error saving specifications:", error);
+          toast.error("Failed to save specifications");
+        });
+    };
+
+    // Execute save operation in background - truly non-blocking
+    setTimeout(saveOperation, 0);
+
+    // Immediate optimistic feedback
+    setEditMode(false);
+    toast.success("Saving specifications in background...");
   };
 
   const handleCancel = () => {
@@ -145,15 +168,37 @@ export function SpecificationsOptimized({
     }
   };
 
-  // Show error state if there's an error and no current data
-  if (error && !currentCarData) {
+  // Phase 2 improvement: Non-blocking loading state
+  if (isLoading && !vehicleInfo) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <p className="text-red-500 mb-4">{error}</p>
+      <div className="space-y-4">
+        <div className="bg-muted/30 border border-muted rounded-md p-4">
+          <div className="flex items-center space-x-2">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-muted-foreground">
+              Loading specifications...
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            You can switch tabs while this loads
+          </p>
+        </div>
+        <SpecificationsSkeleton />
+      </div>
+    );
+  }
+
+  // Show error state if there's an API error and no current data
+  if (apiError && !currentCarData) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-destructive/15 border border-destructive/20 rounded-md p-3">
+          <p className="text-destructive text-sm">
+            Failed to load specifications. Tab switching is still available.
+          </p>
           <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            onClick={() => refetchCarData()}
+            className="text-xs underline text-destructive hover:no-underline mt-2"
           >
             Retry
           </button>
@@ -192,7 +237,7 @@ export function SpecificationsOptimized({
           <div style={{ display: "none" }}>
             <SpecificationsEnrichment
               carId={carId}
-              onEnrichComplete={onRefresh || (() => {})}
+              onEnrichComplete={config.onRefresh || (() => {})}
             />
           </div>
         </Suspense>

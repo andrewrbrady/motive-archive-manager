@@ -3,6 +3,8 @@ import { ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ObjectId } from "mongodb";
 import type { CarImage } from "@/types/car";
+import { useAPI } from "@/hooks/useAPI";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface CarAvatarProps {
   primaryImageId?: string | ObjectId | null;
@@ -31,6 +33,35 @@ export function CarAvatar({
   const fetchController = React.useRef<AbortController | null>(null);
   const mountedRef = React.useRef(true);
 
+  // ✅ PERFORMANCE: Lazy API initialization - only get API when we actually need it
+  // This prevents unnecessary token requests when CarAvatar is rendered in lists
+  const [needsAPI, setNeedsAPI] = React.useState(false);
+  const api = useAPI();
+
+  // ✅ Move useCallback to top with all other hooks
+  const handleImageError = React.useCallback(
+    (event: React.SyntheticEvent<HTMLImageElement>) => {
+      // Only log in development to avoid console spam
+      if (process.env.NODE_ENV === "development") {
+        console.warn("CarAvatar: Image failed to load", {
+          src: event.currentTarget.src,
+          entityName,
+          primaryImageId,
+        });
+      }
+
+      if (mountedRef.current) {
+        setImageError(true);
+        // Clear the problematic URL from cache
+        if (primaryImageId) {
+          const idString = primaryImageId.toString();
+          imageUrlCache.delete(idString);
+        }
+      }
+    },
+    [entityName, primaryImageId]
+  );
+
   React.useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -41,7 +72,26 @@ export function CarAvatar({
     };
   }, []);
 
+  // ✅ PERFORMANCE: Only trigger API need when we have a valid image ID
   React.useEffect(() => {
+    if (
+      primaryImageId &&
+      primaryImageId !== "" &&
+      primaryImageId !== "null" &&
+      primaryImageId !== "undefined"
+    ) {
+      const idString = primaryImageId.toString().trim();
+      if (idString.length >= 12) {
+        // Only set needsAPI to true if we have a valid image ID
+        setNeedsAPI(true);
+      }
+    }
+  }, [primaryImageId]);
+
+  React.useEffect(() => {
+    // Only proceed if we need API AND API is available
+    if (!needsAPI || !api) return;
+
     // Reset state when ID changes
     setImageError(false);
     setImageUrl(null);
@@ -101,44 +151,13 @@ export function CarAvatar({
           }
         }, 5000); // 5 second timeout
 
-        const response = await fetch(`/api/images/${idString}`, {
-          signal: fetchController.current?.signal,
-          headers: {
-            "Cache-Control": "max-age=300", // Cache for 5 minutes
-          },
-        });
+        // Use authenticated API client instead of raw fetch
+        const data = (await api.get(`/api/images/${idString}`)) as {
+          url?: string;
+        };
 
         // Clear timeout if we got a response
         clearTimeout(timeoutId);
-
-        if (!mountedRef.current) return;
-
-        if (!response.ok) {
-          // ✅ Enhanced error handling - don't throw for common HTTP errors
-          if (response.status === 404) {
-            // Image not found - this is common and not really an error
-            if (process.env.NODE_ENV === "development") {
-              console.log(
-                `CarAvatar: Image not found (404) for ID: ${idString} (${entityName})`
-              );
-            }
-          } else if (response.status === 401) {
-            // Authentication issue - log but don't spam
-            if (process.env.NODE_ENV === "development") {
-              console.log(
-                `CarAvatar: Authentication required for image ${idString} (${entityName})`
-              );
-            }
-          } else {
-            console.warn(
-              `CarAvatar: Failed to fetch image (${response.status}): ${response.statusText} for ID: ${idString} (${entityName})`
-            );
-          }
-          setImageError(true);
-          return;
-        }
-
-        const data = await response.json();
 
         if (!mountedRef.current) return;
 
@@ -194,31 +213,44 @@ export function CarAvatar({
     };
 
     fetchWithTimeout();
-  }, [primaryImageId]);
+  }, [primaryImageId, api, needsAPI]); // Include needsAPI in dependencies
 
-  // ✅ Enhanced image error handler - more graceful error handling
-  const handleImageError = React.useCallback(
-    (event: React.SyntheticEvent<HTMLImageElement>) => {
-      // Only log in development to avoid console spam
-      if (process.env.NODE_ENV === "development") {
-        console.warn("CarAvatar: Image failed to load", {
-          src: event.currentTarget.src,
-          entityName,
-          primaryImageId,
-        });
-      }
+  // ✅ PERFORMANCE: Show placeholder immediately if no valid image ID
+  if (
+    !primaryImageId ||
+    primaryImageId === "" ||
+    primaryImageId === "null" ||
+    primaryImageId === "undefined"
+  ) {
+    return (
+      <div
+        className={cn(
+          "relative rounded-full overflow-hidden border border-border shrink-0 bg-muted",
+          sizeClasses[size],
+          className
+        )}
+      >
+        <div className="w-full h-full flex items-center justify-center">
+          <ImageIcon className="w-1/3 h-1/3 text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
 
-      if (mountedRef.current) {
-        setImageError(true);
-        // Clear the problematic URL from cache
-        if (primaryImageId) {
-          const idString = primaryImageId.toString();
-          imageUrlCache.delete(idString);
-        }
-      }
-    },
-    [entityName, primaryImageId]
-  );
+  // ✅ PERFORMANCE: Show loading only when we need API but don't have it yet
+  if (needsAPI && !api) {
+    return (
+      <div
+        className={cn(
+          "relative rounded-full overflow-hidden border border-border shrink-0 bg-muted flex items-center justify-center",
+          sizeClasses[size],
+          className
+        )}
+      >
+        <LoadingSpinner size="sm" />
+      </div>
+    );
+  }
 
   return (
     <div

@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import ImageManager from "@/components/ImageManager";
 import { Loader2 } from "lucide-react";
 import { CarImage } from "@/types/car";
+import { useAPI } from "@/hooks/useAPI";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface CarImageEditorProps {
   carId: string;
@@ -25,8 +27,12 @@ export default function CarImageEditor({
   currentImages,
   onImagesUpdate,
 }: CarImageEditorProps) {
+  const api = useAPI();
   const [saving, setSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<ImageProgress[]>([]);
+
+  // Early return if API not ready
+  if (!api) return <LoadingSpinner size="sm" />;
 
   const handleImagesChange = async (selectedImages: string[]) => {
     setSaving(true);
@@ -36,17 +42,7 @@ export default function CarImageEditor({
         selectedImages.includes(img.url)
       );
 
-      const response = await fetch(`/api/cars/${carId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ images: selectedImageObjects }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update images");
-      }
+      await api.patch(`/api/cars/${carId}`, { images: selectedImageObjects });
 
       onImagesUpdate?.();
     } catch (error) {
@@ -86,15 +82,12 @@ export default function CarImageEditor({
         );
 
         // Update the database immediately
-        const response = await fetch(`/api/cars/${carId}/images`, {
-          method: "POST",
-          body: formData,
-        });
+        const responseData = await api.upload(
+          `/api/cars/${carId}/images`,
+          formData
+        );
 
-        const responseData = await response.json();
-        // [REMOVED] // [REMOVED] console.log("Database update response:", responseData);
-
-        if (!response.ok) {
+        if (!responseData) {
           console.error(
             "Failed to update database with new image:",
             responseData
@@ -127,21 +120,12 @@ export default function CarImageEditor({
       const updatedImages = [...currentImages, newImage];
 
       // Update the backend with metadata
-      fetch(`/api/cars/${carId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ images: updatedImages }),
-      })
-        .then((response) => {
-          if (response.ok) {
-            onImagesUpdate?.();
-          }
-        })
-        .catch((error) => {
-          console.error("Error updating car images metadata:", error);
-        });
+      try {
+        await api.patch(`/api/cars/${carId}`, { images: updatedImages });
+        onImagesUpdate?.();
+      } catch (error) {
+        console.error("Error updating car images metadata:", error);
+      }
     }
   };
 
@@ -208,8 +192,8 @@ export default function CarImageEditor({
                       progress.status === "error"
                         ? "bg-destructive-500"
                         : progress.status === "complete"
-                        ? "bg-success-500"
-                        : "bg-info-500"
+                          ? "bg-success-500"
+                          : "bg-info-500"
                     }`}
                     style={{ width: `${progress.progress}%` }}
                   />

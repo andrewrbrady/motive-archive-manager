@@ -130,6 +130,38 @@ export async function GET(request: NextRequest) {
     // Build advanced query with filters (consolidated from simple endpoint)
     const query: Record<string, any> = {};
 
+    // Handle batch ID fetching for optimization (CarDetailsContext support)
+    const idsParam = searchParams.get("ids");
+    if (idsParam) {
+      const ids = idsParam.split(",").filter(Boolean);
+      const validObjectIds: ObjectId[] = [];
+
+      for (const id of ids) {
+        if (ObjectId.isValid(id)) {
+          validObjectIds.push(new ObjectId(id));
+        }
+      }
+
+      if (validObjectIds.length > 0) {
+        query._id = { $in: validObjectIds };
+        // For batch ID queries, skip pagination and return all requested cars
+        const cars = await db
+          .collection("cars")
+          .find(query)
+          .project(
+            Object.keys(projection).length > 0
+              ? projection
+              : { _id: 1, make: 1, model: 1, year: 1, color: 1, vin: 1 }
+          )
+          .toArray();
+
+        return NextResponse.json(cars);
+      } else {
+        // No valid IDs provided
+        return NextResponse.json([]);
+      }
+    }
+
     // Handle make filter
     const make = searchParams.get("make");
     if (make) {
