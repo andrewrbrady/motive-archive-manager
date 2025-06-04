@@ -11,7 +11,7 @@
     "build": "next build",
     "build:safe": "npm run check:console-logs && next build",
     "build:production": "npm run fix:console-logs && next build",
-    "start": "node start-server.js",
+    "start": "node scripts/start-server.js",
     "start:next": "next start",
     "start:standalone": "node .next/standalone/server.js",
     "check-env": "node scripts/check-env.js",
