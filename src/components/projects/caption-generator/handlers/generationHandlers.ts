@@ -36,8 +36,8 @@ export function useGenerationHandlers() {
   });
 
   const updateGenerationState = useCallback(
-    (updates: Partial<GenerationState>) => {
-      setGenerationState((prev) => ({ ...prev, ...updates }));
+    (update: Partial<GenerationState>) => {
+      setGenerationState((prev) => ({ ...prev, ...update }));
     },
     []
   );
@@ -73,59 +73,66 @@ export function useGenerationHandlers() {
       formState: FormState
     ): Promise<string | null> => {
       if (!api) {
-        updateGenerationState({
-          error: "API not available",
-          isGenerating: false,
+        toast({
+          title: "Error",
+          description: "Authentication required to generate captions",
+          variant: "destructive",
         });
         return null;
       }
 
-      // Validate inputs
-      const validationError = validateGeneration(context, formState);
-      if (validationError) {
-        updateGenerationState({
-          error: validationError,
-          isGenerating: false,
-        });
-        return null;
-      }
+      // Prepare context for reuse
+      const contextToUse = formState.additionalContext
+        ? `${formState.context}\n\nAdditional context: ${formState.additionalContext}`
+        : formState.context;
 
-      // Prepare car details for the API
-      const combinedCarDetails = {
-        count: context.selectedCarIds.length,
-        cars: context.carDetails,
-        makes: [...new Set(context.carDetails.map((car) => car.make))],
-        years: [...new Set(context.carDetails.map((car) => car.year))].sort(),
-        colors: [
-          ...new Set(
-            context.carDetails.map((car) => car.color).filter((color) => color)
-          ),
-        ],
-      };
-
-      // Prepare event details for the API
-      const combinedEventDetails = {
-        count: context.selectedEventIds.length,
-        events: context.eventDetails,
-        types: [...new Set(context.eventDetails.map((event) => event.type))],
-        upcomingEvents: context.eventDetails.filter(
-          (event) => new Date(event.start) > new Date()
-        ),
-        pastEvents: context.eventDetails.filter(
-          (event) => new Date(event.start) <= new Date()
-        ),
-      };
-
-      // Determine context to use
-      let contextToUse = formState.context;
-
-      // Client info handling
+      // Build client info if needed
       const clientInfo = context.clientHandle
         ? {
             handle: context.clientHandle,
             includeInCaption: true,
           }
         : null;
+
+      // Process car details appropriately
+      let combinedCarDetails;
+      if (Array.isArray(context.carDetails) && context.carDetails.length > 0) {
+        combinedCarDetails = {
+          cars: context.carDetails,
+          count: context.carDetails.length,
+          useMinimal: context.useMinimalCarData,
+        };
+      } else {
+        // Handle case where carDetails might not be an array or might be empty
+        console.warn(
+          "Car details not provided or invalid:",
+          context.carDetails
+        );
+        combinedCarDetails = {
+          cars: [],
+          count: 0,
+          useMinimal: context.useMinimalCarData,
+        };
+      }
+
+      // Process event details
+      let combinedEventDetails = null;
+      if (
+        Array.isArray(context.eventDetails) &&
+        context.eventDetails.length > 0
+      ) {
+        combinedEventDetails = {
+          events: context.eventDetails,
+          count: context.eventDetails.length,
+          types: [...new Set(context.eventDetails.map((event) => event.type))],
+          upcomingEvents: context.eventDetails.filter(
+            (event) => new Date(event.start) > new Date()
+          ),
+          pastEvents: context.eventDetails.filter(
+            (event) => new Date(event.start) <= new Date()
+          ),
+        };
+      }
 
       // Prepare the request payload
       const requestPayload: any = {
@@ -226,17 +233,125 @@ export function useGenerationHandlers() {
         }
       };
 
-      // Phase 3C FIX: Remove blocking await from background generation
-      setTimeout(() => {
-        generateOperation().catch((error) => {
-          console.error("Error in generation operation:", error);
-        });
-      }, 0);
+      // Execute operation in background
+      setTimeout(generateOperation, 0);
 
-      // Return immediately - don't block UI
-      return null;
+      return null; // Immediate return since we're async
     },
-    [api, validateGeneration, updateGenerationState]
+    [api, updateGenerationState]
+  );
+
+  // New streaming generation function
+  const generateCaptionStream = useCallback(
+    async (context: GenerationContext, formState: FormState): Promise<void> => {
+      if (!api) {
+        toast({
+          title: "Error",
+          description: "Authentication required to generate captions",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Prepare the same request payload as the regular generation
+      const contextToUse = formState.additionalContext
+        ? `${formState.context}\n\nAdditional context: ${formState.additionalContext}`
+        : formState.context;
+
+      const requestPayload = {
+        platform: formState.platform,
+        context: contextToUse,
+        temperature: formState.temperature,
+        tone: formState.tone,
+        style: formState.style,
+        length: context.derivedLength?.key || "standard",
+        aiModel: formState.model,
+        projectId: context.projectId,
+        selectedCarIds: context.selectedCarIds,
+        selectedEventIds: context.selectedEventIds,
+        systemPromptId: context.selectedSystemPromptId,
+        useMinimalCarData: context.useMinimalCarData,
+        customLLMText: context.editableLLMText,
+      };
+
+      updateGenerationState({
+        isGenerating: true,
+        error: null,
+        generatedCaption: "",
+      });
+
+      try {
+        // Make streaming request
+        const response = await fetch(
+          "/api/openai/generate-project-caption-stream",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestPayload),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error("No response body reader available");
+        }
+
+        const decoder = new TextDecoder();
+        let accumulator = "";
+
+        toast({
+          title: "Streaming...",
+          description: "Caption is being generated in real-time",
+        });
+
+        // Read the stream
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          accumulator += chunk;
+
+          // Update the caption in real-time
+          updateGenerationState({
+            generatedCaption: accumulator,
+            isGenerating: true, // Still generating
+          });
+        }
+
+        // Mark as complete
+        updateGenerationState({
+          isGenerating: false,
+        });
+
+        toast({
+          title: "Success",
+          description: "Caption generated successfully with streaming",
+        });
+      } catch (error: any) {
+        console.error("Error in streaming generation:", error);
+
+        updateGenerationState({
+          error: error.message || "Failed to generate streaming caption",
+          isGenerating: false,
+          generatedCaption: "",
+        });
+
+        toast({
+          title: "Error",
+          description: "Failed to generate streaming caption",
+          variant: "destructive",
+        });
+      }
+    },
+    [api, updateGenerationState]
   );
 
   const clearGeneration = useCallback(() => {
@@ -267,6 +382,7 @@ export function useGenerationHandlers() {
     setError,
     validateGeneration,
     updateGeneratedCaption,
+    generateCaptionStream,
   };
 }
 

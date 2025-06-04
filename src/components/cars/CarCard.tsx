@@ -191,7 +191,7 @@ const CarCard = memo(function CarCard({
     findPrimaryImage();
   }, [car._id, car.imageIds, car.images, car.primaryImageId, api]);
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDelete = (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent navigation
 
     if (
@@ -207,14 +207,23 @@ const CarCard = memo(function CarCard({
       return;
     }
 
-    try {
-      await api.delete(`cars/${car._id}`);
-      // Refresh the page to update the list
-      window.location.reload();
-    } catch (error) {
-      console.error("Error deleting car:", error);
-      alert("Failed to delete car. Please try again.");
-    }
+    // Immediate optimistic feedback
+    alert("Deleting car in background...");
+
+    // Background delete operation - non-blocking
+    const deleteOperation = async () => {
+      try {
+        await api.delete(`cars/${car._id}`);
+        // Refresh the page to update the list
+        window.location.reload();
+      } catch (error) {
+        console.error("Error deleting car:", error);
+        alert("Failed to delete car. Please try again.");
+      }
+    };
+
+    // Execute delete in background - non-blocking
+    setTimeout(deleteOperation, 0);
   };
 
   // Helper function to safely format mileage

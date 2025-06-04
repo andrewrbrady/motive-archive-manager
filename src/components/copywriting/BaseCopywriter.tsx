@@ -1,11 +1,18 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { toast } from "@/components/ui/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { CarSelection } from "../projects/caption-generator/CarSelection";
 import { EventSelection } from "../projects/caption-generator/EventSelection";
 import { SystemPromptSelection } from "../projects/caption-generator/SystemPromptSelection";
@@ -31,6 +38,14 @@ import type {
 } from "../projects/caption-generator/types";
 import type { ProviderId } from "@/lib/llmProviders";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import {
+  saveSystemPrompt,
+  restoreSystemPrompt,
+  saveDataSourceSections,
+  restoreDataSourceSections,
+  getDefaultDataSourceSections,
+  type DataSourceSections,
+} from "@/lib/copywriter-storage";
 
 export interface CopywriterConfig {
   mode: "car" | "project";
@@ -56,6 +71,10 @@ export interface CopywriterData {
   lengthSettings: any[];
   savedCaptions: ProjectSavedCaption[];
   clientHandle?: string | null;
+  // Enhanced data integration for richer content generation
+  deliverables?: any[];
+  galleries?: any[];
+  inspections?: any[];
   // Load more flags
   hasMoreEvents?: boolean;
   hasMoreCaptions?: boolean;
@@ -63,6 +82,9 @@ export interface CopywriterData {
 
 export interface CopywriterCallbacks {
   onDataFetch: () => Promise<CopywriterData>;
+  onConditionalDataFetch?: (
+    sections: DataSourceSections
+  ) => Promise<Partial<CopywriterData>>;
   onSaveCaption: (captionData: any) => Promise<boolean>;
   onDeleteCaption: (captionId: string) => Promise<boolean>;
   onUpdateCaption: (captionId: string, newText: string) => Promise<boolean>;
@@ -76,18 +98,42 @@ interface BaseCopywriterProps {
 
 /**
  * BaseCopywriter - Non-blocking copywriter component with shared cache strategy
- * Part of Phase 1 optimization - uses shared useAPIQuery for system data
+ * Part of Phase 3 optimization - adds collapsible sections with lazy loading and localStorage persistence
  * Prevents duplicate API calls between car and project copywriters
  */
 export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   const { user } = useFirebaseAuth();
+
+  // Data source section states with localStorage persistence
+  const [dataSections, setDataSections] = useState<DataSourceSections>(() => {
+    return restoreDataSourceSections() || getDefaultDataSourceSections();
+  });
+
+  // Save data sections to localStorage whenever they change
+  useEffect(() => {
+    saveDataSourceSections(dataSections);
+  }, [dataSections]);
+
+  // Conditional data states
+  const [conditionalData, setConditionalData] = useState<
+    Partial<CopywriterData>
+  >({});
+  const [loadingConditionalData, setLoadingConditionalData] = useState<{
+    deliverables: boolean;
+    galleries: boolean;
+    inspections: boolean;
+  }>({
+    deliverables: false,
+    galleries: false,
+    inspections: false,
+  });
 
   // Shared cache strategy - Use direct useAPIQuery for system data that's common across all copywriters
   const {
     data: sharedSystemPrompts,
     isLoading: isLoadingSharedSystemPrompts,
     error: sharedSystemPromptsError,
-  } = useAPIQuery<any[]>(`system-prompts/active`, {
+  } = useAPIQuery<any[]>(`system-prompts/list`, {
     queryKey: ["shared-system-prompts"], // Shared cache key
     staleTime: 5 * 60 * 1000, // 5 minutes cache for system data
     retry: 2,
@@ -123,33 +169,52 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   });
 
   // Combine shared and entity-specific data with proper type safety
-  const memoizedData = useMemo(() => {
-    // Ensure arrays are properly initialized to prevent .map() errors
-    const safeSystemPrompts = Array.isArray(sharedSystemPrompts)
-      ? sharedSystemPrompts
-      : [];
-    const safeLengthSettings = Array.isArray(sharedLengthSettings)
-      ? sharedLengthSettings
-      : [];
-    const safeCars = Array.isArray(entityData?.cars) ? entityData.cars : [];
-    const safeEvents = Array.isArray(entityData?.events)
-      ? entityData.events
-      : [];
-    const safeSavedCaptions = Array.isArray(entityData?.savedCaptions)
-      ? entityData.savedCaptions
-      : [];
-
-    return {
-      cars: safeCars,
-      events: safeEvents,
-      systemPrompts: safeSystemPrompts, // Always ensure this is an array
-      lengthSettings: safeLengthSettings, // Always ensure this is an array
-      savedCaptions: safeSavedCaptions,
+  const memoizedDataWithConditional = useMemo(() => {
+    // Base data from entity and shared sources
+    const baseData = {
+      // Ensure arrays are properly initialized to prevent .map() errors
+      cars: Array.isArray(entityData?.cars) ? entityData.cars : [],
+      events: Array.isArray(entityData?.events) ? entityData.events : [],
+      systemPrompts: Array.isArray(sharedSystemPrompts)
+        ? sharedSystemPrompts
+        : [],
+      lengthSettings: Array.isArray(sharedLengthSettings)
+        ? sharedLengthSettings
+        : [],
+      savedCaptions: Array.isArray(entityData?.savedCaptions)
+        ? entityData.savedCaptions
+        : [],
       clientHandle: entityData?.clientHandle || null,
       hasMoreEvents: entityData?.hasMoreEvents || false,
       hasMoreCaptions: entityData?.hasMoreCaptions || false,
     };
-  }, [entityData, sharedSystemPrompts, sharedLengthSettings]);
+
+    // Add conditional data only if sections are expanded
+    return {
+      ...baseData,
+      deliverables: dataSections.deliverables
+        ? Array.isArray(conditionalData.deliverables)
+          ? conditionalData.deliverables
+          : []
+        : [],
+      galleries: dataSections.galleries
+        ? Array.isArray(conditionalData.galleries)
+          ? conditionalData.galleries
+          : []
+        : [],
+      inspections: dataSections.inspections
+        ? Array.isArray(conditionalData.inspections)
+          ? conditionalData.inspections
+          : []
+        : [],
+    };
+  }, [
+    entityData,
+    sharedSystemPrompts,
+    sharedLengthSettings,
+    conditionalData,
+    dataSections,
+  ]);
 
   // Combined loading state - must wait for both shared and entity data
   const isLoading =
@@ -177,6 +242,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [editableLLMText, setEditableLLMText] = useState<string>("");
   const [useMinimalCarData, setUseMinimalCarData] = useState(false);
+  const [enableStreaming, setEnableStreaming] = useState<boolean>(true);
 
   // Saved captions management
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -201,14 +267,14 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     if (!promptHandlers.selectedPrompt) return null;
 
     // Try to find matching length setting
-    const matchedLength = memoizedData.lengthSettings.find(
+    const matchedLength = memoizedDataWithConditional.lengthSettings.find(
       (l) => l.key === promptHandlers.selectedPrompt?.length
     );
 
     if (matchedLength) return matchedLength;
 
     // Fallback: try to find "standard" as default
-    const standardLength = memoizedData.lengthSettings.find(
+    const standardLength = memoizedDataWithConditional.lengthSettings.find(
       (l) => l.key === "standard"
     );
 
@@ -220,11 +286,11 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     }
 
     // Last resort: use first available length setting
-    if (memoizedData.lengthSettings.length > 0) {
+    if (memoizedDataWithConditional.lengthSettings.length > 0) {
       console.warn(
-        `🚨 BaseCopywriter: No "standard" length found. Using first available: "${memoizedData.lengthSettings[0].key}"`
+        `🚨 BaseCopywriter: No "standard" length found. Using first available: "${memoizedDataWithConditional.lengthSettings[0].key}"`
       );
-      return memoizedData.lengthSettings[0];
+      return memoizedDataWithConditional.lengthSettings[0];
     }
 
     // Ultimate fallback: create a default length setting
@@ -237,7 +303,10 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
       description: "2-3 lines",
       instructions: "Write a standard length caption of 2-3 lines.",
     };
-  }, [promptHandlers.selectedPrompt, memoizedData.lengthSettings]);
+  }, [
+    promptHandlers.selectedPrompt,
+    memoizedDataWithConditional.lengthSettings,
+  ]);
 
   // Generation handlers - must be called before any early returns
   const { generationState, generateCaption, updateGeneratedCaption } =
@@ -250,13 +319,31 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   React.useEffect(() => {
     if (
       config.mode === "car" &&
-      memoizedData.cars.length === 1 &&
+      memoizedDataWithConditional.cars.length === 1 &&
       selectedCarIds.length === 0
     ) {
-      setSelectedCarIds([memoizedData.cars[0]._id]);
-      setCarDetails(memoizedData.cars);
+      setSelectedCarIds([memoizedDataWithConditional.cars[0]._id]);
+      setCarDetails(memoizedDataWithConditional.cars);
     }
-  }, [config.mode, memoizedData.cars, selectedCarIds.length]);
+  }, [config.mode, memoizedDataWithConditional.cars, selectedCarIds.length]);
+
+  // Auto-select cars for project mode
+  React.useEffect(() => {
+    if (
+      config.mode === "project" &&
+      memoizedDataWithConditional.cars.length > 0 &&
+      selectedCarIds.length === 0
+    ) {
+      // In project mode, auto-select all cars to enable generation controls
+      const allCarIds = memoizedDataWithConditional.cars.map((car) => car._id);
+      setSelectedCarIds(allCarIds);
+      setCarDetails(memoizedDataWithConditional.cars);
+
+      console.log(
+        `🚗 BaseCopywriter: Auto-selected ${allCarIds.length} cars for project mode`
+      );
+    }
+  }, [config.mode, memoizedDataWithConditional.cars, selectedCarIds.length]);
 
   // Fetch prompts when component mounts
   React.useEffect(() => {
@@ -276,14 +363,93 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
           : "N/A",
       },
       memoizedSystemPrompts: {
-        value: memoizedData.systemPrompts,
-        isArray: Array.isArray(memoizedData.systemPrompts),
-        length: memoizedData.systemPrompts.length,
+        value: memoizedDataWithConditional.systemPrompts,
+        isArray: Array.isArray(memoizedDataWithConditional.systemPrompts),
+        length: memoizedDataWithConditional.systemPrompts.length,
       },
       loading: isLoading,
       error: hasError,
     });
-  }, [memoizedData.systemPrompts, sharedSystemPrompts, isLoading, hasError]);
+  }, [
+    memoizedDataWithConditional.systemPrompts,
+    sharedSystemPrompts,
+    isLoading,
+    hasError,
+  ]);
+
+  // Debug logging for enhanced data integration
+  React.useEffect(() => {
+    console.log("BaseCopywriter: Enhanced data integration status:", {
+      deliverables: {
+        available: Array.isArray(memoizedDataWithConditional.deliverables),
+        length: memoizedDataWithConditional.deliverables?.length || 0,
+        sample: memoizedDataWithConditional.deliverables?.[0]
+          ? {
+              id:
+                memoizedDataWithConditional.deliverables[0]._id ||
+                memoizedDataWithConditional.deliverables[0].id,
+              title: memoizedDataWithConditional.deliverables[0].title,
+              type: memoizedDataWithConditional.deliverables[0].type,
+            }
+          : null,
+      },
+      galleries: {
+        available: Array.isArray(memoizedDataWithConditional.galleries),
+        length: memoizedDataWithConditional.galleries?.length || 0,
+      },
+      inspections: {
+        available: Array.isArray(memoizedDataWithConditional.inspections),
+        length: memoizedDataWithConditional.inspections?.length || 0,
+      },
+      mode: config.mode,
+      entityId: config.entityId,
+    });
+  }, [
+    memoizedDataWithConditional.deliverables,
+    memoizedDataWithConditional.galleries,
+    memoizedDataWithConditional.inspections,
+    config.mode,
+    config.entityId,
+  ]);
+
+  // Debug logging for car data and selection states
+  React.useEffect(() => {
+    console.log("BaseCopywriter: Car selection state:", {
+      mode: config.mode,
+      entityId: config.entityId,
+      availableCars: {
+        count: memoizedDataWithConditional.cars.length,
+        cars: memoizedDataWithConditional.cars.map((car) => ({
+          id: car._id,
+          make: car.make,
+          model: car.model,
+          year: car.year,
+        })),
+      },
+      selectedCarIds: selectedCarIds,
+      carDetails: {
+        count: carDetails.length,
+        details: carDetails.map((car) => ({
+          id: car._id,
+          make: car.make,
+          model: car.model,
+          year: car.year,
+        })),
+      },
+      systemPrompts: {
+        count: memoizedDataWithConditional.systemPrompts.length,
+        selectedId: selectedSystemPromptId,
+      },
+    });
+  }, [
+    config.mode,
+    config.entityId,
+    memoizedDataWithConditional.cars,
+    selectedCarIds,
+    carDetails,
+    memoizedDataWithConditional.systemPrompts,
+    selectedSystemPromptId,
+  ]);
 
   // Event selection handlers
   const handleEventSelection = useCallback(
@@ -294,7 +460,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
           : [...prev, eventId];
 
         // Update event details based on selection
-        const details = memoizedData.events.filter((event) =>
+        const details = memoizedDataWithConditional.events.filter((event) =>
           newSelection.includes(event.id)
         );
         setEventDetails(details);
@@ -302,18 +468,20 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
         return newSelection;
       });
     },
-    [memoizedData.events]
+    [memoizedDataWithConditional.events]
   );
 
   const handleSelectAllEvents = useCallback(() => {
-    const allEventIds = memoizedData.events.map((event) => event.id);
+    const allEventIds = memoizedDataWithConditional.events.map(
+      (event) => event.id
+    );
     setSelectedEventIds(allEventIds);
-    setEventDetails(memoizedData.events);
-  }, [memoizedData.events]);
+    setEventDetails(memoizedDataWithConditional.events);
+  }, [memoizedDataWithConditional.events]);
 
   // Load more events handler
   const handleLoadMoreEvents = useCallback(async () => {
-    if (loadingMoreEvents || !memoizedData.hasMoreEvents) return;
+    if (loadingMoreEvents || !memoizedDataWithConditional.hasMoreEvents) return;
 
     setLoadingMoreEvents(true);
     try {
@@ -326,7 +494,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     } finally {
       setLoadingMoreEvents(false);
     }
-  }, [loadingMoreEvents, memoizedData.hasMoreEvents]);
+  }, [loadingMoreEvents, memoizedDataWithConditional.hasMoreEvents]);
 
   // Car selection handlers (for multi-car mode)
   const handleCarSelection = useCallback(
@@ -339,7 +507,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
           : [...prev, carId];
 
         // Update car details based on selection
-        const details = memoizedData.cars.filter((car) =>
+        const details = memoizedDataWithConditional.cars.filter((car) =>
           newSelection.includes(car._id)
         );
         setCarDetails(details);
@@ -347,21 +515,95 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
         return newSelection;
       });
     },
-    [memoizedData.cars, config.features.allowMultipleCars]
+    [memoizedDataWithConditional.cars, config.features.allowMultipleCars]
   );
 
   const handleSelectAllCars = useCallback(() => {
     if (!config.features.allowMultipleCars) return;
 
-    const allCarIds = memoizedData.cars.map((car) => car._id);
+    const allCarIds = memoizedDataWithConditional.cars.map((car) => car._id);
     setSelectedCarIds(allCarIds);
-    setCarDetails(memoizedData.cars);
-  }, [memoizedData.cars, config.features.allowMultipleCars]);
+    setCarDetails(memoizedDataWithConditional.cars);
+  }, [memoizedDataWithConditional.cars, config.features.allowMultipleCars]);
 
-  // System prompt handler
+  // System prompt handler with localStorage persistence
   const handleSystemPromptChange = useCallback((promptId: string) => {
     setSelectedSystemPromptId(promptId);
+    saveSystemPrompt(promptId);
   }, []);
+
+  // Restore system prompt selection on mount
+  useEffect(() => {
+    const savedPromptId = restoreSystemPrompt();
+    if (
+      savedPromptId &&
+      memoizedDataWithConditional.systemPrompts.some(
+        (prompt) => prompt._id === savedPromptId
+      )
+    ) {
+      setSelectedSystemPromptId(savedPromptId);
+    }
+  }, [memoizedDataWithConditional.systemPrompts]);
+
+  // Conditional data fetching handler
+  const handleSectionToggle = useCallback(
+    (section: keyof DataSourceSections) => {
+      const newSections = {
+        ...dataSections,
+        [section]: !dataSections[section],
+      };
+      setDataSections(newSections);
+
+      // If section is being opened and we don't have data, fetch it
+      if (
+        newSections[section] &&
+        !conditionalData[section] &&
+        callbacks.onConditionalDataFetch
+      ) {
+        // PHASE 3C FIX: Remove blocking await from background operations
+        const fetchOperation = () => {
+          setLoadingConditionalData((prev) => ({ ...prev, [section]: true }));
+
+          console.log(
+            `🔄 BaseCopywriter: Fetching ${section} data for ${config.mode} ${config.entityId}`
+          );
+
+          callbacks.onConditionalDataFetch!({
+            deliverables: section === "deliverables",
+            galleries: section === "galleries",
+            inspections: section === "inspections",
+          })
+            .then((sectionData) => {
+              setConditionalData((prev) => ({ ...prev, ...sectionData }));
+              console.log(
+                `✅ BaseCopywriter: Successfully fetched ${section} data`
+              );
+            })
+            .catch((error) => {
+              console.warn(
+                `⚠️ BaseCopywriter: Failed to fetch ${section} data:`,
+                error
+              );
+              toast({
+                title: "Data Loading Error",
+                description: `Failed to load ${section} data. Please try again.`,
+                variant: "destructive",
+              });
+            })
+            .finally(() => {
+              setLoadingConditionalData((prev) => ({
+                ...prev,
+                [section]: false,
+              }));
+            });
+        };
+
+        // Execute fetch operation in background - truly non-blocking
+        setTimeout(fetchOperation, 0);
+      }
+    },
+    [dataSections, conditionalData, callbacks, config.mode, config.entityId]
+  );
 
   // LLM preview handlers
   const buildLLMText = useCallback(() => {
@@ -370,7 +612,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     let llmText = "";
 
     // Add system prompt context
-    const systemPrompt = memoizedData.systemPrompts.find(
+    const systemPrompt = memoizedDataWithConditional.systemPrompts.find(
       (p) => p._id === selectedSystemPromptId
     );
     if (systemPrompt) {
@@ -561,7 +803,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   }, [
     carDetails,
     selectedSystemPromptId,
-    memoizedData.systemPrompts,
+    memoizedDataWithConditional.systemPrompts,
     formState,
     eventDetails,
     derivedLength,
@@ -581,23 +823,35 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   }, [buildLLMText]);
 
   // Caption management
-  const handleCopy = useCallback(async (text: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-      toast({
-        title: "Copied",
-        description: "Caption copied to clipboard",
-      });
-    } catch (error) {
-      console.error("Failed to copy:", error);
-      toast({
-        title: "Error",
-        description: "Failed to copy to clipboard",
-        variant: "destructive",
-      });
-    }
+  const handleCopy = useCallback((text: string, id: string) => {
+    // PHASE 3C FIX: Remove blocking await from background operations
+    const copyOperation = () => {
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          setCopiedId(id);
+          setTimeout(() => setCopiedId(null), 2000);
+          toast({
+            title: "Copied",
+            description: "Caption copied to clipboard",
+          });
+        })
+        .catch((error) => {
+          console.error("Failed to copy:", error);
+          toast({
+            title: "Error",
+            description: "Failed to copy to clipboard",
+            variant: "destructive",
+          });
+        });
+    };
+
+    // Execute copy operation in background - truly non-blocking
+    setTimeout(copyOperation, 0);
+
+    // Immediate optimistic feedback
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
   }, []);
 
   const handleStartEdit = useCallback(
@@ -631,25 +885,227 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
       derivedLength,
       useMinimalCarData,
       editableLLMText,
-      clientHandle: memoizedData.clientHandle || null,
+      clientHandle: memoizedDataWithConditional.clientHandle || null,
     };
 
-    // Phase 3C FIX: Remove blocking await from background operations
-    const generateOperation = () => {
-      generateCaption(context, formState).catch((error) => {
-        console.error("Error generating caption:", error);
-        // Error handling is already in generateCaption
+    // Choose between streaming and regular generation
+    if (enableStreaming) {
+      // STREAMING GENERATION - Real-time caption building
+      updateGeneratedCaption(""); // Clear previous caption
+
+      try {
+        // Prepare context for reuse (same as regular generation)
+        const contextToUse = formState.additionalContext
+          ? `${formState.context}\n\nAdditional context: ${formState.additionalContext}`
+          : formState.context;
+
+        // Build client info if needed
+        const clientInfo = context.clientHandle
+          ? {
+              handle: context.clientHandle,
+              includeInCaption: true,
+            }
+          : null;
+
+        // Process car details appropriately (same as regular generation)
+        let combinedCarDetails;
+        if (
+          Array.isArray(context.carDetails) &&
+          context.carDetails.length > 0
+        ) {
+          combinedCarDetails = {
+            cars: context.carDetails,
+            count: context.carDetails.length,
+            useMinimal: context.useMinimalCarData,
+          };
+        } else {
+          console.warn(
+            "Car details not provided or invalid:",
+            context.carDetails
+          );
+          combinedCarDetails = {
+            cars: [],
+            count: 0,
+            useMinimal: context.useMinimalCarData,
+          };
+        }
+
+        // Process event details (same as regular generation)
+        let combinedEventDetails = null;
+        if (
+          Array.isArray(context.eventDetails) &&
+          context.eventDetails.length > 0
+        ) {
+          combinedEventDetails = {
+            events: context.eventDetails,
+            count: context.eventDetails.length,
+            types: [
+              ...new Set(context.eventDetails.map((event) => event.type)),
+            ],
+            upcomingEvents: context.eventDetails.filter(
+              (event) => new Date(event.start) > new Date()
+            ),
+            pastEvents: context.eventDetails.filter(
+              (event) => new Date(event.start) <= new Date()
+            ),
+          };
+        }
+
+        const response = await fetch(
+          "/api/openai/generate-project-caption-stream",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              platform: formState.platform,
+              context: contextToUse,
+              clientInfo,
+              carDetails: combinedCarDetails,
+              eventDetails: combinedEventDetails,
+              temperature: formState.temperature,
+              tone: formState.tone,
+              style: formState.style,
+              length: context.derivedLength?.key || "standard",
+              template: formState.context,
+              aiModel: formState.model,
+              projectId: context.projectId,
+              selectedCarIds: context.selectedCarIds,
+              selectedEventIds: context.selectedEventIds,
+              systemPromptId: context.selectedSystemPromptId,
+              useMinimalCarData: context.useMinimalCarData,
+              customLLMText: context.editableLLMText,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error("No response body reader available");
+        }
+
+        const decoder = new TextDecoder();
+        let accumulator = "";
+        let chunkCount = 0;
+
+        toast({
+          title: "✨ Streaming Caption",
+          description: "Watch your caption appear in real-time!",
+        });
+
+        console.log("🎬 Frontend: Starting stream reading...");
+
+        // Read the stream and build caption progressively with timeout protection
+        const streamTimeout = setTimeout(() => {
+          reader.cancel();
+          console.warn(
+            "⏰ Frontend: Stream reading timeout after 60s - finalizing caption"
+          );
+          if (accumulator) {
+            updateGeneratedCaption(accumulator);
+            toast({
+              title: "⚠️ Stream Timeout",
+              description: "Caption generation completed but may be truncated",
+              variant: "destructive",
+            });
+          }
+        }, 60000); // 60 second timeout
+
+        // PHASE 3C FIX: Non-blocking stream reading using recursive setTimeout pattern
+        const readNextChunk = () => {
+          reader
+            .read()
+            .then(({ done, value }) => {
+              if (done) {
+                console.log(
+                  `✅ Frontend: Stream completed after ${chunkCount} chunks, total length: ${accumulator.length}`
+                );
+                clearTimeout(streamTimeout);
+                toast({
+                  title: "🎉 Caption Complete!",
+                  description: "Your caption has been generated successfully",
+                });
+                return;
+              }
+
+              if (value) {
+                chunkCount++;
+                const chunk = decoder.decode(value, { stream: true });
+                accumulator += chunk;
+
+                console.log(
+                  `📤 Frontend: Chunk ${chunkCount}: +${chunk.length} chars (total: ${accumulator.length})`
+                );
+
+                // Update the caption in real-time - users see words appearing!
+                updateGeneratedCaption(accumulator);
+              } else {
+                console.log(
+                  `⚠️ Frontend: Chunk ${chunkCount + 1} had no value`
+                );
+              }
+
+              // Continue reading next chunk in background
+              setTimeout(readNextChunk, 0);
+            })
+            .catch((streamError) => {
+              clearTimeout(streamTimeout);
+              console.error("❌ Frontend: Stream reading error:", streamError);
+
+              // If we have partial content, use it
+              if (accumulator) {
+                console.log(
+                  `⚠️ Frontend: Using partial content (${accumulator.length} chars)`
+                );
+                updateGeneratedCaption(accumulator);
+                toast({
+                  title: "⚠️ Partial Caption",
+                  description:
+                    "Caption generation was interrupted but partial content is available",
+                  variant: "destructive",
+                });
+              } else {
+                toast({
+                  title: "Error",
+                  description:
+                    "Failed to generate streaming caption. Try regular mode.",
+                  variant: "destructive",
+                });
+              }
+            });
+        };
+
+        // Start reading first chunk in background
+        setTimeout(readNextChunk, 0);
+      } catch (error: any) {
+        console.error("Error in streaming generation:", error);
+        toast({
+          title: "Error",
+          description:
+            "Failed to generate streaming caption. Try regular mode.",
+          variant: "destructive",
+        });
+      }
+    } else {
+      // REGULAR GENERATION - Traditional approach
+      const generateOperation = () => {
+        generateCaption(context, formState).catch((error) => {
+          console.error("Error generating caption:", error);
+        });
+      };
+
+      setTimeout(generateOperation, 0);
+
+      toast({
+        title: "Generating...",
+        description: "Caption is being generated in background",
       });
-    };
-
-    // Execute generation in background - truly non-blocking
-    setTimeout(generateOperation, 0);
-
-    // Immediate feedback for better UX
-    toast({
-      title: "Generating...",
-      description: "Caption is being generated in background",
-    });
+    }
   };
 
   const handleSaveContent = async () => {
@@ -796,7 +1252,8 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
 
   // Load more captions handler
   const handleLoadMoreCaptions = useCallback(async () => {
-    if (loadingMoreCaptions || !memoizedData.hasMoreCaptions) return;
+    if (loadingMoreCaptions || !memoizedDataWithConditional.hasMoreCaptions)
+      return;
 
     setLoadingMoreCaptions(true);
     try {
@@ -809,7 +1266,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     } finally {
       setLoadingMoreCaptions(false);
     }
-  }, [loadingMoreCaptions, memoizedData.hasMoreCaptions]);
+  }, [loadingMoreCaptions, memoizedDataWithConditional.hasMoreCaptions]);
 
   // Handle error state without blocking UI
   if (hasError) {
@@ -856,7 +1313,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
         <div className="space-y-6">
           {/* Car Selection */}
           <CarSelection
-            projectCars={memoizedData.cars}
+            projectCars={memoizedDataWithConditional.cars}
             selectedCarIds={selectedCarIds}
             loadingCars={isLoading}
             onCarSelection={handleCarSelection}
@@ -866,19 +1323,19 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
           {/* Event Selection */}
           {config.features.allowEventSelection && (
             <EventSelection
-              projectEvents={memoizedData.events}
+              projectEvents={memoizedDataWithConditional.events}
               selectedEventIds={selectedEventIds}
               loadingEvents={isLoading || loadingMoreEvents}
               onEventSelection={handleEventSelection}
               onSelectAllEvents={handleSelectAllEvents}
-              hasMoreEvents={memoizedData.hasMoreEvents}
+              hasMoreEvents={memoizedDataWithConditional.hasMoreEvents}
               onLoadMoreEvents={handleLoadMoreEvents}
             />
           )}
 
           {/* System Prompt Selection */}
           <SystemPromptSelection
-            systemPrompts={memoizedData.systemPrompts}
+            systemPrompts={memoizedDataWithConditional.systemPrompts}
             selectedSystemPromptId={selectedSystemPromptId}
             loadingSystemPrompts={isLoading}
             systemPromptError={
@@ -886,6 +1343,209 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
             }
             onSystemPromptChange={handleSystemPromptChange}
           />
+
+          {/* Data Source Sections - Collapsible with Lazy Loading */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Enhanced Data Sources</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Expand sections to load additional data for richer content
+                generation
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Deliverables Section */}
+              <Collapsible
+                open={dataSections.deliverables}
+                onOpenChange={() => handleSectionToggle("deliverables")}
+              >
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between p-2 h-auto"
+                  >
+                    <div className="flex items-center gap-2">
+                      {dataSections.deliverables ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                      <span className="font-medium">Deliverables</span>
+                      <Badge variant="secondary" className="ml-2">
+                        {memoizedDataWithConditional.deliverables.length}
+                      </Badge>
+                    </div>
+                    {loadingConditionalData.deliverables && (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-2 pt-2">
+                  {memoizedDataWithConditional.deliverables.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-2">
+                      {memoizedDataWithConditional.deliverables
+                        .slice(0, 3)
+                        .map((deliverable: any, index: number) => (
+                          <div
+                            key={deliverable._id || index}
+                            className="p-2 border rounded text-sm"
+                          >
+                            <div className="font-medium">
+                              {deliverable.title ||
+                                deliverable.name ||
+                                `Deliverable ${index + 1}`}
+                            </div>
+                            {deliverable.type && (
+                              <div className="text-xs text-muted-foreground">
+                                {deliverable.type}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      {memoizedDataWithConditional.deliverables.length > 3 && (
+                        <div className="text-xs text-muted-foreground text-center">
+                          and{" "}
+                          {memoizedDataWithConditional.deliverables.length - 3}{" "}
+                          more...
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground text-center py-2">
+                      No deliverables available
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Galleries Section */}
+              <Collapsible
+                open={dataSections.galleries}
+                onOpenChange={() => handleSectionToggle("galleries")}
+              >
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between p-2 h-auto"
+                  >
+                    <div className="flex items-center gap-2">
+                      {dataSections.galleries ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                      <span className="font-medium">Galleries</span>
+                      <Badge variant="secondary" className="ml-2">
+                        {memoizedDataWithConditional.galleries.length}
+                      </Badge>
+                    </div>
+                    {loadingConditionalData.galleries && (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-2 pt-2">
+                  {memoizedDataWithConditional.galleries.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-2">
+                      {memoizedDataWithConditional.galleries
+                        .slice(0, 3)
+                        .map((gallery: any, index: number) => (
+                          <div
+                            key={gallery._id || index}
+                            className="p-2 border rounded text-sm"
+                          >
+                            <div className="font-medium">
+                              {gallery.title ||
+                                gallery.name ||
+                                `Gallery ${index + 1}`}
+                            </div>
+                            {gallery.imageCount && (
+                              <div className="text-xs text-muted-foreground">
+                                {gallery.imageCount} images
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      {memoizedDataWithConditional.galleries.length > 3 && (
+                        <div className="text-xs text-muted-foreground text-center">
+                          and {memoizedDataWithConditional.galleries.length - 3}{" "}
+                          more...
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground text-center py-2">
+                      No galleries available
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Inspections Section */}
+              <Collapsible
+                open={dataSections.inspections}
+                onOpenChange={() => handleSectionToggle("inspections")}
+              >
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between p-2 h-auto"
+                  >
+                    <div className="flex items-center gap-2">
+                      {dataSections.inspections ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                      <span className="font-medium">Inspections</span>
+                      <Badge variant="secondary" className="ml-2">
+                        {memoizedDataWithConditional.inspections.length}
+                      </Badge>
+                    </div>
+                    {loadingConditionalData.inspections && (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-2 pt-2">
+                  {memoizedDataWithConditional.inspections.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-2">
+                      {memoizedDataWithConditional.inspections
+                        .slice(0, 3)
+                        .map((inspection: any, index: number) => (
+                          <div
+                            key={inspection._id || index}
+                            className="p-2 border rounded text-sm"
+                          >
+                            <div className="font-medium">
+                              {inspection.title ||
+                                inspection.name ||
+                                `Inspection ${index + 1}`}
+                            </div>
+                            {inspection.status && (
+                              <div className="text-xs text-muted-foreground">
+                                {inspection.status}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      {memoizedDataWithConditional.inspections.length > 3 && (
+                        <div className="text-xs text-muted-foreground text-center">
+                          and{" "}
+                          {memoizedDataWithConditional.inspections.length - 3}{" "}
+                          more...
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground text-center py-2">
+                      No inspections available
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+            </CardContent>
+          </Card>
 
           {/* Generation Controls */}
           <GenerationControls
@@ -913,14 +1573,16 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
             onEditableLLMTextChange={setEditableLLMText}
             onRefreshLLMText={handleRefreshLLMText}
             selectedSystemPromptId={selectedSystemPromptId}
-            systemPrompts={memoizedData.systemPrompts}
-            projectCars={memoizedData.cars}
-            projectEvents={memoizedData.events}
+            systemPrompts={memoizedDataWithConditional.systemPrompts}
+            projectCars={memoizedDataWithConditional.cars}
+            projectEvents={memoizedDataWithConditional.events}
             model={formState.model}
             temperature={formState.temperature}
             isGenerating={generationState.isGenerating}
             onGenerate={handleGenerateContent}
             error={generationState.error}
+            enableStreaming={enableStreaming}
+            onStreamingToggle={setEnableStreaming}
           />
         </div>
 
@@ -934,7 +1596,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
             onSaveCaption={handleSaveContent}
             viewMode={contentViewMode}
             onViewModeChange={setContentViewMode}
-            savedCaptions={memoizedData.savedCaptions}
+            savedCaptions={memoizedDataWithConditional.savedCaptions}
             editingCaptionId={editingCaptionId}
             editingText={editingText}
             onStartEdit={handleStartEdit}
@@ -943,7 +1605,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
             onEditTextChange={handleEditTextChange}
             onDeleteCaption={handleDeleteContent}
             onUpdatePreviewCaption={handleUpdatePreviewContent}
-            hasMoreCaptions={memoizedData.hasMoreCaptions}
+            hasMoreCaptions={memoizedDataWithConditional.hasMoreCaptions}
             onLoadMoreCaptions={handleLoadMoreCaptions}
             loadingCaptions={loadingMoreCaptions}
           />
@@ -959,7 +1621,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
         model={formState.model}
         provider={formState.provider}
         temperature={formState.temperature}
-        clientHandle={memoizedData.clientHandle || null}
+        clientHandle={memoizedDataWithConditional.clientHandle || null}
         onPromptSaved={(prompt: PromptTemplate) => {
           promptHandlers.handlePromptSaved(prompt);
         }}

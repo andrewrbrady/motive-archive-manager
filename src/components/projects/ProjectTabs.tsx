@@ -42,8 +42,10 @@ const ProjectGalleriesTab = lazy(() =>
     default: m.ProjectGalleriesTab,
   }))
 );
-const ProjectCopywriter = lazy(() =>
-  import("./ProjectCopywriter").then((m) => ({ default: m.ProjectCopywriter }))
+const UnifiedCopywriter = lazy(() =>
+  import("../copywriting/UnifiedCopywriter").then((m) => ({
+    default: m.UnifiedCopywriter,
+  }))
 );
 const ProjectEventsTab = lazy(() => import("./ProjectEventsTab"));
 const ProjectCalendarTab = lazy(() =>
@@ -226,8 +228,12 @@ export function ProjectTabs({
 
         {activeTab === "copywriter" && hasLoadedTab.copywriter && (
           <Suspense fallback={<TabLoadingFallback />}>
-            <ProjectCopywriter
-              project={project}
+            <UnifiedCopywriter
+              projectId={project._id!}
+              title="Project Copywriter"
+              allowMultipleCars={true}
+              allowEventSelection={true}
+              allowMinimalCarData={true}
               onProjectUpdate={onProjectUpdate}
             />
           </Suspense>

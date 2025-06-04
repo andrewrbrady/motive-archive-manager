@@ -131,7 +131,10 @@ export default function EditDeliverableForm({
     setReleaseDate(safeFormatDate(deliverable.release_date));
     setDropboxLink(deliverable.dropbox_link || "");
     setSocialMediaLink(deliverable.social_media_link || "");
+  }, [deliverable, editors]);
 
+  // Separate useEffect for platform handling to avoid infinite loops
+  useEffect(() => {
     if (availablePlatforms.length > 0) {
       if (deliverable.platforms && deliverable.platforms.length > 0) {
         const selectedPlatformOptions = deliverable.platforms
@@ -154,7 +157,7 @@ export default function EditDeliverableForm({
         }
       }
     }
-  }, [deliverable, editors, availablePlatforms]);
+  }, [availablePlatforms.length, deliverable.platforms, deliverable.platform]);
 
   if (!api) {
     return null;

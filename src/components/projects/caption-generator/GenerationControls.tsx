@@ -49,6 +49,8 @@ interface GenerationControlsProps {
   isGenerating: boolean;
   onGenerate: () => void;
   error: string | null;
+  enableStreaming?: boolean;
+  onStreamingToggle?: (enabled: boolean) => void;
 }
 
 export function GenerationControls({
@@ -84,6 +86,8 @@ export function GenerationControls({
   isGenerating,
   onGenerate,
   error,
+  enableStreaming,
+  onStreamingToggle,
 }: GenerationControlsProps) {
   if (selectedCarIds.length === 0) {
     return null;
@@ -444,6 +448,34 @@ export function GenerationControls({
         )}
       </div>
 
+      {/* Streaming Toggle */}
+      {onStreamingToggle && (
+        <div className="space-y-2 p-3 rounded-lg bg-[var(--background-secondary)] border border-[hsl(var(--border-subtle))]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="enable-streaming"
+                checked={enableStreaming || false}
+                onCheckedChange={(checked) => {
+                  onStreamingToggle(checked as boolean);
+                }}
+              />
+              <label
+                htmlFor="enable-streaming"
+                className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white cursor-pointer"
+              >
+                ✨ Real-time Streaming
+              </label>
+            </div>
+          </div>
+          <p className="text-xs text-[hsl(var(--foreground-muted))]">
+            {enableStreaming
+              ? "Captions will appear word-by-word as they're generated (faster experience)"
+              : "Traditional generation - complete caption appears when finished"}
+          </p>
+        </div>
+      )}
+
       {/* Generate Button */}
       <Button
         onClick={onGenerate}
@@ -456,7 +488,13 @@ export function GenerationControls({
         variant="outline"
         className="w-full bg-[var(--background-primary)] hover:bg-black dark:bg-[var(--background-primary)] dark:hover:bg-black text-white border-[hsl(var(--border))]"
       >
-        {isGenerating ? "Generating..." : "Generate Caption"}
+        {isGenerating
+          ? enableStreaming
+            ? "✨ Streaming..."
+            : "Generating..."
+          : enableStreaming
+            ? "✨ Stream Caption"
+            : "Generate Caption"}
       </Button>
 
       {error && (

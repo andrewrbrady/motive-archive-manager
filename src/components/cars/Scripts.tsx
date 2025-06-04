@@ -290,52 +290,63 @@ Add a brief description of the script here...
     return results;
   };
 
-  const handleUpload = async () => {
+  const handleUpload = () => {
     if (selectedFiles.length === 0 || !api) return;
 
+    // Immediate optimistic feedback
     setUploading(true);
     setError(null);
+    toast.success("Starting script upload in background...");
 
-    try {
-      const processFile = async (file: File) => {
-        const formData = new FormData();
-        formData.append("file", file);
+    // Background upload operation - non-blocking
+    const uploadOperation = async () => {
+      try {
+        const processFile = async (file: File) => {
+          const formData = new FormData();
+          formData.append("file", file);
 
-        // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
-        const result = await api.post(`cars/${carId}/scripts/upload`, formData);
-        return { success: true, data: result };
-      };
+          // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+          const result = await api.post(
+            `cars/${carId}/scripts/upload`,
+            formData
+          );
+          return { success: true, data: result };
+        };
 
-      // Process files in batches of 5
-      const results = await batchProcess(
-        Array.from(selectedFiles),
-        5,
-        processFile
-      );
+        // Process files in batches of 5
+        const results = await batchProcess(
+          Array.from(selectedFiles),
+          5,
+          processFile
+        );
 
-      // Process failures
-      const failures = results.filter((result) => !result.success);
+        // Process failures
+        const failures = results.filter((result) => !result.success);
 
-      if (failures.length > 0) {
-        const errorMessage = failures
-          .map((failure) => failure.error?.message || "Upload failed")
-          .join(", ");
-        setError(`Some files failed to upload: ${errorMessage}`);
+        if (failures.length > 0) {
+          const errorMessage = failures
+            .map((failure) => failure.error?.message || "Upload failed")
+            .join(", ");
+          setError(`Some files failed to upload: ${errorMessage}`);
+        }
+
+        // Clear selected files regardless of success/failure
+        setSelectedFiles([]);
+        await fetchFiles();
+      } catch (error) {
+        console.error("Error in upload process:", error);
+        setError(
+          error instanceof Error ? error.message : "Failed to upload files"
+        );
+      } finally {
+        setUploading(false);
+        // Keep progress visible briefly so users can see completion
+        setTimeout(() => setUploadProgress({}), 2000);
       }
+    };
 
-      // Clear selected files regardless of success/failure
-      setSelectedFiles([]);
-      await fetchFiles();
-    } catch (error) {
-      console.error("Error in upload process:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to upload files"
-      );
-    } finally {
-      setUploading(false);
-      // Keep progress visible briefly so users can see completion
-      setTimeout(() => setUploadProgress({}), 2000);
-    }
+    // Execute upload in background - non-blocking
+    setTimeout(uploadOperation, 0);
   };
 
   const handleDelete = async (fileId: string) => {
@@ -735,84 +746,102 @@ ${convertRowsToMarkdown(updatedRows)}`;
     }
   };
 
-  const handleSaveScript = async (shouldExit: boolean = false) => {
+  const handleSaveScript = (shouldExit: boolean = false) => {
     if (!selectedFile || !api) return;
 
-    try {
-      const scriptData = {
-        name: selectedFile.name || "Untitled",
-        description: selectedFile.description || "",
-        platforms: selectedFile.platforms || [],
-        aspectRatio: selectedFile.aspectRatio || "16:9",
-        content: markdownContent || "",
-        brief: selectedFile.brief || "",
-        duration: selectedFile.duration || "00:00",
-        rows: selectedFile.rows || [],
-      };
+    // Immediate optimistic feedback
+    toast.success("Saving script in background...");
 
-      let result: Partial<Script>;
-      // For existing scripts, use the scripts/content endpoint
-      if (selectedFile._id) {
-        // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
-        result = (await api.put(`cars/${carId}/scripts/content`, {
-          fileId: selectedFile._id,
+    // Background save operation - non-blocking
+    const saveOperation = async () => {
+      try {
+        const scriptData = {
+          name: selectedFile.name || "Untitled",
+          description: selectedFile.description || "",
+          platforms: selectedFile.platforms || [],
+          aspectRatio: selectedFile.aspectRatio || "16:9",
+          content: markdownContent || "",
+          brief: selectedFile.brief || "",
+          duration: selectedFile.duration || "00:00",
+          rows: selectedFile.rows || [],
+        };
+
+        let result: Partial<Script>;
+        // For existing scripts, use the scripts/content endpoint
+        if (selectedFile._id) {
+          // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+          result = (await api.put(`cars/${carId}/scripts/content`, {
+            fileId: selectedFile._id,
+            ...scriptData,
+          })) as Partial<Script>;
+        } else {
+          // For new scripts, use the scripts endpoint
+          // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+          result = (await api.post(`cars/${carId}/scripts`, {
+            ...scriptData,
+            carId: carId, // Make sure to include the carId for new scripts
+          })) as Partial<Script>;
+        }
+
+        // Update the files list and selected file with the latest content
+        const updatedScript: Script = {
+          ...selectedFile,
           ...scriptData,
-        })) as Partial<Script>;
-      } else {
-        // For new scripts, use the scripts endpoint
-        // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
-        result = (await api.post(`cars/${carId}/scripts`, {
-          ...scriptData,
-          carId: carId, // Make sure to include the carId for new scripts
-        })) as Partial<Script>;
+          ...result,
+          _id: result._id || selectedFile._id, // Ensure we have the _id for new scripts
+          updatedAt: new Date(),
+        };
+
+        setFiles((prev) =>
+          selectedFile._id
+            ? prev.map((s) => (s._id === selectedFile._id ? updatedScript : s))
+            : [...prev, updatedScript]
+        );
+        setSelectedFile(updatedScript);
+        setMarkdownContent(scriptData.content);
+
+        if (shouldExit) {
+          setIsEditing(false);
+        }
+        toast.success("Script saved successfully");
+      } catch (error) {
+        console.error("Error saving script:", error);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to save script"
+        );
       }
+    };
 
-      // Update the files list and selected file with the latest content
-      const updatedScript: Script = {
-        ...selectedFile,
-        ...scriptData,
-        ...result,
-        _id: result._id || selectedFile._id, // Ensure we have the _id for new scripts
-        updatedAt: new Date(),
-      };
-
-      setFiles((prev) =>
-        selectedFile._id
-          ? prev.map((s) => (s._id === selectedFile._id ? updatedScript : s))
-          : [...prev, updatedScript]
-      );
-      setSelectedFile(updatedScript);
-      setMarkdownContent(scriptData.content);
-
-      if (shouldExit) {
-        setIsEditing(false);
-      }
-      toast.success("Script saved successfully");
-    } catch (error) {
-      console.error("Error saving script:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to save script"
-      );
-    }
+    // Execute save in background - non-blocking
+    setTimeout(saveOperation, 0);
   };
 
-  const handleDeleteScript = async (scriptId: string) => {
+  const handleDeleteScript = (scriptId: string) => {
     if (!api) return;
 
-    try {
-      // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
-      await api.delete(`cars/${carId}/scripts?fileId=${scriptId}`);
+    // Immediate optimistic feedback
+    toast.success("Deleting script in background...");
 
-      setFiles((prev) => prev.filter((s) => s._id !== scriptId));
-      if (selectedFile?._id === scriptId) {
-        setSelectedFile(null);
-        setIsEditing(false);
+    // Background delete operation - non-blocking
+    const deleteOperation = async () => {
+      try {
+        // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+        await api.delete(`cars/${carId}/scripts?fileId=${scriptId}`);
+
+        setFiles((prev) => prev.filter((s) => s._id !== scriptId));
+        if (selectedFile?._id === scriptId) {
+          setSelectedFile(null);
+          setIsEditing(false);
+        }
+        toast.success("Script deleted successfully");
+      } catch (error) {
+        console.error("Error deleting script:", error);
+        toast.error("Failed to delete script");
       }
-      toast.success("Script deleted successfully");
-    } catch (error) {
-      console.error("Error deleting script:", error);
-      toast.error("Failed to delete script");
-    }
+    };
+
+    // Execute delete in background - non-blocking
+    setTimeout(deleteOperation, 0);
   };
 
   const handleDuplicateScript = (script: Script) => {

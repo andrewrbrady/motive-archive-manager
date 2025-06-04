@@ -76,112 +76,125 @@ export default function DocumentationEditor({
 
   /**
    * File upload with progress tracking - optimized for multiple files
+   * PHASE 2 FIX: Non-blocking upload pattern prevents UI freezing
    */
-  const handleUpload = async () => {
+  const handleUpload = () => {
     if (!api || selectedFiles.length === 0) return;
 
+    // Immediate optimistic feedback
     setUploading(true);
     setError(null);
     setUploadProgress({});
+    toast.success("Starting file upload in background...");
 
-    try {
-      // Create upload promises with progress tracking
-      const uploadPromises = selectedFiles.map(async (file) => {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("carId", carId);
+    // Background upload operation - non-blocking
+    const uploadOperation = async () => {
+      try {
+        // Create upload promises with progress tracking
+        const uploadPromises = selectedFiles.map(async (file) => {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("carId", carId);
 
-        // Initialize progress for this file
-        setUploadProgress((prev) => ({
-          ...prev,
-          [file.name]: 0,
-        }));
+          // Initialize progress for this file
+          setUploadProgress((prev) => ({
+            ...prev,
+            [file.name]: 0,
+          }));
 
-        try {
-          const xhr = new XMLHttpRequest();
+          try {
+            const xhr = new XMLHttpRequest();
 
-          // Create upload promise with progress tracking
-          const uploadPromise = new Promise<DocumentationFile>(
-            (resolve, reject) => {
-              xhr.upload.addEventListener("progress", (event) => {
-                if (event.lengthComputable) {
-                  const progress = Math.round(
-                    (event.loaded * 100) / event.total
-                  );
-                  setUploadProgress((prev) => ({
-                    ...prev,
-                    [file.name]: progress,
-                  }));
-                }
-              });
-
-              xhr.onload = () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                  try {
-                    const response = JSON.parse(xhr.responseText);
-                    resolve(response);
-                  } catch (e) {
-                    reject(new Error("Invalid response"));
+            // Create upload promise with progress tracking
+            const uploadPromise = new Promise<DocumentationFile>(
+              (resolve, reject) => {
+                xhr.upload.addEventListener("progress", (event) => {
+                  if (event.lengthComputable) {
+                    const progress = Math.round(
+                      (event.loaded * 100) / event.total
+                    );
+                    setUploadProgress((prev) => ({
+                      ...prev,
+                      [file.name]: progress,
+                    }));
                   }
-                } else {
-                  reject(new Error(`Upload failed with status ${xhr.status}`));
-                }
-              };
+                });
 
-              xhr.onerror = () => {
-                reject(new Error("Network error"));
-              };
-            }
-          );
+                xhr.onload = () => {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                      const response = JSON.parse(xhr.responseText);
+                      resolve(response);
+                    } catch (e) {
+                      reject(new Error("Invalid response"));
+                    }
+                  } else {
+                    reject(
+                      new Error(`Upload failed with status ${xhr.status}`)
+                    );
+                  }
+                };
 
-          // Start the upload
-          xhr.open("POST", "/api/documentation/upload", true);
-          xhr.send(formData);
+                xhr.onerror = () => {
+                  reject(new Error("Network error"));
+                };
+              }
+            );
 
-          return await uploadPromise;
-        } catch (error) {
-          console.error(`Error uploading ${file.name}:`, error);
-          throw error;
-        }
-      });
+            // Start the upload
+            xhr.open("POST", "/api/documentation/upload", true);
+            xhr.send(formData);
 
-      // Wait for all uploads to complete
-      const results = await Promise.allSettled(uploadPromises);
+            return await uploadPromise;
+          } catch (error) {
+            console.error(`Error uploading ${file.name}:`, error);
+            throw error;
+          }
+        });
 
-      // Process successful uploads
-      const successfulUploads = results
-        .filter(
-          (result): result is PromiseFulfilledResult<DocumentationFile> =>
-            result.status === "fulfilled"
-        )
-        .map((result) => result.value);
+        // Wait for all uploads to complete
+        const results = await Promise.allSettled(uploadPromises);
 
-      // Check for failures
-      const failures = results.filter((result) => result.status === "rejected");
-      if (failures.length > 0) {
-        setError(`${failures.length} file(s) failed to upload`);
-      }
+        // Process successful uploads
+        const successfulUploads = results
+          .filter(
+            (result): result is PromiseFulfilledResult<DocumentationFile> =>
+              result.status === "fulfilled"
+          )
+          .map((result) => result.value);
 
-      // Notify parent component of successful uploads
-      if (successfulUploads.length > 0) {
-        onUploadComplete(successfulUploads);
-        toast.success(
-          `Successfully uploaded ${successfulUploads.length} file(s)`
+        // Check for failures
+        const failures = results.filter(
+          (result) => result.status === "rejected"
         );
-      }
+        if (failures.length > 0) {
+          setError(`${failures.length} file(s) failed to upload`);
+        }
 
-      // Clear selected files after upload attempt
-      setSelectedFiles([]);
-    } catch (error) {
-      console.error("Error in upload process:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to upload files"
-      );
-    } finally {
-      setUploading(false);
-      // Keep progress visible briefly so users can see completion
-      setTimeout(() => setUploadProgress({}), 2000);
-    }
+        // Notify parent component of successful uploads
+        if (successfulUploads.length > 0) {
+          onUploadComplete(successfulUploads);
+          toast.success(
+            `Successfully uploaded ${successfulUploads.length} file(s)`
+          );
+        }
+
+        // Clear selected files after upload attempt
+        setSelectedFiles([]);
+      } catch (error) {
+        console.error("Error in upload process:", error);
+        setError(
+          error instanceof Error ? error.message : "Failed to upload files"
+        );
+      } finally {
+        setUploading(false);
+        // Keep progress visible briefly so users can see completion
+        setTimeout(() => setUploadProgress({}), 2000);
+      }
+    };
+
+    // Execute upload in background - non-blocking
+    setTimeout(uploadOperation, 0);
   };
 
   /**

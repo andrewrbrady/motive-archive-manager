@@ -98,26 +98,39 @@ export function ImageCard({
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDelete = (e: React.MouseEvent) => {
     // [REMOVED] // [REMOVED] console.log("Delete button clicked for image:", image);
     e.stopPropagation();
     if (!onDelete) return;
+
+    // Immediate optimistic feedback
     setIsDeleting(true);
-    try {
-      await onDelete(image);
-      toast({
-        title: "Deleted!",
-        description: "Image deleted successfully",
-      });
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to delete image",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeleting(false);
-    }
+    toast({
+      title: "Deleting...",
+      description: "Image deletion in progress",
+    });
+
+    // Background delete operation - non-blocking
+    const deleteOperation = async () => {
+      try {
+        await onDelete(image);
+        toast({
+          title: "Deleted!",
+          description: "Image deleted successfully",
+        });
+      } catch (err) {
+        toast({
+          title: "Error",
+          description: "Failed to delete image",
+          variant: "destructive",
+        });
+      } finally {
+        setIsDeleting(false);
+      }
+    };
+
+    // Execute delete in background - non-blocking
+    setTimeout(deleteOperation, 0);
   };
 
   const handleCanvasExtension = (e: React.MouseEvent) => {

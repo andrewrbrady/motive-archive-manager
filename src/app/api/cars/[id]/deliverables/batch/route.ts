@@ -74,10 +74,8 @@ export async function POST(
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    // Create all deliverables
-    const createdDeliverables = [];
-
-    for (const deliverableData of deliverables) {
+    // OPTIMIZATION: Create all deliverables in parallel instead of sequentially
+    const deliverablePromises = deliverables.map(async (deliverableData) => {
       const deliverable = new Deliverable({
         car_id: new ObjectId(carId),
         title: deliverableData.title,
@@ -109,9 +107,12 @@ export async function POST(
         updated_at: new Date(),
       });
 
-      const savedDeliverable = await deliverable.save();
-      createdDeliverables.push(savedDeliverable.toPublicJSON());
-    }
+      return await deliverable.save();
+    });
+
+    // Wait for all deliverables to be created in parallel
+    const savedDeliverables = await Promise.all(deliverablePromises);
+    const createdDeliverables = savedDeliverables.map((d) => d.toPublicJSON());
 
     return NextResponse.json({
       message: `Successfully created ${createdDeliverables.length} deliverables`,

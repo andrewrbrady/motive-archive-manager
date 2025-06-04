@@ -353,16 +353,12 @@ export function CarImageGallery({
   const hasExplicitSearch = hasActiveSearch && searchQuery.trim().length > 0;
   const shouldShowNoResults = hasExplicitFilters || hasExplicitSearch;
 
-  // IMPROVED: Comprehensive loading check to prevent "Page 1 of 0" flash
+  // IMPROVED: Comprehensive loading check to prevent infinite loading states
   // Show loading when:
-  // 1. Explicitly loading (isLoading)
-  // 2. Initial load not complete (isInitialLoad)
-  // 3. No data available yet and no active filters (prevents flash during initial data fetch)
-  if (
-    isLoading ||
-    isInitialLoad ||
-    (!hasImages && images.length === 0 && !hasActiveFilters && !hasActiveSearch)
-  ) {
+  // 1. Explicitly loading (isLoading) AND initial load is not complete yet
+  // 2. Initial load not complete AND we don't have error state
+  // The key fix: Don't rely on vehicleInfo.imageIds as it might be stale
+  if ((isLoading && isInitialLoad) || (isInitialLoad && !error)) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="flex flex-col items-center gap-3">

@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MakesDropdown } from "@/components/ui/MakesDropdown";
+import { MakesDropdown, MakeData } from "@/components/ui/MakesDropdown";
 import { useDebounce } from "@/hooks/useDebounce";
 import Pagination from "@/components/Pagination";
 import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
@@ -33,6 +33,7 @@ import {
 } from "@/components/performance/PerformanceMonitor";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fixCloudflareImageUrl } from "@/lib/image-utils";
+import { usePrefetchAPI } from "@/hooks/useAPIQuery";
 
 interface FilterParams {
   make?: string;
@@ -57,217 +58,251 @@ interface CarImageProps {
   className?: string;
 }
 
-// Helper function to build enhanced Cloudflare URL for car thumbnails
+// ✅ PHASE 1C: Optimized image URL helper - reduce blocking operations
 const getEnhancedImageUrl = (
   baseUrl: string,
   width?: string,
   quality?: string
 ) => {
-  let params = [];
-  // Always check for truthy values and non-empty strings
-  if (width && width.trim() !== "") params.push(`w=${width}`);
-  if (quality && quality.trim() !== "") params.push(`q=${quality}`);
+  // Early return for empty parameters to avoid unnecessary processing
+  if (!width && !quality) return baseUrl;
 
-  if (params.length === 0) return baseUrl;
-
-  // Handle different Cloudflare URL formats
-  // Format: https://imagedelivery.net/account/image-id/public
-  // Should become: https://imagedelivery.net/account/image-id/w=400,q=85
-  if (baseUrl.includes("imagedelivery.net")) {
-    // Check if URL already has transformations (contains variant like 'public')
-    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
-      // Replace the last segment (usually 'public') with our parameters
-      const urlParts = baseUrl.split("/");
-      urlParts[urlParts.length - 1] = params.join(",");
-      return urlParts.join("/");
-    } else {
-      // URL doesn't have a variant, append transformations
-      return `${baseUrl}/${params.join(",")}`;
-    }
+  // Use faster string operations instead of array operations
+  let paramString = "";
+  if (width && width.trim()) paramString += `w=${width}`;
+  if (quality && quality.trim()) {
+    if (paramString) paramString += ",";
+    paramString += `q=${quality}`;
   }
 
-  // Fallback for other URL formats - try to replace /public if it exists
-  return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
+  if (!paramString) return baseUrl;
+
+  // Handle Cloudflare URL formats with minimal string operations
+  if (baseUrl.includes("imagedelivery.net")) {
+    // Fast path: check for /public suffix and replace
+    if (baseUrl.endsWith("/public")) {
+      return baseUrl.slice(0, -7) + "/" + paramString; // Remove "/public" and add params
+    }
+    // Check for other variant patterns
+    const lastSlashIndex = baseUrl.lastIndexOf("/");
+    if (lastSlashIndex > 0 && /\/[a-zA-Z]+$/.test(baseUrl)) {
+      return baseUrl.substring(0, lastSlashIndex + 1) + paramString;
+    }
+    return `${baseUrl}/${paramString}`;
+  }
+
+  // Fallback with simple replacement
+  return baseUrl.replace(/\/public$/, `/${paramString}`);
 };
 
 function CarImage({ car, className = "aspect-video" }: CarImageProps) {
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [blurDataUrl, setBlurDataUrl] = useState<string | null>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
-  // Fetch image using primaryImageId like CarAvatar does
+  // Get primary image ID or fallback to first image
+  const primaryImageId = car.primaryImageId?.toString() || car.images?.[0]?.url;
+  const shouldFetchFromAPI =
+    primaryImageId && !primaryImageId.includes("imagedelivery.net");
+
+  // ✅ Phase 1A: Convert blocking fetch to non-blocking useAPIQuery pattern
+  const {
+    data: imageData,
+    isLoading: isImageLoading,
+    error: imageQueryError,
+  } = useAPIQuery<{ url: string }>(`images/${primaryImageId}`, {
+    enabled: !!(shouldFetchFromAPI && primaryImageId),
+    staleTime: 5 * 60 * 1000, // 5 minutes cache for images
+    retry: 1,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // ✅ Log API errors for debugging without breaking functionality
   useEffect(() => {
-    setImageError(false);
-    setImageUrl(null);
-    setBlurDataUrl(null);
-    setIsLoading(true);
+    if (imageQueryError) {
+      console.warn("CarImage: Failed to fetch image from API, trying fallback");
+    }
+  }, [imageQueryError]);
 
-    console.log("[CarImage] URL transformation:", {
-      carId: car._id,
-      primaryImageId: car.primaryImageId,
-      imagesCount: car.images?.length || 0,
-    });
-
-    // If no primaryImageId, try to fall back to first image in images array
-    if (!car.primaryImageId) {
-      if (car.images && car.images.length > 0) {
-        const firstImage = car.images[0];
-        if (firstImage && firstImage.url) {
-          const baseUrl = fixCloudflareImageUrl(firstImage.url);
-          const fullUrl = getEnhancedImageUrl(baseUrl, "400", "85");
-          const blurUrl = getEnhancedImageUrl(baseUrl, "50", "30");
-
-          console.log("[CarImage] URL transformation:", {
-            baseUrl,
-            transformedUrl: fullUrl,
-            params: "w=400,q=85",
-          });
-
-          setImageUrl(fullUrl);
-          setBlurDataUrl(blurUrl);
-          setIsLoading(false);
-          return;
-        }
-      }
-      setIsLoading(false);
-      return;
+  // ✅ PHASE 1C: Optimized image URL computation - defer expensive operations
+  const finalImageUrl = useMemo(() => {
+    // Fast path: if we have direct Cloudflare URL, process immediately
+    if (primaryImageId && primaryImageId.includes("imagedelivery.net")) {
+      const baseUrl = fixCloudflareImageUrl(primaryImageId);
+      return getEnhancedImageUrl(baseUrl, "400", "85");
     }
 
-    const idString = car.primaryImageId.toString().trim();
+    // If we have API data, use it (already loaded)
+    if (imageData?.url) {
+      const baseUrl = fixCloudflareImageUrl(imageData.url);
+      return getEnhancedImageUrl(baseUrl, "400", "85");
+    }
 
-    // Fetch image data from API
-    const fetchImage = async () => {
-      try {
-        const response = await fetch(`/api/images/${idString}`, {
-          headers: {
-            "Cache-Control": "max-age=300",
-          },
-        });
+    // Fast fallback: check first image without heavy processing
+    const firstImage = car.images?.[0];
+    if (firstImage?.url) {
+      const baseUrl = fixCloudflareImageUrl(firstImage.url);
+      return getEnhancedImageUrl(baseUrl, "400", "85");
+    }
 
-        if (!response.ok) {
-          // Try fallback to first image in images array
-          if (car.images && car.images.length > 0) {
-            const firstImage = car.images[0];
-            if (firstImage && firstImage.url) {
-              const baseUrl = fixCloudflareImageUrl(firstImage.url);
-              const fullUrl = getEnhancedImageUrl(baseUrl, "400", "85");
-              const blurUrl = getEnhancedImageUrl(baseUrl, "50", "30");
+    return null;
+  }, [primaryImageId, imageData?.url, car.images]);
 
-              console.log("[CarImage] URL transformation (fallback):", {
-                baseUrl,
-                transformedUrl: fullUrl,
-                params: "w=400,q=85",
-              });
+  // ✅ Phase 1A: Implement non-blocking loading states
+  const showImageLoading = shouldFetchFromAPI ? isImageLoading : isLoading;
+  const hasImageError =
+    imageQueryError || imageError || (!finalImageUrl && !showImageLoading);
 
-              setImageUrl(fullUrl);
-              setBlurDataUrl(blurUrl);
-              setIsLoading(false);
-              return;
-            }
-          }
-          setImageError(true);
-          setIsLoading(false);
-          return;
-        }
+  // Handle direct image loading for non-API images
+  useEffect(() => {
+    if (!shouldFetchFromAPI && finalImageUrl) {
+      setIsLoading(false);
+    }
+  }, [shouldFetchFromAPI, finalImageUrl]);
 
-        const data = await response.json();
+  // Reset image loaded state when URL changes
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [finalImageUrl]);
 
-        if (!data || !data.url) {
-          setImageError(true);
-          setIsLoading(false);
-          return;
-        }
-
-        // Use enhanced URL transformation with proper quality parameters
-        const baseUrl = fixCloudflareImageUrl(data.url);
-        const finalImageUrl = getEnhancedImageUrl(baseUrl, "400", "85");
-        const blurImageUrl = getEnhancedImageUrl(baseUrl, "50", "30");
-
-        console.log("[CarImage] URL transformation:", {
-          baseUrl,
-          transformedUrl: finalImageUrl,
-          params: "w=400,q=85",
-        });
-
-        setImageUrl(finalImageUrl);
-        setBlurDataUrl(blurImageUrl);
-        setIsLoading(false);
-      } catch (error) {
-        console.warn("CarImage: Error fetching image:", error);
-        // Try fallback to first image in images array
-        if (car.images && car.images.length > 0) {
-          const firstImage = car.images[0];
-          if (firstImage && firstImage.url) {
-            const baseUrl = fixCloudflareImageUrl(firstImage.url);
-            const fullUrl = getEnhancedImageUrl(baseUrl, "400", "85");
-            const blurUrl = getEnhancedImageUrl(baseUrl, "50", "30");
-
-            console.log("[CarImage] URL transformation (error fallback):", {
-              baseUrl,
-              transformedUrl: fullUrl,
-              params: "w=400,q=85",
-            });
-
-            setImageUrl(fullUrl);
-            setBlurDataUrl(blurUrl);
-            setIsLoading(false);
-            return;
-          }
-        }
-        setImageError(true);
-        setIsLoading(false);
-      }
-    };
-
-    fetchImage();
-  }, [car.primaryImageId, car.images]);
-
-  if (!imageUrl || imageError) {
-    // Fallback placeholder
+  // ✅ Phase 1A: Progressive loading with skeleton states
+  if (showImageLoading) {
     return (
       <div
-        className={`${className} bg-muted rounded flex items-center justify-center`}
+        className={`${className} bg-muted rounded-md overflow-hidden flex items-center justify-center`}
       >
-        <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-2 bg-muted-foreground/20 rounded-lg flex items-center justify-center">
-            <svg
-              className="w-6 h-6 text-muted-foreground"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-          <span className="text-xs text-muted-foreground block">
-            {car.make} {car.model}
-          </span>
+        <Skeleton className="w-full h-full animate-pulse" />
+      </div>
+    );
+  }
+
+  // ✅ Phase 1A: Non-blocking error state with retry
+  if (hasImageError) {
+    return (
+      <div
+        className={`${className} bg-muted rounded-md overflow-hidden flex items-center justify-center`}
+      >
+        <div className="text-xs text-muted-foreground text-center p-2">
+          <div className="w-8 h-8 mx-auto mb-1 opacity-50">📷</div>
+          <div>No image</div>
         </div>
       </div>
     );
   }
 
+  // ✅ SMOOTH TRANSITION: Two-layer approach for blur-to-sharp transition
   return (
-    <div className={`${className} bg-muted rounded overflow-hidden relative`}>
+    <div
+      className={`${className} bg-muted rounded-md overflow-hidden relative`}
+    >
       <Image
-        src={imageUrl}
+        src={finalImageUrl!}
         alt={`${car.year} ${car.make} ${car.model}`}
         fill
-        className="object-cover"
-        placeholder={blurDataUrl ? "blur" : "empty"}
-        blurDataURL={blurDataUrl || undefined}
-        onError={() => {
-          setImageError(true);
-          setIsLoading(false);
-        }}
-        onLoad={() => setIsLoading(false)}
-        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-        priority={false}
+        className={`object-cover transition-opacity duration-300 ${
+          imageLoaded ? "opacity-100" : "opacity-0"
+        }`}
+        onLoad={() => setImageLoaded(true)}
+        onError={() => setImageError(true)}
+        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+        quality={85}
+        placeholder="blur"
+        blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
       />
+    </div>
+  );
+}
+
+// ✅ Phase 1C: Optimized Car Card Component with hover-based prefetching
+interface CarCardProps {
+  car: Car;
+  view: "grid" | "list";
+}
+
+function CarCard({ car, view }: CarCardProps) {
+  const { prefetch } = usePrefetchAPI();
+  const [hoverTimeoutId, setHoverTimeoutId] = useState<NodeJS.Timeout | null>(
+    null
+  );
+
+  // ✅ Debounced hover handler for car detail prefetching (300ms delay)
+  const handleMouseEnter = useCallback(() => {
+    // Clear any existing timeout
+    if (hoverTimeoutId) {
+      clearTimeout(hoverTimeoutId);
+    }
+
+    // Set new timeout for debounced prefetching
+    const timeoutId = setTimeout(() => {
+      if (car._id) {
+        prefetch(`cars/${car._id}`, 3 * 60 * 1000); // 3min cache for car details
+      }
+    }, 300);
+
+    setHoverTimeoutId(timeoutId);
+  }, [car._id, prefetch, hoverTimeoutId]);
+
+  const handleMouseLeave = useCallback(() => {
+    // Clear timeout if user leaves before delay
+    if (hoverTimeoutId) {
+      clearTimeout(hoverTimeoutId);
+      setHoverTimeoutId(null);
+    }
+  }, [hoverTimeoutId]);
+
+  // ✅ Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutId) {
+        clearTimeout(hoverTimeoutId);
+      }
+    };
+  }, [hoverTimeoutId]);
+
+  if (view === "grid") {
+    return (
+      <div
+        key={car._id || `car-${car.make}-${car.model}-${car.year}`}
+        className="bg-card rounded-lg border p-4"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <CarImage car={car} className="aspect-video mb-3" />
+        <h3 className="font-semibold">
+          {car.year} {car.make} {car.model}
+        </h3>
+        <p className="text-sm text-muted-foreground">{car.status}</p>
+        <Link href={`/cars/${car._id}`} prefetch={true}>
+          <Button variant="outline" size="sm" className="w-full mt-2">
+            View Details
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      key={car._id || `car-list-${car.make}-${car.model}-${car.year}`}
+      className="bg-card rounded-lg border p-4 flex items-center justify-between"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div className="flex items-center gap-4">
+        <CarImage car={car} className="w-16 h-16 flex-shrink-0" />
+        <div>
+          <h3 className="font-semibold">
+            {car.year} {car.make} {car.model}
+          </h3>
+          <p className="text-sm text-muted-foreground">{car.status}</p>
+        </div>
+      </div>
+      <Link href={`/cars/${car._id}`} prefetch={true}>
+        <Button variant="outline" size="sm">
+          View Details
+        </Button>
+      </Link>
     </div>
   );
 }
@@ -305,8 +340,6 @@ export default function CarsPageOptimized({
   filters,
 }: CarsPageOptimizedProps) {
   // ✅ COMPONENT STATE: Organize state logically
-  const [makes, setMakes] = useState<string[]>([]); // ✅ FIXED: Use string array for car filtering
-  const [clients, setClients] = useState<Client[]>([]);
   const [backgroundLoading, setBackgroundLoading] = useState(true);
   const [hasEverLoaded, setHasEverLoaded] = useState(false);
 
@@ -324,24 +357,53 @@ export default function CarsPageOptimized({
   // ✅ PERFORMANCE TRACKING: Add performance monitoring
   const { logTime, resetTimer } = usePerformanceTimer("CarsPageOptimized");
 
-  const api = useAPI();
+  // ✅ PHASE 1C: Optimized query key generation - reduce blocking computations
+  const queryKey = useMemo(() => {
+    // Use simple string concatenation instead of object manipulation to reduce blocking
+    const keyParts = [
+      currentPage.toString(),
+      pageSize.toString(),
+      view,
+      debouncedSearchQuery || "",
+      selectedMake || "",
+      debouncedMinYear || "",
+      debouncedMaxYear || "",
+      filters.sort || "",
+      filters.clientId || "",
+    ];
 
-  // ✅ Build query params for critical path
+    return keyParts.join("|");
+  }, [
+    currentPage,
+    pageSize,
+    view,
+    debouncedSearchQuery,
+    selectedMake,
+    debouncedMinYear,
+    debouncedMaxYear,
+    filters.sort,
+    filters.clientId,
+  ]);
+
+  // ✅ PHASE 1C: Optimized query params generation - defer heavy operations
   const queryParams = useMemo(() => {
-    const params = new URLSearchParams();
-    params.set("page", currentPage.toString());
-    params.set("pageSize", pageSize.toString());
-    params.set("view", view);
+    // Use direct string concatenation to avoid URLSearchParams overhead
+    const params = [
+      `page=${currentPage}`,
+      `pageSize=${pageSize}`,
+      `view=${view}`,
+    ];
 
-    // Add filter parameters
-    if (debouncedSearchQuery) params.set("search", debouncedSearchQuery);
-    if (selectedMake) params.set("make", selectedMake);
-    if (debouncedMinYear) params.set("minYear", debouncedMinYear);
-    if (debouncedMaxYear) params.set("maxYear", debouncedMaxYear);
-    if (filters.sort) params.set("sort", filters.sort);
-    if (filters.clientId) params.set("clientId", filters.clientId);
+    // Only add non-empty parameters to minimize string operations
+    if (debouncedSearchQuery)
+      params.push(`search=${encodeURIComponent(debouncedSearchQuery)}`);
+    if (selectedMake) params.push(`make=${encodeURIComponent(selectedMake)}`);
+    if (debouncedMinYear) params.push(`minYear=${debouncedMinYear}`);
+    if (debouncedMaxYear) params.push(`maxYear=${debouncedMaxYear}`);
+    if (filters.sort) params.push(`sort=${filters.sort}`);
+    if (filters.clientId) params.push(`clientId=${filters.clientId}`);
 
-    return params.toString();
+    return params.join("&");
   }, [
     currentPage,
     pageSize,
@@ -369,79 +431,141 @@ export default function CarsPageOptimized({
       pageSize: number;
     };
   }>(`cars?${queryParams}`, {
-    staleTime: 2 * 60 * 1000, // 2 minutes cache for cars list
+    queryKey: ["cars", queryKey], // ✅ PHASE 1B: Use optimized query key for better caching
+    staleTime: 3 * 60 * 1000, // ✅ Phase 1A: 3min cache for cars data per guidelines
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+    // ✅ PHASE 1B: Enable background refetch for seamless updates
+    refetchOnMount: false,
+  });
+
+  // ✅ Phase 1A: Convert blocking background data to non-blocking useAPIQuery pattern
+  const {
+    data: makesResponse,
+    isLoading: makesLoading,
+    error: makesError,
+  } = useAPIQuery<{ makes: string[] } | string[]>("cars/makes", {
+    staleTime: 5 * 60 * 1000, // ✅ Phase 1A: 5min cache for shared data per guidelines
     retry: 2,
     retryDelay: 1000,
     refetchOnWindowFocus: false,
   });
 
-  // ✅ BACKGROUND LOADING: Load makes and clients after critical path
-  const fetchBackgroundData = useCallback(async () => {
-    if (!api) return;
+  const {
+    data: clientsData,
+    isLoading: clientsLoading,
+    error: clientsError,
+  } = useAPIQuery<{ clients: Client[] }>("clients", {
+    staleTime: 5 * 60 * 1000, // ✅ Phase 1A: 5min cache for shared data per guidelines
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+    select: (data: any) => data?.clients || [],
+  });
 
-    try {
-      resetTimer();
+  // ✅ Phase 1A: Process makes data to MakeData[] format
+  const makes: MakeData[] = useMemo(() => {
+    if (!makesResponse) return [];
 
-      const [makesResponse, clientsResponse] = await Promise.all([
-        api.get("cars/makes"), // ✅ Uses enhanced endpoint with backward compatibility
-        api.get("clients"),
-      ]);
-
-      const makesData = makesResponse as any;
-      const clientsData = clientsResponse as any;
-
-      // ✅ ENHANCED: Handle both simple string array (default) and enhanced response
-      let makesArray: string[] = [];
-      if (Array.isArray(makesData)) {
-        // Direct array response (future enhanced format)
-        makesArray = makesData.map((make: any) =>
-          typeof make === "string" ? make : make.name
-        );
-      } else if (makesData.makes && Array.isArray(makesData.makes)) {
-        // Wrapped response format (current backward-compatible format)
-        makesArray = makesData.makes;
-      }
-
-      setMakes(makesArray);
-      setClients(clientsData.clients || []);
-
-      logTime("Background data fetch completed");
-    } catch (error) {
-      console.warn("⚠️ Background data fetch failed:", error);
-      // Non-blocking error - critical path still works
-    } finally {
-      setBackgroundLoading(false);
+    if (Array.isArray(makesResponse)) {
+      return makesResponse.map((make: any) =>
+        typeof make === "string" ? make : make.name
+      );
     }
-  }, [api, logTime, resetTimer]);
+    return makesResponse?.makes || [];
+  }, [makesResponse]);
 
-  // ✅ Load background data after component mounts (non-blocking)
-  useEffect(() => {
-    if (api && backgroundLoading) {
-      // Small delay to let critical path render first
-      const timer = setTimeout(fetchBackgroundData, 100);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [api, backgroundLoading, fetchBackgroundData]);
+  // ✅ Phase 1A: Process background data safely with non-blocking patterns
+  const clients = clientsData || [];
+  const backgroundDataLoading = makesLoading || clientsLoading;
 
-  // ✅ Track when critical path data loads
+  // ✅ Phase 1A: Track loading states for progressive enhancement
   useEffect(() => {
     if (carsData && !carsLoading) {
       logTime("Critical path cars data loaded");
-      setHasEverLoaded(true); // Mark that we've successfully loaded data
+      setHasEverLoaded(true);
     }
   }, [carsData, carsLoading, logTime]);
 
-  // ✅ Filter handlers with URL updating
+  // ✅ Phase 1A: Update background loading state based on data availability
+  useEffect(() => {
+    if (makesResponse && clientsData) {
+      setBackgroundLoading(false);
+      logTime("Background data loaded");
+    }
+  }, [makesResponse, clientsData, logTime]);
+
+  // ✅ PHASE 1B: Pagination prefetching for seamless user experience
+  const { prefetch } = usePrefetchAPI();
+
+  // ✅ PHASE 1C: Non-blocking URL update function - defer heavy operations
   const updateURL = useCallback((newParams: URLSearchParams) => {
-    newParams.set("page", "1"); // Reset to first page
-    window.history.pushState(
-      {},
-      "",
-      `${window.location.pathname}?${newParams.toString()}`
-    );
+    // Defer URL update to avoid blocking the render
+    setTimeout(() => {
+      newParams.set("page", "1"); // Reset to first page
+      const newUrl = `${window.location.pathname}?${newParams.toString()}`;
+      window.history.pushState({}, "", newUrl);
+    }, 0);
   }, []);
 
+  // ✅ PHASE 1C: Optimized URL updates - batch and defer operations
+  useEffect(() => {
+    // Batch URL updates to avoid multiple blocking operations
+    const updateBatchedParams = () => {
+      const newParams = new URLSearchParams(window.location.search);
+      let hasChanges = false;
+
+      // Update search parameter
+      if (debouncedSearchQuery) {
+        if (newParams.get("search") !== debouncedSearchQuery) {
+          newParams.set("search", debouncedSearchQuery);
+          hasChanges = true;
+        }
+      } else {
+        if (newParams.has("search")) {
+          newParams.delete("search");
+          hasChanges = true;
+        }
+      }
+
+      // Update year parameters
+      if (debouncedMinYear) {
+        if (newParams.get("minYear") !== debouncedMinYear) {
+          newParams.set("minYear", debouncedMinYear);
+          hasChanges = true;
+        }
+      } else {
+        if (newParams.has("minYear")) {
+          newParams.delete("minYear");
+          hasChanges = true;
+        }
+      }
+
+      if (debouncedMaxYear) {
+        if (newParams.get("maxYear") !== debouncedMaxYear) {
+          newParams.set("maxYear", debouncedMaxYear);
+          hasChanges = true;
+        }
+      } else {
+        if (newParams.has("maxYear")) {
+          newParams.delete("maxYear");
+          hasChanges = true;
+        }
+      }
+
+      // Only update URL if there are actual changes
+      if (hasChanges) {
+        updateURL(newParams);
+      }
+    };
+
+    // Defer the batch update to avoid blocking
+    const timeoutId = setTimeout(updateBatchedParams, 50);
+    return () => clearTimeout(timeoutId);
+  }, [debouncedSearchQuery, debouncedMinYear, debouncedMaxYear, updateURL]);
+
+  // ✅ Filter handlers with URL updating
   const handleSearchChange = useCallback((value: string) => {
     setSearchQuery(value);
   }, []);
@@ -484,31 +608,6 @@ export default function CarsPageOptimized({
     updateURL(newParams);
   }, [updateURL]);
 
-  // ✅ Update URL when debounced values change
-  useEffect(() => {
-    const newParams = new URLSearchParams(window.location.search);
-
-    if (debouncedSearchQuery) {
-      newParams.set("search", debouncedSearchQuery);
-    } else {
-      newParams.delete("search");
-    }
-
-    if (debouncedMinYear) {
-      newParams.set("minYear", debouncedMinYear);
-    } else {
-      newParams.delete("minYear");
-    }
-
-    if (debouncedMaxYear) {
-      newParams.set("maxYear", debouncedMaxYear);
-    } else {
-      newParams.delete("maxYear");
-    }
-
-    updateURL(newParams);
-  }, [debouncedSearchQuery, debouncedMinYear, debouncedMaxYear, updateURL]);
-
   // ✅ Track search loading state
   const isSearching = searchQuery !== debouncedSearchQuery;
   const isYearFiltering =
@@ -529,11 +628,11 @@ export default function CarsPageOptimized({
     debouncedMinYear ||
     debouncedMaxYear;
 
-  // ✅ Improved loading/empty state logic to prevent flashing
-  const isInitialLoad = carsLoading && !hasEverLoaded; // Only initial load if we've never loaded before
+  // ✅ Phase 1A: Improved loading states for progressive loading strategy
+  const isInitialLoad = carsLoading && !hasEverLoaded;
   const isDataLoaded = !carsLoading && carsData;
   const hasNoCars = isDataLoaded && cars.length === 0;
-  const isUpdatingResults = carsLoading && hasEverLoaded; // When we have loaded before but are loading new results
+  const isUpdatingResults = carsLoading && hasEverLoaded;
 
   // ✅ Debug: Log cars data to help identify key issues (moved after hook declarations)
   useEffect(() => {
@@ -545,7 +644,61 @@ export default function CarsPageOptimized({
     }
   }, [cars]);
 
-  // ✅ Loading state for critical path (after all hooks) - ONLY for true initial load
+  // ✅ PHASE 1C: Optimized pagination prefetching - reduce blocking operations
+  useEffect(() => {
+    if (!carsLoading && pagination.totalPages > 1) {
+      // Prefetch next and previous pages for seamless pagination
+      const nextPage = pagination.currentPage + 1;
+      const prevPage = pagination.currentPage - 1;
+
+      // ✅ PHASE 1C: Simplified query building - use direct string operations
+      const buildPrefetchQuery = (page: number) => {
+        const params = [`page=${page}`, `pageSize=${pageSize}`, `view=${view}`];
+
+        // Only add non-empty parameters to minimize operations
+        if (debouncedSearchQuery)
+          params.push(`search=${encodeURIComponent(debouncedSearchQuery)}`);
+        if (selectedMake)
+          params.push(`make=${encodeURIComponent(selectedMake)}`);
+        if (debouncedMinYear) params.push(`minYear=${debouncedMinYear}`);
+        if (debouncedMaxYear) params.push(`maxYear=${debouncedMaxYear}`);
+        if (filters.sort) params.push(`sort=${filters.sort}`);
+        if (filters.clientId) params.push(`clientId=${filters.clientId}`);
+
+        return params.join("&");
+      };
+
+      // Defer prefetching to avoid blocking current operations
+      setTimeout(() => {
+        // Prefetch next page (higher priority)
+        if (nextPage <= pagination.totalPages) {
+          const nextPageQuery = buildPrefetchQuery(nextPage);
+          prefetch(`cars?${nextPageQuery}`, 2 * 60 * 1000); // 2min cache for prefetched data
+        }
+
+        // Prefetch previous page (lower priority)
+        if (prevPage >= 1) {
+          const prevPageQuery = buildPrefetchQuery(prevPage);
+          prefetch(`cars?${prevPageQuery}`, 2 * 60 * 1000);
+        }
+      }, 100); // Small delay to avoid blocking main thread
+    }
+  }, [
+    carsLoading,
+    pagination.currentPage,
+    pagination.totalPages,
+    pageSize,
+    view,
+    debouncedSearchQuery,
+    selectedMake,
+    debouncedMinYear,
+    debouncedMaxYear,
+    filters.sort,
+    filters.clientId,
+    prefetch,
+  ]);
+
+  // ✅ Phase 1A: Progressive loading - show skeleton cards instead of blocking spinner
   if (isInitialLoad) {
     return (
       <CarsErrorBoundary>
@@ -555,7 +708,7 @@ export default function CarsPageOptimized({
             {/* ✅ Header section - loads immediately */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
               <PageTitle title="Cars Collection" />
-              <Link href="/cars/new">
+              <Link href="/cars/new" prefetch={true}>
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
                   Add New Car
@@ -563,7 +716,77 @@ export default function CarsPageOptimized({
               </Link>
             </div>
 
-            <CarsLoadingSpinner />
+            {/* ✅ Phase 1A: Show filters interface immediately */}
+            <div className="bg-card rounded-lg border p-6 mb-6 space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search cars..."
+                      value={searchQuery}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+                <div className="w-full sm:w-48">
+                  <MakesDropdown
+                    value={selectedMake || "all"}
+                    onValueChange={handleMakeChange}
+                    makes={makes}
+                    loading={backgroundDataLoading}
+                    placeholder="All Makes"
+                    allOptionLabel="All Makes"
+                    allOptionValue="all"
+                    loadingText="Loading makes..."
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Min Year"
+                    value={minYear}
+                    onChange={(e) => handleYearChange("min", e.target.value)}
+                    className="w-24"
+                  />
+                  <Input
+                    placeholder="Max Year"
+                    value={maxYear}
+                    onChange={(e) => handleYearChange("max", e.target.value)}
+                    className="w-24"
+                  />
+                </div>
+                {hasActiveFilters && (
+                  <Button variant="outline" onClick={clearFilters}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+
+              {/* ✅ Phase 1A: Progressive loading message following established patterns */}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                <span>
+                  Loading cars... You can interact with the page while data
+                  loads
+                </span>
+              </div>
+            </div>
+
+            {/* ✅ Phase 1A: Show skeleton cards instead of blocking spinner */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {Array.from({ length: 8 }).map((_, index) => (
+                <div
+                  key={`skeleton-${index}`}
+                  className="bg-card rounded-lg border p-4"
+                >
+                  <Skeleton className="aspect-video mb-3 rounded" />
+                  <Skeleton className="h-5 mb-2 rounded" />
+                  <Skeleton className="h-4 mb-2 w-20 rounded" />
+                  <Skeleton className="h-8 w-full mt-2 rounded" />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </CarsErrorBoundary>
@@ -579,7 +802,7 @@ export default function CarsPageOptimized({
             {/* ✅ Header section */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
               <PageTitle title="Cars Collection" />
-              <Link href="/cars/new">
+              <Link href="/cars/new" prefetch={true}>
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
                   Add New Car
@@ -613,7 +836,7 @@ export default function CarsPageOptimized({
           {/* ✅ Header section - loads immediately */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
             <PageTitle title="Cars Collection" />
-            <Link href="/cars/new">
+            <Link href="/cars/new" prefetch={true}>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
                 Add New Car
@@ -649,7 +872,7 @@ export default function CarsPageOptimized({
                   value={selectedMake || "all"}
                   onValueChange={handleMakeChange}
                   makes={makes}
-                  loading={backgroundLoading}
+                  loading={backgroundDataLoading}
                   placeholder="All Makes"
                   allOptionLabel="All Makes"
                   allOptionValue="all"
@@ -696,7 +919,7 @@ export default function CarsPageOptimized({
             </div>
 
             {/* Background loading indicator */}
-            {backgroundLoading && (
+            {backgroundDataLoading && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
                 <span>Loading advanced filters...</span>
@@ -739,55 +962,23 @@ export default function CarsPageOptimized({
             ) : view === "grid" ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {cars.map((car) => (
-                  <div
+                  <CarCard
                     key={car._id || `car-${car.make}-${car.model}-${car.year}`}
-                    className="bg-card rounded-lg border p-4"
-                  >
-                    <CarImage car={car} className="aspect-video mb-3" />
-                    <h3 className="font-semibold">
-                      {car.year} {car.make} {car.model}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {car.status}
-                    </p>
-                    <Link href={`/cars/${car._id}`}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full mt-2"
-                      >
-                        View Details
-                      </Button>
-                    </Link>
-                  </div>
+                    car={car}
+                    view={view}
+                  />
                 ))}
               </div>
             ) : (
               <div className="space-y-4">
                 {cars.map((car) => (
-                  <div
+                  <CarCard
                     key={
                       car._id || `car-list-${car.make}-${car.model}-${car.year}`
                     }
-                    className="bg-card rounded-lg border p-4 flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-4">
-                      <CarImage car={car} className="w-16 h-16 flex-shrink-0" />
-                      <div>
-                        <h3 className="font-semibold">
-                          {car.year} {car.make} {car.model}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {car.status}
-                        </p>
-                      </div>
-                    </div>
-                    <Link href={`/cars/${car._id}`}>
-                      <Button variant="outline" size="sm">
-                        View Details
-                      </Button>
-                    </Link>
-                  </div>
+                    car={car}
+                    view={view}
+                  />
                 ))}
               </div>
             )}
@@ -802,7 +993,7 @@ export default function CarsPageOptimized({
                     : "Start by adding your first car to the collection."}
                 </p>
                 {!hasActiveFilters && (
-                  <Link href="/cars/new">
+                  <Link href="/cars/new" prefetch={true}>
                     <Button className="mt-4">
                       <Plus className="mr-2 h-4 w-4" />
                       Add Your First Car

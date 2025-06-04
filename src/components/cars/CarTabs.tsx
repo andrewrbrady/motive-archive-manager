@@ -64,9 +64,9 @@ const CarImageGallery = lazy(() =>
   import("./CarImageGallery").then((m) => ({ default: m.CarImageGallery }))
 );
 
-const CarCopywriter = lazy(() =>
-  import("../copywriting/CarCopywriter").then((m) => ({
-    default: m.CarCopywriter,
+const UnifiedCopywriter = lazy(() =>
+  import("../copywriting/UnifiedCopywriter").then((m) => ({
+    default: m.UnifiedCopywriter,
   }))
 );
 
@@ -191,11 +191,13 @@ const MemoizedGalleriesOptimized = React.memo(
 );
 MemoizedGalleriesOptimized.displayName = "MemoizedGalleriesOptimized";
 
-const MemoizedCarCopywriter = React.memo(
-  ({ carId }: { carId: string }) => <CarCopywriter carId={carId} />,
+const MemoizedUnifiedCopywriter = React.memo(
+  ({ carId }: { carId: string }) => (
+    <UnifiedCopywriter carId={carId} showClientHandle={true} />
+  ),
   (prevProps, nextProps) => prevProps.carId === nextProps.carId
 );
-MemoizedCarCopywriter.displayName = "MemoizedCarCopywriter";
+MemoizedUnifiedCopywriter.displayName = "MemoizedUnifiedCopywriter";
 
 const MemoizedInspectionTab = React.memo(
   ({ carId }: { carId: string }) => <InspectionTab carId={carId} />,
@@ -308,7 +310,7 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
         label: "Copywriter",
         content: (
           <Suspense fallback={<TabLoadingFallback />}>
-            <MemoizedCarCopywriter carId={carId} />
+            <MemoizedUnifiedCopywriter carId={carId} />
           </Suspense>
         ),
       },

@@ -1194,8 +1194,9 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
       setTotalImagesAvailable(fallbackTotal);
     }
 
-    // Mark initial load as complete once we have data
-    if (data && isInitialLoad) {
+    // FIXED: Mark initial load as complete when we have ANY response from API (including empty responses)
+    // This prevents infinite loading when there are no images
+    if ((data !== undefined || error) && isInitialLoad) {
       setIsInitialLoad(false);
     }
   }, [
@@ -1203,6 +1204,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     images.length,
     currentLimit,
     data,
+    error,
     isInitialLoad,
   ]);
 
