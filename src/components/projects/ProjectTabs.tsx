@@ -54,6 +54,20 @@ const ProjectCalendarTab = lazy(() =>
   }))
 );
 
+// Add AI Chat Tab
+const AIChatTab = lazy(() =>
+  import("../ai-chat/AIChatTab").then((m) => ({
+    default: m.AIChatTab,
+  }))
+);
+
+// Add Content Studio Tab
+const ContentStudioTab = lazy(() =>
+  import("../content-studio/ContentStudioTab").then((m) => ({
+    default: m.ContentStudioTab,
+  }))
+);
+
 interface MemberDetails {
   name: string;
   email: string;
@@ -79,6 +93,8 @@ const tabs = [
   { value: "assets", label: "Assets" },
   { value: "deliverables", label: "Deliverables" },
   { value: "copywriter", label: "Copywriter" },
+  { value: "content-studio", label: "Content Studio" },
+  { value: "ai-chat", label: "AI Assistant" },
   { value: "calendar", label: "Calendar" },
 ];
 
@@ -140,7 +156,7 @@ export function ProjectTabs({
         onValueChange={onTabChange}
         className="hidden lg:block space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-10 bg-transparent border rounded-md h-auto p-1 gap-1">
+        <TabsList className="grid w-full grid-cols-12 bg-transparent border rounded-md h-auto p-1 gap-1">
           {tabs.map((tab) => (
             <TabsTrigger
               key={tab.value}
@@ -235,6 +251,26 @@ export function ProjectTabs({
               allowEventSelection={true}
               allowMinimalCarData={true}
               onProjectUpdate={onProjectUpdate}
+            />
+          </Suspense>
+        )}
+
+        {activeTab === "content-studio" && hasLoadedTab["content-studio"] && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ContentStudioTab
+              projectId={project._id!}
+              projectInfo={project}
+              onUpdate={onProjectUpdate}
+            />
+          </Suspense>
+        )}
+
+        {activeTab === "ai-chat" && hasLoadedTab["ai-chat"] && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <AIChatTab
+              entityType="project"
+              entityId={project._id!}
+              entityInfo={project}
             />
           </Suspense>
         )}

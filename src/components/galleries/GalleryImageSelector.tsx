@@ -231,7 +231,7 @@ export function GalleryImageSelector({
 
   // Get current car name
   const currentCarName = React.useMemo(() => {
-    if (currentCarId === "all") return "All Cars";
+    if (!currentCarId || currentCarId === "all") return "All Cars";
     if (!carsData?.cars) return "Loading...";
     const car = carsData.cars.find((c) => c._id === currentCarId);
     return car ? `${car.year} ${car.make} ${car.model}` : "All Cars";
@@ -330,19 +330,13 @@ export function GalleryImageSelector({
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-1 gap-2">
           <div className="w-full md:w-[250px]">
-            <Popover
-              open={carSearchOpen}
-              onOpenChange={(open) => {
-                setCarSearchOpen(open);
-              }}
-            >
+            <Popover open={carSearchOpen} onOpenChange={setCarSearchOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   role="combobox"
                   aria-expanded={carSearchOpen}
                   className="w-full justify-between"
-                  onClick={() => {}}
                 >
                   {currentCarName}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -353,56 +347,70 @@ export function GalleryImageSelector({
                 align="start"
                 side="bottom"
                 sideOffset={4}
-                onInteractOutside={(e) => {}}
-                onEscapeKeyDown={() => {}}
               >
                 <Command
                   className="w-full rounded-lg bg-background"
                   shouldFilter={false}
-                  onKeyDown={(e) => {}}
                 >
                   <CommandInput
                     placeholder="Search cars..."
                     value={carSearchQuery}
-                    onValueChange={(value) => {
-                      setCarSearchQuery(value);
-                    }}
+                    onValueChange={setCarSearchQuery}
                     className="h-9 border-none focus:ring-0"
                   />
                   <CommandEmpty className="py-2 px-4 text-sm text-muted-foreground">
                     No cars found.
                   </CommandEmpty>
-                  <CommandGroup
-                    className="max-h-[300px] overflow-y-auto p-1"
-                    onClick={(e) => {}}
-                  >
+                  <CommandGroup className="max-h-[300px] overflow-y-auto p-1">
                     <CommandItem
+                      value="all"
                       onSelect={() => {
+                        handleFilterChange("carId", null);
                         setCarSearchQuery("");
                         setCarSearchOpen(false);
                       }}
-                      className="cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                      className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
                     >
-                      <div className="flex items-center">
-                        <Car className="mr-2 h-4 w-4" />
-                        All Cars
-                      </div>
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4 pointer-events-none",
+                          !currentCarId || currentCarId === "all"
+                            ? "opacity-100"
+                            : "opacity-0"
+                        )}
+                      />
+                      <span className="pointer-events-none">All Cars</span>
                     </CommandItem>
-                    {filteredCars.map((car) => (
+                    {sortedCars.map((car) => (
                       <CommandItem
                         key={car._id}
+                        value={`${car.year} ${car.make} ${car.model}`}
                         onSelect={() => {
+                          handleFilterChange("carId", car._id);
                           setCarSearchQuery(
                             `${car.year} ${car.make} ${car.model}`
                           );
                           setCarSearchOpen(false);
                         }}
-                        className="cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                        className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
                       >
-                        <div className="flex items-center">
-                          <Car className="mr-2 h-4 w-4" />
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4 pointer-events-none",
+                            currentCarId === car._id
+                              ? "opacity-100"
+                              : "opacity-0"
+                          )}
+                        />
+                        <span className="pointer-events-none">
                           {car.year} {car.make} {car.model}
-                        </div>
+                        </span>
                       </CommandItem>
                     ))}
                   </CommandGroup>

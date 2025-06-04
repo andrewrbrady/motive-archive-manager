@@ -70,6 +70,20 @@ const UnifiedCopywriter = lazy(() =>
   }))
 );
 
+// Add AI Chat Tab
+const AIChatTab = lazy(() =>
+  import("../ai-chat/AIChatTab").then((m) => ({
+    default: m.AIChatTab,
+  }))
+);
+
+// Add Content Studio Tab
+const ContentStudioTab = lazy(() =>
+  import("../content-studio/ContentStudioTab").then((m) => ({
+    default: m.ContentStudioTab,
+  }))
+);
+
 interface CarTabsProps {
   carId: string;
   vehicleInfo?: any;
@@ -229,6 +243,22 @@ const MemoizedCalendarTab = React.memo(
 );
 MemoizedCalendarTab.displayName = "MemoizedCalendarTab";
 
+const MemoizedAIChatTab = React.memo(
+  ({ carId, vehicleInfo }: { carId: string; vehicleInfo: any }) => (
+    <AIChatTab entityType="car" entityId={carId} entityInfo={vehicleInfo} />
+  ),
+  (prevProps, nextProps) => prevProps.carId === nextProps.carId
+);
+MemoizedAIChatTab.displayName = "MemoizedAIChatTab";
+
+const MemoizedContentStudioTab = React.memo(
+  ({ carId, vehicleInfo }: { carId: string; vehicleInfo: any }) => (
+    <ContentStudioTab carId={carId} carInfo={vehicleInfo} />
+  ),
+  (prevProps, nextProps) => prevProps.carId === nextProps.carId
+);
+MemoizedContentStudioTab.displayName = "MemoizedContentStudioTab";
+
 export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
   const { prefetch } = usePrefetchAPI();
 
@@ -311,6 +341,30 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
         content: (
           <Suspense fallback={<TabLoadingFallback />}>
             <MemoizedUnifiedCopywriter carId={carId} />
+          </Suspense>
+        ),
+      },
+      {
+        value: "content-studio",
+        label: "Content Studio",
+        content: (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <MemoizedContentStudioTab
+              carId={carId}
+              vehicleInfo={memoizedVehicleInfo}
+            />
+          </Suspense>
+        ),
+      },
+      {
+        value: "ai-chat",
+        label: "AI Assistant",
+        content: (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <MemoizedAIChatTab
+              carId={carId}
+              vehicleInfo={memoizedVehicleInfo}
+            />
           </Suspense>
         ),
       },

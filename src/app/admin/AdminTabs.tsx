@@ -28,6 +28,7 @@ import LengthSettingsContent from "./LengthSettingsContent";
 import PlatformSettingsContent from "./PlatformSettingsContent";
 import EventTypeSettingsContent from "./EventTypeSettingsContent";
 import ImageAnalysisPromptsContent from "./ImageAnalysisPromptsContent";
+import { ModelsConfigurator } from "@/components/admin/ModelsConfigurator";
 import { useAPI } from "@/hooks/useAPI";
 
 // TypeScript interfaces for API responses
@@ -321,6 +322,11 @@ export default function AdminTabs() {
       value: "system-prompts",
       label: "System Prompts",
       content: <SystemPromptsContent />,
+    },
+    {
+      value: "ai-models",
+      label: "AI Models",
+      content: <ModelsConfigurator />,
     },
     {
       value: "platform-settings",
