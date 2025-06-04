@@ -6,13 +6,6 @@ const nextConfig = {
     "@tanstack/react-query",
     "@tanstack/react-query-devtools",
   ],
-  outputFileTracingIncludes: {
-    "/api/images/extend-canvas": [
-      "./extend_canvas",
-      "./extend_canvas_linux",
-      "./extend_canvas_macos",
-    ],
-  },
   // Skip static optimization for API routes
   generateBuildId: async () => {
     // Return a unique build ID to prevent caching issues

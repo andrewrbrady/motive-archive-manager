@@ -172,7 +172,12 @@ const iconCategories = {
 } as const;
 
 // Get icon component by name
-export const getIconComponent = (iconName: string) => {
+export const getIconComponent = (iconName: string | null | undefined) => {
+  // Handle null/undefined iconName
+  if (!iconName) {
+    return null;
+  }
+
   // First, try direct icon name lookup
   for (const category of Object.values(iconCategories)) {
     const icon = category.icons.find((icon) => icon.name === iconName);

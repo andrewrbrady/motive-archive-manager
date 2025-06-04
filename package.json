@@ -8,8 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "npm run build:cpp && next build",
-    "build:cpp": "./build-cpp.sh",
+    "build": "next build",
     "build:safe": "npm run check:console-logs && next build",
     "build:production": "npm run fix:console-logs && next build",
     "start": "node start-server.js",
