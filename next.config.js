@@ -12,9 +12,9 @@ const nextConfig = {
     return `build-${Date.now()}`;
   },
   images: {
-    // Temporarily disable custom loader for debugging
-    // loader: "custom",
-    // loaderFile: "./src/lib/cloudflare-image-loader.ts",
+    // Enable custom loader to bypass Vercel optimization
+    loader: "custom",
+    loaderFile: "./src/lib/cloudflare-image-loader.ts",
 
     // Cloudflare Images domains
     domains: ["localhost", "imagedelivery.net", "cloudflareimages.com"],
@@ -35,15 +35,15 @@ const nextConfig = {
       },
     ],
 
-    // Standard device sizes for responsive images - more conservative for performance
-    deviceSizes: [640, 750, 828, 1080, 1200, 1600],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384, 512, 768],
+    // More conservative device sizes to reduce transformations
+    deviceSizes: [640, 828, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
 
-    // Let Cloudflare handle format optimization
+    // Limit formats to reduce transformations
     formats: ["image/webp"],
 
-    // Standard cache TTL
-    minimumCacheTTL: 60,
+    // Longer cache TTL to reduce reprocessing
+    minimumCacheTTL: 2592000, // 30 days
   },
   // Add webpack configuration for Node.js modules
   webpack: (config, { isServer }) => {
