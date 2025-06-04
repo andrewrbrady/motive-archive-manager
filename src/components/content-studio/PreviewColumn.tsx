@@ -26,37 +26,52 @@ interface PreviewColumnProps {
 export function PreviewColumn({ blocks }: PreviewColumnProps) {
   return (
     <div className="h-full">
-      <div className="sticky top-0 bg-background pb-4">
-        <h3 className="text-lg font-semibold">Live Preview</h3>
-        <p className="text-sm text-muted-foreground">
-          See how your content will look
-        </p>
+      <div className="sticky top-0 bg-background pb-4 border-b border-border/20">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">Live Preview</h3>
+            <p className="text-sm text-muted-foreground">
+              See how your content will look
+            </p>
+          </div>
+          {/* Debug info */}
+          <div className="text-xs text-muted-foreground bg-muted/20 px-2 py-1 rounded">
+            {blocks.length} block{blocks.length !== 1 ? "s" : ""}
+          </div>
+        </div>
       </div>
 
-      <Card className="min-h-[400px] bg-transparent border border-border/40">
-        <CardContent>
-          {/* Email-style container */}
-          <div
-            className="mx-auto bg-background/60 backdrop-blur-sm border border-border/20 rounded-lg overflow-hidden"
-            style={{ maxWidth: "600px" }}
-          >
-            {blocks.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                <div className="w-16 h-16 mx-auto mb-4 bg-muted/20 rounded-full flex items-center justify-center">
-                  <span className="text-2xl">👁️</span>
+      <div className="mt-4">
+        <Card className="min-h-[500px] bg-background border shadow-sm">
+          <CardContent className="p-6">
+            {/* Email-style container */}
+            <div
+              className="mx-auto bg-background/60 backdrop-blur-sm border border-border/20 rounded-lg shadow-sm overflow-hidden"
+              style={{ maxWidth: "600px" }}
+            >
+              {blocks.length === 0 ? (
+                <div className="p-12 text-center text-muted-foreground">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-muted/20 rounded-full flex items-center justify-center">
+                    <span className="text-2xl">👁️</span>
+                  </div>
+                  <p>Add blocks to see your content preview</p>
+                  <p className="text-xs mt-2 opacity-60">
+                    Content will appear here as you create it
+                  </p>
                 </div>
-                <p>Add blocks to see your content preview</p>
-              </div>
-            ) : (
-              <div className="space-y-0">
-                {blocks.map((block) => (
-                  <PreviewBlock key={block.id} block={block} />
-                ))}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              ) : (
+                <div className="space-y-0">
+                  {blocks.map((block, index) => (
+                    <div key={block.id} className="relative">
+                      <PreviewBlock block={block} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -97,13 +112,13 @@ function TextBlockPreview({ block }: { block: TextBlock }) {
       style={{
         fontSize: formatting.fontSize || "16px",
         fontWeight: formatting.fontWeight || "normal",
-        color: formatting.color || "#000000",
+        color: formatting.color || "currentColor",
         textAlign: formatting.textAlign || "left",
-        lineHeight: formatting.lineHeight || "1.5",
+        lineHeight: formatting.lineHeight || "1.6",
       }}
     >
       <div
-        className={`whitespace-pre-wrap ${!block.content ? "text-muted-foreground italic" : ""}`}
+        className={`whitespace-pre-wrap ${!block.content ? "text-muted-foreground italic" : "text-foreground"}`}
       >
         {content}
       </div>

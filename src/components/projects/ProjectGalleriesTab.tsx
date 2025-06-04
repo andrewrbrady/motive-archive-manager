@@ -216,9 +216,17 @@ export function ProjectGalleriesTab({
     if (!api) return;
 
     try {
-      const data = (await api.get("/api/galleries")) as Gallery[];
+      const response = (await api.get("/api/galleries")) as
+        | { galleries: Gallery[]; pagination?: any }
+        | Gallery[];
+
+      // Handle both response formats - object with galleries property or plain array
+      const allGalleries = Array.isArray(response)
+        ? response
+        : response.galleries || [];
+
       // Filter out galleries that are already linked to this project
-      const unlinkedGalleries = data.filter(
+      const unlinkedGalleries = allGalleries.filter(
         (gallery) =>
           !galleries.some((linkedGallery) => linkedGallery._id === gallery._id)
       );
