@@ -5,6 +5,7 @@ import { ProjectHeader } from "@/components/projects/ProjectHeader";
 import { ProjectTabs } from "@/components/projects/ProjectTabs";
 import { getMongoClient } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { ProjectMember } from "@/types/project";
 
 interface ProjectPageProps {
   params: Promise<{
@@ -199,7 +200,7 @@ export default async function ProjectDetailPage({ params }: ProjectPageProps) {
   }
 
   // Fetch member details for the project
-  const memberUserIds = project.members.map((member) => member.userId);
+  const memberUserIds = project.members.map((member: ProjectMember) => member.userId);
   const memberDetails = await getMemberDetails(memberUserIds);
 
   return (
