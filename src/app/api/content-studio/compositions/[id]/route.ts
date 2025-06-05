@@ -6,7 +6,7 @@ import { ObjectId } from "mongodb";
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check authentication
@@ -37,7 +37,8 @@ export async function DELETE(
       tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     // Validate composition ID
-    if (!ObjectId.isValid(params.id)) {
+    const resolvedParams = await params;
+    if (!ObjectId.isValid(resolvedParams.id)) {
       return NextResponse.json(
         { error: "Invalid composition ID" },
         { status: 400 }
@@ -46,7 +47,7 @@ export async function DELETE(
 
     // Delete the composition (only if user owns it)
     const result = await db.collection("content_compositions").deleteOne({
-      _id: new ObjectId(params.id),
+      _id: new ObjectId(resolvedParams.id),
       "metadata.createdBy": userId,
     });
 
@@ -72,7 +73,7 @@ export async function DELETE(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check authentication
@@ -115,7 +116,8 @@ export async function PUT(
       tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     // Validate composition ID
-    if (!ObjectId.isValid(params.id)) {
+    const resolvedParams = await params;
+    if (!ObjectId.isValid(resolvedParams.id)) {
       return NextResponse.json(
         { error: "Invalid composition ID" },
         { status: 400 }
@@ -125,7 +127,7 @@ export async function PUT(
     // Update the composition (only if user owns it)
     const result = await db.collection("content_compositions").updateOne(
       {
-        _id: new ObjectId(params.id),
+        _id: new ObjectId(resolvedParams.id),
         "metadata.createdBy": userId,
       },
       {

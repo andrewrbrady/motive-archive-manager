@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Type, Image, Heading, GripVertical, Minus } from "lucide-react";
@@ -11,6 +11,7 @@ import { ContentBlock, ContentBlockType } from "./types";
 /**
  * BlockEditor - Individual block editor component
  * Phase 1 Performance: Extracted from BlockComposer.tsx for better maintainability
+ * PHASE 3B+ PERFORMANCE FIX: Simplified implementation prioritizing drag functionality
  */
 interface BlockEditorProps {
   block: ContentBlock;
@@ -29,7 +30,7 @@ interface BlockEditorProps {
   onBlocksChange: (blocks: ContentBlock[]) => void;
 }
 
-const BlockEditor = React.memo<BlockEditorProps>(function BlockEditor({
+function BlockEditor({
   block,
   blocks,
   index,
@@ -44,7 +45,7 @@ const BlockEditor = React.memo<BlockEditorProps>(function BlockEditor({
   onDragOver,
   onSetActive,
   onBlocksChange,
-}) {
+}: BlockEditorProps) {
   const getBlockIcon = (type: ContentBlockType) => {
     switch (type) {
       case "text":
@@ -77,12 +78,19 @@ const BlockEditor = React.memo<BlockEditorProps>(function BlockEditor({
     onDragOver();
   };
 
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    // The actual reordering logic is handled by the parent component
+    // We just need to prevent default to allow the drop
+  };
+
   return (
     <div
       className={`relative group transition-all duration-200 ease-out ${
         isDragging ? "opacity-50 scale-[0.98] z-50" : ""
       }`}
       onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       <Card
         className={`bg-transparent border transition-all duration-200 cursor-pointer relative ${
@@ -160,6 +168,6 @@ const BlockEditor = React.memo<BlockEditorProps>(function BlockEditor({
       </div>
     </div>
   );
-});
+}
 
 export { BlockEditor };

@@ -1236,7 +1236,11 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
                 >
                   {editingCaptionId === caption._id ? (
                     <Textarea
-                      value={editingText || caption.caption}
+                      value={
+                        editingCaptionId === caption._id
+                          ? editingText
+                          : caption.caption
+                      }
                       onChange={(e) =>
                         handleTextChange(e.target.value, caption._id)
                       }
@@ -1413,7 +1417,11 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
                 >
                   {editingCaptionId === caption._id ? (
                     <Textarea
-                      value={editingText || caption.caption}
+                      value={
+                        editingCaptionId === caption._id
+                          ? editingText
+                          : caption.caption
+                      }
                       onChange={(e) =>
                         handleTextChange(e.target.value, caption._id)
                       }

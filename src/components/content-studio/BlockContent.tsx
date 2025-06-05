@@ -4,7 +4,15 @@ import React, { useMemo, useState, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Bold, Link, Type } from "lucide-react";
+import {
+  Bold,
+  Link,
+  Type,
+  Info,
+  Italic,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import {
   ContentBlock,
   TextBlock,
@@ -17,6 +25,7 @@ import {
  * BlockContent - Renders block-specific editing interface
  * Phase 1 Performance: Extracted from BlockComposer.tsx for better maintainability
  * Phase 2A Performance: Added useMemo for image processing and block type optimizations
+ * Phase 2 Performance: Added custom comparison function for React.memo
  * Rich Text Enhancement: Added bold and link formatting support
  */
 interface BlockContentProps {
@@ -25,6 +34,92 @@ interface BlockContentProps {
   onUpdate: (updates: Partial<ContentBlock>) => void;
   onBlocksChange: (blocks: ContentBlock[]) => void;
 }
+
+// Custom comparison function for React.memo to prevent unnecessary re-renders
+const areBlockContentPropsEqual = (
+  prevProps: BlockContentProps,
+  nextProps: BlockContentProps
+) => {
+  // Quick reference check for functions (they should be stable)
+  if (
+    prevProps.onUpdate !== nextProps.onUpdate ||
+    prevProps.onBlocksChange !== nextProps.onBlocksChange
+  ) {
+    return false;
+  }
+
+  // Compare blocks array length only for performance
+  if (prevProps.blocks.length !== nextProps.blocks.length) {
+    return false;
+  }
+
+  // Deep compare the specific block that this component is editing
+  const prevBlock = prevProps.block;
+  const nextBlock = nextProps.block;
+
+  // Quick primitive checks first
+  if (
+    prevBlock.id !== nextBlock.id ||
+    prevBlock.type !== nextBlock.type ||
+    prevBlock.order !== nextBlock.order
+  ) {
+    return false;
+  }
+
+  // Check content property only for blocks that have it
+  if (
+    (prevBlock.type === "text" || prevBlock.type === "heading") &&
+    (nextBlock.type === "text" || nextBlock.type === "heading")
+  ) {
+    const prevContentBlock = prevBlock as TextBlock | HeadingBlock;
+    const nextContentBlock = nextBlock as TextBlock | HeadingBlock;
+    if (prevContentBlock.content !== nextContentBlock.content) {
+      return false;
+    }
+  }
+
+  // Compare type-specific properties efficiently
+  switch (prevBlock.type) {
+    case "heading": {
+      const prevHeading = prevBlock as HeadingBlock;
+      const nextHeading = nextBlock as HeadingBlock;
+      return (
+        prevHeading.level === nextHeading.level &&
+        JSON.stringify(prevHeading.richFormatting) ===
+          JSON.stringify(nextHeading.richFormatting)
+      );
+    }
+    case "text": {
+      const prevText = prevBlock as TextBlock;
+      const nextText = nextBlock as TextBlock;
+      return (
+        JSON.stringify(prevText.richFormatting) ===
+        JSON.stringify(nextText.richFormatting)
+      );
+    }
+    case "image": {
+      const prevImage = prevBlock as ImageBlock;
+      const nextImage = nextBlock as ImageBlock;
+      return (
+        prevImage.imageUrl === nextImage.imageUrl &&
+        prevImage.altText === nextImage.altText &&
+        prevImage.width === nextImage.width &&
+        prevImage.height === nextImage.height
+      );
+    }
+    case "divider": {
+      const prevDivider = prevBlock as DividerBlock;
+      const nextDivider = nextBlock as DividerBlock;
+      return (
+        prevDivider.thickness === nextDivider.thickness &&
+        prevDivider.color === nextDivider.color &&
+        prevDivider.margin === nextDivider.margin
+      );
+    }
+    default:
+      return true;
+  }
+};
 
 const BlockContent = React.memo<BlockContentProps>(function BlockContent({
   block,
@@ -68,7 +163,7 @@ const BlockContent = React.memo<BlockContentProps>(function BlockContent({
     default:
       return <DefaultBlockContent block={block} />;
   }
-});
+}, areBlockContentPropsEqual);
 
 /**
  * FormattedTextPreview - Renders formatted text preview with bold and links
@@ -129,6 +224,37 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
       }
       return block.content || "";
     }, [block.content, block.richFormatting?.formattedContent]);
+
+    // Auto-resize textarea based on content
+    const autoResizeTextarea = useMemo(() => {
+      return () => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        // Reset height to auto to get the correct scrollHeight
+        textarea.style.height = "auto";
+
+        // Set height based on scrollHeight, with min and max limits
+        const minHeight = 120; // Minimum height in pixels
+        const maxHeight = 400; // Maximum height in pixels
+        const newHeight = Math.min(
+          Math.max(textarea.scrollHeight, minHeight),
+          maxHeight
+        );
+
+        textarea.style.height = `${newHeight}px`;
+      };
+    }, []);
+
+    // Auto-resize on content change
+    React.useEffect(() => {
+      autoResizeTextarea();
+    }, [displayContent, autoResizeTextarea]);
+
+    // Auto-resize on initial mount
+    React.useEffect(() => {
+      autoResizeTextarea();
+    }, [autoResizeTextarea]);
 
     // Ensure rich formatting is always enabled
     React.useEffect(() => {
@@ -241,6 +367,31 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
       }
     };
 
+    // Apply italic formatting to selected text
+    const applyItalicFormatting = () => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const selectedText = displayContent.substring(start, end);
+
+      if (selectedText) {
+        // Wrap selected text in italic markdown
+        const beforeText = displayContent.substring(0, start);
+        const afterText = displayContent.substring(end);
+        const newContent = `${beforeText}*${selectedText}*${afterText}`;
+
+        updateFormattedContent(newContent);
+
+        // Restore cursor position
+        setTimeout(() => {
+          textarea.focus();
+          textarea.setSelectionRange(start, end + 2); // +2 for the * *
+        }, 0);
+      }
+    };
+
     // Insert link at cursor position
     const insertLink = () => {
       const textarea = textareaRef.current;
@@ -291,6 +442,7 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
     const updateFormattedContent = (newContent: string) => {
       const hasLinks = /\[([^\]]+)\]\(([^)]+)\)/.test(newContent);
       const hasBold = /\*\*([^*]+)\*\*/.test(newContent);
+      const hasItalic = /\*([^*]+)\*/.test(newContent);
 
       onUpdate({
         content: newContent, // Always update plain content too
@@ -300,6 +452,7 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
           formattedContent: newContent,
           hasLinks,
           hasBold,
+          hasItalic,
         },
       } as Partial<TextBlock>);
     };
@@ -311,60 +464,62 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
 
     return (
       <div className="space-y-3">
-        {/* Content Label */}
-        <Label htmlFor={`text-${block.id}`} className="text-sm font-medium">
-          Content
-        </Label>
-
-        {/* Formatting Toolbar - always visible */}
-        <div className="flex items-center space-x-2 p-2 bg-muted/10 rounded-md border border-border/20">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={applyBoldFormatting}
-            className="h-8 w-8 p-0"
-            title="Bold (select text first)"
-          >
-            <Bold className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={insertLink}
-            className="h-8 w-8 p-0"
-            title="Insert Link"
-          >
-            <Link className="h-4 w-4" />
-          </Button>
-          <span className="text-xs text-muted-foreground ml-2">
-            Use **bold** or [link text](url) syntax
-          </span>
-        </div>
-
-        {/* Text Content Input */}
-        <div>
+        {/* Text Content Input with Formatting Controls */}
+        <div className="flex items-start space-x-2">
           <textarea
             ref={textareaRef}
             id={`text-${block.id}`}
-            className="w-full min-h-[100px] p-3 border border-border/40 rounded-md resize-vertical bg-transparent focus:border-border/60 focus:ring-1 focus:ring-ring transition-colors"
-            placeholder="Enter your text content... Use **bold** for bold text and [link text](url) for links"
+            className="flex-1 p-3 border border-border/40 rounded-md resize-none bg-transparent focus:border-border/60 focus:ring-1 focus:ring-ring transition-colors"
+            placeholder="Enter your text content..."
             value={displayContent}
             onChange={handleContentChange}
             onPaste={handleTextPaste}
+            style={{ minHeight: "120px", height: "auto" }}
           />
-        </div>
 
-        {/* Rich formatting preview - always show when there's content */}
-        {displayContent && (
-          <div className="mt-2">
-            <Label className="text-sm font-medium mb-1 block">Preview</Label>
-            <div className="p-3 bg-muted/10 rounded-md border border-border/20 text-sm">
-              <FormattedTextPreview content={displayContent} />
-            </div>
+          {/* Formatting Controls */}
+          <div className="flex flex-col space-y-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={applyBoldFormatting}
+              className="h-8 w-8 p-0 hover:bg-muted/20"
+              title="Bold (select text first)"
+            >
+              <Bold className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={applyItalicFormatting}
+              className="h-8 w-8 p-0 hover:bg-muted/20"
+              title="Italic (select text first)"
+            >
+              <Italic className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={insertLink}
+              className="h-8 w-8 p-0 hover:bg-muted/20"
+              title="Insert Link"
+            >
+              <Link className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 hover:bg-muted/20"
+              title="Use **bold**, *italic*, or [link text](url) syntax"
+            >
+              <Info className="h-4 w-4 text-muted-foreground" />
+            </Button>
           </div>
-        )}
+        </div>
 
         {/* Link Dialog */}
         {showLinkDialog && (
@@ -438,6 +593,8 @@ interface ImageBlockContentProps {
 
 const ImageBlockContent = React.memo<ImageBlockContentProps>(
   function ImageBlockContent({ block, onUpdate }) {
+    const [isCollapsed, setIsCollapsed] = useState(true);
+
     // Performance optimization: Memoize image URL validation and processing
     const imageUrlState = useMemo(() => {
       const url = block.imageUrl?.trim() || "";
@@ -504,39 +661,62 @@ const ImageBlockContent = React.memo<ImageBlockContentProps>(
           </div>
         )}
 
-        {/* Image URL Input */}
-        <div>
-          <Label
-            htmlFor={`image-url-${block.id}`}
-            className="text-sm font-medium"
+        {/* Toggle Button */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Image Settings</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 hover:bg-muted/20"
+            onClick={() => setIsCollapsed(!isCollapsed)}
           >
-            Image URL
-          </Label>
-          <Input
-            id={`image-url-${block.id}`}
-            placeholder="https://example.com/image.jpg"
-            value={block.imageUrl || ""}
-            onChange={handleImageUrlChange}
-            className="bg-transparent border-border/40 focus:border-border/60"
-          />
+            {isCollapsed ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronUp className="h-4 w-4" />
+            )}
+          </Button>
         </div>
 
-        {/* Alt Text Input */}
-        <div>
-          <Label
-            htmlFor={`image-alt-${block.id}`}
-            className="text-sm font-medium"
-          >
-            Alt Text
-          </Label>
-          <Input
-            id={`image-alt-${block.id}`}
-            placeholder="Describe the image..."
-            value={block.altText || ""}
-            onChange={handleAltTextChange}
-            className="bg-transparent border-border/40 focus:border-border/60"
-          />
-        </div>
+        {/* Collapsible Image Settings */}
+        {!isCollapsed && (
+          <div className="space-y-3 pt-2">
+            {/* Image URL Input */}
+            <div>
+              <Label
+                htmlFor={`image-url-${block.id}`}
+                className="text-sm font-medium"
+              >
+                Image URL
+              </Label>
+              <Input
+                id={`image-url-${block.id}`}
+                placeholder="https://example.com/image.jpg"
+                value={block.imageUrl || ""}
+                onChange={handleImageUrlChange}
+                className="bg-transparent border-border/40 focus:border-border/60"
+              />
+            </div>
+
+            {/* Alt Text Input */}
+            <div>
+              <Label
+                htmlFor={`image-alt-${block.id}`}
+                className="text-sm font-medium"
+              >
+                Alt Text
+              </Label>
+              <Input
+                id={`image-alt-${block.id}`}
+                placeholder="Describe the image..."
+                value={block.altText || ""}
+                onChange={handleAltTextChange}
+                className="bg-transparent border-border/40 focus:border-border/60"
+              />
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -555,6 +735,8 @@ interface HeadingBlockContentProps {
 
 const HeadingBlockContent = React.memo<HeadingBlockContentProps>(
   function HeadingBlockContent({ block, blocks, onUpdate, onBlocksChange }) {
+    const inputRef = useRef<HTMLInputElement>(null);
+
     // Performance optimization: Memoize heading preview class calculation
     const headingPreviewClass = useMemo(() => {
       const levelClassMap = {
@@ -575,6 +757,47 @@ const HeadingBlockContent = React.memo<HeadingBlockContentProps>(
       }
       return block.content || "";
     }, [block.content, block.richFormatting?.formattedContent]);
+
+    // Auto-resize input based on content
+    const autoResizeInput = useMemo(() => {
+      return () => {
+        const input = inputRef.current;
+        if (!input) return;
+
+        // Create a temporary element to measure text width
+        const temp = document.createElement("span");
+        temp.style.visibility = "hidden";
+        temp.style.position = "absolute";
+        temp.style.whiteSpace = "nowrap";
+        temp.style.font = window.getComputedStyle(input).font;
+        temp.textContent = input.value || input.placeholder;
+
+        document.body.appendChild(temp);
+        const textWidth = temp.offsetWidth;
+        document.body.removeChild(temp);
+
+        // Set width with some padding, min and max limits
+        const minWidth = 200; // Minimum width in pixels
+        const maxWidth = 600; // Maximum width in pixels
+        const padding = 24; // Extra padding for comfortable editing
+        const newWidth = Math.min(
+          Math.max(textWidth + padding, minWidth),
+          maxWidth
+        );
+
+        input.style.width = `${newWidth}px`;
+      };
+    }, []);
+
+    // Auto-resize on content change
+    React.useEffect(() => {
+      autoResizeInput();
+    }, [displayContent, autoResizeInput]);
+
+    // Auto-resize on initial mount
+    React.useEffect(() => {
+      autoResizeInput();
+    }, [autoResizeInput]);
 
     // Ensure rich formatting is always enabled for headings
     React.useEffect(() => {
@@ -712,8 +935,10 @@ const HeadingBlockContent = React.memo<HeadingBlockContentProps>(
     const handleContentChange = useMemo(
       () => (e: React.ChangeEvent<HTMLInputElement>) => {
         updateFormattedContent(e.target.value);
+        // Trigger auto-resize after content change
+        setTimeout(autoResizeInput, 0);
       },
-      [updateFormattedContent]
+      [updateFormattedContent, autoResizeInput]
     );
 
     const handleLevelChange = useMemo(
@@ -730,74 +955,40 @@ const HeadingBlockContent = React.memo<HeadingBlockContentProps>(
 
     return (
       <div className="space-y-3">
-        {/* Heading Preview */}
-        <div className="mb-3">
-          <Label className="text-sm font-medium mb-1 block">Preview</Label>
-          <div className="mt-1 p-3 bg-muted/10 rounded-md border border-border/20">
-            {React.createElement(
-              `h${block.level}`,
-              {
-                className: headingPreviewClass,
-                ...(hasFormattedContent
-                  ? {
-                      dangerouslySetInnerHTML: {
-                        __html: formattedPreviewContent,
-                      },
-                    }
-                  : {}),
-              },
-              hasFormattedContent
-                ? undefined
-                : displayContent || "Heading content..."
-            )}
-          </div>
-        </div>
-
-        {/* Formatting Hint */}
-        <div className="text-xs text-muted-foreground bg-muted/10 p-2 rounded border border-border/20">
-          💡 Use **bold** for bold text and [link text](url) for links in
-          headings
-        </div>
-
-        {/* Heading Content Input */}
-        <div>
-          <Label
-            htmlFor={`heading-${block.id}`}
-            className="text-sm font-medium"
-          >
-            Heading Text
-          </Label>
+        {/* Heading Content Input with Level Selector */}
+        <div className="flex items-center space-x-2">
           <Input
             id={`heading-${block.id}`}
-            placeholder="Enter heading text... Use **bold** and [link](url) syntax"
+            placeholder="Enter heading text..."
             value={displayContent}
             onChange={handleContentChange}
             onPaste={handleHeadingPaste}
-            className="bg-transparent border-border/40 focus:border-border/60"
+            className="bg-transparent border-border/40 focus:border-border/60 min-w-0"
+            ref={inputRef}
+            style={{ width: "200px" }} // Initial width, will be overridden by auto-resize
           />
-        </div>
-
-        {/* Heading Level Selector */}
-        <div>
-          <Label
-            htmlFor={`heading-level-${block.id}`}
-            className="text-sm font-medium"
-          >
-            Heading Level
-          </Label>
           <select
             id={`heading-level-${block.id}`}
             value={block.level}
             onChange={handleLevelChange}
-            className="w-full mt-1 p-2 border border-border/40 rounded-md bg-transparent focus:border-border/60 focus:ring-1 focus:ring-ring transition-colors"
+            className="px-3 py-2 border border-border/40 rounded-md bg-transparent focus:border-border/60 focus:ring-1 focus:ring-ring transition-colors text-sm min-w-16"
           >
-            <option value={1}>H1 - Main Title</option>
-            <option value={2}>H2 - Section Header</option>
-            <option value={3}>H3 - Subsection</option>
-            <option value={4}>H4 - Minor Heading</option>
-            <option value={5}>H5 - Small Heading</option>
-            <option value={6}>H6 - Smallest Heading</option>
+            <option value={1}>H1</option>
+            <option value={2}>H2</option>
+            <option value={3}>H3</option>
+            <option value={4}>H4</option>
+            <option value={5}>H5</option>
+            <option value={6}>H6</option>
           </select>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 hover:bg-muted/20"
+            title="Use **bold** for bold text and [link text](url) for links"
+          >
+            <Info className="h-4 w-4 text-muted-foreground" />
+          </Button>
         </div>
       </div>
     );
@@ -815,6 +1006,8 @@ interface DividerBlockContentProps {
 
 const DividerBlockContent = React.memo<DividerBlockContentProps>(
   function DividerBlockContent({ block, onUpdate }) {
+    const [isCollapsed, setIsCollapsed] = useState(true);
+
     // Performance optimization: Memoize change handlers
     const handleThicknessChange = useMemo(
       () => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -839,9 +1032,8 @@ const DividerBlockContent = React.memo<DividerBlockContentProps>(
 
     return (
       <div className="space-y-3">
-        {/* Divider Preview */}
-        <div className="mb-3">
-          <Label className="text-sm font-medium mb-1 block">Preview</Label>
+        {/* Divider Preview with Toggle Button */}
+        <div className="mb-3 relative">
           <div className="mt-1 p-3 bg-muted/10 rounded-md border border-border/20">
             <hr
               style={{
@@ -853,75 +1045,76 @@ const DividerBlockContent = React.memo<DividerBlockContentProps>(
               }}
             />
           </div>
+
+          {/* Toggle Button positioned on the right */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute top-2 right-2 h-6 w-6 p-0 hover:bg-muted/20 bg-background/80 backdrop-blur-sm border border-border/20"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+          >
+            {isCollapsed ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronUp className="h-3 w-3" />
+            )}
+          </Button>
         </div>
 
-        {/* Thickness Input */}
-        <div>
-          <Label
-            htmlFor={`divider-thickness-${block.id}`}
-            className="text-sm font-medium"
-          >
-            Thickness
-          </Label>
-          <Input
-            id={`divider-thickness-${block.id}`}
-            placeholder="1px"
-            value={block.thickness || "1px"}
-            onChange={handleThicknessChange}
-            className="bg-transparent border-border/40 focus:border-border/60"
-          />
-          <div className="text-xs text-muted-foreground mt-1">
-            e.g., 1px, 2px, 3px
-          </div>
-        </div>
+        {/* Collapsible Divider Settings */}
+        {!isCollapsed && (
+          <div className="pt-2">
+            {/* Single Line Controls */}
+            <div className="flex items-center space-x-3">
+              {/* Thickness Input */}
+              <div className="flex-1">
+                <Input
+                  id={`divider-thickness-${block.id}`}
+                  placeholder="1px"
+                  value={block.thickness || "1px"}
+                  onChange={handleThicknessChange}
+                  className="bg-transparent border-border/40 focus:border-border/60 text-sm"
+                />
+              </div>
 
-        {/* Color Input */}
-        <div>
-          <Label
-            htmlFor={`divider-color-${block.id}`}
-            className="text-sm font-medium"
-          >
-            Color
-          </Label>
-          <div className="flex gap-2">
-            <Input
-              id={`divider-color-${block.id}`}
-              type="color"
-              value={block.color || "#dddddd"}
-              onChange={handleColorChange}
-              className="w-16 h-8 p-0 border-border/40 focus:border-border/60"
-            />
-            <Input
-              placeholder="#dddddd"
-              value={block.color || "#dddddd"}
-              onChange={handleColorChange}
-              className="flex-1 bg-transparent border-border/40 focus:border-border/60"
-            />
-          </div>
-          <div className="text-xs text-muted-foreground mt-1">
-            Click color picker or enter hex code
-          </div>
-        </div>
+              {/* Color Picker */}
+              <div className="flex items-center space-x-1">
+                <Input
+                  id={`divider-color-${block.id}`}
+                  type="color"
+                  value={block.color || "#dddddd"}
+                  onChange={handleColorChange}
+                  className="w-10 h-8 p-0 border-border/40 focus:border-border/60 cursor-pointer"
+                />
+                <Input
+                  placeholder="#dddddd"
+                  value={block.color || "#dddddd"}
+                  onChange={handleColorChange}
+                  className="w-20 bg-transparent border-border/40 focus:border-border/60 text-sm"
+                />
+              </div>
 
-        {/* Margin Input */}
-        <div>
-          <Label
-            htmlFor={`divider-margin-${block.id}`}
-            className="text-sm font-medium"
-          >
-            Spacing (Top/Bottom)
-          </Label>
-          <Input
-            id={`divider-margin-${block.id}`}
-            placeholder="20px"
-            value={block.margin || "20px"}
-            onChange={handleMarginChange}
-            className="bg-transparent border-border/40 focus:border-border/60"
-          />
-          <div className="text-xs text-muted-foreground mt-1">
-            e.g., 10px, 20px, 30px
+              {/* Margin Input */}
+              <div className="flex-1">
+                <Input
+                  id={`divider-margin-${block.id}`}
+                  placeholder="20px"
+                  value={block.margin || "20px"}
+                  onChange={handleMarginChange}
+                  className="bg-transparent border-border/40 focus:border-border/60 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Compact Hints */}
+            <div className="flex items-center justify-between text-xs text-muted-foreground mt-2 px-1">
+              <span>Thickness</span>
+              <span>Color</span>
+              <span>Spacing</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   }

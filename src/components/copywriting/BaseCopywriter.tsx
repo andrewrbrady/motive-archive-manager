@@ -1188,37 +1188,48 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   };
 
   const handleSaveEdit = async (contentId: string) => {
-    // Phase 3C FIX: Remove blocking await from background operations
-    const saveEditOperation = () => {
-      callbacks
-        .onUpdateCaption(contentId, editingText)
-        .then((success) => {
-          if (success) {
-            callbacks.onRefresh().catch((error) => {
-              console.error("Error refreshing after update:", error);
-            });
-            handleCancelEdit();
-            toast({
-              title: "Success",
-              description: "Caption updated and refreshed successfully",
-            });
-          }
-        })
-        .catch((error) => {
-          console.error("Error updating caption:", error);
-          // Error handling is already in callbacks
+    try {
+      // Keep edit mode open while saving
+      toast({
+        title: "Saving...",
+        description: "Updating caption...",
+      });
+
+      // Wait for the update to complete
+      const success = await callbacks.onUpdateCaption(contentId, editingText);
+
+      if (success) {
+        // Only close edit mode after successful save
+        handleCancelEdit();
+
+        // Refresh the data
+        try {
+          await callbacks.onRefresh();
+        } catch (error) {
+          console.error("Error refreshing after update:", error);
+        }
+
+        toast({
+          title: "Success",
+          description: "Caption updated successfully",
         });
-    };
-
-    // Execute update operation in background - truly non-blocking
-    setTimeout(saveEditOperation, 0);
-
-    // Immediate optimistic feedback and close edit mode
-    handleCancelEdit();
-    toast({
-      title: "Updating...",
-      description: "Caption is being updated in background",
-    });
+      } else {
+        // Keep edit mode open on failure so user can try again
+        toast({
+          title: "Error",
+          description: "Failed to update caption",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error updating caption:", error);
+      // Keep edit mode open on error so user can try again
+      toast({
+        title: "Error",
+        description: "Failed to update caption",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleUpdatePreviewContent = (newContent: string) => {

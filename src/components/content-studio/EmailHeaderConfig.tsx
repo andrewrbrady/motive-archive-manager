@@ -1,10 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Settings, ChevronDown, ChevronUp } from "lucide-react";
 
 /**
  * EmailHeaderConfig - Email header configuration component
@@ -32,6 +33,8 @@ interface EmailHeaderConfigProps {
 
 const EmailHeaderConfig = React.memo<EmailHeaderConfigProps>(
   function EmailHeaderConfig({ emailHeader, onEmailHeaderChange }) {
+    const [isCollapsed, setIsCollapsed] = useState(true);
+
     const setEmailHeader = (
       updater: (prev: EmailHeaderState) => EmailHeaderState
     ) => {
@@ -42,253 +45,283 @@ const EmailHeaderConfig = React.memo<EmailHeaderConfigProps>(
       <div className="space-y-4">
         <Separator />
         <div className="space-y-3">
-          <div className="flex items-center space-x-2">
-            <Settings className="h-4 w-4" />
-            <Label className="text-base font-medium">
-              Email Header Settings
-            </Label>
+          {/* Toggle Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Settings className="h-4 w-4" />
+              <Label className="text-base font-medium">
+                Email Header Settings
+              </Label>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 hover:bg-muted/20"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+            >
+              {isCollapsed ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronUp className="h-4 w-4" />
+              )}
+            </Button>
           </div>
 
-          {/* Enable Header Toggle */}
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="enable-header"
-              checked={emailHeader.enabled}
-              onChange={(e) =>
-                setEmailHeader((prev) => ({
-                  ...prev,
-                  enabled: e.target.checked,
-                }))
-              }
-              className="rounded border-gray-300"
-            />
-            <Label htmlFor="enable-header" className="text-sm">
-              Add branded header image (Gmail compatible)
-            </Label>
-          </div>
-
-          {/* Header Configuration - Only show when enabled */}
-          {emailHeader.enabled && (
-            <div className="space-y-4 p-4 bg-muted/10 rounded-lg border border-border/20">
-              <div className="space-y-3">
-                <h4 className="font-medium text-sm">Header Image</h4>
-                <div className="space-y-3">
-                  <div>
-                    <Label
-                      htmlFor="header-image-url"
-                      className="text-sm font-medium"
-                    >
-                      Header Image URL
-                    </Label>
-                    <Input
-                      id="header-image-url"
-                      placeholder="https://example.com/header.png"
-                      value={emailHeader.headerImageUrl}
-                      onChange={(e) =>
-                        setEmailHeader((prev) => ({
-                          ...prev,
-                          headerImageUrl: e.target.value,
-                        }))
-                      }
-                      className="bg-transparent border-border/40 focus:border-border/60"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label
-                        htmlFor="header-image-alt"
-                        className="text-sm font-medium"
-                      >
-                        Alt Text
-                      </Label>
-                      <Input
-                        id="header-image-alt"
-                        placeholder="Email Header"
-                        value={emailHeader.headerImageAlt}
-                        onChange={(e) =>
-                          setEmailHeader((prev) => ({
-                            ...prev,
-                            headerImageAlt: e.target.value,
-                          }))
-                        }
-                        className="bg-transparent border-border/40 focus:border-border/60"
-                      />
-                    </div>
-                    <div>
-                      <Label
-                        htmlFor="header-image-height"
-                        className="text-sm font-medium"
-                      >
-                        Height (px)
-                      </Label>
-                      <Input
-                        id="header-image-height"
-                        placeholder="100"
-                        value={emailHeader.headerImageHeight}
-                        onChange={(e) =>
-                          setEmailHeader((prev) => ({
-                            ...prev,
-                            headerImageHeight: e.target.value,
-                          }))
-                        }
-                        className="bg-transparent border-border/40 focus:border-border/60"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="text-sm text-muted-foreground bg-blue-50/50 p-3 rounded border border-blue-200/50">
-                    💡 <strong>Recommended:</strong> 600px wide × 80-120px tall
-                    <br />
-                    Create a single image with your logo, colored stripes, and
-                    branding for best Gmail compatibility.
-                  </div>
-                </div>
+          {/* Collapsible Email Header Settings */}
+          {!isCollapsed && (
+            <div className="space-y-4 pt-2">
+              {/* Enable Header Toggle */}
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="enable-header"
+                  checked={emailHeader.enabled}
+                  onChange={(e) =>
+                    setEmailHeader((prev) => ({
+                      ...prev,
+                      enabled: e.target.checked,
+                    }))
+                  }
+                  className="rounded border-gray-300"
+                />
+                <Label htmlFor="enable-header" className="text-sm">
+                  Add branded header image (Gmail compatible)
+                </Label>
               </div>
 
-              {/* Optional Colored Stripes */}
-              <div className="space-y-3">
-                <h4 className="font-medium text-sm flex items-center space-x-2">
-                  <span>🎨</span>
-                  <span>Colored Stripes (Optional)</span>
-                </h4>
-
-                {/* Enable Stripes Toggle */}
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="enable-header-stripes"
-                    checked={emailHeader.stripes?.enabled || false}
-                    onChange={(e) =>
-                      setEmailHeader((prev) => ({
-                        ...prev,
-                        stripes: {
-                          enabled: e.target.checked,
-                          topColor: prev.stripes?.topColor || "#BC1F1F",
-                          bottomColor: prev.stripes?.bottomColor || "#0E2D4E",
-                          height: prev.stripes?.height || "4px",
-                        },
-                      }))
-                    }
-                    className="rounded border-gray-300"
-                  />
-                  <Label htmlFor="enable-header-stripes" className="text-sm">
-                    Add colored stripes above and below header image
-                  </Label>
-                </div>
-
-                {/* Stripe Configuration - Only show when enabled */}
-                {emailHeader.stripes?.enabled && (
-                  <div className="space-y-3 p-3 bg-muted/10 rounded-lg border border-border/20">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs font-medium">
-                          Top Stripe Color
+              {/* Header Configuration - Only show when enabled */}
+              {emailHeader.enabled && (
+                <div className="space-y-4 p-4 bg-muted/10 rounded-lg border border-border/20">
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm">Header Image</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <Label
+                          htmlFor="header-image-url"
+                          className="text-sm font-medium"
+                        >
+                          Header Image URL
                         </Label>
-                        <div className="flex space-x-2">
+                        <Input
+                          id="header-image-url"
+                          placeholder="https://example.com/header.png"
+                          value={emailHeader.headerImageUrl}
+                          onChange={(e) =>
+                            setEmailHeader((prev) => ({
+                              ...prev,
+                              headerImageUrl: e.target.value,
+                            }))
+                          }
+                          className="bg-transparent border-border/40 focus:border-border/60"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label
+                            htmlFor="header-image-alt"
+                            className="text-sm font-medium"
+                          >
+                            Alt Text
+                          </Label>
                           <Input
-                            type="color"
-                            value={emailHeader.stripes?.topColor || "#BC1F1F"}
+                            id="header-image-alt"
+                            placeholder="Email Header"
+                            value={emailHeader.headerImageAlt}
                             onChange={(e) =>
                               setEmailHeader((prev) => ({
                                 ...prev,
-                                stripes: {
-                                  ...prev.stripes,
-                                  enabled: true,
-                                  topColor: e.target.value,
-                                },
+                                headerImageAlt: e.target.value,
                               }))
                             }
-                            className="w-12 h-8 p-1 bg-transparent border-border/40"
+                            className="bg-transparent border-border/40 focus:border-border/60"
                           />
+                        </div>
+                        <div>
+                          <Label
+                            htmlFor="header-image-height"
+                            className="text-sm font-medium"
+                          >
+                            Height (px)
+                          </Label>
                           <Input
-                            placeholder="#BC1F1F"
-                            value={emailHeader.stripes?.topColor || "#BC1F1F"}
+                            id="header-image-height"
+                            placeholder="100"
+                            value={emailHeader.headerImageHeight}
                             onChange={(e) =>
                               setEmailHeader((prev) => ({
                                 ...prev,
-                                stripes: {
-                                  ...prev.stripes,
-                                  enabled: true,
-                                  topColor: e.target.value,
-                                },
+                                headerImageHeight: e.target.value,
                               }))
                             }
-                            className="bg-transparent border-border/40 focus:border-border/60 text-xs"
+                            className="bg-transparent border-border/40 focus:border-border/60"
                           />
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label className="text-xs font-medium">
-                          Bottom Stripe Color
-                        </Label>
-                        <div className="flex space-x-2">
-                          <Input
-                            type="color"
-                            value={
-                              emailHeader.stripes?.bottomColor || "#0E2D4E"
-                            }
-                            onChange={(e) =>
-                              setEmailHeader((prev) => ({
-                                ...prev,
-                                stripes: {
-                                  ...prev.stripes,
-                                  enabled: true,
-                                  bottomColor: e.target.value,
-                                },
-                              }))
-                            }
-                            className="w-12 h-8 p-1 bg-transparent border-border/40"
-                          />
-                          <Input
-                            placeholder="#0E2D4E"
-                            value={
-                              emailHeader.stripes?.bottomColor || "#0E2D4E"
-                            }
-                            onChange={(e) =>
-                              setEmailHeader((prev) => ({
-                                ...prev,
-                                stripes: {
-                                  ...prev.stripes,
-                                  enabled: true,
-                                  bottomColor: e.target.value,
-                                },
-                              }))
-                            }
-                            className="bg-transparent border-border/40 focus:border-border/60 text-xs"
-                          />
-                        </div>
+                      <div className="text-sm text-muted-foreground bg-blue-50/50 p-3 rounded border border-blue-200/50">
+                        💡 <strong>Recommended:</strong> 600px wide × 80-120px
+                        tall
+                        <br />
+                        Create a single image with your logo, colored stripes,
+                        and branding for best Gmail compatibility.
                       </div>
                     </div>
+                  </div>
 
-                    <div className="space-y-2">
-                      <Label className="text-xs font-medium">
-                        Stripe Height
-                      </Label>
-                      <Input
-                        placeholder="4px"
-                        value={emailHeader.stripes?.height || "4px"}
+                  {/* Optional Colored Stripes */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm flex items-center space-x-2">
+                      <span>🎨</span>
+                      <span>Colored Stripes (Optional)</span>
+                    </h4>
+
+                    {/* Enable Stripes Toggle */}
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="enable-header-stripes"
+                        checked={emailHeader.stripes?.enabled || false}
                         onChange={(e) =>
                           setEmailHeader((prev) => ({
                             ...prev,
                             stripes: {
-                              ...prev.stripes,
-                              enabled: true,
-                              height: e.target.value,
+                              enabled: e.target.checked,
+                              topColor: prev.stripes?.topColor || "#BC1F1F",
+                              bottomColor:
+                                prev.stripes?.bottomColor || "#0E2D4E",
+                              height: prev.stripes?.height || "4px",
                             },
                           }))
                         }
-                        className="bg-transparent border-border/40 focus:border-border/60 text-xs"
+                        className="rounded border-gray-300"
                       />
-                      <div className="text-xs text-muted-foreground">
-                        Examples: 4px, 6px, 8px
-                      </div>
+                      <Label
+                        htmlFor="enable-header-stripes"
+                        className="text-sm"
+                      >
+                        Add colored stripes above and below header image
+                      </Label>
                     </div>
+
+                    {/* Stripe Configuration - Only show when enabled */}
+                    {emailHeader.stripes?.enabled && (
+                      <div className="space-y-3 p-3 bg-muted/10 rounded-lg border border-border/20">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label className="text-xs font-medium">
+                              Top Stripe Color
+                            </Label>
+                            <div className="flex space-x-2">
+                              <Input
+                                type="color"
+                                value={
+                                  emailHeader.stripes?.topColor || "#BC1F1F"
+                                }
+                                onChange={(e) =>
+                                  setEmailHeader((prev) => ({
+                                    ...prev,
+                                    stripes: {
+                                      ...prev.stripes,
+                                      enabled: true,
+                                      topColor: e.target.value,
+                                    },
+                                  }))
+                                }
+                                className="w-12 h-8 p-1 bg-transparent border-border/40"
+                              />
+                              <Input
+                                placeholder="#BC1F1F"
+                                value={
+                                  emailHeader.stripes?.topColor || "#BC1F1F"
+                                }
+                                onChange={(e) =>
+                                  setEmailHeader((prev) => ({
+                                    ...prev,
+                                    stripes: {
+                                      ...prev.stripes,
+                                      enabled: true,
+                                      topColor: e.target.value,
+                                    },
+                                  }))
+                                }
+                                className="bg-transparent border-border/40 focus:border-border/60 text-xs"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-xs font-medium">
+                              Bottom Stripe Color
+                            </Label>
+                            <div className="flex space-x-2">
+                              <Input
+                                type="color"
+                                value={
+                                  emailHeader.stripes?.bottomColor || "#0E2D4E"
+                                }
+                                onChange={(e) =>
+                                  setEmailHeader((prev) => ({
+                                    ...prev,
+                                    stripes: {
+                                      ...prev.stripes,
+                                      enabled: true,
+                                      bottomColor: e.target.value,
+                                    },
+                                  }))
+                                }
+                                className="w-12 h-8 p-1 bg-transparent border-border/40"
+                              />
+                              <Input
+                                placeholder="#0E2D4E"
+                                value={
+                                  emailHeader.stripes?.bottomColor || "#0E2D4E"
+                                }
+                                onChange={(e) =>
+                                  setEmailHeader((prev) => ({
+                                    ...prev,
+                                    stripes: {
+                                      ...prev.stripes,
+                                      enabled: true,
+                                      bottomColor: e.target.value,
+                                    },
+                                  }))
+                                }
+                                className="bg-transparent border-border/40 focus:border-border/60 text-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-xs font-medium">
+                            Stripe Height
+                          </Label>
+                          <Input
+                            placeholder="4px"
+                            value={emailHeader.stripes?.height || "4px"}
+                            onChange={(e) =>
+                              setEmailHeader((prev) => ({
+                                ...prev,
+                                stripes: {
+                                  ...prev.stripes,
+                                  enabled: true,
+                                  height: e.target.value,
+                                },
+                              }))
+                            }
+                            className="bg-transparent border-border/40 focus:border-border/60 text-xs"
+                          />
+                          <div className="text-xs text-muted-foreground">
+                            Examples: 4px, 6px, 8px
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </div>

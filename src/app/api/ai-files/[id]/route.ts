@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 // GET single file details
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check authentication
@@ -42,7 +42,8 @@ export async function GET(
     }
 
     const userId = getUserIdFromToken(tokenData);
-    const fileId = params.id;
+    const resolvedParams = await params;
+    const fileId = resolvedParams.id;
 
     if (!ObjectId.isValid(fileId)) {
       return NextResponse.json(
@@ -99,7 +100,7 @@ export async function GET(
 // PATCH update file metadata
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check authentication
@@ -128,7 +129,8 @@ export async function PATCH(
     }
 
     const userId = getUserIdFromToken(tokenData);
-    const fileId = params.id;
+    const resolvedParams = await params;
+    const fileId = resolvedParams.id;
 
     if (!ObjectId.isValid(fileId)) {
       return NextResponse.json(
@@ -225,7 +227,7 @@ export async function PATCH(
 // DELETE file (soft delete in database, hard delete from OpenAI)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check authentication
@@ -254,7 +256,8 @@ export async function DELETE(
     }
 
     const userId = getUserIdFromToken(tokenData);
-    const fileId = params.id;
+    const resolvedParams = await params;
+    const fileId = resolvedParams.id;
 
     if (!ObjectId.isValid(fileId)) {
       return NextResponse.json(
@@ -279,47 +282,33 @@ export async function DELETE(
       );
     }
 
+    // Get OpenAI client and delete file from OpenAI
     const openai = getOpenAIClient();
-
     try {
-      // Delete file from OpenAI (if it exists)
-      if (file.openaiFileId) {
-        try {
-          await openai.files.del(file.openaiFileId);
-          console.log(`Deleted OpenAI file: ${file.openaiFileId}`);
-        } catch (openaiError: any) {
-          // If file doesn't exist on OpenAI, that's fine - continue with database deletion
-          if (openaiError.status !== 404) {
-            console.error("OpenAI file deletion error:", openaiError);
-            // Don't fail the whole operation for OpenAI errors
-          }
-        }
-      }
-
-      // Soft delete in database (mark as deleted)
-      await db.collection("ai_files").updateOne(
-        { _id: new ObjectId(fileId) },
-        {
-          $set: {
-            status: "deleted",
-            updatedAt: new Date(),
-          },
-        }
-      );
-
-      return NextResponse.json({
-        success: true,
-        message: "File deleted successfully",
-      });
-    } catch (error) {
-      console.error("File deletion error:", error);
-      return NextResponse.json(
-        { error: "Failed to delete file completely" },
-        { status: 500 }
-      );
+      await openai.files.del(file.openaiFileId);
+    } catch (openaiError) {
+      console.warn("Failed to delete file from OpenAI:", openaiError);
+      // Continue with database deletion even if OpenAI deletion fails
     }
+
+    // Soft delete in database
+    await db.collection("ai_files").updateOne(
+      { _id: new ObjectId(fileId) },
+      {
+        $set: {
+          status: "deleted",
+          deletedAt: new Date(),
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: "File deleted successfully",
+    });
   } catch (error) {
-    console.error("File delete error:", error);
+    console.error("File deletion error:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Internal server error",

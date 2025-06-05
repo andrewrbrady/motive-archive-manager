@@ -283,7 +283,11 @@ export function CaptionPreview({
 
                       {editingCaptionId === caption._id ? (
                         <Textarea
-                          value={editingText || caption.caption}
+                          value={
+                            editingCaptionId === caption._id
+                              ? editingText
+                              : caption.caption
+                          }
                           onChange={(e) => onEditTextChange(e.target.value)}
                           className="min-h-[120px] w-full resize-none bg-transparent border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] text-sm leading-relaxed"
                           onKeyDown={(e) => {

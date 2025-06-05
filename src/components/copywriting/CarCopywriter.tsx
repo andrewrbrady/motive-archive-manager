@@ -317,44 +317,39 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
       captionId: string,
       newText: string
     ): Promise<boolean> => {
-      // Phase 3C FIX: Remove blocking await from background operations
-      const updateOperation = () => {
-        api
-          .patch(`captions?id=${captionId}`, {
-            caption: newText,
-          })
-          .then(() => {
-            toast({
-              title: "Success",
-              description: "Caption updated successfully",
-            });
+      try {
+        toast({
+          title: "Updating...",
+          description: "Saving caption changes...",
+        });
 
-            // Refresh captions in background - non-blocking
-            setTimeout(() => {
-              refetchCaptions().catch((error) => {
-                console.error("Error refreshing captions:", error);
-              });
-            }, 100);
-          })
-          .catch((error) => {
-            console.error("Error updating caption:", error);
-            toast({
-              title: "Error",
-              description: "Failed to update caption",
-              variant: "destructive",
-            });
-          });
-      };
+        // Wait for the update to complete
+        await api.patch(`captions?id=${captionId}`, {
+          caption: newText,
+        });
 
-      // Execute update operation in background - truly non-blocking
-      setTimeout(updateOperation, 0);
+        toast({
+          title: "Success",
+          description: "Caption updated successfully",
+        });
 
-      // Return immediately with optimistic success
-      toast({
-        title: "Updating...",
-        description: "Caption is being updated in background",
-      });
-      return true;
+        // Refresh captions after successful update
+        try {
+          await refetchCaptions();
+        } catch (error) {
+          console.error("Error refreshing captions:", error);
+        }
+
+        return true;
+      } catch (error) {
+        console.error("Error updating caption:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update caption",
+          variant: "destructive",
+        });
+        return false;
+      }
     },
 
     onRefresh: async (): Promise<void> => {

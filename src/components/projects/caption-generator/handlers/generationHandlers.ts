@@ -498,52 +498,48 @@ export function useSavedCaptions() {
     async (projectId: string, captionId: string) => {
       if (!api) return false;
 
-      // Phase 3C FIX: Convert blocking await to non-blocking pattern
-      toast({
-        title: "Updating...",
-        description: "Caption is being updated in background",
-      });
+      try {
+        // Keep edit mode open while saving
+        toast({
+          title: "Saving...",
+          description: "Updating caption...",
+        });
 
-      // Provide immediate feedback
-      setEditingCaptionId(null);
-      setEditingText("");
+        // Make the API call and wait for it to complete
+        await api.patch(`projects/${projectId}/captions?id=${captionId}`, {
+          caption: editingText,
+        });
 
-      // Execute update operation in background - truly non-blocking
-      const updateOperation = () => {
-        api
-          .patch(`projects/${projectId}/captions?id=${captionId}`, {
-            caption: editingText,
-          })
-          .then(() => {
-            // Update local state
-            setSavedCaptions((prev) =>
-              prev.map((caption) =>
-                caption._id === captionId
-                  ? { ...caption, caption: editingText }
-                  : caption
-              )
-            );
+        // Update local state
+        setSavedCaptions((prev) =>
+          prev.map((caption) =>
+            caption._id === captionId
+              ? { ...caption, caption: editingText }
+              : caption
+          )
+        );
 
-            toast({
-              title: "Success",
-              description: "Caption updated successfully",
-            });
-          })
-          .catch((error) => {
-            console.error("Error updating caption:", error);
-            toast({
-              title: "Error",
-              description: "Failed to update caption",
-              variant: "destructive",
-            });
-          });
-      };
+        // Only close edit mode after successful save
+        setEditingCaptionId(null);
+        setEditingText("");
 
-      // Start background operation
-      setTimeout(updateOperation, 0);
+        toast({
+          title: "Success",
+          description: "Caption updated successfully",
+        });
 
-      // Return immediately with optimistic success
-      return true;
+        return true;
+      } catch (error) {
+        console.error("Error updating caption:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update caption",
+          variant: "destructive",
+        });
+
+        // Keep edit mode open on error so user can try again
+        return false;
+      }
     },
     [api, editingText]
   );
