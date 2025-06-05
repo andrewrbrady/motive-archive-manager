@@ -5,7 +5,51 @@ import { ProjectHeader } from "@/components/projects/ProjectHeader";
 import { ProjectTabs } from "@/components/projects/ProjectTabs";
 import { getMongoClient } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { ProjectMember } from "@/types/project";
+import { Project, ProjectMember } from "@/types/project";
+
+// Serialized project type that matches what we return from SSR
+type SerializedProject = Omit<Project, 'timeline' | 'createdAt' | 'updatedAt' | 'completedAt' | 'archivedAt' | 'budget' | 'progress'> & {
+  timeline: {
+    startDate: string | null;
+    endDate: string | null;
+    milestones: Array<{
+      id: string;
+      title: string;
+      description: string | null;
+      dueDate: string | null;
+      completed: boolean;
+      completedAt: string | null;
+      dependencies: string[];
+      assignedTo: string[];
+    }>;
+    estimatedDuration: number | null;
+  };
+  budget?: {
+    total: number;
+    spent: number;
+    remaining: number;
+    currency: string;
+    expenses: Array<{
+      id: string;
+      description: string;
+      amount: number;
+      category: string;
+      date: string | null;
+      receipt: string | null;
+      approvedBy: string | null;
+    }>;
+  };
+  progress: {
+    percentage: number;
+    completedTasks: number;
+    totalTasks: number;
+    lastUpdated: string | null;
+  };
+  createdAt: string | null;
+  updatedAt: string | null;
+  completedAt: string | null;
+  archivedAt: string | null;
+};
 
 interface ProjectPageProps {
   params: Promise<{
@@ -13,7 +57,7 @@ interface ProjectPageProps {
   }>;
 }
 
-async function getProject(id: string) {
+async function getProject(id: string): Promise<SerializedProject | null> {
   try {
     const mongoClient = await getMongoClient();
     const db = mongoClient.db(process.env.MONGODB_DB || "motive_archive");
@@ -46,7 +90,7 @@ async function getProject(id: string) {
     };
 
     // Properly serialize all MongoDB objects to plain objects
-    const serializedProject = {
+    const serializedProject: SerializedProject = {
       _id: project._id.toString(),
       title: project.title || "",
       description: project.description || "",
@@ -103,7 +147,7 @@ async function getProject(id: string) {
           receipt: expense.receipt || null,
           approvedBy: expense.approvedBy || null,
         })),
-      } : null,
+      } : undefined,
       
       // Assets and deliverables
       assets: (project.assets || []).map((asset: any) => ({
@@ -208,14 +252,14 @@ export default async function ProjectDetailPage({ params }: ProjectPageProps) {
       <div className="min-h-screen bg-background">
         <main className="container-wide px-6 py-8">
           <ProjectHeader 
-            project={project}
+            project={project as any} // Type assertion for component compatibility
             onStatusChange={() => {}} // This will be handled client-side in the header component
             onBack={() => {}} // This will be handled client-side in the header component
           />
 
           <div className="mt-8">
             <ProjectTabs
-              project={project}
+              project={project as any} // Type assertion for component compatibility
               activeTab="overview" // Default to overview, tabs component will handle URL params
               onTabChange={() => {}} // This will be handled client-side in the tabs component
               memberDetails={memberDetails}

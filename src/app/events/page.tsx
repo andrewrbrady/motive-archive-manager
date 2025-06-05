@@ -1,3 +1,4 @@
+import React from "react";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { getMongoClient } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
@@ -40,9 +41,9 @@ async function getEvents(): Promise<EventWithCar[]> {
     const events = await eventsCollection.find({}).sort({ date: -1 }).toArray();
 
     // Get unique car IDs and fetch car details in a single query
-    const carIds = [
-      ...new Set(events.map((event: any) => event.car_id).filter(Boolean)),
-    ];
+    const carIdsSet = new Set(events.map((event: any) => event.car_id).filter(Boolean));
+    const carIds = Array.from(carIdsSet);
+    
     const cars = await carsCollection
       .find({
         _id: { $in: carIds.map((id: any) => new ObjectId(id)) },
@@ -52,28 +53,24 @@ async function getEvents(): Promise<EventWithCar[]> {
     // Create a map for quick car lookup
     const carsMap = new Map(cars.map((car: any) => [car._id.toString(), car]));
 
+    // Helper function to serialize dates
+    const serializeDate = (date: any) => {
+      if (!date) return undefined;
+      if (date instanceof Date) return date.toISOString();
+      if (typeof date === "string") return date;
+      return new Date(date).toISOString();
+    };
+
     // Serialize events with car details
     const serializedEvents: EventWithCar[] = events.map((event: any) => ({
       _id: event._id.toString(),
       type: event.type || "",
       car_id: event.car_id || "",
-      date: event.date
-        ? event.date instanceof Date
-          ? event.date.toISOString()
-          : event.date
-        : null,
+      date: serializeDate(event.date),
       location: event.location || "",
       description: event.description || "",
-      createdAt: event.createdAt
-        ? event.createdAt instanceof Date
-          ? event.createdAt.toISOString()
-          : event.createdAt
-        : null,
-      updatedAt: event.updatedAt
-        ? event.updatedAt instanceof Date
-          ? event.updatedAt.toISOString()
-          : event.updatedAt
-        : null,
+      createdAt: serializeDate(event.createdAt),
+      updatedAt: serializeDate(event.updatedAt),
       car:
         event.car_id && carsMap.has(event.car_id)
           ? (() => {
@@ -93,6 +90,7 @@ async function getEvents(): Promise<EventWithCar[]> {
     console.error("Error fetching events:", error);
     return [];
   }
+  // DO NOT close the connection - getMongoClient() returns a shared connection
 }
 
 export default async function EventsPage() {
