@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
+import { verifyFirebaseToken } from "@/lib/firebase-auth-middleware";
 import { getDatabase } from "@/lib/mongodb";
 
 export async function POST(request: NextRequest) {
@@ -31,11 +32,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user ID from request headers (set by auth middleware)
-    const userId = request.headers.get("x-user-id");
-    if (!userId) {
-      return NextResponse.json({ error: "User ID not found" }, { status: 401 });
+    // Get user ID from the verified token
+    const authHeader = request.headers.get("authorization");
+    const token = authHeader?.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token!);
+
+    if (!tokenData) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     // Create composition document
     const composition = {
@@ -87,11 +94,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user ID from request headers (set by auth middleware)
-    const userId = request.headers.get("x-user-id");
-    if (!userId) {
-      return NextResponse.json({ error: "User ID not found" }, { status: 401 });
+    // Get user ID from the verified token
+    const authHeader = request.headers.get("authorization");
+    const token = authHeader?.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token!);
+
+    if (!tokenData) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
 
     // Get query parameters
     const { searchParams } = new URL(request.url);

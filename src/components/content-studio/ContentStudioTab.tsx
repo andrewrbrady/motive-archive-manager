@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Palette, FileText, Sparkles, Info } from "lucide-react";
+import { Palette, FileText, Sparkles, Info, Archive } from "lucide-react";
 
 import { CopySelector } from "./CopySelector";
 import { BlockComposer } from "./BlockComposer";
+import { CompositionsList } from "./CompositionsList";
 import {
   ContentStudioTabProps,
   SelectedCopy,
@@ -37,6 +38,7 @@ export function ContentStudioTab({
     null
   );
   const [activeTab, setActiveTab] = useState<string>("copy-selection");
+  const [loadedComposition, setLoadedComposition] = useState<any>(null);
 
   // Determine context (car vs project mode)
   const isProjectMode = Boolean(projectId);
@@ -70,11 +72,34 @@ export function ContentStudioTab({
     [onUpdate]
   );
 
+  // Handle loading a saved composition
+  const handleLoadComposition = useCallback((composition: any) => {
+    // Set the loaded composition for editing
+    setLoadedComposition(composition);
+
+    // Load the composition's blocks
+    setBlocks(composition.blocks || []);
+
+    // Set selected copies from metadata if available
+    if (composition.metadata?.selectedCopies) {
+      setSelectedCopies(composition.metadata.selectedCopies);
+    }
+
+    // Switch to the block composer tab
+    setActiveTab("block-composer");
+  }, []);
+
+  // Clear loaded composition when starting fresh
+  const handleClearComposition = useCallback(() => {
+    setLoadedComposition(null);
+  }, []);
+
   // Reset state when switching contexts
   React.useEffect(() => {
     setSelectedCopies([]);
     setBlocks([]);
     setActiveTemplate(null);
+    setLoadedComposition(null);
     setActiveTab("copy-selection");
   }, [carId, projectId]);
 
@@ -117,7 +142,7 @@ export function ContentStudioTab({
         onValueChange={setActiveTab}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
           <TabsTrigger
             value="copy-selection"
             className="flex items-center space-x-2"
@@ -151,6 +176,14 @@ export function ContentStudioTab({
           </TabsTrigger>
 
           <TabsTrigger
+            value="saved-compositions"
+            className="flex items-center space-x-2"
+          >
+            <Archive className="h-4 w-4" />
+            <span>Saved</span>
+          </TabsTrigger>
+
+          <TabsTrigger
             value="preview"
             className="flex items-center space-x-2 hidden lg:flex"
           >
@@ -177,6 +210,16 @@ export function ContentStudioTab({
             onBlocksChange={handleBlocksChange}
             template={activeTemplate || undefined}
             onTemplateChange={handleTemplateChange}
+            loadedComposition={loadedComposition}
+          />
+        </TabsContent>
+
+        {/* Saved Compositions Tab */}
+        <TabsContent value="saved-compositions" className="space-y-6">
+          <CompositionsList
+            carId={carId}
+            projectId={projectId}
+            onLoadComposition={handleLoadComposition}
           />
         </TabsContent>
 

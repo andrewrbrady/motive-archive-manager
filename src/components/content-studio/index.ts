@@ -7,6 +7,7 @@
 export { ContentStudioTab } from "./ContentStudioTab";
 export { CopySelector } from "./CopySelector";
 export { BlockComposer } from "./BlockComposer";
+export { CompositionsList } from "./CompositionsList";
 export { PreviewColumn } from "./PreviewColumn";
 
 // Export types

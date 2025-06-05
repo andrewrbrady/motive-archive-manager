@@ -7,6 +7,7 @@
 // Content block types that can be added to templates
 export type ContentBlockType =
   | "text"
+  | "heading"
   | "image"
   | "divider"
   | "button"
@@ -32,6 +33,36 @@ export interface TextBlock extends BaseContentBlock {
     color?: string;
     textAlign?: "left" | "center" | "right";
     lineHeight?: string;
+  };
+  // Rich text formatting support for bold and links
+  richFormatting?: {
+    enabled?: boolean;
+    // Store rich content as HTML or markdown-like format
+    formattedContent?: string;
+    // Track formatting rules applied
+    hasLinks?: boolean;
+    hasBold?: boolean;
+  };
+}
+
+export interface HeadingBlock extends BaseContentBlock {
+  type: "heading";
+  content: string;
+  level: 1 | 2 | 3 | 4 | 5 | 6;
+  formatting?: {
+    fontSize?: string;
+    fontWeight?: string;
+    color?: string;
+    textAlign?: "left" | "center" | "right";
+    marginTop?: string;
+    marginBottom?: string;
+  };
+  // Rich text formatting support for bold and links (optional for headings)
+  richFormatting?: {
+    enabled?: boolean;
+    formattedContent?: string;
+    hasLinks?: boolean;
+    hasBold?: boolean;
   };
 }
 
@@ -77,6 +108,7 @@ export interface ColumnsBlock extends BaseContentBlock {
 // Union type for all content blocks
 export type ContentBlock =
   | TextBlock
+  | HeadingBlock
   | ImageBlock
   | DividerBlock
   | ButtonBlock
@@ -144,6 +176,7 @@ export interface BlockComposerProps {
   onBlocksChange: (blocks: ContentBlock[]) => void;
   template?: ContentTemplate;
   onTemplateChange?: (template: ContentTemplate) => void;
+  loadedComposition?: any; // For editing existing compositions
 }
 
 // API response types (reusing existing patterns)
