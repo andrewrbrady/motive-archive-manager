@@ -30,11 +30,13 @@ import { toast } from "@/components/ui/use-toast";
 interface ProjectAssetsTabProps {
   project: Project;
   onProjectUpdate: () => void;
+  initialAssets?: any[]; // Optional pre-fetched assets data for SSR optimization (currently assets are part of project data)
 }
 
 export function ProjectAssetsTab({
   project,
   onProjectUpdate,
+  initialAssets,
 }: ProjectAssetsTabProps) {
   const [isAddAssetOpen, setIsAddAssetOpen] = useState(false);
   const [assetForm, setAssetForm] = useState({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Components, EventProps } from "react-big-calendar";
 import BaseCalendar, { BaseCalendarEvent } from "./BaseCalendar";
 import { Event } from "@/types/event";
@@ -89,28 +89,125 @@ export function MotiveCalendar({
   calendarRef,
 }: MotiveCalendarProps) {
   const api = useAPI();
-  const [showEvents, setShowEvents] = useState(true);
-  const [showDeliverables, setShowDeliverables] = useState(true);
-  const [showMilestones, setShowMilestones] = useState(true);
-  const [eventTypeFilters, setEventTypeFilters] = useState<string[]>([]);
-  const [deliverableEventFilters, setDeliverableEventFilters] = useState<
+
+  // Create a unique storage key for this calendar context
+  const storageKey = `motive-calendar-filters-${projectId || carId || "default"}`;
+
+  // Load filter states from localStorage with fallback defaults
+  const loadFiltersFromStorage = useCallback(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const data = JSON.parse(stored);
+        // For backward compatibility, ensure we have the new structure
+        return {
+          showEvents: data.showEvents !== undefined ? data.showEvents : true,
+          showDeliverables:
+            data.showDeliverables !== undefined ? data.showDeliverables : true,
+          showMilestones:
+            data.showMilestones !== undefined ? data.showMilestones : true,
+          // For filters, use empty arrays as default - we'll populate with all available options
+          eventTypeFilters: data.eventTypeFilters || [],
+          deliverableEventFilters: data.deliverableEventFilters || [],
+          deliverablePlatformFilters: data.deliverablePlatformFilters || [],
+          deliverableTypeFilters: data.deliverableTypeFilters || [],
+          milestoneStatusFilters: data.milestoneStatusFilters || [],
+        };
+      }
+    } catch (error) {
+      console.warn("Failed to load calendar filters from localStorage:", error);
+    }
+    return {
+      showEvents: true,
+      showDeliverables: true,
+      showMilestones: true,
+      eventTypeFilters: [],
+      deliverableEventFilters: [],
+      deliverablePlatformFilters: [],
+      deliverableTypeFilters: [],
+      milestoneStatusFilters: [],
+    };
+  }, [storageKey]);
+
+  // Save filter states to localStorage
+  const saveFiltersToStorage = useCallback(
+    (filters: any) => {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(filters));
+      } catch (error) {
+        console.warn("Failed to save calendar filters to localStorage:", error);
+      }
+    },
+    [storageKey]
+  );
+
+  // Initialize filter states from localStorage
+  const initialFilters = loadFiltersFromStorage();
+  const [showEvents, setShowEventsState] = useState(initialFilters.showEvents);
+  const [showDeliverables, setShowDeliverablesState] = useState(
+    initialFilters.showDeliverables
+  );
+  const [showMilestones, setShowMilestonesState] = useState(
+    initialFilters.showMilestones
+  );
+  const [eventTypeFilters, setEventTypeFiltersState] = useState<string[]>(
+    initialFilters.eventTypeFilters
+  );
+  const [deliverableEventFilters, setDeliverableEventFiltersState] = useState<
     string[]
-  >([]);
-  const [deliverablePlatformFilters, setDeliverablePlatformFilters] = useState<
+  >(initialFilters.deliverableEventFilters);
+  const [deliverablePlatformFilters, setDeliverablePlatformFiltersState] =
+    useState<string[]>(initialFilters.deliverablePlatformFilters);
+  const [deliverableTypeFilters, setDeliverableTypeFiltersState] = useState<
     string[]
-  >([]);
-  const [deliverableTypeFilters, setDeliverableTypeFilters] = useState<
+  >(initialFilters.deliverableTypeFilters);
+  const [milestoneStatusFilters, setMilestoneStatusFiltersState] = useState<
     string[]
-  >([]);
-  const [milestoneStatusFilters, setMilestoneStatusFilters] = useState<
-    string[]
-  >([]);
+  >(initialFilters.milestoneStatusFilters);
+
+  // Enhanced setters that automatically save to localStorage
+  const setShowEvents = useCallback((value: boolean) => {
+    setShowEventsState(value);
+  }, []);
+
+  const setShowDeliverables = useCallback((value: boolean) => {
+    setShowDeliverablesState(value);
+  }, []);
+
+  const setShowMilestones = useCallback((value: boolean) => {
+    setShowMilestonesState(value);
+  }, []);
+
+  const setEventTypeFilters = useCallback((value: string[]) => {
+    setEventTypeFiltersState(value);
+  }, []);
+
+  const setDeliverableEventFilters = useCallback((value: string[]) => {
+    setDeliverableEventFiltersState(value);
+  }, []);
+
+  const setDeliverablePlatformFilters = useCallback((value: string[]) => {
+    setDeliverablePlatformFiltersState(value);
+  }, []);
+
+  const setDeliverableTypeFilters = useCallback((value: string[]) => {
+    setDeliverableTypeFiltersState(value);
+  }, []);
+
+  const setMilestoneStatusFilters = useCallback((value: string[]) => {
+    setMilestoneStatusFiltersState(value);
+  }, []);
   const [eventsWithCars, setEventsWithCars] = useState<
     (Event & { car?: { make: string; model: string; year: number } })[]
   >([]);
 
   // Use caching strategy for car data to reduce blocking fetches
   const [carCache, setCarCache] = useState<
+    Map<string, { make: string; model: string; year: number }>
+  >(new Map());
+
+  // Create a map to store deliverable car data
+  const [deliverableCarCache, setDeliverableCarCache] = useState<
     Map<string, { make: string; model: string; year: number }>
   >(new Map());
 
@@ -142,18 +239,49 @@ export function MotiveCalendar({
     [api, carCache]
   );
 
+  // Fetch car data for deliverables
+  const fetchDeliverableCarData = useCallback(
+    async (carId: string) => {
+      if (!api || !carId) return undefined;
+
+      // Check cache first
+      if (deliverableCarCache.has(carId)) {
+        return deliverableCarCache.get(carId);
+      }
+
+      try {
+        const car = (await api.get(`/api/cars/${carId}`)) as {
+          make: string;
+          model: string;
+          year: number;
+        };
+
+        // Cache the result
+        setDeliverableCarCache((prev) => new Map(prev).set(carId, car));
+        return { make: car.make, model: car.model, year: car.year };
+      } catch (error) {
+        console.error("Error fetching deliverable car:", error);
+        return undefined;
+      }
+    },
+    [api, deliverableCarCache]
+  );
+
   // Update eventsWithCars when events change, with optimized car fetching
   useEffect(() => {
+    // Ensure events is an array to prevent map errors
+    const eventsArray = Array.isArray(events) ? events : [];
+
     if (!api) {
-      setEventsWithCars(events);
+      setEventsWithCars(eventsArray);
       return;
     }
 
-    if (projectId && events.length > 0) {
+    if (projectId && eventsArray.length > 0) {
       // Phase 3A: Optimized non-blocking car data fetching
       const updateEventsWithCarData = async () => {
         const eventsWithCarData = await Promise.all(
-          events.map(async (event) => {
+          eventsArray.map(async (event) => {
             if (event.car_id) {
               const car = await fetchCarData(event.car_id);
               return car ? { ...event, car } : event;
@@ -167,13 +295,45 @@ export function MotiveCalendar({
       // Run asynchronously to avoid blocking the UI
       updateEventsWithCarData();
     } else {
-      setEventsWithCars(events);
+      setEventsWithCars(eventsArray);
     }
   }, [events, projectId, api, fetchCarData]); // Include fetchCarData in dependencies
 
+  // Fetch car data for deliverables when deliverables change (non-blocking)
+  useEffect(() => {
+    if (!api || !projectId || !deliverables.length) return;
+
+    const fetchDeliverableCars = async () => {
+      const uniqueCarIds = [
+        ...new Set(
+          deliverables.filter((d) => d.car_id).map((d) => d.car_id!.toString())
+        ),
+      ];
+
+      // Fetch car data in background without blocking render
+      uniqueCarIds.forEach((carId) => {
+        if (!deliverableCarCache.has(carId)) {
+          fetchDeliverableCarData(carId).catch(console.error);
+        }
+      });
+    };
+
+    // Defer car data fetching to not block initial render
+    const timeoutId = setTimeout(fetchDeliverableCars, 500);
+    return () => clearTimeout(timeoutId);
+  }, [
+    deliverables,
+    projectId,
+    api,
+    fetchDeliverableCarData,
+    deliverableCarCache,
+  ]);
+
   // Get unique event types
   const uniqueEventTypes = useMemo(() => {
-    return [...new Set(events.map((event) => event.type))];
+    // Ensure events is an array to prevent map errors
+    const eventsArray = Array.isArray(events) ? events : [];
+    return [...new Set(eventsArray.map((event) => event.type))];
   }, [events]);
 
   // Get unique deliverable event categories (deadline and release)
@@ -194,14 +354,142 @@ export function MotiveCalendar({
     ];
   }, [deliverables]);
 
-  // Initialize all filters when data is loaded
-  useEffect(() => {
+  // Function to reset all filters to defaults
+  const resetFilters = useCallback(() => {
+    setShowEvents(true);
+    setShowDeliverables(true);
+    setShowMilestones(true);
     setEventTypeFilters([...uniqueEventTypes]);
     setDeliverableTypeFilters([...uniqueDeliverableTypes]);
     setDeliverablePlatformFilters([...uniqueDeliverablePlatforms]);
     setDeliverableEventFilters([...deliverableEventCategories]);
     setMilestoneStatusFilters([...milestoneStatusCategories]);
-  }, [uniqueEventTypes, uniqueDeliverableTypes, uniqueDeliverablePlatforms]);
+  }, [
+    uniqueEventTypes,
+    uniqueDeliverableTypes,
+    uniqueDeliverablePlatforms,
+    setShowEvents,
+    setShowDeliverables,
+    setShowMilestones,
+    setEventTypeFilters,
+    setDeliverableTypeFilters,
+    setDeliverablePlatformFilters,
+    setDeliverableEventFilters,
+    setMilestoneStatusFilters,
+  ]);
+
+  // Save filters to localStorage whenever they change
+  useEffect(() => {
+    const currentFilters = {
+      showEvents,
+      showDeliverables,
+      showMilestones,
+      eventTypeFilters,
+      deliverableEventFilters,
+      deliverablePlatformFilters,
+      deliverableTypeFilters,
+      milestoneStatusFilters,
+    };
+    saveFiltersToStorage(currentFilters);
+  }, [
+    showEvents,
+    showDeliverables,
+    showMilestones,
+    eventTypeFilters,
+    deliverableEventFilters,
+    deliverablePlatformFilters,
+    deliverableTypeFilters,
+    milestoneStatusFilters,
+    saveFiltersToStorage,
+  ]);
+
+  // Initialize all filters when data is loaded (simple approach)
+  useEffect(() => {
+    // Only set filters if they're empty (first time or no saved data)
+    if (eventTypeFilters.length === 0 && uniqueEventTypes.length > 0) {
+      setEventTypeFilters([...uniqueEventTypes]);
+    }
+    if (
+      deliverableTypeFilters.length === 0 &&
+      uniqueDeliverableTypes.length > 0
+    ) {
+      setDeliverableTypeFilters([...uniqueDeliverableTypes]);
+    }
+    if (
+      deliverablePlatformFilters.length === 0 &&
+      uniqueDeliverablePlatforms.length > 0
+    ) {
+      setDeliverablePlatformFilters([...uniqueDeliverablePlatforms]);
+    }
+    if (
+      deliverableEventFilters.length === 0 &&
+      deliverableEventCategories.length > 0
+    ) {
+      setDeliverableEventFilters([...deliverableEventCategories]);
+    }
+    if (
+      milestoneStatusFilters.length === 0 &&
+      milestoneStatusCategories.length > 0
+    ) {
+      setMilestoneStatusFilters([...milestoneStatusCategories]);
+    }
+  }, [
+    uniqueEventTypes,
+    uniqueDeliverableTypes,
+    uniqueDeliverablePlatforms,
+    eventTypeFilters.length,
+    deliverableTypeFilters.length,
+    deliverablePlatformFilters.length,
+    deliverableEventFilters.length,
+    milestoneStatusFilters.length,
+  ]);
+
+  // Clean up invalid filter values (simplified approach)
+  useEffect(() => {
+    // Remove any filter values that no longer exist in the current data
+    if (eventTypeFilters.length > 0 && uniqueEventTypes.length > 0) {
+      const validEventTypes = eventTypeFilters.filter((type) =>
+        uniqueEventTypes.includes(type as any)
+      );
+      if (validEventTypes.length !== eventTypeFilters.length) {
+        setEventTypeFilters(validEventTypes);
+      }
+    }
+
+    if (
+      deliverableTypeFilters.length > 0 &&
+      uniqueDeliverableTypes.length > 0
+    ) {
+      const validDeliverableTypes = deliverableTypeFilters.filter((type) =>
+        uniqueDeliverableTypes.includes(type as any)
+      );
+      if (validDeliverableTypes.length !== deliverableTypeFilters.length) {
+        setDeliverableTypeFilters(validDeliverableTypes);
+      }
+    }
+
+    if (
+      deliverablePlatformFilters.length > 0 &&
+      uniqueDeliverablePlatforms.length > 0
+    ) {
+      const validPlatforms = deliverablePlatformFilters.filter((platform) =>
+        uniqueDeliverablePlatforms.includes(platform as any)
+      );
+      if (validPlatforms.length !== deliverablePlatformFilters.length) {
+        setDeliverablePlatformFilters(validPlatforms);
+      }
+    }
+  }, [
+    uniqueEventTypes,
+    uniqueDeliverableTypes,
+    uniqueDeliverablePlatforms,
+    eventTypeFilters,
+    deliverableTypeFilters,
+    deliverablePlatformFilters,
+    setEventTypeFilters,
+    setDeliverableTypeFilters,
+    setDeliverablePlatformFilters,
+  ]);
 
   // Helper function to format event title for project calendar
   const formatEventTitle = useCallback(
@@ -252,6 +540,7 @@ export function MotiveCalendar({
       ? eventsWithCars
           .filter(
             (event) =>
+              // Only filter if we explicitly have filters set, otherwise show everything
               eventTypeFilters.length === 0 ||
               eventTypeFilters.includes(event.type)
           )
@@ -269,59 +558,75 @@ export function MotiveCalendar({
       : [];
 
     const deliverableItems: MotiveCalendarEvent[] = showDeliverables
-      ? deliverables
-          .filter(
-            (deliverable) =>
-              (deliverablePlatformFilters.length === 0 ||
-                deliverablePlatformFilters.includes(deliverable.platform)) &&
-              (deliverableTypeFilters.length === 0 ||
-                deliverableTypeFilters.includes(deliverable.type))
-          )
-          .flatMap((deliverable): MotiveCalendarEvent[] => {
-            const items: MotiveCalendarEvent[] = [];
+      ? deliverables.flatMap((deliverable): MotiveCalendarEvent[] => {
+          const items: MotiveCalendarEvent[] = [];
 
-            if (
-              deliverableEventFilters.length === 0 ||
-              deliverableEventFilters.includes("deadline")
-            ) {
-              const deadlineEvent: MotiveCalendarEvent = {
-                id: `${deliverable._id?.toString()}-deadline`,
-                title: `${deliverable.title} (Edit Deadline)`,
-                start: new Date(deliverable.edit_deadline),
-                end: new Date(deliverable.edit_deadline),
+          if (
+            deliverableEventFilters.length === 0 ||
+            deliverableEventFilters.includes("deadline")
+          ) {
+            // Format title with car info if available
+            const carData = deliverable.car_id
+              ? deliverableCarCache.get(deliverable.car_id.toString())
+              : undefined;
+            const carInfo = carData
+              ? `${carData.year} ${carData.make} ${carData.model}`
+              : "";
+            const title = carInfo
+              ? `${carInfo} | ${deliverable.title} (Edit Deadline)`
+              : `${deliverable.title} (Edit Deadline)`;
+
+            const deadlineEvent: MotiveCalendarEvent = {
+              id: `${deliverable._id?.toString()}-deadline`,
+              title: title,
+              start: new Date(deliverable.edit_deadline),
+              end: new Date(deliverable.edit_deadline),
+              type: "deliverable",
+              resource: {
+                ...deliverable,
+                eventType: "deadline",
+                car: carData,
+              } as DeliverableWithEventType,
+              allDay: true,
+            };
+            items.push(deadlineEvent);
+          }
+
+          if (
+            deliverableEventFilters.length === 0 ||
+            deliverableEventFilters.includes("release")
+          ) {
+            if (deliverable.release_date) {
+              // Format title with car info if available
+              const carData = deliverable.car_id
+                ? deliverableCarCache.get(deliverable.car_id.toString())
+                : undefined;
+              const carInfo = carData
+                ? `${carData.year} ${carData.make} ${carData.model}`
+                : "";
+              const title = carInfo
+                ? `${carInfo} | ${deliverable.title} (Release)`
+                : `${deliverable.title} (Release)`;
+
+              const releaseEvent: MotiveCalendarEvent = {
+                id: `${deliverable._id?.toString()}-release`,
+                title: title,
+                start: new Date(deliverable.release_date),
+                end: new Date(deliverable.release_date),
                 type: "deliverable",
                 resource: {
                   ...deliverable,
-                  eventType: "deadline",
+                  eventType: "release",
+                  car: carData,
                 } as DeliverableWithEventType,
                 allDay: true,
               };
-              items.push(deadlineEvent);
+              items.push(releaseEvent);
             }
+          }
 
-            if (
-              deliverableEventFilters.length === 0 ||
-              deliverableEventFilters.includes("release")
-            ) {
-              if (deliverable.release_date) {
-                const releaseEvent: MotiveCalendarEvent = {
-                  id: `${deliverable._id?.toString()}-release`,
-                  title: `${deliverable.title} (Release)`,
-                  start: new Date(deliverable.release_date),
-                  end: new Date(deliverable.release_date),
-                  type: "deliverable",
-                  resource: {
-                    ...deliverable,
-                    eventType: "release",
-                  } as DeliverableWithEventType,
-                  allDay: true,
-                };
-                items.push(releaseEvent);
-              }
-            }
-
-            return items;
-          })
+          return items;
+        })
       : [];
 
     const milestoneItems: MotiveCalendarEvent[] = showMilestones
@@ -356,6 +661,7 @@ export function MotiveCalendar({
     api, // Add api dependency
     eventsWithCars,
     deliverables,
+    deliverableCarCache, // Add deliverable car cache dependency
     milestones,
     eventTypeFilters,
     deliverableEventFilters,
@@ -583,7 +889,7 @@ export function MotiveCalendar({
         </div>
 
         {showVisibilityControls && (
-          <>
+          <React.Fragment key="visibility-controls">
             <Separator orientation="vertical" className="h-6" />
 
             <div className="flex items-center gap-2">
@@ -641,11 +947,11 @@ export function MotiveCalendar({
                 </Button>
               )}
             </div>
-          </>
+          </React.Fragment>
         )}
 
         {showFilterControls && (
-          <>
+          <React.Fragment key="filter-controls">
             <Separator orientation="vertical" className="h-6" />
 
             <DropdownMenu>
@@ -661,12 +967,12 @@ export function MotiveCalendar({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 {showEvents && uniqueEventTypes.length > 0 && (
-                  <>
+                  <React.Fragment key="event-types-section">
                     <DropdownMenuLabel>Event Types</DropdownMenuLabel>
                     <DropdownMenuGroup>
                       {uniqueEventTypes.map((type) => (
                         <DropdownMenuCheckboxItem
-                          key={type}
+                          key={`event-type-${type}`}
                           checked={eventTypeFilters.includes(type)}
                           onCheckedChange={(checked) => {
                             setEventTypeFilters(
@@ -680,11 +986,11 @@ export function MotiveCalendar({
                         </DropdownMenuCheckboxItem>
                       ))}
                     </DropdownMenuGroup>
-                  </>
+                  </React.Fragment>
                 )}
 
                 {showDeliverables && (
-                  <>
+                  <React.Fragment key="deliverables-section">
                     {showEvents && uniqueEventTypes.length > 0 && (
                       <DropdownMenuSeparator />
                     )}
@@ -692,7 +998,7 @@ export function MotiveCalendar({
                     <DropdownMenuGroup>
                       {uniqueDeliverableTypes.map((type) => (
                         <DropdownMenuCheckboxItem
-                          key={type}
+                          key={`deliverable-type-${type}`}
                           checked={deliverableTypeFilters.includes(type)}
                           onCheckedChange={(checked) => {
                             setDeliverableTypeFilters(
@@ -714,7 +1020,7 @@ export function MotiveCalendar({
                     <DropdownMenuGroup>
                       {uniqueDeliverablePlatforms.map((platform) => (
                         <DropdownMenuCheckboxItem
-                          key={platform}
+                          key={`deliverable-platform-${platform}`}
                           checked={deliverablePlatformFilters.includes(
                             platform
                           )}
@@ -738,7 +1044,7 @@ export function MotiveCalendar({
                     <DropdownMenuGroup>
                       {deliverableEventCategories.map((category) => (
                         <DropdownMenuCheckboxItem
-                          key={category}
+                          key={`deliverable-category-${category}`}
                           checked={deliverableEventFilters.includes(category)}
                           onCheckedChange={(checked) => {
                             setDeliverableEventFilters(
@@ -754,11 +1060,11 @@ export function MotiveCalendar({
                         </DropdownMenuCheckboxItem>
                       ))}
                     </DropdownMenuGroup>
-                  </>
+                  </React.Fragment>
                 )}
 
                 {showMilestones && milestones.length > 0 && (
-                  <>
+                  <React.Fragment key="milestones-section">
                     {(showEvents && uniqueEventTypes.length > 0) ||
                     showDeliverables ? (
                       <DropdownMenuSeparator />
@@ -767,7 +1073,7 @@ export function MotiveCalendar({
                     <DropdownMenuGroup>
                       {milestoneStatusCategories.map((status) => (
                         <DropdownMenuCheckboxItem
-                          key={status}
+                          key={`milestone-status-${status}`}
                           checked={milestoneStatusFilters.includes(status)}
                           onCheckedChange={(checked) => {
                             setMilestoneStatusFilters(
@@ -783,11 +1089,11 @@ export function MotiveCalendar({
                         </DropdownMenuCheckboxItem>
                       ))}
                     </DropdownMenuGroup>
-                  </>
+                  </React.Fragment>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
-          </>
+          </React.Fragment>
         )}
       </div>
     </div>
@@ -947,6 +1253,9 @@ export function MotiveCalendar({
       }}
       eventPropGetter={eventPropGetter}
       components={components}
+      popup={false} // Show all events inline, no popup
+      popupOffset={15} // Show up to 15 events before "show more" link
+      showAllEvents={false} // Disable to maintain drag/drop functionality
       showFilterControls={showFilterControls}
       showVisibilityControls={showVisibilityControls}
       filterOptions={{

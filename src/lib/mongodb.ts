@@ -23,13 +23,13 @@ if (!process.env.MONGODB_URI) {
 
 const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/fallback";
 const options: MongoClientOptions = {
-  maxPoolSize: 10,
+  maxPoolSize: 5, // ⚡ REDUCED: Conservative pool size to prevent connection exhaustion
   minPoolSize: 1,
-  maxIdleTimeMS: 60000,
+  maxIdleTimeMS: 30000, // ⚡ REDUCED: Shorter idle time to release connections faster
   connectTimeoutMS: 30000,
   socketTimeoutMS: 60000,
   serverSelectionTimeoutMS: 30000,
-  waitQueueTimeoutMS: 10000,
+  waitQueueTimeoutMS: 5000, // ⚡ REDUCED: Shorter wait time for available connections
   retryWrites: true,
   retryReads: true,
   w: 1,
@@ -52,12 +52,13 @@ const isVercel = process.env.VERCEL === "1";
 
 // Adjust options for Vercel environment - optimized for better reliability
 if (isVercel) {
-  options.maxPoolSize = 5;
+  options.maxPoolSize = 3; // ⚡ FURTHER REDUCED: Even more conservative for Vercel
   options.minPoolSize = 0;
+  options.maxIdleTimeMS = 15000; // ⚡ REDUCED: Faster connection release on Vercel
   options.serverSelectionTimeoutMS = 15000;
   options.connectTimeoutMS = 15000;
   options.socketTimeoutMS = 30000;
-  options.waitQueueTimeoutMS = 5000;
+  options.waitQueueTimeoutMS = 3000; // ⚡ REDUCED: Shorter wait time on Vercel
   options.heartbeatFrequencyMS = 15000;
   options.family = 4;
   // console.log(

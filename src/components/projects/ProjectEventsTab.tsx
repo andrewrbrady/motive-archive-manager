@@ -85,6 +85,7 @@ import { formatEventDateTime } from "@/lib/dateUtils";
 
 interface ProjectEventsTabProps {
   projectId: string;
+  initialEvents?: EventWithCar[]; // Optional pre-fetched events data for SSR optimization
 }
 
 interface Car {
@@ -122,11 +123,14 @@ const getEventTypeIcon = (type: EventType) => {
   }
 };
 
-export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
+export default function ProjectEventsTab({
+  projectId,
+  initialEvents,
+}: ProjectEventsTabProps) {
   const api = useAPI();
-  const [events, setEvents] = useState<EventWithCar[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [view, setView] = useState("grid"); // Start with grid view for projects
+  const [events, setEvents] = useState<EventWithCar[]>(initialEvents || []);
+  const [isLoading, setIsLoading] = useState(!initialEvents); // Don't show loading if we have initial data
+  const [view, setView] = useState<"list" | "grid">("list");
   const [isEditMode, setIsEditMode] = useState(false);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
   const [showAttachEvent, setShowAttachEvent] = useState(false);
@@ -143,18 +147,33 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
       console.time("ProjectEventsTab-parallel-fetch");
 
       // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
-      const response = (await api.get(
-        `projects/${projectId}/events`
-      )) as Event[];
+      const response = (await api.get(`projects/${projectId}/events`)) as {
+        events: Event[];
+        total: number;
+        limit: number;
+        offset: number;
+        hasMore: boolean;
+      };
+
+      // Extract events array from response
+      const events = response.events || [];
 
       // Fetch car information for events that have car_id in parallel
       const eventsWithCars = await Promise.all(
-        response.map(async (event: Event) => {
+        events.map(async (event: Event) => {
           try {
             let car: Car | undefined = undefined;
             if (event.car_id) {
-              // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
-              car = (await api.get(`cars/${event.car_id}`)) as Car;
+              try {
+                // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
+                car = (await api.get(`cars/${event.car_id}`)) as Car;
+              } catch (carError) {
+                // Silently handle car fetch errors - car might not exist or be inaccessible
+                console.warn(
+                  `Car ${event.car_id} could not be fetched for event ${event.id}`
+                );
+                car = undefined;
+              }
             }
 
             // Check if this event was created specifically for this project
@@ -167,7 +186,11 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
               isAttached: !isCreatedForProject,
             };
           } catch (error) {
-            console.error("Error fetching car:", error);
+            // This should rarely happen since we handle car errors separately
+            console.warn(
+              `Error processing event ${event.id}:`,
+              error instanceof Error ? error.message : "Unknown error"
+            );
             return {
               ...event,
               car: undefined,
@@ -188,10 +211,11 @@ export default function ProjectEventsTab({ projectId }: ProjectEventsTabProps) {
   };
 
   useEffect(() => {
-    if (projectId && api) {
+    // Only fetch if we don't have initial data and API is available
+    if (projectId && api && !initialEvents) {
       fetchEvents();
     }
-  }, [projectId, api]);
+  }, [projectId, api, initialEvents]);
 
   const handleCreateEvent = async (eventData: Partial<Event>) => {
     if (!api) return;

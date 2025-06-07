@@ -35,6 +35,13 @@ interface UnifiedCopywriterProps {
 
   // Callbacks for parent components
   onProjectUpdate?: () => void;
+
+  // SSR optimization - optional pre-fetched data
+  initialCopywriterData?: {
+    cars: BaTCarDetails[];
+    events: any[];
+    captions: any[];
+  };
 }
 
 /**
@@ -75,6 +82,7 @@ export function UnifiedCopywriter({
   allowMinimalCarData = false,
   showClientHandle = false,
   onProjectUpdate,
+  initialCopywriterData,
 }: UnifiedCopywriterProps) {
   const api = useAPI();
 
@@ -134,7 +142,7 @@ export function UnifiedCopywriter({
     isLoading: isLoadingCars,
     error: carsError,
   } = useAPIQuery<BaTCarDetails[]>(carsEndpoint!, {
-    enabled: !!carsEndpoint,
+    enabled: !!carsEndpoint && !initialCopywriterData?.cars, // Don't fetch if we have initial data
     staleTime: 3 * 60 * 1000,
     retry: 2,
     retryDelay: 1000,
@@ -190,7 +198,12 @@ export function UnifiedCopywriter({
     isLoading: isLoadingFullCars,
     error: fullCarsError,
   } = useAPIQuery<BaTCarDetails[]>(fullCarsEndpoint!, {
-    enabled: Boolean(projectId && projectCarIds.length > 0 && fullCarsEndpoint),
+    enabled: Boolean(
+      projectId &&
+        projectCarIds.length > 0 &&
+        fullCarsEndpoint &&
+        !initialCopywriterData?.cars
+    ), // Don't fetch if we have initial data
     staleTime: 3 * 60 * 1000,
     retry: 2,
     retryDelay: 1000,
@@ -206,7 +219,19 @@ export function UnifiedCopywriter({
   });
 
   // Use full car data if available (project mode), otherwise use basic car data
+  // Prioritize initial data from SSR optimization
   const finalCarsData = React.useMemo(() => {
+    // First priority: Use pre-loaded data from SSR
+    if (initialCopywriterData?.cars && initialCopywriterData.cars.length > 0) {
+      console.log(
+        `✅ UnifiedCopywriter: Using pre-loaded SSR car data:`,
+        initialCopywriterData.cars.length,
+        "cars"
+      );
+      return initialCopywriterData.cars;
+    }
+
+    // Second priority: Use full car data (project mode)
     if (projectId && fullCarsData && fullCarsData.length > 0) {
       console.log(
         `🚗 UnifiedCopywriter: Using full car data for project mode:`,
@@ -214,9 +239,11 @@ export function UnifiedCopywriter({
       );
       return fullCarsData;
     }
+
+    // Fallback: Use basic car data
     console.log(`🚗 UnifiedCopywriter: Using basic car data:`, carsData || []);
     return carsData || [];
-  }, [projectId, fullCarsData, carsData]);
+  }, [initialCopywriterData?.cars, projectId, fullCarsData, carsData]);
 
   // Events data fetching
   const eventsEndpoint = apiEndpoints.events;
@@ -225,7 +252,8 @@ export function UnifiedCopywriter({
     isLoading: isLoadingEvents,
     error: eventsError,
   } = useAPIQuery<any[]>(eventsEndpoint!, {
-    enabled: !!eventsEndpoint && allowEventSelection,
+    enabled:
+      !!eventsEndpoint && allowEventSelection && !initialCopywriterData?.events, // Don't fetch if we have initial data
     staleTime: 3 * 60 * 1000,
     retry: 2,
     retryDelay: 1000,
@@ -243,32 +271,64 @@ export function UnifiedCopywriter({
     error: captionsError,
     refetch: refetchCaptions,
   } = useAPIQuery<any[]>(captionsQuery, {
-    enabled: !!carsEndpoint, // Enable if we have a cars endpoint (either project or car mode)
+    enabled: !!carsEndpoint && !initialCopywriterData?.captions, // Don't fetch if we have initial data
     staleTime: 1 * 60 * 1000,
     retry: 2,
     retryDelay: 1000,
     refetchOnWindowFocus: false,
   });
 
-  // Loading and error states
+  // Loading and error states - don't show loading if we have initial data
   const isLoading =
-    isLoadingCars ||
-    (projectId && isLoadingFullCars) ||
-    (allowEventSelection && isLoadingEvents);
+    (!initialCopywriterData && isLoadingCars) ||
+    (!initialCopywriterData && projectId && isLoadingFullCars) ||
+    (!initialCopywriterData?.events && allowEventSelection && isLoadingEvents);
   const hasError = carsError || fullCarsError || eventsError || captionsError;
 
-  // Non-blocking loading state
+  // Non-blocking loading state with skeleton
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">
-            Loading {title || "copywriter"}...
-          </p>
-          <p className="text-xs text-muted-foreground text-center">
-            You can switch tabs while this loads
-          </p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-8 w-48 bg-muted animate-pulse rounded" />
+            <div className="h-4 w-64 bg-muted animate-pulse rounded" />
+          </div>
+          <div className="h-10 w-32 bg-muted animate-pulse rounded" />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left column skeleton */}
+          <div className="space-y-4">
+            <div className="h-6 w-32 bg-muted animate-pulse rounded" />
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-16 bg-muted animate-pulse rounded" />
+              ))}
+            </div>
+          </div>
+
+          {/* Right column skeleton */}
+          <div className="space-y-4">
+            <div className="h-6 w-40 bg-muted animate-pulse rounded" />
+            <div className="h-64 bg-muted animate-pulse rounded" />
+            <div className="flex gap-2">
+              <div className="h-10 w-24 bg-muted animate-pulse rounded" />
+              <div className="h-10 w-24 bg-muted animate-pulse rounded" />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center py-8">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">
+              Loading {title || "copywriter"}...
+            </p>
+            <p className="text-xs text-muted-foreground text-center">
+              You can switch tabs while this loads
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -350,8 +410,8 @@ export function UnifiedCopywriter({
           })
         );
 
-        // Convert events to project format
-        const events = eventsData || [];
+        // Convert events to project format - use initial data if available
+        const events = initialCopywriterData?.events || eventsData || [];
         const projectEvents: ProjectEvent[] = events
           .filter((event: any) => {
             if (!event.id) {
@@ -377,8 +437,12 @@ export function UnifiedCopywriter({
             updatedAt: event.updatedAt,
           }));
 
-        // Convert captions to unified format
-        const savedCaptions = (captionsData || []).map((caption: any) => ({
+        // Convert captions to unified format - use initial data if available
+        const savedCaptions = (
+          initialCopywriterData?.captions ||
+          captionsData ||
+          []
+        ).map((caption: any) => ({
           _id: caption._id,
           platform: caption.platform,
           context: caption.context,
@@ -406,7 +470,10 @@ export function UnifiedCopywriter({
           galleries: [],
           inspections: [],
           hasMoreEvents: events.length > 5,
-          hasMoreCaptions: captionsData ? captionsData.length >= 4 : false,
+          hasMoreCaptions:
+            initialCopywriterData?.captions || captionsData
+              ? (initialCopywriterData?.captions || captionsData)!.length >= 4
+              : false,
         };
       } catch (error) {
         console.error("Error fetching copywriter data:", error);

@@ -411,106 +411,108 @@ export function ProjectTeamTab({
       </CardHeader>
       <CardContent className="pt-4">
         <div className="space-y-4">
-          {project.members.map((member) => (
-            <div
-              key={member.userId}
-              className="flex items-center justify-between p-4 border rounded-lg"
-            >
-              <div className="flex items-center gap-3">
-                <Avatar className="w-10 h-10">
-                  <AvatarImage
-                    src={memberDetails[member.userId]?.image}
-                    alt={
-                      memberDetails[member.userId]?.name ||
-                      `User ${member.userId}`
-                    }
-                  />
-                  <AvatarFallback>
-                    {memberDetails[member.userId]?.name
-                      ? memberDetails[member.userId].name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .toUpperCase()
-                          .substring(0, 2)
-                      : "U"}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="font-medium">
-                    {memberDetails[member.userId]?.name ||
-                      `User ${member.userId}`}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {memberDetails[member.userId]?.email ||
-                      `Joined ${format(new Date(member.joinedAt), "MMM d, yyyy")}`}
+          {project.members.map((member) => {
+            const memberDetail = memberDetails[member.userId];
+            const hasDetails = !!memberDetail;
+
+            return (
+              <div
+                key={member.userId}
+                className="flex items-center justify-between p-4 border rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <Avatar className="w-10 h-10">
+                    <AvatarImage
+                      src={memberDetail?.image}
+                      alt={memberDetail?.name || `User ${member.userId}`}
+                    />
+                    <AvatarFallback>
+                      {hasDetails && memberDetail.name
+                        ? memberDetail.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")
+                            .toUpperCase()
+                            .substring(0, 2)
+                        : "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="font-medium">
+                      {hasDetails ? memberDetail.name : `Loading...`}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {hasDetails
+                        ? memberDetail.email
+                        : `Joined ${format(new Date(member.joinedAt), "MMM d, yyyy")}`}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge className={getRoleColor(member.role)}>
-                  {member.role}
-                </Badge>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() =>
-                        handleUpdateMemberRole(member.userId, "viewer")
-                      }
-                      disabled={member.role === "viewer"}
-                    >
-                      Set as Viewer
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() =>
-                        handleUpdateMemberRole(member.userId, "writer")
-                      }
-                      disabled={member.role === "writer"}
-                    >
-                      Set as Writer
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() =>
-                        handleUpdateMemberRole(member.userId, "editor")
-                      }
-                      disabled={member.role === "editor"}
-                    >
-                      Set as Editor
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() =>
-                        handleUpdateMemberRole(member.userId, "photographer")
-                      }
-                      disabled={member.role === "photographer"}
-                    >
-                      Set as Photographer
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() =>
-                        handleUpdateMemberRole(member.userId, "manager")
-                      }
-                      disabled={member.role === "manager"}
-                    >
-                      Set as Manager
-                    </DropdownMenuItem>
-                    {member.role !== "owner" && (
+                <div className="flex items-center gap-2">
+                  <Badge className={getRoleColor(member.role)}>
+                    {member.role}
+                  </Badge>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onClick={() => handleRemoveMember(member.userId)}
-                        className="text-red-600"
+                        onClick={() =>
+                          handleUpdateMemberRole(member.userId, "viewer")
+                        }
+                        disabled={member.role === "viewer"}
                       >
-                        Remove from Project
+                        Set as Viewer
                       </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          handleUpdateMemberRole(member.userId, "writer")
+                        }
+                        disabled={member.role === "writer"}
+                      >
+                        Set as Writer
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          handleUpdateMemberRole(member.userId, "editor")
+                        }
+                        disabled={member.role === "editor"}
+                      >
+                        Set as Editor
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          handleUpdateMemberRole(member.userId, "photographer")
+                        }
+                        disabled={member.role === "photographer"}
+                      >
+                        Set as Photographer
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          handleUpdateMemberRole(member.userId, "manager")
+                        }
+                        disabled={member.role === "manager"}
+                      >
+                        Set as Manager
+                      </DropdownMenuItem>
+                      {member.role !== "owner" && (
+                        <DropdownMenuItem
+                          onClick={() => handleRemoveMember(member.userId)}
+                          className="text-red-600"
+                        >
+                          Remove from Project
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {project.members.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />

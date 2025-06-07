@@ -26,8 +26,15 @@ export function ProjectCalendarTab({ projectId }: ProjectCalendarTabProps) {
 
     try {
       console.time("ProjectCalendarTab-fetch-events");
-      const data = (await api.get(`projects/${projectId}/events`)) as Event[];
-      setEvents(data);
+      const response = (await api.get(`projects/${projectId}/events`)) as {
+        events: Event[];
+        total: number;
+        limit: number;
+        offset: number;
+        hasMore: boolean;
+      };
+      // Extract events array from response
+      setEvents(response.events || []);
     } catch (error) {
       console.error("Error fetching project events:", error);
       toast.error("Failed to fetch events");

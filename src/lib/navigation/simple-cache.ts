@@ -1,28 +1,30 @@
 /**
- * Instant Navigation System - Prioritizes speed over preloading
+ * Enhanced Navigation System - Optimized for fast page transitions
  *
- * Philosophy: Show pages instantly, load data after
- * 1. ✅ Instant page transitions
- * 2. ✅ Minimal preloading (only on explicit hover)
- * 3. ✅ No debouncing delays
- * 4. ✅ No aggressive caching that slows things down
+ * Philosophy: Instant feedback with smart preloading
+ * 1. ✅ Instant visual feedback on navigation
+ * 2. ✅ Smart preloading based on user behavior
+ * 3. ✅ Performance monitoring and optimization
+ * 4. ✅ Graceful error handling and fallbacks
  */
 
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * Instant router - no delays, immediate navigation
+ * Enhanced router with performance tracking
  */
-class InstantRouter {
-  private static instance: InstantRouter;
+class PerformanceRouter {
+  private static instance: PerformanceRouter;
   private router: any = null;
+  private navigationTimes = new Map<string, number>();
+  private pendingNavigations = new Set<string>();
 
-  static getInstance(): InstantRouter {
-    if (!InstantRouter.instance) {
-      InstantRouter.instance = new InstantRouter();
+  static getInstance(): PerformanceRouter {
+    if (!PerformanceRouter.instance) {
+      PerformanceRouter.instance = new PerformanceRouter();
     }
-    return InstantRouter.instance;
+    return PerformanceRouter.instance;
   }
 
   setRouter(router: any) {
@@ -30,25 +32,288 @@ class InstantRouter {
   }
 
   /**
-   * Instant replace - no delays
+   * Navigate with performance tracking
    */
-  replace(url: string, options: any = {}) {
-    if (!this.router) return;
-    this.router.replace(url, options);
+  async navigate(
+    url: string,
+    method: "push" | "replace" = "push",
+    options: any = {}
+  ) {
+    if (!this.router || this.pendingNavigations.has(url)) return;
+
+    const startTime = performance.now();
+    this.pendingNavigations.add(url);
+
+    try {
+      // Track navigation start
+      console.time(`Navigation-${url}`);
+
+      if (method === "replace") {
+        await this.router.replace(url, options);
+      } else {
+        await this.router.push(url, options);
+      }
+
+      // Track successful navigation
+      const duration = performance.now() - startTime;
+      this.navigationTimes.set(url, duration);
+      console.timeEnd(`Navigation-${url}`);
+
+      if (duration > 1000) {
+        console.warn(
+          `Slow navigation detected: ${url} took ${duration.toFixed(2)}ms`
+        );
+      }
+    } catch (error) {
+      console.error(`Navigation failed: ${url}`, error);
+    } finally {
+      this.pendingNavigations.delete(url);
+    }
   }
 
   /**
-   * Instant push - no delays
+   * Get navigation performance metrics
    */
-  push(url: string, options: any = {}) {
-    if (!this.router) return;
-    this.router.push(url, options);
+  getPerformanceMetrics() {
+    const times = Array.from(this.navigationTimes.values());
+    if (times.length === 0) return null;
+
+    return {
+      averageTime: times.reduce((a, b) => a + b, 0) / times.length,
+      maxTime: Math.max(...times),
+      minTime: Math.min(...times),
+      totalNavigations: times.length,
+      slowNavigations: times.filter((t) => t > 1000).length,
+    };
   }
 }
 
 /**
- * Minimal navigation cache - only preload on explicit hover
+ * Smart navigation cache with intelligent preloading
  */
+class SmartNavigationCache {
+  private static instance: SmartNavigationCache;
+  private router: any = null;
+  private preloadedRoutes = new Set<string>();
+  private userBehavior = new Map<string, number>(); // Track user navigation patterns
+  private preloadQueue = new Set<string>();
+
+  static getInstance(): SmartNavigationCache {
+    if (!SmartNavigationCache.instance) {
+      SmartNavigationCache.instance = new SmartNavigationCache();
+    }
+    return SmartNavigationCache.instance;
+  }
+
+  setRouter(router: any) {
+    this.router = router;
+  }
+
+  /**
+   * Track user navigation patterns
+   */
+  trackNavigation(from: string, to: string) {
+    const pattern = `${from}->${to}`;
+    this.userBehavior.set(pattern, (this.userBehavior.get(pattern) || 0) + 1);
+  }
+
+  /**
+   * Get predicted next routes based on user behavior
+   */
+  getPredictedRoutes(currentRoute: string): string[] {
+    const predictions: Array<{ route: string; confidence: number }> = [];
+
+    this.userBehavior.forEach((count, pattern) => {
+      const [from, to] = pattern.split("->");
+      if (from === currentRoute) {
+        predictions.push({ route: to, confidence: count });
+      }
+    });
+
+    return predictions
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 3)
+      .map((p) => p.route);
+  }
+
+  /**
+   * Smart preload with behavior prediction
+   */
+  async smartPreload(href: string, currentRoute: string) {
+    if (this.preloadedRoutes.has(href) || this.preloadQueue.has(href)) return;
+
+    this.preloadQueue.add(href);
+
+    try {
+      await this.router.prefetch(href);
+      this.preloadedRoutes.add(href);
+
+      // Also preload predicted next routes
+      const predicted = this.getPredictedRoutes(href);
+      predicted.forEach((route) => {
+        if (!this.preloadedRoutes.has(route)) {
+          setTimeout(() => this.router.prefetch(route), 100);
+        }
+      });
+    } catch (error) {
+      console.warn("Failed to preload:", href, error);
+    } finally {
+      this.preloadQueue.delete(href);
+    }
+  }
+
+  /**
+   * Clear old cache entries periodically
+   */
+  cleanup() {
+    // Keep cache size manageable
+    if (this.preloadedRoutes.size > 50) {
+      const routesToDelete = Array.from(this.preloadedRoutes).slice(0, 20);
+      routesToDelete.forEach((route) => this.preloadedRoutes.delete(route));
+    }
+  }
+}
+
+/**
+ * Enhanced hook for fast navigation with performance tracking
+ */
+export function useFastRouter() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const performanceRouter = PerformanceRouter.getInstance();
+  const cache = SmartNavigationCache.getInstance();
+  const [isNavigating, setIsNavigating] = useState(false);
+  const lastPathname = useRef(pathname);
+
+  useEffect(() => {
+    performanceRouter.setRouter(router);
+    cache.setRouter(router);
+  }, [router]);
+
+  // Track navigation patterns
+  useEffect(() => {
+    if (lastPathname.current !== pathname && pathname && lastPathname.current) {
+      cache.trackNavigation(lastPathname.current, pathname);
+      lastPathname.current = pathname;
+    }
+  }, [pathname]);
+
+  const navigateWithPerformance = useCallback(
+    async (
+      url: string,
+      method: "push" | "replace" = "push",
+      options: any = {}
+    ) => {
+      setIsNavigating(true);
+      await performanceRouter.navigate(url, method, options);
+      setIsNavigating(false);
+    },
+    []
+  );
+
+  const fastPush = useCallback(
+    (url: string, options: any = {}) =>
+      navigateWithPerformance(url, "push", options),
+    [navigateWithPerformance]
+  );
+
+  const fastReplace = useCallback(
+    (url: string, options: any = {}) =>
+      navigateWithPerformance(url, "replace", options),
+    [navigateWithPerformance]
+  );
+
+  return {
+    fastPush,
+    fastReplace,
+    isNavigating,
+    getPerformanceMetrics: () => performanceRouter.getPerformanceMetrics(),
+  };
+}
+
+/**
+ * Enhanced hook for smart navigation caching
+ */
+export function useSmartNavigationCache() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const cache = SmartNavigationCache.getInstance();
+
+  useEffect(() => {
+    cache.setRouter(router);
+  }, [router]);
+
+  const preloadRoute = useCallback(
+    (href: string) => {
+      if (pathname) {
+        cache.smartPreload(href, pathname);
+      }
+    },
+    [pathname]
+  );
+
+  // Cleanup cache periodically
+  useEffect(() => {
+    const interval = setInterval(() => cache.cleanup(), 60000); // Every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  return { preloadRoute };
+}
+
+/**
+ * Enhanced Link hook with smart preloading and performance tracking
+ */
+export function useFastLink({
+  href,
+  prefetch = true,
+  preloadOnHover = true,
+}: {
+  href: string;
+  prefetch?: boolean;
+  preloadOnHover?: boolean;
+}) {
+  const { preloadRoute } = useSmartNavigationCache();
+  const [isHovered, setIsHovered] = useState(false);
+  const preloadedRef = useRef(false);
+
+  const handleMouseEnter = useCallback(() => {
+    setIsHovered(true);
+    if (preloadOnHover && !preloadedRef.current) {
+      preloadRoute(href);
+      preloadedRef.current = true;
+    }
+  }, [href, preloadOnHover, preloadRoute]);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsHovered(false);
+  }, []);
+
+  const handleFocus = useCallback(() => {
+    if (preloadOnHover && !preloadedRef.current) {
+      preloadRoute(href);
+      preloadedRef.current = true;
+    }
+  }, [href, preloadOnHover, preloadRoute]);
+
+  return {
+    linkProps: {
+      href,
+      prefetch,
+      onMouseEnter: handleMouseEnter,
+      onMouseLeave: handleMouseLeave,
+      onFocus: handleFocus,
+    },
+    isHovered,
+  };
+}
+
+// Legacy exports for backward compatibility
+export const useDebouncedRouter = useFastRouter;
+export const useNavigationCache = useSmartNavigationCache;
+export const useCachedLink = useFastLink;
+
+// Keep minimal navigation cache for existing usage
 class MinimalNavigationCache {
   private static instance: MinimalNavigationCache;
   private router: any = null;
@@ -65,16 +330,12 @@ class MinimalNavigationCache {
     this.router = router;
   }
 
-  /**
-   * Preload only on hover - no aggressive preloading
-   */
   async preloadOnHover(href: string): Promise<void> {
     if (!this.router || this.hoverPreloads.has(href)) return;
 
     this.hoverPreloads.add(href);
 
     try {
-      // Simple prefetch without high priority to avoid blocking
       await this.router.prefetch(href);
     } catch (error) {
       console.warn("Failed to preload on hover:", href, error);
@@ -82,129 +343,32 @@ class MinimalNavigationCache {
     }
   }
 
-  /**
-   * Clear hover preloads periodically
-   */
   cleanup(): void {
-    // Clear hover preloads after 2 minutes
-    setTimeout(
-      () => {
-        this.hoverPreloads.clear();
-      },
-      2 * 60 * 1000
-    );
+    setTimeout(() => this.hoverPreloads.clear(), 2 * 60 * 1000);
   }
 }
 
-/**
- * Hook for instant navigation
- */
-export function useFastRouter() {
-  const router = useRouter();
-  const instantRouter = InstantRouter.getInstance();
-
-  useEffect(() => {
-    instantRouter.setRouter(router);
-  }, [router, instantRouter]);
-
-  const fastReplace = useCallback(
-    (url: string, options: any = {}) => {
-      instantRouter.replace(url, options);
-    },
-    [instantRouter]
-  );
-
-  const fastPush = useCallback(
-    (url: string, options: any = {}) => {
-      instantRouter.push(url, options);
-    },
-    [instantRouter]
-  );
-
-  const immediateNavigation = useCallback(
-    (method: "push" | "replace", url: string, options: any = {}) => {
-      instantRouter[method](url, options);
-    },
-    [instantRouter]
-  );
-
-  return {
-    fastReplace,
-    fastPush,
-    immediateNavigation,
-    clearPendingNavigations: () => {}, // No-op since no timeouts
-  };
-}
-
-/**
- * Hook for minimal navigation caching
- */
 export function useMinimalNavigationCache() {
   const router = useRouter();
   const cache = MinimalNavigationCache.getInstance();
 
   useEffect(() => {
     cache.setRouter(router);
-  }, [router, cache]);
+  }, [router]);
 
   const preloadOnHover = useCallback(
-    (href: string) => {
-      cache.preloadOnHover(href);
-    },
-    [cache]
+    (href: string) => cache.preloadOnHover(href),
+    []
   );
 
-  return {
-    preloadOnHover,
-  };
+  return { preloadOnHover };
 }
 
-/**
- * Enhanced Link hook with minimal preloading
- */
-export function useFastLink({
-  href,
-  prefetch = true,
-  preloadOnHover = true,
-}: {
-  href: string;
-  prefetch?: boolean;
-  preloadOnHover?: boolean;
-}) {
-  const { preloadOnHover: preload } = useMinimalNavigationCache();
-
-  const handleMouseEnter = useCallback(() => {
-    if (preloadOnHover) {
-      preload(href);
-    }
-  }, [preload, href, preloadOnHover]);
-
-  const handleFocus = useCallback(() => {
-    if (preloadOnHover) {
-      preload(href);
-    }
-  }, [preload, href, preloadOnHover]);
-
-  return {
-    linkProps: {
-      href,
-      prefetch,
-      onMouseEnter: handleMouseEnter,
-      onFocus: handleFocus,
-    },
-  };
-}
-
-// Legacy exports for backward compatibility
-export const useDebouncedRouter = useFastRouter;
-export const useNavigationCache = useMinimalNavigationCache;
-export const useCachedLink = useFastLink;
-
-// Remove aggressive preloading hooks
+// Cleanup functions (keeping for compatibility)
 export function usePreloadCommonRoutes() {
-  // Do nothing - no aggressive preloading
+  // Implementation moved to NavigationCacheProvider
 }
 
 export function useCacheMonitor() {
-  // Do nothing - no monitoring needed
+  // Implementation moved to performance router
 }

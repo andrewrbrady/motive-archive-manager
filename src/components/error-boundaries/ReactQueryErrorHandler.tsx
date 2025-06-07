@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryErrorResetBoundary } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useAuthErrorBoundary } from "./AuthErrorBoundary";
 
 interface ReactQueryErrorHandlerProps {
@@ -26,10 +26,12 @@ export function ReactQueryErrorHandler({
 }: ReactQueryErrorHandlerProps) {
   const { reset } = useQueryErrorResetBoundary();
   const { captureError } = useAuthErrorBoundary();
+  const isSetupRef = useRef(false);
+  const originalConsoleErrorRef = useRef<typeof console.error | null>(null);
 
-  useEffect(() => {
-    // Global error handler for React Query
-    const handleQueryError = (error: Error) => {
+  // Stable error handler using useCallback
+  const handleQueryError = useCallback(
+    (error: Error) => {
       console.error("🚨 React Query Error:", error);
 
       // Check if it's an authentication error
@@ -37,16 +39,25 @@ export function ReactQueryErrorHandler({
         // Forward to error boundary
         captureError(error);
       }
-    };
+    },
+    [captureError]
+  );
+
+  useEffect(() => {
+    // Prevent multiple setups
+    if (isSetupRef.current) {
+      return;
+    }
 
     // ✅ More robust error handling - use flag to prevent recursion
-    const originalConsoleError = console.error;
+    originalConsoleErrorRef.current = console.error;
     let isIntercepting = false; // Prevent recursion flag
+    isSetupRef.current = true;
 
     console.error = (...args) => {
       // Prevent recursive interception
       if (isIntercepting) {
-        originalConsoleError(...args);
+        originalConsoleErrorRef.current?.(...args);
         return;
       }
 
@@ -97,7 +108,7 @@ export function ReactQueryErrorHandler({
         )
       ) {
         // Pass through directly without any intervention
-        originalConsoleError(...args);
+        originalConsoleErrorRef.current?.(...args);
         return;
       }
 
@@ -126,21 +137,18 @@ export function ReactQueryErrorHandler({
       }
 
       // Always call original console.error
-      originalConsoleError(...args);
+      originalConsoleErrorRef.current?.(...args);
     };
 
     return () => {
-      console.error = originalConsoleError;
+      if (originalConsoleErrorRef.current) {
+        console.error = originalConsoleErrorRef.current;
+      }
     };
-  }, [captureError]);
+  }, [handleQueryError]); // Use stable handleQueryError instead of captureError
 
-  useEffect(() => {
-    // When error boundary resets, also reset React Query errors
-    // This ensures that queries can be retried after auth issues are resolved
-    return () => {
-      reset();
-    };
-  }, [reset]);
+  // ✅ REMOVED problematic cleanup function that was causing infinite loops
+  // React Query error reset should be handled explicitly, not in cleanup
 
   return <>{children}</>;
 }

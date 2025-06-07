@@ -55,7 +55,15 @@ async function getProjectCars(
       );
     }
 
-    // Fetch car details for linked cars
+    // Parse query parameters for server-side filtering and pagination
+    const url = new URL(request.url);
+    const limit = parseInt(url.searchParams.get("limit") || "20");
+    const offset = parseInt(url.searchParams.get("offset") || "0");
+    const includeImages = url.searchParams.get("includeImages") === "true";
+
+    console.time("getProjectCars-fetch");
+
+    // ⚡ OPTIMIZED: Fetch car details with improved field projection
     const cars = [];
     if (project.carIds && project.carIds.length > 0) {
       // carIds should already be ObjectIds in the database
@@ -68,28 +76,46 @@ async function getProjectCars(
         );
 
       if (carObjectIds.length > 0) {
+        // Build field projection based on what's requested
+        const projection: any = {
+          _id: 1,
+          make: 1,
+          model: 1,
+          year: 1,
+          color: 1,
+          vin: 1,
+          status: 1,
+          primaryImageId: 1,
+          createdAt: 1,
+        };
+
+        if (includeImages) {
+          projection.imageIds = 1;
+          projection.images = 1;
+        }
+
         const carDocs = await db
           .collection("cars")
           .find({ _id: { $in: carObjectIds } })
-          .project({
-            _id: 1,
-            make: 1,
-            model: 1,
-            year: 1,
-            color: 1,
-            vin: 1,
-            status: 1,
-            primaryImageId: 1,
-            imageIds: 1,
-            createdAt: 1,
-          })
+          .project(projection)
+          .sort({ createdAt: -1 })
+          .skip(offset)
+          .limit(limit)
           .toArray();
 
         cars.push(...carDocs);
       }
     }
 
-    return NextResponse.json({ cars });
+    console.timeEnd("getProjectCars-fetch");
+
+    return NextResponse.json({
+      cars,
+      total: cars.length,
+      limit,
+      offset,
+      hasMore: cars.length === limit,
+    });
   } catch (error) {
     console.error("Error fetching project cars:", error);
     return NextResponse.json(

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { NavigationCacheProvider } from "@/components/providers/NavigationCacheProvider";
+import { NavigationPerformanceMonitor } from "@/components/performance/NavigationPerformanceMonitor";
 import { Suspense, lazy } from "react";
 
 // ✅ Lazy load heavy components to reduce layout bundle
@@ -104,6 +105,7 @@ export default function RootLayout({
             </Suspense>
 
             <Toaster />
+            <NavigationPerformanceMonitor />
           </NavigationCacheProvider>
         </Providers>
         {/* ✅ Only load analytics in production */}

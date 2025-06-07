@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,7 @@ import { Project } from "@/types/project";
 import { toast } from "@/components/ui/use-toast";
 import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
 import { useAPI } from "@/hooks/useAPI";
+import { CarAvatar } from "@/components/ui/CarAvatar";
 
 interface MemberDetails {
   name: string;
@@ -40,12 +41,14 @@ interface ProjectDeliverablesTabProps {
   project: Project;
   memberDetails: Record<string, MemberDetails>;
   onProjectUpdate: () => void;
+  initialDeliverables?: any[]; // Optional pre-fetched deliverables data for SSR optimization
 }
 
 export function ProjectDeliverablesTab({
   project,
   memberDetails,
   onProjectUpdate,
+  initialDeliverables,
 }: ProjectDeliverablesTabProps) {
   const api = useAPI();
   const [isAddDeliverableOpen, setIsAddDeliverableOpen] = useState(false);
@@ -68,28 +71,42 @@ export function ProjectDeliverablesTab({
     carId: "",
   });
   const [isAddingDeliverable, setIsAddingDeliverable] = useState(false);
-  const [projectDeliverables, setProjectDeliverables] = useState<any[]>([]);
-  const [isLoadingDeliverables, setIsLoadingDeliverables] = useState(true);
+  const [projectDeliverables, setProjectDeliverables] = useState<any[]>(
+    initialDeliverables || []
+  );
+  const [isLoadingDeliverables, setIsLoadingDeliverables] =
+    useState(!initialDeliverables); // Don't show loading if we have initial data
+
+  // Log initial data if provided for performance tracking
+  useEffect(() => {
+    if (initialDeliverables) {
+      console.log(
+        "✅ Using pre-loaded deliverables data:",
+        initialDeliverables.length,
+        "deliverables"
+      );
+    }
+  }, [initialDeliverables]);
+
   const [existingDeliverables, setExistingDeliverables] = useState<any[]>([]);
   const [selectedDeliverables, setSelectedDeliverables] = useState<string[]>(
     []
   );
   const [isLinkingDeliverables, setIsLinkingDeliverables] = useState(false);
+  const [filterByProjectVehicles, setFilterByProjectVehicles] = useState(false);
+  const [filterOutPublished, setFilterOutPublished] = useState(false);
 
-  // Fetch project deliverables on mount and when project changes
-  useEffect(() => {
-    if (project) {
-      fetchProjectDeliverables();
-    }
-  }, [project]);
+  // Car details for displaying avatars
+  const [carDetails, setCarDetails] = useState<Record<string, any>>({});
 
-  const fetchProjectDeliverables = async () => {
+  const fetchProjectDeliverables = useCallback(async () => {
     if (!api) {
       console.log("API not available for fetching project deliverables");
       return;
     }
 
     try {
+      setIsLoadingDeliverables(true);
       console.log("📦 Fetching project deliverables...");
 
       const data = (await api.get(`projects/${project._id}/deliverables`)) as {
@@ -100,55 +117,186 @@ export function ProjectDeliverablesTab({
         data.deliverables?.length || 0
       );
       setProjectDeliverables(data.deliverables || []);
+
+      // Fetch car details for deliverables that have car_id
+      const carIds = data.deliverables
+        ?.filter((d: any) => d.car_id)
+        .map((d: any) => d.car_id.toString())
+        .filter(
+          (id: string, index: number, arr: string[]) =>
+            arr.indexOf(id) === index
+        ); // Remove duplicates
+
+      if (carIds && carIds.length > 0) {
+        fetchCarDetails(carIds);
+      }
     } catch (error) {
       console.error("💥 Error fetching project deliverables:", error);
-    }
-  };
-
-  const fetchExistingDeliverables = async () => {
-    if (!api) {
-      console.log("API not available for fetching existing deliverables");
-      return;
-    }
-
-    try {
-      setIsLoadingDeliverables(true);
-      console.log("📦 Fetching all existing deliverables...");
-
-      const data = (await api.get("deliverables")) as { deliverables: any[] };
-      console.log(
-        "✅ Existing deliverables fetched:",
-        data.deliverables?.length || 0
-      );
-
-      // Filter out deliverables that are already linked to this project
-      const currentDeliverableIds = project?.deliverableIds || [];
-      const availableDeliverables = (data.deliverables || []).filter(
-        (deliverable: any) => !currentDeliverableIds.includes(deliverable._id)
-      );
-
-      setExistingDeliverables(availableDeliverables);
-    } catch (error) {
-      console.error("💥 Error fetching existing deliverables:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load existing deliverables",
-        variant: "destructive",
-      });
     } finally {
       setIsLoadingDeliverables(false);
     }
-  };
+  }, [api, project?._id]);
+
+  // Fetch car details for deliverable avatars
+  const fetchCarDetails = useCallback(
+    async (carIds: string[]) => {
+      if (!api || !carIds || carIds.length === 0) return;
+
+      try {
+        console.log("🚗 Fetching car details for deliverables:", carIds);
+        const carPromises = carIds.map(async (carId) => {
+          try {
+            const carData = await api.get(`cars/${carId}`);
+            return { carId, carData };
+          } catch (error) {
+            console.warn(`Failed to fetch car ${carId}:`, error);
+            return { carId, carData: null };
+          }
+        });
+
+        const carResults = await Promise.all(carPromises);
+        const newCarDetails: Record<string, any> = {};
+
+        carResults.forEach(({ carId, carData }) => {
+          if (carData) {
+            newCarDetails[carId] = carData;
+          }
+        });
+
+        setCarDetails((prev) => ({ ...prev, ...newCarDetails }));
+        console.log(
+          "✅ Car details fetched for",
+          Object.keys(newCarDetails).length,
+          "cars"
+        );
+      } catch (error) {
+        console.error("💥 Error fetching car details:", error);
+      }
+    },
+    [api]
+  );
+
+  // Fetch project deliverables on mount and when project changes (only if no initial data)
+  useEffect(() => {
+    if (project && !initialDeliverables) {
+      fetchProjectDeliverables();
+    }
+  }, [project, initialDeliverables, fetchProjectDeliverables]);
+
+  const fetchExistingDeliverables = useCallback(
+    async (
+      overrideVehicleFilter?: boolean,
+      overridePublishedFilter?: boolean
+    ) => {
+      // Use overrides if provided, otherwise use state
+      const shouldFilterByVehicles =
+        overrideVehicleFilter !== undefined
+          ? overrideVehicleFilter
+          : filterByProjectVehicles;
+      const shouldFilterOutPublished =
+        overridePublishedFilter !== undefined
+          ? overridePublishedFilter
+          : filterOutPublished;
+      if (!api) {
+        console.log("API not available for fetching existing deliverables");
+        return;
+      }
+
+      try {
+        setIsLoadingDeliverables(true);
+        const data = (await api.get("deliverables?pageSize=100")) as {
+          deliverables: any[];
+        };
+
+        // Filter out deliverables that are already linked to this project
+        const currentDeliverableIds = project?.deliverableIds || [];
+        let availableDeliverables = (data.deliverables || []).filter(
+          (deliverable: any) => !currentDeliverableIds.includes(deliverable._id)
+        );
+
+        // Apply filters
+        if (shouldFilterByVehicles) {
+          const projectCarIds = (project?.carIds || []).map((carId: any) =>
+            typeof carId === "string" ? carId : String(carId)
+          );
+
+          console.log("🎯 FILTER: Project cars:", projectCarIds);
+
+          const filteredDeliverables = availableDeliverables.filter(
+            (deliverable: any) => {
+              if (!deliverable.car_id) return false;
+
+              const deliverableCarId = String(deliverable.car_id);
+              const matches = projectCarIds.includes(deliverableCarId);
+
+              if (matches) {
+                console.log(`✅ "${deliverable.title}" matches project car`);
+              }
+
+              return matches;
+            }
+          );
+
+          availableDeliverables = filteredDeliverables;
+          console.log(
+            `🎯 Found ${availableDeliverables.length} deliverables with project vehicles`
+          );
+        }
+
+        // Apply published filter if enabled
+        if (shouldFilterOutPublished) {
+          const unpublishedDeliverables = availableDeliverables.filter(
+            (deliverable: any) => {
+              // Check if deliverable has been published (has release date in past + social media link)
+              if (!deliverable.release_date || !deliverable.social_media_link) {
+                return true; // Keep if missing release date or social media link
+              }
+
+              const releaseDate = new Date(deliverable.release_date);
+              const now = new Date();
+              const isPublished =
+                releaseDate <= now && deliverable.social_media_link.trim();
+
+              if (isPublished) {
+                console.log(
+                  `📅 Filtering out published: "${deliverable.title}"`
+                );
+                return false; // Filter out published deliverables
+              }
+
+              return true; // Keep unpublished deliverables
+            }
+          );
+
+          availableDeliverables = unpublishedDeliverables;
+          console.log(
+            `📅 Found ${availableDeliverables.length} unpublished deliverables`
+          );
+        }
+
+        setExistingDeliverables(availableDeliverables);
+      } catch (error) {
+        console.error("💥 Error fetching existing deliverables:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load existing deliverables",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingDeliverables(false);
+      }
+    },
+    [
+      api,
+      project?._id,
+      project?.carIds,
+      filterByProjectVehicles,
+      filterOutPublished,
+      toast,
+    ]
+  );
 
   const handleAddDeliverable = async () => {
-    console.log("🚀 Frontend: Starting deliverable creation");
-    console.log("📋 Project state:", {
-      hasProject: !!project,
-      projectId: project?._id,
-      projectTitle: project?.title,
-    });
-    console.log("📝 Form data:", deliverableForm);
-
     if (!deliverableForm.title.trim()) {
       toast({
         title: "Error",
@@ -169,7 +317,6 @@ export function ProjectDeliverablesTab({
 
     try {
       setIsAddingDeliverable(true);
-      console.log("⏳ Setting loading state...");
 
       const requestBody = {
         title: deliverableForm.title,
@@ -186,26 +333,11 @@ export function ProjectDeliverablesTab({
         carId: deliverableForm.carId || undefined,
       };
 
-      console.log(
-        "📤 Request body to send:",
-        JSON.stringify(requestBody, null, 2)
-      );
-      console.log(
-        "🌐 Making API request to:",
-        `projects/${project._id}/deliverables`
-      );
-
-      const successData = await api.post(
-        `projects/${project._id}/deliverables`,
-        requestBody
-      );
-      console.log("✅ API success response:", successData);
+      await api.post(`projects/${project._id}/deliverables`, requestBody);
 
       // Refresh project data and deliverables
-      console.log("🔄 Refreshing project data and deliverables...");
       await onProjectUpdate();
       await fetchProjectDeliverables();
-      console.log("✅ Project data and deliverables refreshed");
 
       // Reset form and close modal
       setDeliverableForm({
@@ -221,19 +353,12 @@ export function ProjectDeliverablesTab({
       });
       setIsAddDeliverableOpen(false);
 
-      console.log("🎉 Showing success toast...");
       toast({
         title: "Success",
         description: "Deliverable added successfully",
       });
-      console.log("🎉 Frontend: Deliverable creation completed successfully");
     } catch (error) {
-      console.error("💥 Frontend error:", error);
-      console.error("📊 Error details:", {
-        name: error instanceof Error ? error.name : "Unknown",
-        message: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : "No stack trace",
-      });
+      console.error("Error adding deliverable:", error);
 
       toast({
         title: "Error",
@@ -260,7 +385,6 @@ export function ProjectDeliverablesTab({
 
     try {
       setIsLinkingDeliverables(true);
-      console.log("🔗 Linking deliverables to project:", selectedDeliverables);
 
       // Link each selected deliverable to the project
       for (const deliverableId of selectedDeliverables) {
@@ -347,11 +471,7 @@ export function ProjectDeliverablesTab({
     }
 
     try {
-      console.log("🗑️ Removing deliverable from project:", deliverableId);
-
       await api.delete(`projects/${project._id}/deliverables/${deliverableId}`);
-
-      console.log("✅ Deliverable removed successfully");
 
       // Update local state
       setProjectDeliverables((prev) =>
@@ -477,7 +597,10 @@ export function ProjectDeliverablesTab({
               onOpenChange={(open) => {
                 setIsLinkDeliverableOpen(open);
                 if (open) {
-                  fetchExistingDeliverables();
+                  fetchExistingDeliverables(
+                    filterByProjectVehicles,
+                    filterOutPublished
+                  );
                 } else {
                   setSelectedDeliverables([]);
                 }
@@ -495,6 +618,76 @@ export function ProjectDeliverablesTab({
                   <DialogDescription>
                     Select existing deliverables to link to this project.
                   </DialogDescription>
+                  <div className="flex flex-col gap-2 pt-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="vehicleFilter"
+                        checked={filterByProjectVehicles}
+                        onChange={(e) => {
+                          const newFilterValue = e.target.checked;
+                          setFilterByProjectVehicles(newFilterValue);
+                          setSelectedDeliverables([]);
+
+                          if (isLinkDeliverableOpen) {
+                            setTimeout(() => {
+                              fetchExistingDeliverables(
+                                newFilterValue,
+                                filterOutPublished
+                              );
+                            }, 100);
+                          }
+                        }}
+                        className="rounded"
+                      />
+                      <Label
+                        htmlFor="vehicleFilter"
+                        className="text-sm font-normal cursor-pointer"
+                      >
+                        Only show deliverables linked to this project's vehicles
+                      </Label>
+                      {filterByProjectVehicles && (
+                        <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                          Vehicle filter active
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="publishedFilter"
+                        checked={filterOutPublished}
+                        onChange={(e) => {
+                          const newFilterValue = e.target.checked;
+                          setFilterOutPublished(newFilterValue);
+                          setSelectedDeliverables([]);
+
+                          if (isLinkDeliverableOpen) {
+                            setTimeout(() => {
+                              fetchExistingDeliverables(
+                                filterByProjectVehicles,
+                                newFilterValue
+                              );
+                            }, 100);
+                          }
+                        }}
+                        className="rounded"
+                      />
+                      <Label
+                        htmlFor="publishedFilter"
+                        className="text-sm font-normal cursor-pointer"
+                      >
+                        Hide published deliverables (release date past + has
+                        social media link)
+                      </Label>
+                      {filterOutPublished && (
+                        <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                          Published filter active
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </DialogHeader>
                 <div className="flex-1 overflow-y-auto py-4">
                   {isLoadingDeliverables ? (
@@ -510,9 +703,16 @@ export function ProjectDeliverablesTab({
                         No available deliverables
                       </p>
                       <p className="text-sm">
-                        All existing deliverables are already linked to this
-                        project
+                        {filterByProjectVehicles || filterOutPublished
+                          ? "No deliverables found matching your current filters"
+                          : "All existing deliverables are already linked to this project"}
                       </p>
+                      {(filterByProjectVehicles || filterOutPublished) && (
+                        <p className="text-xs mt-2 text-blue-600">
+                          Try unchecking the filters to see more available
+                          deliverables
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -538,29 +738,65 @@ export function ProjectDeliverablesTab({
                             }
                             className="rounded"
                           />
-                          <div className="text-2xl">
+                          {/* Car Avatar for existing deliverables dialog */}
+                          {deliverable.car_id && deliverable.car && (
+                            <CarAvatar
+                              primaryImageId={deliverable.car?.primaryImageId}
+                              entityName={`${deliverable.car?.year || ""} ${deliverable.car?.make || ""} ${deliverable.car?.model || ""}`.trim()}
+                              size="sm"
+                              className="flex-shrink-0"
+                            />
+                          )}
+
+                          <div className="text-2xl flex-shrink-0">
                             {getDeliverableTypeIcon(deliverable.type)}
                           </div>
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <div className="font-medium">
                               {deliverable.title}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {deliverable.platform} • {deliverable.type}
+                              <span className="font-medium">
+                                {deliverable.platform || "No Platform"}
+                              </span>{" "}
+                              • {deliverable.type}
                               {deliverable.description && (
                                 <span> • {deliverable.description}</span>
                               )}
                             </div>
                             <div className="text-xs text-muted-foreground mt-1">
-                              Due:{" "}
-                              {format(
-                                new Date(deliverable.edit_deadline),
-                                "MMM d, yyyy"
-                              )}
+                              <span>
+                                Due:{" "}
+                                {deliverable.edit_deadline
+                                  ? (() => {
+                                      try {
+                                        const date = new Date(
+                                          deliverable.edit_deadline
+                                        );
+                                        return isNaN(date.getTime())
+                                          ? "Invalid Date"
+                                          : format(date, "MMM d, yyyy");
+                                      } catch {
+                                        return "Invalid Date";
+                                      }
+                                    })()
+                                  : "No Date Set"}
+                              </span>
                               {deliverable.firebase_uid && (
                                 <span>
                                   {" "}
-                                  • Assigned to user {deliverable.firebase_uid}
+                                  • Assigned to:{" "}
+                                  {memberDetails[deliverable.firebase_uid]
+                                    ?.name || "Unknown User"}
+                                </span>
+                              )}
+                              {(deliverable.car || deliverable.car_id) && (
+                                <span>
+                                  {" "}
+                                  • Vehicle:{" "}
+                                  {deliverable.car
+                                    ? `${deliverable.car.year || ""} ${deliverable.car.make || ""} ${deliverable.car.model || ""}`.trim()
+                                    : `ID: ${deliverable.car_id}`}
                                 </span>
                               )}
                             </div>
@@ -834,10 +1070,24 @@ export function ProjectDeliverablesTab({
                 className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/20 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="text-2xl">
+                  {/* Car Avatar - show if deliverable has a linked car */}
+                  {deliverable.car_id &&
+                    carDetails[deliverable.car_id.toString()] && (
+                      <CarAvatar
+                        primaryImageId={
+                          carDetails[deliverable.car_id.toString()]
+                            ?.primaryImageId
+                        }
+                        entityName={`${carDetails[deliverable.car_id.toString()]?.year || ""} ${carDetails[deliverable.car_id.toString()]?.make || ""} ${carDetails[deliverable.car_id.toString()]?.model || ""}`.trim()}
+                        size="sm"
+                        className="flex-shrink-0"
+                      />
+                    )}
+
+                  <div className="text-2xl flex-shrink-0">
                     {getDeliverableTypeIcon(deliverable.type)}
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="font-medium">{deliverable.title}</div>
                     {deliverable.description && (
                       <p className="text-sm text-muted-foreground mt-1">
@@ -847,16 +1097,36 @@ export function ProjectDeliverablesTab({
                     <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                       <span>
                         Due{" "}
-                        {format(
-                          new Date(deliverable.edit_deadline),
-                          "MMM d, yyyy"
-                        )}
+                        {deliverable.edit_deadline
+                          ? (() => {
+                              try {
+                                const date = new Date(
+                                  deliverable.edit_deadline
+                                );
+                                return isNaN(date.getTime())
+                                  ? "Invalid Date"
+                                  : format(date, "MMM d, yyyy");
+                              } catch {
+                                return "Invalid Date";
+                              }
+                            })()
+                          : "No Date Set"}
                       </span>
                       {deliverable.firebase_uid &&
                         memberDetails[deliverable.firebase_uid] && (
                           <span>
                             Assigned to{" "}
                             {memberDetails[deliverable.firebase_uid].name}
+                          </span>
+                        )}
+                      {/* Car info text - only show if no avatar or car name */}
+                      {deliverable.car_id &&
+                        carDetails[deliverable.car_id.toString()] && (
+                          <span>
+                            Vehicle:{" "}
+                            {carDetails[deliverable.car_id.toString()]?.year}{" "}
+                            {carDetails[deliverable.car_id.toString()]?.make}{" "}
+                            {carDetails[deliverable.car_id.toString()]?.model}
                           </span>
                         )}
                     </div>

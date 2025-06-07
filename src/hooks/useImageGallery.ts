@@ -274,7 +274,10 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   // Local state
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(0);
-  const [filters, setFilters] = useState<FilterState>({});
+  const [filters, setFilters] = useState<FilterState>({
+    sortBy: "filename",
+    sortDirection: "asc",
+  });
   const [searchQuery, setSearchQuery] = useState(urlSearchQuery); // Initialize from URL
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -334,6 +337,13 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
       if (filters.tod) params.append("timeOfDay", filters.tod);
       if (filters.side) params.append("side", filters.side);
       if (filters.imageType) params.append("imageType", filters.imageType);
+
+      // Add sorting parameters (skip for filename - we handle that client-side)
+      if (filters.sortBy && filters.sortBy !== "filename") {
+        params.append("sort", filters.sortBy);
+        if (filters.sortDirection)
+          params.append("sortDirection", filters.sortDirection);
+      }
 
       // Add search query - use debounced version to prevent excessive API calls
       if (debouncedSearchQuery) params.append("search", debouncedSearchQuery);
@@ -506,7 +516,17 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     };
   }, [images]);
 
-  // Memoized filtered images
+  // Natural sorting function for filenames (matches macOS Finder behavior)
+  // This handles numbers in filenames intelligently:
+  // e.g., file1.jpg < file2.jpg < file10.jpg (not file1.jpg < file10.jpg < file2.jpg)
+  const naturalSort = useCallback((a: string, b: string) => {
+    return a.localeCompare(b, undefined, {
+      numeric: true, // Handle numbers in strings properly
+      sensitivity: "base", // Case-insensitive comparison
+    });
+  }, []);
+
+  // Memoized filtered and sorted images
   const filteredImages = useMemo(() => {
     const filtered = images.filter((image: ExtendedImageType) => {
       const imageId = image.id || image._id;
@@ -553,6 +573,21 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
       return acc;
     }, [] as ExtendedImageType[]);
 
+    // Apply client-side sorting for filename (natural sort), keep server-side for dates
+    if (filters.sortBy === "filename") {
+      // Use natural sorting for filenames to match macOS Finder behavior
+      deduplicated.sort((a, b) => {
+        const filenameA = a.filename || "";
+        const filenameB = b.filename || "";
+
+        if (filters.sortDirection === "desc") {
+          return naturalSort(filenameB, filenameA);
+        }
+        return naturalSort(filenameA, filenameB);
+      });
+    }
+    // For date fields, server-side sorting is already applied via the API query
+
     return deduplicated;
   }, [
     images,
@@ -561,6 +596,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     originalImageIds,
     processedImageIds,
     matchesSearchQuery,
+    naturalSort,
   ]);
 
   // Current image based on URL
@@ -604,7 +640,8 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   const serverPagination = useMemo(() => {
     // Check if we have client-side-only filters that the server doesn't handle
     const hasClientSideOnlyFilters = Boolean(
-      filters.hasImageId // Only hasImageId is client-side only now - imageType is server-side
+      filters.hasImageId || // Only hasImageId is client-side only now - imageType is server-side
+        filters.sortBy === "filename" // Filename sorting is also client-side only for natural sort
     );
 
     // Use server pagination only if server is doing the filtering
@@ -633,7 +670,7 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
         clientTotalImages,
         activeFilters: filters,
         imagesLoaded: images.length,
-        note: "imageType is now server-side",
+        note: "Using client-side for filename sorting or hasImageId filter",
       });
 
       return {

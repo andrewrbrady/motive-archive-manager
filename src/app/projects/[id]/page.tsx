@@ -1,445 +1,273 @@
-"use client";
+import React from "react";
+import { notFound } from "next/navigation";
+import { AuthGuard } from "@/components/auth/AuthGuard";
+import { getMongoClient } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
+import { Project } from "@/types/project";
+import { ProjectClientWrapper } from "./ProjectClientWrapper";
 
-import { useState, useEffect, use, lazy, Suspense, useRef } from "react";
-import { useSession, useFirebaseAuth } from "@/hooks/useFirebaseAuth";
-import { useRouter, useParams } from "next/navigation";
-import { Project, ProjectStatus } from "@/types/project";
-import { toast } from "@/components/ui/use-toast";
-import {
-  useProject,
-  useUpdateProjectStatus,
-} from "@/lib/hooks/query/useProjects";
-import { useAPI } from "@/hooks/useAPI";
-import { Loader2 } from "lucide-react";
-
-// ✅ Direct imports to avoid the 20MB barrel export bundle
-const ProjectHeader = lazy(() =>
-  import("@/components/projects/ProjectHeader").then((m) => ({
-    default: m.ProjectHeader,
-  }))
-);
-const ProjectTabs = lazy(() =>
-  import("@/components/projects/ProjectTabs").then((m) => ({
-    default: m.ProjectTabs,
-  }))
-);
-
-// ✅ Enhanced loading fallback with authentication context
-const PageSkeleton = ({ authMessage }: { authMessage?: string }) => (
-  <div className="min-h-screen bg-background">
-    <div className="container mx-auto px-4 py-8">
-      <div className="animate-pulse space-y-6">
-        <div className="h-8 bg-muted rounded w-1/3"></div>
-        <div className="h-32 bg-muted rounded"></div>
-        <div className="h-64 bg-muted rounded"></div>
-      </div>
-      {authMessage && (
-        <div className="fixed bottom-4 right-4 bg-background border rounded-lg p-4 shadow-lg">
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm text-muted-foreground">{authMessage}</span>
-          </div>
-        </div>
-      )}
-    </div>
-  </div>
-);
-
-// ✅ Enhanced error component with retry functionality
-const ProjectError = ({
-  error,
-  onRetry,
-  onBack,
-}: {
-  error: string;
-  onRetry?: () => void;
-  onBack: () => void;
-}) => (
-  <div className="min-h-screen bg-background">
-    <main className="container-wide px-6 py-8">
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center space-y-4">
-          <div className="text-lg text-red-600 mb-4">{error}</div>
-          <div className="flex gap-3 justify-center">
-            {onRetry && (
-              <button
-                onClick={onRetry}
-                className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90"
-              >
-                Try Again
-              </button>
-            )}
-            <button
-              onClick={onBack}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-            >
-              Back to Projects
-            </button>
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
-);
-
-interface ProjectDetailPageProps {
+interface ProjectPageProps {
   params: Promise<{
     id: string;
   }>;
 }
 
-export default function ProjectDetailPage() {
-  const { data: session, status } = useSession();
-  const { user, isAuthenticated, loading: authLoading } = useFirebaseAuth();
-  const router = useRouter();
-  const params = useParams();
-  const projectId = params?.id as string;
-  const api = useAPI();
-
-  // Use the new React Query hooks
-  const {
-    data: project,
-    isLoading,
-    error,
-    refetch: refreshProject,
-  } = useProject(projectId);
-
-  const updateStatusMutation = useUpdateProjectStatus();
-
-  const [invitingUser, setInvitingUser] = useState(false);
-  const retryAttemptRef = useRef(0);
-  const maxRetries = 2;
-
-  // Get tab from URL searchParams, default to "overview"
-  const [activeTab, setActiveTab] = useState("overview");
-
-  // State for member details
-  const [memberDetails, setMemberDetails] = useState<
-    Record<
-      string,
-      {
-        name: string;
-        email: string;
-        image?: string;
-      }
-    >
-  >({});
-
-  // Check for URL parameters on mount
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabFromUrl = urlParams.get("tab");
-
-    // Migration: redirect old "captions" tab to new "copywriter" tab
-    if (tabFromUrl === "captions") {
-      const url = new URL(window.location.href);
-      url.searchParams.set("tab", "copywriter");
-      window.history.replaceState({}, "", url.toString());
-      setActiveTab("copywriter");
-      return;
+async function getProject(id: string) {
+  try {
+    // Validate ObjectId format before using it
+    if (!ObjectId.isValid(id)) {
+      console.error(`Invalid ObjectId format: ${id}`);
+      return null;
     }
 
-    if (
-      tabFromUrl &&
-      [
-        "overview",
-        "timeline",
-        "events",
-        "team",
-        "cars",
-        "galleries",
-        "assets",
-        "deliverables",
-        "copywriter",
-        "calendar",
-      ].includes(tabFromUrl)
-    ) {
-      setActiveTab(tabFromUrl);
+    const mongoClient = await getMongoClient();
+    const db = mongoClient.db(process.env.MONGODB_DB || "motive_archive");
+    const projectsCollection = db.collection("projects");
+
+    const project = await projectsCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!project) {
+      return null;
     }
-  }, []);
 
-  // Handle browser back/forward navigation
-  useEffect(() => {
-    const handlePopState = () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const tabFromUrl = urlParams.get("tab");
+    // Properly serialize all MongoDB objects to plain objects
+    const serializedProject = {
+      _id: project._id.toString(),
+      title: project.title || "",
+      description: project.description || "",
+      type: project.type || "documentation",
+      status: project.status || "draft",
 
-      // Migration: redirect old "captions" tab to new "copywriter" tab
-      if (tabFromUrl === "captions") {
-        const url = new URL(window.location.href);
-        url.searchParams.set("tab", "copywriter");
-        window.history.replaceState({}, "", url.toString());
-        setActiveTab("copywriter");
-        return;
-      }
+      // Relationships - stored as ObjectIds in DB, converted to strings for frontend
+      clientId: project.clientId ? project.clientId.toString() : undefined,
+      carIds: (project.carIds || []).map((id: any) =>
+        typeof id === "string" ? id : id.toString()
+      ),
+      galleryIds: (project.galleryIds || []).map((id: any) =>
+        typeof id === "string" ? id : id.toString()
+      ),
+      deliverableIds: (project.deliverableIds || []).map((id: any) =>
+        typeof id === "string" ? id : id.toString()
+      ),
+      eventIds: (project.eventIds || []).map((id: any) =>
+        typeof id === "string" ? id : id.toString()
+      ),
 
-      if (
-        tabFromUrl &&
-        [
-          "overview",
-          "timeline",
-          "events",
-          "team",
-          "cars",
-          "galleries",
-          "assets",
-          "deliverables",
-          "copywriter",
-          "calendar",
-        ].includes(tabFromUrl)
-      ) {
-        setActiveTab(tabFromUrl);
-      }
+      // Team and permissions - serialize member objects
+      members: (project.members || []).map((member: any) => ({
+        userId: member.userId || "",
+        role: member.role || "viewer",
+        permissions: member.permissions || [],
+        joinedAt:
+          member.joinedAt instanceof Date
+            ? member.joinedAt.toISOString()
+            : typeof member.joinedAt === "string"
+              ? member.joinedAt
+              : new Date(member.joinedAt).toISOString(),
+        hourlyRate: member.hourlyRate || undefined,
+        hoursLogged: member.hoursLogged || undefined,
+        // Remove any _id fields that might exist on member objects
+      })),
+      ownerId: project.ownerId || "",
+
+      // Timeline and milestones - serialize dates
+      timeline: project.timeline
+        ? {
+            ...project.timeline,
+            _id: project.timeline._id
+              ? project.timeline._id.toString()
+              : undefined,
+            startDate:
+              project.timeline.startDate instanceof Date
+                ? project.timeline.startDate.toISOString()
+                : typeof project.timeline.startDate === "string"
+                  ? project.timeline.startDate
+                  : new Date(project.timeline.startDate).toISOString(),
+            endDate: project.timeline.endDate
+              ? project.timeline.endDate instanceof Date
+                ? project.timeline.endDate.toISOString()
+                : typeof project.timeline.endDate === "string"
+                  ? project.timeline.endDate
+                  : new Date(project.timeline.endDate).toISOString()
+              : undefined,
+            milestones: (project.timeline.milestones || []).map(
+              (milestone: any) => ({
+                ...milestone,
+                _id: milestone._id
+                  ? milestone._id.toString()
+                  : milestone.id || undefined,
+                dueDate:
+                  milestone.dueDate instanceof Date
+                    ? milestone.dueDate.toISOString()
+                    : typeof milestone.dueDate === "string"
+                      ? milestone.dueDate
+                      : new Date(milestone.dueDate).toISOString(),
+                completedAt: milestone.completedAt
+                  ? milestone.completedAt instanceof Date
+                    ? milestone.completedAt.toISOString()
+                    : typeof milestone.completedAt === "string"
+                      ? milestone.completedAt
+                      : new Date(milestone.completedAt).toISOString()
+                  : undefined,
+              })
+            ),
+          }
+        : {
+            startDate: new Date().toISOString(),
+            milestones: [],
+          },
+
+      // Budget tracking
+      budget: project.budget
+        ? {
+            ...project.budget,
+            _id: project.budget._id ? project.budget._id.toString() : undefined,
+            expenses: (project.budget.expenses || []).map((expense: any) => ({
+              ...expense,
+              _id: expense._id
+                ? expense._id.toString()
+                : expense.id || undefined,
+              date:
+                expense.date instanceof Date
+                  ? expense.date.toISOString()
+                  : typeof expense.date === "string"
+                    ? expense.date
+                    : new Date(expense.date).toISOString(),
+            })),
+          }
+        : undefined,
+
+      // Assets and deliverables - serialize dates
+      assets: (project.assets || []).map((asset: any) => ({
+        ...asset,
+        _id: asset._id ? asset._id.toString() : asset.id || undefined,
+        addedAt:
+          asset.addedAt instanceof Date
+            ? asset.addedAt.toISOString()
+            : typeof asset.addedAt === "string"
+              ? asset.addedAt
+              : new Date(asset.addedAt).toISOString(),
+      })),
+
+      // Embedded deliverables - serialize dates
+      deliverables: (project.deliverables || []).map((deliverable: any) => ({
+        ...deliverable,
+        _id: deliverable._id
+          ? deliverable._id.toString()
+          : deliverable.id || undefined,
+        dueDate:
+          deliverable.dueDate instanceof Date
+            ? deliverable.dueDate.toISOString()
+            : typeof deliverable.dueDate === "string"
+              ? deliverable.dueDate
+              : new Date(deliverable.dueDate).toISOString(),
+        createdAt:
+          deliverable.createdAt instanceof Date
+            ? deliverable.createdAt.toISOString()
+            : typeof deliverable.createdAt === "string"
+              ? deliverable.createdAt
+              : new Date(deliverable.createdAt).toISOString(),
+        updatedAt:
+          deliverable.updatedAt instanceof Date
+            ? deliverable.updatedAt.toISOString()
+            : typeof deliverable.updatedAt === "string"
+              ? deliverable.updatedAt
+              : new Date(deliverable.updatedAt).toISOString(),
+        completedAt: deliverable.completedAt
+          ? deliverable.completedAt instanceof Date
+            ? deliverable.completedAt.toISOString()
+            : typeof deliverable.completedAt === "string"
+              ? deliverable.completedAt
+              : new Date(deliverable.completedAt).toISOString()
+          : undefined,
+      })),
+
+      // Progress tracking - serialize date
+      progress: project.progress
+        ? {
+            ...project.progress,
+            _id: project.progress._id
+              ? project.progress._id.toString()
+              : undefined,
+            lastUpdated:
+              project.progress.lastUpdated instanceof Date
+                ? project.progress.lastUpdated.toISOString()
+                : typeof project.progress.lastUpdated === "string"
+                  ? project.progress.lastUpdated
+                  : new Date(project.progress.lastUpdated).toISOString(),
+          }
+        : {
+            percentage: 0,
+            completedTasks: 0,
+            totalTasks: 0,
+            lastUpdated: new Date().toISOString(),
+          },
+
+      // Metadata
+      tags: project.tags || [],
+      notes: project.notes || undefined,
+      primaryImageId: project.primaryImageId
+        ? project.primaryImageId.toString()
+        : undefined,
+      primaryImageUrl: project.primaryImageUrl || undefined,
+      templateId: project.templateId
+        ? project.templateId.toString()
+        : undefined,
+
+      // Convert dates to ISO strings - handle both Date objects and existing strings
+      createdAt: project.createdAt
+        ? project.createdAt instanceof Date
+          ? project.createdAt.toISOString()
+          : typeof project.createdAt === "string"
+            ? project.createdAt
+            : new Date(project.createdAt).toISOString()
+        : new Date().toISOString(),
+      updatedAt: project.updatedAt
+        ? project.updatedAt instanceof Date
+          ? project.updatedAt.toISOString()
+          : typeof project.updatedAt === "string"
+            ? project.updatedAt
+            : new Date(project.updatedAt).toISOString()
+        : new Date().toISOString(),
+      completedAt: project.completedAt
+        ? project.completedAt instanceof Date
+          ? project.completedAt.toISOString()
+          : typeof project.completedAt === "string"
+            ? project.completedAt
+            : new Date(project.completedAt).toISOString()
+        : undefined,
+      archivedAt: project.archivedAt
+        ? project.archivedAt instanceof Date
+          ? project.archivedAt.toISOString()
+          : typeof project.archivedAt === "string"
+            ? project.archivedAt
+            : new Date(project.archivedAt).toISOString()
+        : undefined,
     };
 
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
-
-  // Function to handle tab changes with URL updates
-  const handleTabChange = (newTab: string) => {
-    setActiveTab(newTab);
-
-    // Update URL without page reload
-    const url = new URL(window.location.href);
-    url.searchParams.set("tab", newTab);
-    window.history.pushState({}, "", url.toString());
-  };
-
-  // Fetch member details when project is loaded
-  useEffect(() => {
-    if (project?.members && project.members.length > 0) {
-      console.log(
-        "👥 Fetching member details for",
-        project.members.length,
-        "members"
-      );
-      fetchMemberDetails(project.members.map((m: any) => m.userId));
-    }
-  }, [project?.members]);
-
-  // ✅ Enhanced retry functionality
-  const handleRetry = () => {
-    if (retryAttemptRef.current < maxRetries) {
-      retryAttemptRef.current++;
-      console.log(
-        `🔄 Retrying project fetch (attempt ${retryAttemptRef.current}/${maxRetries})`
-      );
-      refreshProject();
-    } else {
-      console.log("❌ Max retry attempts reached");
-      toast({
-        title: "Error",
-        description:
-          "Unable to load project after multiple attempts. Please refresh the page.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // ✅ Enhanced fetchMemberDetails with defensive error handling
-  const fetchMemberDetails = async (userIds: string[]) => {
-    if (!api) {
-      console.log("No API client available for fetching member details");
-      return;
-    }
-
-    try {
-      // Use the project-specific users endpoint (no admin required)
-      const response = await api.get("projects/users");
-      const data = response as any;
-
-      if (!data.users || !Array.isArray(data.users)) {
-        console.warn(
-          "Invalid response format for member details, continuing without member info"
-        );
-        return;
-      }
-
-      const details: Record<
-        string,
-        { name: string; email: string; image?: string }
-      > = {};
-
-      data.users.forEach((user: any) => {
-        if (userIds.includes(user.uid)) {
-          details[user.uid] = {
-            name: user.name || user.email,
-            email: user.email,
-            image: user.image,
-          };
-        }
-      });
-
-      setMemberDetails(details);
-    } catch (error) {
-      console.error("Error fetching member details:", error);
-      // ✅ Don't fail the entire page if member details fail
-      toast({
-        title: "Warning",
-        description: "Could not load team member details",
-        variant: "default",
-      });
-    }
-  };
-
-  const handleStatusChange = async (newStatus: ProjectStatus) => {
-    if (!project) return;
-
-    try {
-      await updateStatusMutation.mutateAsync({
-        projectId: project._id!,
-        status: newStatus,
-      });
-
-      toast({
-        title: "Success",
-        description: "Project status updated successfully",
-      });
-    } catch (error) {
-      console.error("Error updating project status:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update project status",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleBack = () => {
-    router.push("/projects");
-  };
-
-  // ✅ Enhanced inviteUser with comprehensive error handling
-  const inviteUser = async (email: string, role: string) => {
-    if (!api) {
-      toast({
-        title: "Authentication Required",
-        description: "Please refresh the page and try again",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setInvitingUser(true);
-      await api.post("projects/users", {
-        projectId: projectId,
-        userEmail: email,
-        role: role,
-      });
-
-      toast({
-        title: "Success",
-        description: `User invited to project successfully`,
-      });
-
-      // Refresh project to show new member
-      refreshProject();
-    } catch (error) {
-      console.error("Error inviting user:", error);
-      toast({
-        title: "Error",
-        description: "Failed to invite user to project",
-        variant: "destructive",
-      });
-    } finally {
-      setInvitingUser(false);
-    }
-  };
-
-  // ✅ Show loading while checking authentication
-  if (status === "loading" || authLoading) {
-    return <PageSkeleton authMessage="Checking authentication..." />;
+    return serializedProject as any as Project;
+  } catch (error) {
+    console.error("Error fetching project:", error);
+    return null;
   }
+  // DO NOT close the connection - getMongoClient() returns a shared connection
+}
 
-  // ✅ Show loading while fetching project data
-  if (isLoading) {
-    return <PageSkeleton authMessage="Loading project data..." />;
-  }
+export default async function ProjectPage({ params }: ProjectPageProps) {
+  const { id } = await params;
+  const project = await getProject(id);
 
-  // ✅ Enhanced error handling with better UX
-  if (error) {
-    const errorMessage = error?.message || "Failed to load project";
-
-    // Special handling for different error types
-    if (errorMessage.includes("404") || errorMessage.includes("not found")) {
-      return (
-        <ProjectError
-          error="Project not found. It may have been deleted or you don't have access."
-          onBack={handleBack}
-        />
-      );
-    }
-
-    if (
-      errorMessage.includes("403") ||
-      errorMessage.includes("access denied")
-    ) {
-      return (
-        <ProjectError
-          error="Access denied. You don't have permission to view this project."
-          onBack={handleBack}
-        />
-      );
-    }
-
-    if (
-      errorMessage.includes("401") ||
-      errorMessage.includes("authentication")
-    ) {
-      return (
-        <ProjectError
-          error="Authentication failed. Please sign in again."
-          onBack={handleBack}
-        />
-      );
-    }
-
-    return (
-      <ProjectError
-        error={errorMessage}
-        onRetry={retryAttemptRef.current < maxRetries ? handleRetry : undefined}
-        onBack={handleBack}
-      />
-    );
-  }
-
-  // ✅ Show error if project data is missing
   if (!project) {
-    return (
-      <ProjectError
-        error="Project data not found"
-        onRetry={handleRetry}
-        onBack={handleBack}
-      />
-    );
+    notFound();
   }
 
-  // ✅ Main render with all data available
   return (
-    <div className="min-h-screen bg-background">
-      <main className="container-wide px-6 py-8">
-        <div className="space-y-6">
-          <Suspense fallback={<PageSkeleton />}>
-            <ProjectHeader
-              project={project}
-              onStatusChange={handleStatusChange}
-              onBack={handleBack}
-            />
-          </Suspense>
-
-          <Suspense fallback={<PageSkeleton />}>
-            <ProjectTabs
-              project={project}
-              activeTab={activeTab}
-              onTabChange={handleTabChange}
-              memberDetails={memberDetails}
-              onProjectUpdate={refreshProject}
-            />
-          </Suspense>
+    <AuthGuard>
+      <div className="flex flex-col min-h-screen bg-background">
+        <div className="container-wide px-6 py-8">
+          <ProjectClientWrapper project={project} />
         </div>
-      </main>
-    </div>
+      </div>
+    </AuthGuard>
   );
 }

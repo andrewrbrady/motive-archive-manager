@@ -56,6 +56,7 @@ interface Car {
 interface ProjectCarsTabProps {
   project: Project;
   onProjectUpdate: () => void;
+  initialCars?: Car[]; // Optional pre-fetched cars data for SSR optimization
 }
 
 // Car Card Component for Project Cars
@@ -252,10 +253,11 @@ function ProjectCarCard({
 export function ProjectCarsTab({
   project,
   onProjectUpdate,
+  initialCars,
 }: ProjectCarsTabProps) {
   const api = useAPI();
-  const [projectCars, setProjectCars] = useState<Car[]>([]);
-  const [loadingProjectCars, setLoadingProjectCars] = useState(false);
+  const [projectCars, setProjectCars] = useState<Car[]>(initialCars || []);
+  const [loadingProjectCars, setLoadingProjectCars] = useState(!initialCars); // Don't show loading if we have initial data
   const [isLinkCarOpen, setIsLinkCarOpen] = useState(false);
   const [selectedCarIds, setSelectedCarIds] = useState<string[]>([]);
   const [isLinkingCar, setIsLinkingCar] = useState(false);
@@ -287,12 +289,12 @@ export function ProjectCarsTab({
     }
   }, [api, project._id]);
 
-  // Fetch project cars on component mount and when project changes
+  // Fetch project cars on component mount and when project changes - only if no initial data
   useEffect(() => {
-    if (api && project._id) {
+    if (api && project._id && !initialCars) {
       fetchProjectCars();
     }
-  }, [fetchProjectCars, api, project._id]);
+  }, [fetchProjectCars, api, project._id, initialCars]);
 
   const handleLinkCars = async () => {
     if (selectedCarIds.length === 0) {

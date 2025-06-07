@@ -55,14 +55,50 @@ async function getProjectCaptions(
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    // Fetch captions for this project
+    // Parse query parameters for server-side filtering and pagination
+    const url = new URL(request.url);
+    const limit = parseInt(url.searchParams.get("limit") || "50");
+    const offset = parseInt(url.searchParams.get("offset") || "0");
+    const platform = url.searchParams.get("platform");
+
+    // ⚡ OPTIMIZED: Build query with optional platform filter
+    const query: any = { projectId: id };
+    if (platform) {
+      query.platform = platform;
+    }
+
+    console.time("getProjectCaptions-fetch");
+
+    // ⚡ OPTIMIZED: Use field projection and pagination
     const captions = await db
       .collection("project_captions")
-      .find({ projectId: id })
+      .find(query)
+      .project({
+        _id: 1,
+        projectId: 1,
+        carIds: 1,
+        eventIds: 1,
+        platform: 1,
+        context: 1,
+        caption: 1,
+        createdBy: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      })
       .sort({ createdAt: -1 })
+      .skip(offset)
+      .limit(limit)
       .toArray();
 
-    return NextResponse.json(captions);
+    console.timeEnd("getProjectCaptions-fetch");
+
+    return NextResponse.json({
+      captions,
+      total: captions.length,
+      limit,
+      offset,
+      hasMore: captions.length === limit,
+    });
   } catch (error) {
     console.error("Error fetching project captions:", error);
     return NextResponse.json(

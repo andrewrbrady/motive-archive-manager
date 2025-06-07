@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { FirebaseProvider } from "@/contexts/FirebaseContext";
 import { PlatformProvider } from "@/contexts/PlatformContext";
 import { CarDetailsProvider } from "@/contexts/CarDetailsContext";
-import React, { lazy, Suspense } from "react";
+import React, { lazy, Suspense, useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthErrorBoundary } from "@/components/error-boundaries/AuthErrorBoundary";
 import { ReactQueryErrorHandler } from "@/components/error-boundaries/ReactQueryErrorHandler";
@@ -44,6 +44,25 @@ const queryClient = new QueryClient({
   },
 });
 
+// Client-only DevTools component to prevent hydration mismatch
+function DevTools() {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient || process.env.NODE_ENV !== "development") {
+    return null;
+  }
+
+  return (
+    <Suspense fallback={null}>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </Suspense>
+  );
+}
+
 export function Providers({ children }: ProvidersProps) {
   return (
     <AuthErrorBoundary>
@@ -56,9 +75,7 @@ export function Providers({ children }: ProvidersProps) {
               </PlatformProvider>
             </FirebaseProvider>
           </ThemeProvider>
-          <Suspense fallback={null}>
-            {process.env.NODE_ENV === "development" && <ReactQueryDevtools />}
-          </Suspense>
+          <DevTools />
         </ReactQueryErrorHandler>
       </QueryClientProvider>
     </AuthErrorBoundary>

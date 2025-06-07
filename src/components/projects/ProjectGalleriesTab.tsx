@@ -38,7 +38,6 @@ import Link from "next/link";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { fixCloudflareImageUrl } from "@/lib/image-utils";
-import { useSession } from "@/hooks/useFirebaseAuth";
 import { useAPI } from "@/hooks/useAPI";
 
 interface Gallery {
@@ -62,6 +61,7 @@ interface Gallery {
 interface ProjectGalleriesTabProps {
   project: Project;
   onProjectUpdate: () => void;
+  initialGalleries?: Gallery[]; // Optional pre-fetched galleries data for SSR optimization
 }
 
 // Gallery Card Component for Project Galleries
@@ -167,12 +167,12 @@ function ProjectGalleryCard({
 export function ProjectGalleriesTab({
   project,
   onProjectUpdate,
+  initialGalleries,
 }: ProjectGalleriesTabProps) {
-  const { data: session, status } = useSession();
   const api = useAPI();
-  const [galleries, setGalleries] = useState<Gallery[]>([]);
+  const [galleries, setGalleries] = useState<Gallery[]>(initialGalleries || []);
   const [availableGalleries, setAvailableGalleries] = useState<Gallery[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!initialGalleries); // Don't show loading if we have initial data
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLinking, setIsLinking] = useState(false);
@@ -242,11 +242,12 @@ export function ProjectGalleriesTab({
   };
 
   // Load project galleries when component mounts or project changes
+  // Only fetch if we don't have initial data and API is available
   useEffect(() => {
-    if (api && project._id) {
+    if (api && project._id && !initialGalleries) {
       fetchProjectGalleries();
     }
-  }, [api, project._id]);
+  }, [api, project._id, initialGalleries]);
 
   // Load available galleries when link dialog opens
   useEffect(() => {
@@ -332,32 +333,6 @@ export function ProjectGalleriesTab({
 
   return (
     <div className="space-y-6">
-      {/* Debug Section - Development Only */}
-      {process.env.NODE_ENV === "development" && (
-        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <h4 className="text-sm font-medium text-yellow-800 mb-2">
-            Debug: Authentication Status
-          </h4>
-          <div className="text-xs text-yellow-700 space-y-1">
-            <div>
-              Authenticated: {status === "authenticated" ? "✅ Yes" : "❌ No"}
-            </div>
-            <div>User ID: {session?.user?.id || "None"}</div>
-            <div>User Email: {session?.user?.email || "None"}</div>
-            {status !== "authenticated" && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => window.location.reload()}
-                className="mt-2"
-              >
-                Refresh Page
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

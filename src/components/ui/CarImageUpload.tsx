@@ -13,6 +13,7 @@ import { IMAGE_ANALYSIS_CONFIG } from "@/constants/image-analysis";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { useAPI } from "@/hooks/useAPI";
 import { getValidToken } from "@/lib/api-client";
+import { Progress } from "@/components/ui/progress";
 
 interface CarImageUploadProps {
   carId: string;
@@ -22,11 +23,27 @@ interface CarImageUploadProps {
   multiple?: boolean;
 }
 
-interface FileProgress {
-  file: File;
-  percent: number;
-  status: "idle" | "uploading" | "complete" | "error" | "analyzing";
+interface ImageProgress {
+  fileId: string;
+  fileName: string;
+  progress: number;
+  status: "pending" | "uploading" | "analyzing" | "complete" | "error";
   error?: string;
+  currentStep?: string;
+  imageUrl?: string;
+  metadata?: any;
+  stepProgress?: {
+    cloudflare?: {
+      status: string;
+      progress: number;
+      message?: string;
+    };
+    openai?: {
+      status: string;
+      progress: number;
+      message?: string;
+    };
+  };
 }
 
 interface ImageAnalysisPrompt {
@@ -47,7 +64,7 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
   const api = useAPI();
   const inputRef = useRef<HTMLInputElement>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  const [progress, setProgress] = useState<FileProgress[]>([]);
+  const [progress, setProgress] = useState<ImageProgress[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedPromptId, setSelectedPromptId] = useState<string>("");
   const [selectedModelId, setSelectedModelId] = useState<string>(
@@ -60,6 +77,9 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
   const [isLoadingPrompts, setIsLoadingPrompts] = useState(true);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const { user } = useFirebaseAuth();
+
+  // Store original page title to restore later
+  const [originalTitle, setOriginalTitle] = useState<string>("");
 
   // Load available prompts on component mount
   useEffect(() => {
@@ -92,6 +112,16 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
     loadPrompts();
   }, [api]);
 
+  // Store original title on mount and restore on unmount
+  useEffect(() => {
+    setOriginalTitle(document.title);
+    return () => {
+      if (originalTitle) {
+        document.title = originalTitle;
+      }
+    };
+  }, [originalTitle]);
+
   // Handle file selection or drop
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -99,28 +129,48 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
     setProgress([]); // Reset progress if new files are selected
   };
 
-  // Start upload after confirmation
+  // Start upload with streaming progress
   const startUpload = async () => {
     if (pendingFiles.length === 0) return;
 
     setIsUploading(true);
-    const fileProgress = pendingFiles.map((file) => ({
-      file,
-      percent: 0,
-      status: "uploading" as const,
-    }));
-    setProgress(fileProgress);
+    setUploadSuccess(false);
+
+    // Initialize progress for all files
+    const initialProgress: ImageProgress[] = pendingFiles.map(
+      (file, index) => ({
+        fileId: `${index}-${file.name}`,
+        fileName: file.name,
+        progress: 0,
+        status: "pending",
+        currentStep: "Preparing upload...",
+        stepProgress: {
+          cloudflare: {
+            status: "pending",
+            progress: 0,
+            message: "Waiting to start",
+          },
+          openai: {
+            status: "pending",
+            progress: 0,
+            message: "Waiting for upload",
+          },
+        },
+      })
+    );
+    setProgress(initialProgress);
 
     try {
-      // Create FormData with the format expected by /api/images/upload
+      // Create FormData with format expected by /api/cloudflare/images
       const formData = new FormData();
 
-      // ✅ Add files using "files" parameter (not numbered file0, file1, etc.)
-      pendingFiles.forEach((file) => {
-        formData.append("files", file);
+      // Add files with numbered naming (file0, file1, etc.)
+      pendingFiles.forEach((file, index) => {
+        formData.append(`file${index}`, file);
       });
 
       formData.append("carId", carId);
+      formData.append("fileCount", pendingFiles.length.toString());
 
       // Add selected prompt and model
       if (selectedPromptId) {
@@ -130,15 +180,11 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
         formData.append("selectedModelId", selectedModelId);
       }
 
-      if (vehicleInfo) {
-        formData.append("metadata", JSON.stringify(vehicleInfo));
-      }
-
-      // Get auth token for manual fetch with streaming
+      // Get auth token
       const token = await getValidToken();
 
-      // Use manual fetch to handle streaming response
-      const response = await fetch("/api/images/upload", {
+      // Start the streaming upload
+      const response = await fetch("/api/cloudflare/images", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -147,183 +193,148 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error || `Upload failed: ${response.statusText}`
-        );
+        throw new Error(`Upload failed: ${response.statusText}`);
       }
 
-      // ✅ Handle JSON response instead of streaming for this endpoint
-      const data = await response.json();
+      // Handle Server-Sent Events stream
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-      if (!data.success || !data.images || data.images.length === 0) {
-        throw new Error(data.error || "No images were uploaded successfully");
+      if (!reader) {
+        throw new Error("Failed to get response reader");
       }
 
-      // ✅ Now analyze each uploaded image
-      const analyzedImages = [];
-      for (let i = 0; i < data.images.length; i++) {
-        const uploadedImage = data.images[i];
-        const file = pendingFiles[i];
+      let buffer = "";
 
-        try {
-          // Update progress to analyzing
-          setProgress((prev) =>
-            prev.map((p, index) =>
-              index === i
-                ? { ...p, percent: 75, status: "analyzing" as const }
-                : p
-            )
-          );
+      while (true) {
+        const { done, value } = await reader.read();
 
-          // Call analysis API
-          const analysisResponse = await fetch("/api/openai/analyze-image", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              imageUrl: uploadedImage.url,
-              vehicleInfo,
-              promptId: selectedPromptId,
-              modelId: selectedModelId,
-            }),
-          });
+        if (done) break;
 
-          if (analysisResponse.ok) {
-            const analysisData = await analysisResponse.json();
-            console.log("Image analysis completed:", analysisData.analysis);
+        buffer += decoder.decode(value, { stream: true });
 
-            // Update the image metadata in MongoDB
-            if (uploadedImage.cloudflareId) {
-              try {
-                await fetch(
-                  `/api/cloudflare/metadata/${uploadedImage.cloudflareId}`,
-                  {
-                    method: "PATCH",
-                    headers: {
-                      "Content-Type": "application/json",
-                      Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({
-                      metadata: {
-                        ...uploadedImage.metadata,
-                        ...analysisData.analysis,
-                        aiAnalysis: analysisData.analysis,
-                      },
-                    }),
-                  }
-                );
-                console.log("✅ Metadata updated in database for", file.name);
-              } catch (metadataError) {
-                console.warn(
-                  "Failed to update metadata in database:",
-                  metadataError
+        // Process complete messages
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              // Handle individual file progress updates
+              if (data.fileId && data.fileName) {
+                setProgress((prev) =>
+                  prev.map((p) =>
+                    p.fileId === data.fileId
+                      ? {
+                          ...p,
+                          progress: data.progress || p.progress,
+                          status: data.status || p.status,
+                          currentStep: data.currentStep || p.currentStep,
+                          error: data.error,
+                          imageUrl: data.imageUrl || p.imageUrl,
+                          metadata: data.metadata || p.metadata,
+                          stepProgress: {
+                            cloudflare: {
+                              status:
+                                data.status === "uploading"
+                                  ? "uploading"
+                                  : data.status === "analyzing"
+                                    ? "complete"
+                                    : data.status === "complete"
+                                      ? "complete"
+                                      : "pending",
+                              progress:
+                                data.status === "uploading"
+                                  ? data.progress
+                                  : data.status === "analyzing"
+                                    ? 100
+                                    : data.status === "complete"
+                                      ? 100
+                                      : 0,
+                              message:
+                                data.status === "uploading"
+                                  ? "Uploading to Cloudflare..."
+                                  : data.status === "analyzing"
+                                    ? "Upload complete"
+                                    : data.status === "complete"
+                                      ? "Upload complete"
+                                      : "Waiting",
+                            },
+                            openai: {
+                              status:
+                                data.status === "analyzing"
+                                  ? "analyzing"
+                                  : data.status === "complete"
+                                    ? "complete"
+                                    : "pending",
+                              progress:
+                                data.status === "analyzing"
+                                  ? 50
+                                  : data.status === "complete"
+                                    ? 100
+                                    : 0,
+                              message:
+                                data.status === "analyzing"
+                                  ? "Analyzing with AI..."
+                                  : data.status === "complete"
+                                    ? "Analysis complete"
+                                    : "Waiting for upload",
+                            },
+                          },
+                        }
+                      : p
+                  )
                 );
               }
-            }
 
-            analyzedImages.push({
-              ...uploadedImage,
-              metadata: {
-                ...uploadedImage.metadata,
-                ...analysisData.analysis,
-                aiAnalysis: analysisData.analysis,
-              },
-            });
-          } else {
-            console.warn("Image analysis failed for", file.name);
-            analyzedImages.push(uploadedImage);
+              // Handle completion or error
+              if (data.type === "complete") {
+                console.log("Upload batch completed:", data);
+                setUploadSuccess(true);
+
+                // Clear pending files
+                setPendingFiles([]);
+
+                // Trigger onComplete callback after a short delay
+                setTimeout(() => {
+                  if (onComplete) {
+                    onComplete();
+                  }
+                }, 2000);
+              } else if (data.type === "error" || data.error) {
+                console.error("Upload error:", data.error);
+                if (onError) {
+                  onError(data.error || "Upload failed");
+                }
+              }
+            } catch (parseError) {
+              console.error("Error parsing SSE data:", parseError, line);
+            }
           }
-        } catch (analysisError) {
-          console.error("Error analyzing image:", analysisError);
-          analyzedImages.push(uploadedImage);
         }
       }
-
-      // Mark all files as complete
-      setProgress((prev) =>
-        prev.map((p) => ({ ...p, percent: 100, status: "complete" }))
-      );
-
-      // Set success state and trigger onComplete callback
-      setUploadSuccess(true);
-
-      // Clear pending files
-      setPendingFiles([]);
-
-      // Trigger onComplete callback after a short delay to allow users to see the success message
-      setTimeout(() => {
-        if (onComplete) {
-          onComplete();
-        }
-      }, 2000);
     } catch (error) {
       console.error("Upload error:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Upload failed";
+
+      // Update all files to error status
       setProgress((prev) =>
         prev.map((p) => ({
           ...p,
           status: "error",
-          error: error instanceof Error ? error.message : "Upload failed",
+          error: errorMessage,
         }))
       );
+
       if (onError) {
-        onError(error instanceof Error ? error.message : "Upload failed");
+        onError(errorMessage);
       }
+    } finally {
+      setIsUploading(false);
     }
-
-    setIsUploading(false);
-    const completed = progress.filter((p) => p.status === "complete").length;
-    if (completed === fileProgress.length && onComplete) {
-      onComplete();
-    }
-    setPendingFiles([]); // Clear pending files after upload
-  };
-
-  const uploadSingleFile = (
-    file: File,
-    onProgress: (percent: number) => void
-  ) => {
-    return new Promise<void>(async (resolve, reject) => {
-      try {
-        const formData = new FormData();
-        // ✅ Use "files" parameter instead of numbered files
-        formData.append("files", file);
-        formData.append("carId", carId);
-
-        if (vehicleInfo) {
-          formData.append("metadata", JSON.stringify(vehicleInfo));
-        }
-
-        // Get auth token for XMLHttpRequest
-        const token = await getValidToken();
-
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/images/upload");
-        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const percent = Math.round((event.loaded / event.total) * 100);
-            onProgress(percent);
-          }
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            onProgress(100);
-            resolve();
-          } else {
-            reject(new Error("Upload failed: " + xhr.statusText));
-          }
-        };
-        xhr.onerror = () => {
-          reject(new Error("Network error during upload"));
-        };
-        xhr.send(formData);
-      } catch (error) {
-        reject(error);
-      }
-    });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -343,11 +354,59 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
   const overallPercent =
     progress.length > 0
       ? Math.floor(
-          progress.reduce((acc, p) => acc + p.percent, 0) / progress.length
+          progress.reduce((acc, p) => acc + p.progress, 0) / progress.length
         )
       : 0;
+
   const allComplete =
     progress.length > 0 && progress.every((p) => p.status === "complete");
+
+  // Prevent window closing during upload and update page title with progress
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isUploading && progress.length > 0) {
+        e.preventDefault();
+        e.returnValue = "Upload in progress. Are you sure you want to leave?";
+        return "Upload in progress. Are you sure you want to leave?";
+      }
+      return undefined;
+    };
+
+    // Update page title with upload progress
+    if (isUploading && progress.length > 0) {
+      const activeUploads = progress.filter(
+        (p) => p.status !== "complete" && p.status !== "error"
+      ).length;
+      const completedUploads = progress.filter(
+        (p) => p.status === "complete"
+      ).length;
+      const totalUploads = progress.length;
+
+      if (activeUploads > 0) {
+        // Show progress while uploading
+        document.title = `(${completedUploads}/${totalUploads}) Uploading ${overallPercent}% - ${originalTitle}`;
+      } else if (completedUploads === totalUploads && uploadSuccess) {
+        // Show completion
+        document.title = `✅ Upload Complete - ${originalTitle}`;
+      }
+
+      // Add beforeunload listener during upload
+      window.addEventListener("beforeunload", handleBeforeUnload);
+
+      return () => {
+        window.removeEventListener("beforeunload", handleBeforeUnload);
+      };
+    } else {
+      // Restore original title when not uploading
+      if (originalTitle && document.title !== originalTitle) {
+        document.title = originalTitle;
+      }
+    }
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isUploading, progress, overallPercent, uploadSuccess, originalTitle]);
 
   // Remove a file from pending list
   const removePendingFile = (index: number) => {
@@ -498,70 +557,65 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
         </div>
       )}
 
-      {/* Progress display during upload */}
+      {/* Simplified progress display */}
       {progress.length > 0 && (
-        <div className="mt-4 w-full">
-          <div className="mb-2 font-medium">
+        <div className="mt-4 w-full space-y-3">
+          <div className="text-sm font-medium">
             Uploading {progress.length} file{progress.length > 1 ? "s" : ""}...
           </div>
-          <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
+
+          {/* Individual file progress */}
+          <div className="space-y-2 max-h-64 overflow-y-auto">
             {progress.map((fileProgress, i) => (
-              <div key={i} className="space-y-1">
+              <div key={fileProgress.fileId} className="space-y-1">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="truncate flex-1">
-                    {fileProgress.file.name}
-                  </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
                     {fileProgress.status === "uploading" && (
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+                    )}
+                    {fileProgress.status === "analyzing" && (
+                      <Loader2 className="h-3 w-3 animate-spin flex-shrink-0 text-purple-500" />
                     )}
                     {fileProgress.status === "complete" && (
-                      <Check className="h-3 w-3 text-green-500" />
+                      <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
                     )}
                     {fileProgress.status === "error" && (
-                      <XIcon className="h-3 w-3 text-red-500" />
+                      <XIcon className="h-3 w-3 text-red-500 flex-shrink-0" />
                     )}
-                    <span className="text-xs text-muted-foreground">
-                      {fileProgress.percent}%
+                    <span className="truncate text-muted-foreground">
+                      {fileProgress.fileName}
                     </span>
                   </div>
+                  <span className="text-xs font-medium ml-2 flex-shrink-0">
+                    {fileProgress.progress}%
+                  </span>
                 </div>
-                <div className="w-full bg-muted rounded-full h-1.5">
-                  <div
-                    className={cn(
-                      "h-1.5 rounded-full transition-all duration-300",
-                      fileProgress.status === "complete"
-                        ? "bg-green-500"
-                        : fileProgress.status === "error"
-                          ? "bg-red-500"
-                          : "bg-primary"
-                    )}
-                    style={{ width: `${fileProgress.percent}%` }}
-                  />
-                </div>
+                <Progress
+                  value={fileProgress.progress}
+                  className={cn(
+                    "h-1.5",
+                    fileProgress.status === "error" && "bg-red-100"
+                  )}
+                />
                 {fileProgress.error && (
-                  <div className="text-xs text-red-500">
+                  <div className="text-xs text-red-500 px-1">
                     {fileProgress.error}
                   </div>
                 )}
               </div>
             ))}
           </div>
+
           {/* Overall progress */}
-          <div className="space-y-1">
+          <div className="space-y-1 pt-2 border-t border-border">
             <div className="flex items-center justify-between text-sm font-medium">
               <span>Overall Progress</span>
               <span>{overallPercent}%</span>
             </div>
-            <div className="w-full bg-muted rounded-full h-2">
-              <div
-                className={cn(
-                  "h-2 rounded-full transition-all duration-300",
-                  allComplete ? "bg-green-500" : "bg-primary"
-                )}
-                style={{ width: `${overallPercent}%` }}
-              />
-            </div>
+            <Progress
+              value={overallPercent}
+              className={cn("h-2", allComplete && "bg-green-100")}
+            />
           </div>
         </div>
       )}

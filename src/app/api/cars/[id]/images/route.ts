@@ -64,6 +64,8 @@ export async function GET(request: Request) {
     const view = url.searchParams.get("view");
     const side = url.searchParams.get("side");
     const imageType = url.searchParams.get("imageType");
+    const sort = url.searchParams.get("sort") || "updatedAt";
+    const sortDirection = url.searchParams.get("sortDirection") || "desc";
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -173,7 +175,7 @@ export async function GET(request: Request) {
       // Count total matching images
       db.collection("images").countDocuments(query),
 
-      // Get paginated images with optimized projection
+      // Get paginated images with optimized projection and dynamic sorting
       db
         .collection("images")
         .find(query, {
@@ -187,7 +189,11 @@ export async function GET(request: Request) {
             updatedAt: 1,
           },
         })
-        .sort({ updatedAt: -1, createdAt: -1 })
+        .sort({
+          [sort]: sortDirection === "asc" ? 1 : -1,
+          // Add secondary sort to ensure consistency
+          ...(sort !== "createdAt" && { createdAt: -1 }),
+        })
         .skip(skip)
         .limit(limit)
         .toArray(),
@@ -252,7 +258,7 @@ export async function GET(request: Request) {
         }
       }
 
-      // Re-fetch images after creation
+      // Re-fetch images after creation with dynamic sorting
       const newImages = await db
         .collection("images")
         .find(query, {
@@ -266,7 +272,11 @@ export async function GET(request: Request) {
             updatedAt: 1,
           },
         })
-        .sort({ updatedAt: -1, createdAt: -1 })
+        .sort({
+          [sort]: sortDirection === "asc" ? 1 : -1,
+          // Add secondary sort to ensure consistency
+          ...(sort !== "createdAt" && { createdAt: -1 }),
+        })
         .skip(skip)
         .limit(limit)
         .toArray();

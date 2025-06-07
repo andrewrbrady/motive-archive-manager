@@ -21,6 +21,8 @@ export interface FilterState {
   side?: string;
   imageType?: string; // "with-id" | "processed" | "all"
   hasImageId?: boolean; // Filter for images that have imageId
+  sortBy?: string; // "filename" | "createdAt" | "updatedAt"
+  sortDirection?: "asc" | "desc";
 }
 
 export interface FilterOptions {

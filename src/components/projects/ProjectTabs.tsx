@@ -9,8 +9,43 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Suspense, lazy, useState, useEffect } from "react";
-import { Project } from "@/types/project";
+import { Project, ProjectTimeline } from "@/types/project";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { Event } from "@/types/event";
+
+// Define types for SSR optimization (compatible with both tab interfaces)
+interface EventCar {
+  _id: string;
+  make: string;
+  model: string;
+  year: number;
+  primaryImageId?: string;
+}
+
+interface ProjectCar {
+  _id: string;
+  make: string;
+  model: string;
+  year?: number;
+  color?: string;
+  vin?: string;
+  status: string;
+  primaryImageId?: string;
+  imageIds?: string[];
+  images?: Array<{
+    _id: string;
+    url: string;
+    metadata?: {
+      isPrimary?: boolean;
+    };
+  }>;
+  createdAt: string;
+}
+
+interface EventWithCar extends Event {
+  car?: EventCar;
+  isAttached?: boolean;
+}
 
 // Lazy load heavy tab components
 const ProjectOverviewTab = lazy(() =>
@@ -80,6 +115,13 @@ interface ProjectTabsProps {
   onTabChange: (tab: string) => void;
   memberDetails: Record<string, MemberDetails>;
   onProjectUpdate: () => void;
+  preloadedEvents?: EventWithCar[]; // Optional pre-fetched events data for SSR optimization
+  preloadedCars?: ProjectCar[]; // Optional pre-fetched cars data for SSR optimization
+  preloadedGalleries?: any[]; // Optional pre-fetched galleries data for SSR optimization
+  preloadedAssets?: any[]; // Optional pre-fetched assets data for SSR optimization
+  preloadedDeliverables?: any[]; // Optional pre-fetched deliverables data for SSR optimization
+  preloadedTimelineData?: ProjectTimeline; // Optional pre-fetched timeline data for SSR optimization
+  preloadedCopywriterData?: { cars: any[]; events: any[]; captions: any[] }; // Optional pre-fetched copywriter data for SSR optimization
 }
 
 // Define tab configuration
@@ -107,6 +149,13 @@ export function ProjectTabs({
   onTabChange,
   memberDetails,
   onProjectUpdate,
+  preloadedEvents,
+  preloadedCars,
+  preloadedGalleries,
+  preloadedAssets,
+  preloadedDeliverables,
+  preloadedTimelineData,
+  preloadedCopywriterData,
 }: ProjectTabsProps) {
   const [hasLoadedTab, setHasLoadedTab] = useState<Record<string, boolean>>({
     overview: true, // Always load overview first
@@ -185,13 +234,17 @@ export function ProjectTabs({
             <ProjectTimelineTab
               project={project}
               onProjectUpdate={onProjectUpdate}
+              initialTimelineData={preloadedTimelineData}
             />
           </Suspense>
         )}
 
         {activeTab === "events" && hasLoadedTab.events && (
           <Suspense fallback={<TabLoadingFallback />}>
-            <ProjectEventsTab projectId={project._id!} />
+            <ProjectEventsTab
+              projectId={project._id!}
+              initialEvents={preloadedEvents}
+            />
           </Suspense>
         )}
 
@@ -210,6 +263,7 @@ export function ProjectTabs({
             <ProjectCarsTab
               project={project}
               onProjectUpdate={onProjectUpdate}
+              initialCars={preloadedCars}
             />
           </Suspense>
         )}
@@ -219,6 +273,7 @@ export function ProjectTabs({
             <ProjectGalleriesTab
               project={project}
               onProjectUpdate={onProjectUpdate}
+              initialGalleries={preloadedGalleries}
             />
           </Suspense>
         )}
@@ -228,6 +283,7 @@ export function ProjectTabs({
             <ProjectAssetsTab
               project={project}
               onProjectUpdate={onProjectUpdate}
+              initialAssets={preloadedAssets}
             />
           </Suspense>
         )}
@@ -238,6 +294,7 @@ export function ProjectTabs({
               project={project}
               memberDetails={memberDetails}
               onProjectUpdate={onProjectUpdate}
+              initialDeliverables={preloadedDeliverables}
             />
           </Suspense>
         )}
@@ -251,6 +308,7 @@ export function ProjectTabs({
               allowEventSelection={true}
               allowMinimalCarData={true}
               onProjectUpdate={onProjectUpdate}
+              initialCopywriterData={preloadedCopywriterData}
             />
           </Suspense>
         )}
