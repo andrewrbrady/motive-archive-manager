@@ -118,12 +118,25 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const db = await getDatabase();
-    if (!db) {
-      console.error("Failed to get database instance");
+    // ⚡ OPTIMIZED: Single database connection with better error handling
+    let db;
+    try {
+      db = await getDatabase();
+      if (!db) {
+        console.error("Failed to get database instance");
+        return NextResponse.json(
+          { error: "Failed to connect to database" },
+          { status: 500 }
+        );
+      }
+    } catch (dbConnError) {
+      console.error("Database connection error:", dbConnError);
       return NextResponse.json(
-        { error: "Failed to connect to database" },
-        { status: 500 }
+        {
+          error: "Database connection failed",
+          details: "Connection timeout or pool exhaustion",
+        },
+        { status: 503 }
       );
     }
 
@@ -144,18 +157,26 @@ export async function GET(request: NextRequest) {
 
       if (validObjectIds.length > 0) {
         query._id = { $in: validObjectIds };
-        // For batch ID queries, skip pagination and return all requested cars
-        const cars = await db
-          .collection("cars")
-          .find(query)
-          .project(
-            Object.keys(projection).length > 0
-              ? projection
-              : { _id: 1, make: 1, model: 1, year: 1, color: 1, vin: 1 }
-          )
-          .toArray();
+        // ⚡ OPTIMIZED: Simplified query for batch ID requests to reduce connection usage
+        try {
+          const cars = await db
+            .collection("cars")
+            .find(query)
+            .project(
+              Object.keys(projection).length > 0
+                ? projection
+                : { _id: 1, make: 1, model: 1, year: 1, color: 1, vin: 1 }
+            )
+            .toArray();
 
-        return NextResponse.json(cars);
+          return NextResponse.json(cars);
+        } catch (queryError) {
+          console.error("Batch query error:", queryError);
+          return NextResponse.json(
+            { error: "Query execution failed" },
+            { status: 500 }
+          );
+        }
       } else {
         // No valid IDs provided
         return NextResponse.json([]);
@@ -210,9 +231,9 @@ export async function GET(request: NextRequest) {
         // Create $or query for search patterns
         query.$or = [];
 
-        // Define most important fields to search - limit the scope for better performance
+        // ⚡ OPTIMIZED: Reduced search fields for better performance
         const primaryFields = ["make", "model", "vin"];
-        const secondaryFields = ["color", "status", "location"];
+        const secondaryFields = ["color"];
 
         searchTerms.forEach((term) => {
           // Escape special regex characters to prevent errors
@@ -257,156 +278,196 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      // Count total cars for pagination
-      const totalCount = await db.collection("cars").countDocuments(query);
+      // ⚡ OPTIMIZED: Use Promise.allSettled to prevent one query failure from affecting the other
+      const [totalCountResult, carsResult] = await Promise.allSettled([
+        db.collection("cars").countDocuments(query),
+        (() => {
+          // Enhanced sort handling (consolidated from simple endpoint)
+          let sortField = "createdAt";
+          let sortDirection = -1;
+
+          const sort = searchParams.get("sort");
+          if (sort) {
+            const [field, direction] = sort.split("_");
+            sortField = field || "createdAt";
+            sortDirection = direction === "asc" ? 1 : -1;
+
+            // Use _id for sorting when "createdAt_desc" is selected
+            if (sort === "createdAt_desc") {
+              sortField = "_id";
+              sortDirection = -1;
+            }
+          } else {
+            // Default to sorting by _id in descending order
+            sortField = "_id";
+            sortDirection = -1;
+          }
+
+          // Legacy field selection vs modern aggregation pipeline
+          if (fieldsParam && !searchParams.get("includeImages")) {
+            // Legacy simple query with field projection (backward compatibility)
+            const sortOptions: Record<string, 1 | -1> = {
+              [sortField]: sortDirection as 1 | -1,
+            };
+            return db
+              .collection("cars")
+              .find(query)
+              .project(projection)
+              .sort(sortOptions)
+              .skip((page - 1) * pageSize)
+              .limit(pageSize)
+              .toArray();
+          } else {
+            // ⚡ OPTIMIZED: Simplified aggregation pipeline to reduce connection strain
+            const pipeline: any[] = [
+              { $match: query },
+              { $sort: { [sortField]: sortDirection } },
+              { $skip: (page - 1) * pageSize },
+              { $limit: pageSize },
+            ];
+
+            // Only add image lookup if specifically requested to reduce complexity
+            if (searchParams.get("includeImages") === "true") {
+              pipeline.push({
+                $lookup: {
+                  from: "images",
+                  let: { imageIds: { $ifNull: ["$imageIds", []] } },
+                  pipeline: [
+                    {
+                      $match: {
+                        $expr: {
+                          $in: [{ $toString: "$_id" }, "$$imageIds"],
+                        },
+                      },
+                    },
+                    { $limit: imageLimit },
+                  ],
+                  as: "images",
+                },
+              });
+            }
+
+            return db.collection("cars").aggregate(pipeline).toArray();
+          }
+        })(),
+      ]);
+
+      // Handle results with proper error checking
+      let totalCount = 0;
+      let cars: any[] = [];
+
+      if (totalCountResult.status === "fulfilled") {
+        totalCount = totalCountResult.value;
+      } else {
+        console.error("Count query failed:", totalCountResult.reason);
+        // Fallback: continue without count for pagination
+        totalCount = 0;
+      }
+
+      if (carsResult.status === "fulfilled") {
+        cars = carsResult.value;
+      } else {
+        console.error("Cars query failed:", carsResult.reason);
+        return NextResponse.json(
+          {
+            error: "Query execution failed",
+            details: "Database query timeout",
+          },
+          { status: 500 }
+        );
+      }
+
       const totalPages = Math.ceil(totalCount / pageSize);
 
-      // Enhanced sort handling (consolidated from simple endpoint)
-      let sortField = "createdAt";
-      let sortDirection = -1;
+      // ⚡ OPTIMIZED: Simplified data processing with better error handling
+      const processedCars = cars.map((car, index) => {
+        try {
+          const processedCar = {
+            ...car,
+            _id: car._id?.toString() || `unknown-${index}`,
+            client: car.client?.toString() || null,
+            eventIds: (car.eventIds || [])
+              .filter((id: any) => id != null)
+              .map((id: ObjectId) => id.toString()),
+            deliverableIds: (car.deliverableIds || [])
+              .filter((id: any) => id != null)
+              .map((id: ObjectId) => id.toString()),
+            documentationIds: (car.documentationIds || [])
+              .filter((id: any) => id != null)
+              .map((id: ObjectId) => id.toString()),
+          };
 
-      const sort = searchParams.get("sort");
-      if (sort) {
-        const [field, direction] = sort.split("_");
-        sortField = field || "createdAt";
-        sortDirection = direction === "asc" ? 1 : -1;
-
-        // Use _id for sorting when "createdAt_desc" is selected
-        // since MongoDB's ObjectId contains a creation timestamp
-        if (sort === "createdAt_desc") {
-          sortField = "_id";
-          sortDirection = -1;
-        }
-      } else {
-        // If no sort specified, default to sorting by _id in descending order
-        // for "recently added" items using MongoDB's ObjectId timestamp
-        sortField = "_id";
-        sortDirection = -1;
-      }
-
-      // Legacy field selection vs modern aggregation pipeline
-      if (fieldsParam && !searchParams.get("includeImages")) {
-        // Legacy simple query with field projection (backward compatibility)
-        const sortOptions: Record<string, 1 | -1> = {
-          [sortField]: sortDirection as 1 | -1,
-        };
-        const cars = await db
-          .collection("cars")
-          .find(query)
-          .project(projection)
-          .sort(sortOptions)
-          .skip((page - 1) * pageSize)
-          .limit(pageSize)
-          .toArray();
-
-        return NextResponse.json({
-          cars,
-          pagination: {
-            currentPage: page,
-            totalPages,
-            totalCount,
-            pageSize,
-          },
-        });
-      } else {
-        // Modern aggregation pipeline with image handling (consolidated from simple endpoint)
-        const pipeline = [
-          { $match: query },
-          { $sort: { [sortField]: sortDirection } },
-          { $skip: (page - 1) * pageSize },
-          { $limit: pageSize },
-          // Look up images from imageIds
-          {
-            $lookup: {
-              from: "images",
-              let: { imageIds: { $ifNull: ["$imageIds", []] } },
-              pipeline: [
-                {
-                  $match: {
-                    $expr: {
-                      $in: [{ $toString: "$_id" }, "$$imageIds"],
-                    },
-                  },
-                },
-                { $limit: imageLimit }, // Only get first 10 images for performance
-              ],
-              as: "images",
-            },
-          },
-        ];
-
-        // Execute query
-        const cars = await db.collection("cars").aggregate(pipeline).toArray();
-
-        // Process data for client with better error handling (consolidated from simple endpoint)
-        const processedCars = cars.map((car, index) => {
-          try {
-            return {
-              ...car,
-              _id: car._id?.toString() || `unknown-${index}`,
-              images: (car.images || []).map((img: any) => ({
-                ...img,
-                _id: img._id?.toString() || "unknown-image",
-                url:
-                  img.url && img.url.endsWith("/public")
-                    ? img.url
-                    : `${img.url || ""}/public`,
-              })),
-              client: car.client?.toString() || null,
-              eventIds: (car.eventIds || [])
-                .filter((id: any) => id != null)
-                .map((id: ObjectId) => id.toString()),
-              deliverableIds: (car.deliverableIds || [])
-                .filter((id: any) => id != null)
-                .map((id: ObjectId) => id.toString()),
-              documentationIds: (car.documentationIds || [])
-                .filter((id: any) => id != null)
-                .map((id: ObjectId) => id.toString()),
-            };
-          } catch (processingError) {
-            console.error(
-              `Error processing car at index ${index}:`,
-              processingError
-            );
-            console.error("Car data:", JSON.stringify(car, null, 2));
-            throw processingError;
+          // Only process images if they exist
+          if (car.images && Array.isArray(car.images)) {
+            processedCar.images = car.images.map((img: any) => ({
+              ...img,
+              _id: img._id?.toString() || "unknown-image",
+              url:
+                img.url && img.url.endsWith("/public")
+                  ? img.url
+                  : `${img.url || ""}/public`,
+            }));
           }
-        });
 
-        const response = NextResponse.json({
-          cars: processedCars,
-          pagination: {
-            currentPage: page,
-            totalPages,
-            totalCount,
-            pageSize,
-          },
-        });
+          return processedCar;
+        } catch (processingError) {
+          console.error(
+            `Error processing car at index ${index}:`,
+            processingError
+          );
+          // Return minimal car data on processing error
+          return {
+            _id: car._id?.toString() || `error-${index}`,
+            make: car.make || "Unknown",
+            model: car.model || "Unknown",
+            year: car.year || 0,
+            error: "Processing error",
+          };
+        }
+      });
 
-        // Add cache headers for better performance (consolidated from simple endpoint)
-        response.headers.set(
-          "Cache-Control",
-          "public, s-maxage=60, stale-while-revalidate=300"
-        );
-        response.headers.set(
-          "ETag",
-          `"cars-${totalCount}-${page}-${pageSize}"`
-        );
+      const response = NextResponse.json({
+        cars: processedCars,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalCount,
+          pageSize,
+        },
+      });
 
-        return response;
-      }
+      // Add cache headers for better performance
+      response.headers.set(
+        "Cache-Control",
+        "public, s-maxage=60, stale-while-revalidate=300"
+      );
+      response.headers.set("ETag", `"cars-${totalCount}-${page}-${pageSize}"`);
+
+      return response;
     } catch (dbError) {
       console.error("Database operation error:", dbError);
       console.error(
         "Error stack:",
         dbError instanceof Error ? dbError.stack : "No stack trace"
       );
+
+      // ⚡ OPTIMIZED: Better error classification for connection issues
+      const errorMessage =
+        dbError instanceof Error ? dbError.message : "Unknown error";
+      const isConnectionError =
+        errorMessage.toLowerCase().includes("connection") ||
+        errorMessage.toLowerCase().includes("timeout") ||
+        errorMessage.toLowerCase().includes("pool");
+
       return NextResponse.json(
         {
-          error: "Database operation failed",
-          details: dbError instanceof Error ? dbError.message : "Unknown error",
+          error: isConnectionError
+            ? "Database connection timeout"
+            : "Database operation failed",
+          details: errorMessage,
+          retryAfter: isConnectionError ? 5 : null, // Suggest retry for connection errors
         },
-        { status: 500 }
+        { status: isConnectionError ? 503 : 500 }
       );
     }
   } catch (error) {

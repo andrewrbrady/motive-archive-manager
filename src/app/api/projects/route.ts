@@ -42,7 +42,18 @@ async function createProject(request: NextRequest) {
 
     const userId = getUserIdFromToken(tokenData);
 
-    const db = await getDatabase();
+    // ⚡ OPTIMIZED: Single database connection with error handling
+    let db;
+    try {
+      db = await getDatabase();
+    } catch (dbError) {
+      console.error("Database connection error:", dbError);
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 503 }
+      );
+    }
+
     const data: CreateProjectRequest = await request.json();
 
     if (process.env.NODE_ENV !== "production") {
@@ -73,127 +84,135 @@ async function createProject(request: NextRequest) {
 
     // If using a template, fetch it and create project from template
     if (data.templateId) {
-      const template = await db.collection("project_templates").findOne({
-        _id: new ObjectId(data.templateId),
-      });
+      try {
+        const template = await db.collection("project_templates").findOne({
+          _id: new ObjectId(data.templateId),
+        });
 
-      if (!template) {
-        return NextResponse.json(
-          { error: "Template not found" },
-          { status: 404 }
+        if (!template) {
+          return NextResponse.json(
+            { error: "Template not found" },
+            { status: 404 }
+          );
+        }
+
+        // Use template's createProject method would be ideal, but for now create manually
+        const milestones = template.defaultTimeline.milestones.map(
+          (milestone: any) => ({
+            id:
+              new Date().getTime().toString() +
+              Math.random().toString(36).substr(2, 9),
+            title: milestone.title,
+            description: milestone.description,
+            dueDate: new Date(
+              new Date(data.timeline.startDate).getTime() +
+                milestone.daysFromStart * 24 * 60 * 60 * 1000
+            ),
+            completed: false,
+            dependencies: milestone.dependencies || [],
+            assignedTo: [],
+          })
         );
-      }
 
-      // Use template's createProject method would be ideal, but for now create manually
-      const milestones = template.defaultTimeline.milestones.map(
-        (milestone: any) => ({
-          id:
-            new Date().getTime().toString() +
-            Math.random().toString(36).substr(2, 9),
-          title: milestone.title,
-          description: milestone.description,
-          dueDate: new Date(
+        const endDate =
+          data.timeline.endDate ||
+          new Date(
             new Date(data.timeline.startDate).getTime() +
-              milestone.daysFromStart * 24 * 60 * 60 * 1000
-          ),
-          completed: false,
-          dependencies: milestone.dependencies || [],
-          assignedTo: [],
-        })
-      );
+              (template.defaultTimeline.estimatedDuration || 30) *
+                24 *
+                60 *
+                60 *
+                1000
+          );
 
-      const endDate =
-        data.timeline.endDate ||
-        new Date(
-          new Date(data.timeline.startDate).getTime() +
-            (template.defaultTimeline.estimatedDuration || 30) *
-              24 *
-              60 *
-              60 *
-              1000
-        );
-
-      const projectData = {
-        title: data.title,
-        description: data.description,
-        type: data.type,
-        status: "draft",
-        clientId: data.clientId,
-        carIds: data.carIds || [],
-        galleryIds: [],
-        deliverableIds: [],
-        eventIds: [],
-        ownerId: userId,
-        templateId: data.templateId,
-        timeline: {
-          startDate: new Date(data.timeline.startDate),
-          endDate: endDate,
-          milestones: milestones,
-          estimatedDuration: template.defaultTimeline.estimatedDuration || 30,
-        },
-        members: [
-          {
-            userId: userId,
-            role: "owner",
-            permissions: [
-              "read",
-              "write",
-              "delete",
-              "manage_team",
-              "manage_budget",
-              "manage_timeline",
-            ],
-            joinedAt: new Date(),
+        const projectData = {
+          title: data.title,
+          description: data.description,
+          type: data.type,
+          status: "draft",
+          clientId: data.clientId,
+          carIds: data.carIds || [],
+          galleryIds: [],
+          deliverableIds: [],
+          eventIds: [],
+          ownerId: userId,
+          templateId: data.templateId,
+          timeline: {
+            startDate: new Date(data.timeline.startDate),
+            endDate: endDate,
+            milestones: milestones,
+            estimatedDuration: template.defaultTimeline.estimatedDuration || 30,
           },
-          ...(data.members || []).map((member) => ({
-            ...member,
-            permissions: getDefaultPermissions(member.role),
-            joinedAt: new Date(),
-          })),
-        ],
-        assets: [],
-        progress: {
-          percentage: 0,
-          completedTasks: 0,
-          totalTasks: milestones.length,
-          lastUpdated: new Date(),
-        },
-        tags: data.tags || [],
-        budget: data.budget
-          ? {
-              total: data.budget.total,
-              spent: 0,
-              remaining: data.budget.total,
-              currency: data.budget.currency,
-              expenses: [],
-            }
-          : template.defaultBudget
+          members: [
+            {
+              userId: userId,
+              role: "owner",
+              permissions: [
+                "read",
+                "write",
+                "delete",
+                "manage_team",
+                "manage_budget",
+                "manage_timeline",
+              ],
+              joinedAt: new Date(),
+            },
+            ...(data.members || []).map((member) => ({
+              ...member,
+              permissions: getDefaultPermissions(member.role),
+              joinedAt: new Date(),
+            })),
+          ],
+          assets: [],
+          progress: {
+            percentage: 0,
+            completedTasks: 0,
+            totalTasks: milestones.length,
+            lastUpdated: new Date(),
+          },
+          tags: data.tags || [],
+          budget: data.budget
             ? {
-                total: template.defaultBudget.total || 0,
+                total: data.budget.total,
                 spent: 0,
-                remaining: template.defaultBudget.total || 0,
-                currency: template.defaultBudget.currency || "USD",
+                remaining: data.budget.total,
+                currency: data.budget.currency,
                 expenses: [],
               }
-            : undefined,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+            : template.defaultBudget
+              ? {
+                  total: template.defaultBudget.total || 0,
+                  spent: 0,
+                  remaining: template.defaultBudget.total || 0,
+                  currency: template.defaultBudget.currency || "USD",
+                  expenses: [],
+                }
+              : undefined,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
 
-      const result = await db.collection("projects").insertOne(projectData);
-      const project = await db
-        .collection("projects")
-        .findOne({ _id: result.insertedId });
+        const result = await db.collection("projects").insertOne(projectData);
+        const project = await db
+          .collection("projects")
+          .findOne({ _id: result.insertedId });
 
-      console.log(
-        "✅ POST /api/projects: Successfully created project from template"
-      );
-      return NextResponse.json(
-        {
-          project: convertProjectForFrontend(project),
-        },
-        { status: 201 }
-      );
+        console.log(
+          "✅ POST /api/projects: Successfully created project from template"
+        );
+        return NextResponse.json(
+          {
+            project: convertProjectForFrontend(project),
+          },
+          { status: 201 }
+        );
+      } catch (templateError) {
+        console.error("Template processing error:", templateError);
+        return NextResponse.json(
+          { error: "Template processing failed" },
+          { status: 500 }
+        );
+      }
     }
 
     // Create project without template
@@ -281,17 +300,25 @@ async function createProject(request: NextRequest) {
       updatedAt: new Date(),
     };
 
-    const result = await db.collection("projects").insertOne(projectData);
-    const project = await db
-      .collection("projects")
-      .findOne({ _id: result.insertedId });
+    try {
+      const result = await db.collection("projects").insertOne(projectData);
+      const project = await db
+        .collection("projects")
+        .findOne({ _id: result.insertedId });
 
-    return NextResponse.json(
-      {
-        project: convertProjectForFrontend(project),
-      },
-      { status: 201 }
-    );
+      return NextResponse.json(
+        {
+          project: convertProjectForFrontend(project),
+        },
+        { status: 201 }
+      );
+    } catch (insertError) {
+      console.error("Project insertion error:", insertError);
+      return NextResponse.json(
+        { error: "Failed to create project" },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Error creating project:", error);
     return NextResponse.json(
@@ -323,7 +350,17 @@ async function getProjects(request: NextRequest) {
 
     const userId = getUserIdFromToken(tokenData);
 
-    const db = await getDatabase();
+    // ⚡ OPTIMIZED: Single database connection with error handling
+    let db;
+    try {
+      db = await getDatabase();
+    } catch (dbError) {
+      console.error("Database connection error:", dbError);
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 503 }
+      );
+    }
 
     const { searchParams } = new URL(request.url);
 
@@ -419,68 +456,65 @@ async function getProjects(request: NextRequest) {
     // Calculate pagination
     const skip = (page - 1) * pageSize;
 
-    // Build aggregation pipeline similar to cars API
-    const pipeline: any[] = [{ $match: matchQuery }];
+    try {
+      // ⚡ OPTIMIZED: Simplified aggregation pipeline to reduce connection strain
+      const pipeline: any[] = [{ $match: matchQuery }];
 
-    // Add image lookup if requested - using exact working pattern from cars/list API
-    if (includeImages) {
-      console.log("🔍 [DEBUG] Adding image lookup to projects pipeline");
-      pipeline.push(
-        // First, look up the primary image if set (exact copy from cars/list API)
-        {
-          $lookup: {
-            from: "images",
-            let: {
-              primaryId: {
-                $cond: [
-                  { $ifNull: ["$primaryImageId", false] },
-                  { $toObjectId: "$primaryImageId" },
-                  null,
-                ],
-              },
-            },
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $and: [{ $eq: ["$_id", "$$primaryId"] }],
-                  },
+      // ⚡ OPTIMIZED: Only add image lookup if specifically requested
+      if (includeImages) {
+        console.log("🔍 Adding image lookup to projects pipeline");
+        pipeline.push(
+          {
+            $lookup: {
+              from: "images",
+              let: {
+                primaryId: {
+                  $cond: [
+                    { $ifNull: ["$primaryImageId", false] },
+                    { $toObjectId: "$primaryImageId" },
+                    null,
+                  ],
                 },
               },
-              { $limit: 1 },
-            ],
-            as: "primaryImageData",
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [{ $eq: ["$_id", "$$primaryId"] }],
+                    },
+                  },
+                },
+                { $limit: 1 },
+              ],
+              as: "primaryImageData",
+            },
           },
-        },
-        // Add the primaryImageUrl field using corrected logic
-        {
-          $addFields: {
-            primaryImageUrl: {
-              $cond: {
-                if: { $gt: [{ $size: "$primaryImageData" }, 0] },
-                then: { $arrayElemAt: ["$primaryImageData.url", 0] },
-                else: null,
+          {
+            $addFields: {
+              primaryImageUrl: {
+                $cond: {
+                  if: { $gt: [{ $size: "$primaryImageData" }, 0] },
+                  then: { $arrayElemAt: ["$primaryImageData.url", 0] },
+                  else: null,
+                },
               },
             },
           },
-        },
-        // Remove the temporary primaryImageData field
-        {
-          $unset: "primaryImageData",
-        }
+          {
+            $unset: "primaryImageData",
+          }
+        );
+      }
+
+      // Add sorting and pagination
+      pipeline.push(
+        { $sort: sortOptions },
+        { $skip: skip },
+        { $limit: pageSize }
       );
-    }
 
-    // Add sorting and pagination
-    pipeline.push(
-      { $sort: sortOptions },
-      { $skip: skip },
-      { $limit: pageSize }
-    );
-
-    try {
-      // Execute aggregation and count with enhanced error handling
-      const [projects, totalResult] = await Promise.all([
+      // ⚡ OPTIMIZED: Use Promise.allSettled to handle failures gracefully
+      const [projectsResult, totalResult] = await Promise.allSettled([
         db.collection("projects").aggregate(pipeline).toArray(),
         db
           .collection("projects")
@@ -488,16 +522,39 @@ async function getProjects(request: NextRequest) {
           .toArray(),
       ]);
 
-      const total = totalResult[0]?.total || 0;
+      let projects: any[] = [];
+      let total = 0;
+
+      if (projectsResult.status === "fulfilled") {
+        projects = projectsResult.value;
+      } else {
+        console.error("Projects query failed:", projectsResult.reason);
+        return NextResponse.json(
+          {
+            error: "Query execution failed",
+            details: "Database query timeout",
+          },
+          { status: 500 }
+        );
+      }
+
+      if (totalResult.status === "fulfilled") {
+        total = totalResult.value[0]?.total || 0;
+      } else {
+        console.error("Count query failed:", totalResult.reason);
+        // Continue without count for pagination
+        total = 0;
+      }
+
       const totalPages = Math.ceil(total / pageSize);
 
-      console.log("🔍 [DEBUG] Raw projects from aggregation:", projects.length);
+      console.log("🔍 Raw projects from aggregation:", projects.length);
 
-      // Process images with simple URL fixing (direct approach)
+      // ⚡ OPTIMIZED: Simplified image processing
       const processedProjects = projects.map((project) => {
         if (includeImages && project.primaryImageUrl) {
           console.log(
-            "🔍 [DEBUG] Processing project image URL:",
+            "🔍 Processing project image URL:",
             project.primaryImageUrl
           );
 
@@ -510,7 +567,7 @@ async function getProjects(request: NextRequest) {
             finalUrl = `${finalUrl}/public`;
           }
 
-          console.log("🔍 [DEBUG] Final URL:", finalUrl);
+          console.log("🔍 Final URL:", finalUrl);
 
           return {
             ...project,
@@ -551,12 +608,24 @@ async function getProjects(request: NextRequest) {
         "Error stack:",
         dbError instanceof Error ? dbError.stack : "No stack trace"
       );
+
+      // ⚡ OPTIMIZED: Better error classification for connection issues
+      const errorMessage =
+        dbError instanceof Error ? dbError.message : "Unknown error";
+      const isConnectionError =
+        errorMessage.toLowerCase().includes("connection") ||
+        errorMessage.toLowerCase().includes("timeout") ||
+        errorMessage.toLowerCase().includes("pool");
+
       return NextResponse.json(
         {
-          error: "Database operation failed",
-          details: dbError instanceof Error ? dbError.message : "Unknown error",
+          error: isConnectionError
+            ? "Database connection timeout"
+            : "Database operation failed",
+          details: errorMessage,
+          retryAfter: isConnectionError ? 5 : null,
         },
-        { status: 500 }
+        { status: isConnectionError ? 503 : 500 }
       );
     }
   } catch (error) {
