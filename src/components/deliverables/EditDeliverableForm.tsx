@@ -100,19 +100,13 @@ export default function EditDeliverableForm({
         return date;
       }
 
+      // Parse the date consistently with how the calendar interprets dates
+      // This ensures the edit modal shows the same date as the calendar
       const d = new Date(date);
       if (isNaN(d.getTime())) return "";
 
-      // Parse the date components from the original date string to avoid timezone issues
-      if (typeof date === "string" && date.includes("T")) {
-        // For ISO strings, extract the date part directly
-        const datePart = date.split("T")[0];
-        if (datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
-          return datePart;
-        }
-      }
-
-      // Fallback: use the local date components to construct YYYY-MM-DD
+      // Use local date methods to match calendar display behavior
+      // This will show the same date that the calendar displays
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, "0");
       const day = String(d.getDate()).padStart(2, "0");
@@ -206,9 +200,10 @@ export default function EditDeliverableForm({
         firebase_uid: editorId,
         edit_deadline: editDeadline
           ? (() => {
-              // For date-only format (YYYY-MM-DD), treat as local date at midnight
+              // For date-only format (YYYY-MM-DD), create a date that will round-trip correctly
               if (editDeadline.match(/^\d{4}-\d{2}-\d{2}$/)) {
                 const [year, month, day] = editDeadline.split("-").map(Number);
+                // Create a local date first, then convert to ISO to preserve the display date
                 const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
                 return localDate.toISOString();
               }
@@ -218,9 +213,10 @@ export default function EditDeliverableForm({
           : "",
         release_date: releaseDate
           ? (() => {
-              // For date-only format (YYYY-MM-DD), treat as local date at midnight
+              // For date-only format (YYYY-MM-DD), create a date that will round-trip correctly
               if (releaseDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
                 const [year, month, day] = releaseDate.split("-").map(Number);
+                // Create a local date first, then convert to ISO to preserve the display date
                 const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
                 return localDate.toISOString();
               }

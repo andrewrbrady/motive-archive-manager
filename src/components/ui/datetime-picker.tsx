@@ -48,9 +48,10 @@ export function DateTimePicker({
   const currentDate = value
     ? (() => {
         if (isAllDay && value.match(/^\d{4}-\d{2}-\d{2}$/)) {
-          // For all-day events with date-only format, parse as local date
+          // For all-day events with date-only format, parse consistently with calendar
+          // Create a date that will display the same as what the calendar shows
           const [year, month, day] = value.split("-").map(Number);
-          return new Date(year, month - 1, day, 0, 0, 0, 0);
+          return new Date(year, month - 1, day, 12, 0, 0, 0); // Use noon to avoid timezone edge cases
         } else {
           // For datetime strings, parse normally
           return new Date(value);
@@ -158,32 +159,9 @@ export function DateTimePicker({
               {currentDate ? (
                 <span>
                   {(() => {
-                    let formatted;
-                    if (isAllDay && value.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                      // For all-day events, format using local date methods
-                      const months = [
-                        "Jan",
-                        "Feb",
-                        "Mar",
-                        "Apr",
-                        "May",
-                        "Jun",
-                        "Jul",
-                        "Aug",
-                        "Sep",
-                        "Oct",
-                        "Nov",
-                        "Dec",
-                      ];
-                      const month = months[currentDate.getMonth()];
-                      const day = currentDate.getDate();
-                      const year = currentDate.getFullYear();
-                      formatted = `${month} ${day}, ${year}`;
-                    } else {
-                      // For timed events, use date-fns format normally
-                      formatted = format(currentDate, "MMM d, yyyy");
-                    }
-                    return formatted;
+                    // For all-day events, format consistently with calendar display
+                    // Use local date methods to match how the calendar shows the date
+                    return format(currentDate, "MMM d, yyyy");
                   })()}
                   {!isAllDay && (
                     <span className="text-muted-foreground ml-2">
