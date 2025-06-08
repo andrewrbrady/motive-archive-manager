@@ -6,6 +6,10 @@ import { ObjectId } from "mongodb";
 export const maxDuration = 300;
 export const runtime = "nodejs";
 
+// Increase body size limit for Vercel
+export const dynamic = "force-dynamic";
+export const maxBodySize = "10mb";
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   console.log("[API] Images upload called at", new Date().toISOString());
@@ -120,17 +124,39 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      if (file.size > 4 * 1024 * 1024) {
-        // 4MB limit (reduced for Vercel)
+      // More lenient file size check - 8MB per file for better user experience
+      if (file.size > 8 * 1024 * 1024) {
         const error = `File "${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)}MB)`;
         console.error("[API]", error);
         uploadErrors.push({
           fileName: file.name,
           fileIndex: i + 1,
           error,
-          details: "File exceeds 4MB limit (Vercel function payload limit)",
+          details:
+            "File exceeds 8MB limit. Please compress your image before uploading.",
         });
         continue;
+      }
+
+      // Check total request size for multiple files
+      const totalSize = files.reduce((acc: number, f: any) => {
+        if (f instanceof File) return acc + f.size;
+        return acc;
+      }, 0);
+
+      if (totalSize > 25 * 1024 * 1024) {
+        const error = `Total upload size too large (${(totalSize / 1024 / 1024).toFixed(1)}MB)`;
+        console.error("[API]", error);
+        return NextResponse.json(
+          {
+            error: "Upload too large",
+            details:
+              "Total upload size exceeds 25MB. Please upload fewer images at once or compress them.",
+            totalSize: `${(totalSize / 1024 / 1024).toFixed(1)}MB`,
+            timestamp: new Date().toISOString(),
+          },
+          { status: 413 }
+        );
       }
 
       try {

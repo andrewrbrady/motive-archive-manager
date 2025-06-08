@@ -4,6 +4,7 @@ import React, { useState, useRef } from "react";
 import { CarImage } from "@/types/car";
 import { useAPI } from "@/hooks/useAPI";
 import { getValidToken } from "@/lib/api-client";
+import { compressImages, needsCompression } from "@/lib/imageCompression";
 
 interface UploadResponse {
   imageUrl: string;

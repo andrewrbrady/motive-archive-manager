@@ -22,6 +22,10 @@
     }
   ],
   "functions": {
+    "app/api/images/upload/route.ts": {
+      "maxDuration": 300,
+      "memory": 1536
+    },
     "app/api/images/extend-canvas/route.ts": {
       "maxDuration": 60,
       "memory": 1536
@@ -31,6 +35,14 @@
       "memory": 1536
     },
     "app/api/images/extend-canvas-remote/route.ts": {
+      "maxDuration": 60,
+      "memory": 1536
+    },
+    "app/api/cars/*/images/route.ts": {
+      "maxDuration": 60,
+      "memory": 1536
+    },
+    "app/api/cloudflare/images/route.ts": {
       "maxDuration": 60,
       "memory": 1536
     },

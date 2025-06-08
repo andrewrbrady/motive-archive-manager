@@ -125,7 +125,30 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
   // Handle file selection or drop
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setPendingFiles(Array.from(files));
+
+    const fileArray = Array.from(files);
+
+    // Check individual file sizes (8MB limit per file)
+    const oversizedFiles = fileArray.filter(
+      (file) => file.size > 8 * 1024 * 1024
+    );
+    if (oversizedFiles.length > 0) {
+      onError?.(
+        `The following files are too large (over 8MB): ${oversizedFiles.map((f) => f.name).join(", ")}. Please compress them before uploading.`
+      );
+      return;
+    }
+
+    // Check total batch size (25MB limit for Vercel functions)
+    const totalSize = fileArray.reduce((acc, file) => acc + file.size, 0);
+    if (totalSize > 25 * 1024 * 1024) {
+      onError?.(
+        `Total upload size (${(totalSize / 1024 / 1024).toFixed(1)}MB) exceeds 25MB limit. Please upload fewer images at once or compress them.`
+      );
+      return;
+    }
+
+    setPendingFiles(fileArray);
     setProgress([]); // Reset progress if new files are selected
   };
 
@@ -521,7 +544,7 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
             Click to select or drag and drop images
           </div>
           <div className="text-xs text-muted-foreground mt-1">
-            Images up to 5MB each
+            Images up to 8MB each (25MB total per batch)
           </div>
         </div>
       )}

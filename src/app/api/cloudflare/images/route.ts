@@ -7,8 +7,9 @@ import { analyzeImage } from "@/lib/imageAnalyzer";
 export const maxDuration = 300;
 export const runtime = "nodejs";
 
-// Allow very large uploads (up to 2GB) to prevent 413 errors
-// export const maxSize = 2 * 1024 * 1024 * 1024; // 2GB
+// Increase body size limit for Vercel (max 4.5MB for Hobby/Pro)
+export const dynamic = "force-dynamic";
+export const maxBodySize = "10mb";
 
 // Ensure environment variables are set
 if (
