@@ -94,6 +94,7 @@ export default function DeliverablesCalendar() {
   const [editor, setEditor] = useState("");
   const [selectedCar, setSelectedCar] = useState("");
   const [creativeRole, setCreativeRole] = useState("");
+  const [showOnlyScheduled, setShowOnlyScheduled] = useState(false);
 
   const CREATIVE_ROLES = [
     "video_editor",

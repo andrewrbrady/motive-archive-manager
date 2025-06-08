@@ -194,11 +194,14 @@ export async function POST(
       description,
       type,
       dueDate,
+      editDeadline,
+      releaseDate,
       assignedTo,
       platform,
       duration,
       aspectRatio,
       carId,
+      scheduled,
     } = body;
 
     if (!title?.trim()) {
@@ -249,9 +252,14 @@ export async function POST(
         : getUserEmailFromToken(tokenData) || "Unknown",
       status: "not_started",
       edit_dates: [],
-      edit_deadline: new Date(dueDate),
-      release_date: new Date(dueDate), // Use same date for now
+      edit_deadline: editDeadline
+        ? new Date(editDeadline)
+        : new Date(dueDate || new Date()),
+      release_date: releaseDate
+        ? new Date(releaseDate)
+        : new Date(dueDate || new Date()),
       tags: [],
+      scheduled: scheduled || false,
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -354,7 +362,10 @@ export async function PUT(
       description,
       type,
       dueDate,
+      editDeadline,
+      releaseDate,
       assignedTo,
+      scheduled,
     } = body;
 
     console.log("📝 Update request:", { deliverableId, status, title });
@@ -409,8 +420,17 @@ export async function PUT(
       updateData.edit_deadline = new Date(dueDate);
       updateData.release_date = new Date(dueDate);
     }
+    if (editDeadline) {
+      updateData.edit_deadline = new Date(editDeadline);
+    }
+    if (releaseDate) {
+      updateData.release_date = new Date(releaseDate);
+    }
     if (assignedTo !== undefined) {
       updateData.firebase_uid = assignedTo || userId;
+    }
+    if (scheduled !== undefined) {
+      updateData.scheduled = scheduled;
     }
 
     console.log("📝 Updating deliverable with data:", updateData);

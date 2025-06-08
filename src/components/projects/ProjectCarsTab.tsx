@@ -86,90 +86,41 @@ function ProjectCarCard({
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Simple effect: just fetch the primary image
   useEffect(() => {
-    const findPrimaryImage = () => {
-      setLoading(true);
+    const loadPrimaryImage = async () => {
+      if (!car.primaryImageId || !api) {
+        setLoading(false);
+        setPrimaryImage(null);
+        return;
+      }
 
-      // Case 1: We have an array of images
-      if (car.images && Array.isArray(car.images) && car.images.length > 0) {
-        // Try to find the image marked as primary first
-        const primaryImg = car.images.find(
-          (img) =>
-            img.metadata?.isPrimary ||
-            (car.primaryImageId && img._id === car.primaryImageId)
-        );
-
-        // Use primary image if found, otherwise use first image
-        const imageToUse = primaryImg || car.images[0];
-
+      try {
+        const imageData = (await api.get(
+          `images/${car.primaryImageId}`
+        )) as any;
         setPrimaryImage({
-          id: imageToUse._id,
+          id: imageData._id,
           url: getEnhancedImageUrlBySize(
-            fixCloudflareImageUrl(imageToUse.url),
+            fixCloudflareImageUrl(imageData.url),
             "thumbnail"
           ),
         });
-
-        setLoading(false);
-        return;
+      } catch (error) {
+        console.error(`Error loading primary image for car ${car._id}:`, error);
+        setPrimaryImage(null);
       }
 
-      // Case 2: We have image IDs but no loaded images
-      if (car.imageIds?.length && car.primaryImageId && api) {
-        // Fetch the primary image using authenticated API
-        const fetchImage = async () => {
-          try {
-            const imageData = (await api.get(
-              `images/${car.primaryImageId}`
-            )) as any;
-            setPrimaryImage({
-              id: imageData._id,
-              url: getEnhancedImageUrlBySize(
-                fixCloudflareImageUrl(imageData.url),
-                "thumbnail"
-              ),
-            });
-          } catch (error) {
-            // If primary image fetch fails, try the first image
-            if (
-              car.imageIds &&
-              car.imageIds.length > 0 &&
-              car.imageIds[0] !== car.primaryImageId
-            ) {
-              try {
-                const fallbackImageData = (await api.get(
-                  `images/${car.imageIds[0]}`
-                )) as any;
-                setPrimaryImage({
-                  id: fallbackImageData._id,
-                  url: getEnhancedImageUrlBySize(
-                    fixCloudflareImageUrl(fallbackImageData.url),
-                    "thumbnail"
-                  ),
-                });
-              } catch (fallbackError) {
-                console.error("Error fetching fallback image:", fallbackError);
-                setPrimaryImage(null);
-              }
-            } else {
-              setPrimaryImage(null);
-            }
-          } finally {
-            setLoading(false);
-          }
-        };
-
-        fetchImage();
-        return;
-      }
-
-      // No images available
       setLoading(false);
-      setPrimaryImage(null);
     };
 
-    findPrimaryImage();
-  }, [car._id, car.imageIds, car.images, car.primaryImageId, api]);
+    if (api && car.primaryImageId) {
+      loadPrimaryImage();
+    } else {
+      setLoading(false);
+      setPrimaryImage(null);
+    }
+  }, [car._id, car.primaryImageId, api]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -301,6 +252,23 @@ export function ProjectCarsTab({
       )) as {
         cars?: Car[];
       };
+
+      console.log("ProjectCarsTab: Fetched cars data:", {
+        carsCount: data.cars?.length || 0,
+        carsWithImages:
+          data.cars?.filter((car) => car.images?.length).length || 0,
+        carsWithImageIds:
+          data.cars?.filter((car) => car.imageIds?.length).length || 0,
+        sampleCar: data.cars?.[0]
+          ? {
+              id: data.cars[0]._id,
+              hasImages: !!data.cars[0].images?.length,
+              hasImageIds: !!data.cars[0].imageIds?.length,
+              primaryImageId: data.cars[0].primaryImageId,
+            }
+          : null,
+      });
+
       setProjectCars(data.cars || []);
     } catch (error) {
       console.error("Error fetching project cars:", error);
@@ -317,10 +285,41 @@ export function ProjectCarsTab({
 
   // Fetch project cars on component mount and when project changes - only if no initial data
   useEffect(() => {
-    if (api && project._id && !initialCars) {
+    // ✅ Fix: Add proper API readiness check and avoid race conditions
+    if (!initialCars && project._id) {
+      if (api) {
+        fetchProjectCars();
+      } else {
+        // API not ready yet, keep loading state until it is
+        setLoadingProjectCars(true);
+      }
+    }
+  }, [api, project._id, initialCars, fetchProjectCars]);
+
+  // ✅ Fix: Additional effect to handle API becoming available after initial render
+  useEffect(() => {
+    if (
+      api &&
+      !initialCars &&
+      project._id &&
+      projectCars.length === 0 &&
+      !loadingProjectCars
+    ) {
+      console.log("ProjectCarsTab: API became available, fetching cars...");
       fetchProjectCars();
     }
-  }, [fetchProjectCars, api, project._id, initialCars]);
+  }, [api]);
+
+  // ✅ Fix: Add effect to handle lazy loading scenarios
+  useEffect(() => {
+    // If we're lazy loaded and don't have initial cars, and the API is available, fetch immediately
+    if (api && !initialCars && project._id && projectCars.length === 0) {
+      console.log(
+        "ProjectCarsTab: Component mounted with API ready, fetching cars..."
+      );
+      fetchProjectCars();
+    }
+  }, []); // Run once on mount
 
   // ✅ Fix: Cleanup dialog state on unmount to prevent react-remove-scroll errors
   useEffect(() => {

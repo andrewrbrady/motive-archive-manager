@@ -79,6 +79,8 @@
     --deliverable-other: 220 9% 46%; /* gray-500 */
     --deliverable-deadline: 0 74% 50%; /* red-600 */
     --deliverable-release: 263 70% 58%; /* violet-600 */
+    --deliverable-deadline-scheduled: 142 76% 36%; /* green-600 - scheduled deadline */
+    --deliverable-release-scheduled: 142 69% 58%; /* green-500 - scheduled release */
 
     /* Calendar Status Colors */
     --status-not-started: var(--destructive);

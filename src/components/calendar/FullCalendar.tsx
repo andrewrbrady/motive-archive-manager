@@ -83,6 +83,7 @@ export function FullCalendarComponent({
 }: FullCalendarProps) {
   const [showEvents, setShowEvents] = useState(true);
   const [showDeliverables, setShowDeliverables] = useState(true);
+  const [showOnlyScheduled, setShowOnlyScheduled] = useState(false);
   const [eventTypeFilters, setEventTypeFilters] = useState<string[]>([]);
   const [deliverableTypeFilters, setDeliverableTypeFilters] = useState<
     string[]
@@ -193,7 +194,8 @@ export function FullCalendarComponent({
               (deliverablePlatformFilters.length === 0 ||
                 deliverablePlatformFilters.includes(deliverable.platform)) &&
               (deliverableTypeFilters.length === 0 ||
-                deliverableTypeFilters.includes(deliverable.type))
+                deliverableTypeFilters.includes(deliverable.type)) &&
+              (!showOnlyScheduled || deliverable.scheduled === true) // Filter by scheduled status
           )
           .flatMap((deliverable): FullCalendarEvent[] => {
             const items: FullCalendarEvent[] = [];
@@ -204,12 +206,16 @@ export function FullCalendarComponent({
             ) {
               const deadlineEvent: FullCalendarEvent = {
                 id: `${deliverable._id?.toString()}-deadline`,
-                title: `${deliverable.title} (Edit Deadline)`,
+                title: `${deliverable.scheduled ? "🗓️ " : ""}${deliverable.title} (Edit Deadline)`,
                 start: new Date(deliverable.edit_deadline),
                 end: new Date(deliverable.edit_deadline),
                 allDay: true,
-                backgroundColor: `hsl(var(--deliverable-deadline))`,
-                borderColor: `hsl(var(--deliverable-deadline))`,
+                backgroundColor: deliverable.scheduled
+                  ? `hsl(var(--deliverable-deadline-scheduled))`
+                  : `hsl(var(--deliverable-deadline))`,
+                borderColor: deliverable.scheduled
+                  ? `hsl(var(--deliverable-deadline-scheduled))`
+                  : `hsl(var(--deliverable-deadline))`,
                 textColor: "white",
                 editable: true,
                 startEditable: true,
@@ -232,12 +238,16 @@ export function FullCalendarComponent({
               if (deliverable.release_date) {
                 const releaseEvent: FullCalendarEvent = {
                   id: `${deliverable._id?.toString()}-release`,
-                  title: `${deliverable.title} (Release)`,
+                  title: `${deliverable.scheduled ? "🗓️ " : ""}${deliverable.title} (Release)`,
                   start: new Date(deliverable.release_date),
                   end: new Date(deliverable.release_date),
                   allDay: true,
-                  backgroundColor: `hsl(var(--deliverable-release))`,
-                  borderColor: `hsl(var(--deliverable-release))`,
+                  backgroundColor: deliverable.scheduled
+                    ? `hsl(var(--deliverable-release-scheduled))`
+                    : `hsl(var(--deliverable-release))`,
+                  borderColor: deliverable.scheduled
+                    ? `hsl(var(--deliverable-release-scheduled))`
+                    : `hsl(var(--deliverable-release))`,
                   textColor: "white",
                   editable: true,
                   startEditable: true,
@@ -511,6 +521,21 @@ export function FullCalendarComponent({
                       <Square className="mr-2 h-4 w-4" />
                     )}
                     <span>Deliverables</span>
+                  </DropdownMenuCheckboxItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuCheckboxItem
+                    checked={showOnlyScheduled}
+                    onCheckedChange={setShowOnlyScheduled}
+                    disabled={!showDeliverables}
+                  >
+                    {showOnlyScheduled ? (
+                      <CheckSquare className="mr-2 h-4 w-4" />
+                    ) : (
+                      <Square className="mr-2 h-4 w-4" />
+                    )}
+                    <span>Show Only Scheduled</span>
                   </DropdownMenuCheckboxItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>

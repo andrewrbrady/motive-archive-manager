@@ -77,6 +77,7 @@ export interface Deliverable {
   edit_dates: Date[];
   edit_deadline: Date;
   release_date?: Date;
+  scheduled?: boolean; // Calendar scheduled status
 
   // Content Details
   target_audience?: string;

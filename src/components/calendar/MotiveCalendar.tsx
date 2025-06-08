@@ -106,6 +106,10 @@ export function MotiveCalendar({
             data.showDeliverables !== undefined ? data.showDeliverables : true,
           showMilestones:
             data.showMilestones !== undefined ? data.showMilestones : true,
+          showOnlyScheduled:
+            data.showOnlyScheduled !== undefined
+              ? data.showOnlyScheduled
+              : false,
           // For filters, use empty arrays as default - we'll populate with all available options
           eventTypeFilters: data.eventTypeFilters || [],
           deliverableEventFilters: data.deliverableEventFilters || [],
@@ -121,6 +125,7 @@ export function MotiveCalendar({
       showEvents: true,
       showDeliverables: true,
       showMilestones: true,
+      showOnlyScheduled: false,
       eventTypeFilters: [],
       deliverableEventFilters: [],
       deliverablePlatformFilters: [],
@@ -149,6 +154,9 @@ export function MotiveCalendar({
   );
   const [showMilestones, setShowMilestonesState] = useState(
     initialFilters.showMilestones
+  );
+  const [showOnlyScheduled, setShowOnlyScheduledState] = useState(
+    initialFilters.showOnlyScheduled
   );
   const [eventTypeFilters, setEventTypeFiltersState] = useState<string[]>(
     initialFilters.eventTypeFilters
@@ -196,6 +204,10 @@ export function MotiveCalendar({
 
   const setMilestoneStatusFilters = useCallback((value: string[]) => {
     setMilestoneStatusFiltersState(value);
+  }, []);
+
+  const setShowOnlyScheduled = useCallback((value: boolean) => {
+    setShowOnlyScheduledState(value);
   }, []);
   const [eventsWithCars, setEventsWithCars] = useState<
     (Event & { car?: { make: string; model: string; year: number } })[]
@@ -384,6 +396,7 @@ export function MotiveCalendar({
       showEvents,
       showDeliverables,
       showMilestones,
+      showOnlyScheduled,
       eventTypeFilters,
       deliverableEventFilters,
       deliverablePlatformFilters,
@@ -395,6 +408,7 @@ export function MotiveCalendar({
     showEvents,
     showDeliverables,
     showMilestones,
+    showOnlyScheduled,
     eventTypeFilters,
     deliverableEventFilters,
     deliverablePlatformFilters,
@@ -558,45 +572,18 @@ export function MotiveCalendar({
       : [];
 
     const deliverableItems: MotiveCalendarEvent[] = showDeliverables
-      ? deliverables.flatMap((deliverable): MotiveCalendarEvent[] => {
-          const items: MotiveCalendarEvent[] = [];
+      ? deliverables
+          .filter(
+            (deliverable) =>
+              !showOnlyScheduled || deliverable.scheduled === true
+          )
+          .flatMap((deliverable): MotiveCalendarEvent[] => {
+            const items: MotiveCalendarEvent[] = [];
 
-          if (
-            deliverableEventFilters.length === 0 ||
-            deliverableEventFilters.includes("deadline")
-          ) {
-            // Format title with car info if available
-            const carData = deliverable.car_id
-              ? deliverableCarCache.get(deliverable.car_id.toString())
-              : undefined;
-            const carInfo = carData
-              ? `${carData.year} ${carData.make} ${carData.model}`
-              : "";
-            const title = carInfo
-              ? `${carInfo} | ${deliverable.title} (Edit Deadline)`
-              : `${deliverable.title} (Edit Deadline)`;
-
-            const deadlineEvent: MotiveCalendarEvent = {
-              id: `${deliverable._id?.toString()}-deadline`,
-              title: title,
-              start: new Date(deliverable.edit_deadline),
-              end: new Date(deliverable.edit_deadline),
-              type: "deliverable",
-              resource: {
-                ...deliverable,
-                eventType: "deadline",
-                car: carData,
-              } as DeliverableWithEventType,
-              allDay: true,
-            };
-            items.push(deadlineEvent);
-          }
-
-          if (
-            deliverableEventFilters.length === 0 ||
-            deliverableEventFilters.includes("release")
-          ) {
-            if (deliverable.release_date) {
+            if (
+              deliverableEventFilters.length === 0 ||
+              deliverableEventFilters.includes("deadline")
+            ) {
               // Format title with car info if available
               const carData = deliverable.car_id
                 ? deliverableCarCache.get(deliverable.car_id.toString())
@@ -605,28 +592,60 @@ export function MotiveCalendar({
                 ? `${carData.year} ${carData.make} ${carData.model}`
                 : "";
               const title = carInfo
-                ? `${carInfo} | ${deliverable.title} (Release)`
-                : `${deliverable.title} (Release)`;
+                ? `${carInfo} | ${deliverable.scheduled ? "🗓️ " : ""}${deliverable.title} (Edit Deadline)`
+                : `${deliverable.scheduled ? "🗓️ " : ""}${deliverable.title} (Edit Deadline)`;
 
-              const releaseEvent: MotiveCalendarEvent = {
-                id: `${deliverable._id?.toString()}-release`,
+              const deadlineEvent: MotiveCalendarEvent = {
+                id: `${deliverable._id?.toString()}-deadline`,
                 title: title,
-                start: new Date(deliverable.release_date),
-                end: new Date(deliverable.release_date),
+                start: new Date(deliverable.edit_deadline),
+                end: new Date(deliverable.edit_deadline),
                 type: "deliverable",
                 resource: {
                   ...deliverable,
-                  eventType: "release",
+                  eventType: "deadline",
                   car: carData,
                 } as DeliverableWithEventType,
                 allDay: true,
               };
-              items.push(releaseEvent);
+              items.push(deadlineEvent);
             }
-          }
 
-          return items;
-        })
+            if (
+              deliverableEventFilters.length === 0 ||
+              deliverableEventFilters.includes("release")
+            ) {
+              if (deliverable.release_date) {
+                // Format title with car info if available
+                const carData = deliverable.car_id
+                  ? deliverableCarCache.get(deliverable.car_id.toString())
+                  : undefined;
+                const carInfo = carData
+                  ? `${carData.year} ${carData.make} ${carData.model}`
+                  : "";
+                const title = carInfo
+                  ? `${carInfo} | ${deliverable.scheduled ? "🗓️ " : ""}${deliverable.title} (Release)`
+                  : `${deliverable.scheduled ? "🗓️ " : ""}${deliverable.title} (Release)`;
+
+                const releaseEvent: MotiveCalendarEvent = {
+                  id: `${deliverable._id?.toString()}-release`,
+                  title: title,
+                  start: new Date(deliverable.release_date),
+                  end: new Date(deliverable.release_date),
+                  type: "deliverable",
+                  resource: {
+                    ...deliverable,
+                    eventType: "release",
+                    car: carData,
+                  } as DeliverableWithEventType,
+                  allDay: true,
+                };
+                items.push(releaseEvent);
+              }
+            }
+
+            return items;
+          })
       : [];
 
     const milestoneItems: MotiveCalendarEvent[] = showMilestones
@@ -671,6 +690,7 @@ export function MotiveCalendar({
     showEvents,
     showDeliverables,
     showMilestones,
+    showOnlyScheduled,
     formatEventTitle,
   ]);
 
@@ -709,9 +729,13 @@ export function MotiveCalendar({
 
       // Use event type (deadline/release) as a secondary indicator
       if (deliverableResource?.eventType === "deadline") {
-        backgroundColor = `hsl(var(--deliverable-deadline))`;
+        backgroundColor = deliverableResource.scheduled
+          ? `hsl(var(--deliverable-deadline-scheduled))`
+          : `hsl(var(--deliverable-deadline))`;
       } else if (deliverableResource?.eventType === "release") {
-        backgroundColor = `hsl(var(--deliverable-release))`;
+        backgroundColor = deliverableResource.scheduled
+          ? `hsl(var(--deliverable-release-scheduled))`
+          : `hsl(var(--deliverable-release))`;
       }
 
       return {
@@ -948,6 +972,24 @@ export function MotiveCalendar({
                   Milestones
                 </Button>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowOnlyScheduled(!showOnlyScheduled)}
+                disabled={!showDeliverables}
+                className={cn(
+                  "flex items-center gap-2",
+                  showOnlyScheduled &&
+                    "bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]"
+                )}
+              >
+                {showOnlyScheduled ? (
+                  <CheckSquare className="h-4 w-4" />
+                ) : (
+                  <Square className="h-4 w-4" />
+                )}
+                Scheduled Only
+              </Button>
             </div>
           </React.Fragment>
         )}

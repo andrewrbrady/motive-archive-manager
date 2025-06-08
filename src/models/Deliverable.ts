@@ -30,6 +30,7 @@ export interface IDeliverable extends Document {
   edit_dates: Date[];
   edit_deadline: Date;
   release_date: Date;
+  scheduled?: boolean; // Calendar scheduled status
   target_audience?: string;
   music_track?: string;
   thumbnail_url?: string;
@@ -137,6 +138,11 @@ const deliverableSchema = new mongoose.Schema(
     release_date: {
       type: Date,
       required: true,
+      index: true,
+    },
+    scheduled: {
+      type: Boolean,
+      default: false,
       index: true,
     },
     target_audience: String,

@@ -89,6 +89,13 @@ export async function PUT(
     if (body.release_date) {
       updateData.release_date = new Date(body.release_date);
     }
+    // Handle frontend camelCase field names
+    if (body.editDeadline) {
+      updateData.edit_deadline = new Date(body.editDeadline);
+    }
+    if (body.releaseDate) {
+      updateData.release_date = new Date(body.releaseDate);
+    }
 
     // Handle other updates
     if (body.title) updateData.title = body.title.trim();
@@ -97,6 +104,10 @@ export async function PUT(
     if (body.status) updateData.status = body.status;
     if (body.type) updateData.type = body.type;
     if (body.platform) updateData.platform = body.platform;
+    if (body.duration !== undefined) updateData.duration = body.duration;
+    if (body.aspectRatio) updateData.aspect_ratio = body.aspectRatio;
+    if (body.platforms) updateData.platforms = body.platforms;
+    if (body.scheduled !== undefined) updateData.scheduled = body.scheduled;
 
     const updatedDeliverable = await Deliverable.findByIdAndUpdate(
       deliverableId,

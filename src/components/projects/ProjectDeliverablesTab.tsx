@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import {
   DropdownMenu,
@@ -30,6 +31,9 @@ import { toast } from "@/components/ui/use-toast";
 import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
 import { useAPI } from "@/hooks/useAPI";
 import { CarAvatar } from "@/components/ui/CarAvatar";
+import { usePlatforms } from "@/contexts/PlatformContext";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
 
 interface MemberDetails {
   name: string;
@@ -51,7 +55,10 @@ export function ProjectDeliverablesTab({
   initialDeliverables,
 }: ProjectDeliverablesTabProps) {
   const api = useAPI();
+  const { platforms: availablePlatforms } = usePlatforms();
   const [isAddDeliverableOpen, setIsAddDeliverableOpen] = useState(false);
+  const [isEditDeliverableOpen, setIsEditDeliverableOpen] = useState(false);
+  const [editingDeliverable, setEditingDeliverable] = useState<any>(null);
   const [isLinkDeliverableOpen, setIsLinkDeliverableOpen] = useState(false);
   const [showJsonUpload, setShowJsonUpload] = useState(false);
   const [isSubmittingJson, setIsSubmittingJson] = useState(false);
@@ -62,15 +69,28 @@ export function ProjectDeliverablesTab({
       | "Video"
       | "Photo Gallery"
       | "Mixed Gallery"
-      | "Video Gallery",
-    platform: "Other" as string,
+      | "Video Gallery"
+      | "Still"
+      | "Graphic"
+      | "feature"
+      | "promo"
+      | "review"
+      | "walkthrough"
+      | "highlights"
+      | "Marketing Email"
+      | "Blog"
+      | "other",
+    platforms: [] as { label: string; value: string }[],
     duration: 30,
     aspectRatio: "16:9",
-    dueDate: new Date(),
+    editDeadline: "",
+    releaseDate: "",
     assignedTo: "unassigned",
     carId: "",
+    scheduled: false,
   });
   const [isAddingDeliverable, setIsAddingDeliverable] = useState(false);
+  const [isUpdatingDeliverable, setIsUpdatingDeliverable] = useState(false);
   const [projectDeliverables, setProjectDeliverables] = useState<any[]>(
     initialDeliverables || []
   );
@@ -116,6 +136,20 @@ export function ProjectDeliverablesTab({
         "✅ Project deliverables fetched:",
         data.deliverables?.length || 0
       );
+
+      // Debug: Check for deliverables without cars
+      const deliverablesWithCars =
+        data.deliverables?.filter((d) => d.car_id) || [];
+      const deliverablesWithoutCars =
+        data.deliverables?.filter((d) => !d.car_id) || [];
+
+      console.log("📊 Deliverables breakdown:", {
+        total: data.deliverables?.length || 0,
+        withCars: deliverablesWithCars.length,
+        withoutCars: deliverablesWithoutCars.length,
+        withoutCarsData: deliverablesWithoutCars,
+      });
+
       setProjectDeliverables(data.deliverables || []);
 
       // Fetch car details for deliverables that have car_id
@@ -322,18 +356,27 @@ export function ProjectDeliverablesTab({
         title: deliverableForm.title,
         description: deliverableForm.description,
         type: deliverableForm.type,
-        platform: deliverableForm.platform,
+        platforms: deliverableForm.platforms.map((p) => p.value),
         duration: deliverableForm.duration,
         aspectRatio: deliverableForm.aspectRatio,
-        dueDate: deliverableForm.dueDate.toISOString(),
+        editDeadline: deliverableForm.editDeadline
+          ? new Date(deliverableForm.editDeadline).toISOString()
+          : undefined,
+        releaseDate: deliverableForm.releaseDate
+          ? new Date(deliverableForm.releaseDate).toISOString()
+          : undefined,
         assignedTo:
           deliverableForm.assignedTo === "unassigned"
             ? undefined
             : deliverableForm.assignedTo,
         carId: deliverableForm.carId || undefined,
+        scheduled: deliverableForm.scheduled,
       };
 
-      await api.post(`projects/${project._id}/deliverables`, requestBody);
+      const response = await api.post(
+        `projects/${project._id}/deliverables`,
+        requestBody
+      );
 
       // Refresh project data and deliverables
       await onProjectUpdate();
@@ -344,12 +387,14 @@ export function ProjectDeliverablesTab({
         title: "",
         description: "",
         type: "Video",
-        platform: "Other",
+        platforms: [],
         duration: 30,
         aspectRatio: "16:9",
-        dueDate: new Date(),
+        editDeadline: "",
+        releaseDate: "",
         assignedTo: "unassigned",
         carId: "",
+        scheduled: false,
       });
       setIsAddDeliverableOpen(false);
 
@@ -368,6 +413,120 @@ export function ProjectDeliverablesTab({
       });
     } finally {
       setIsAddingDeliverable(false);
+    }
+  };
+
+  const handleEditDeliverable = (deliverable: any) => {
+    // Populate form with deliverable data
+    setDeliverableForm({
+      title: deliverable.title || "",
+      description: deliverable.description || "",
+      type: deliverable.type || "Video",
+      platforms:
+        deliverable.platforms?.map((platformId: string) => {
+          const platform = availablePlatforms.find((p) => p._id === platformId);
+          return platform
+            ? { label: platform.name, value: platform._id }
+            : { label: platformId, value: platformId };
+        }) || [],
+      duration: deliverable.duration || 30,
+      aspectRatio: deliverable.aspect_ratio || "16:9",
+      editDeadline: deliverable.edit_deadline || "",
+      releaseDate: deliverable.release_date || "",
+      assignedTo: deliverable.firebase_uid || "unassigned",
+      carId: deliverable.car_id?.toString() || "",
+      scheduled: deliverable.scheduled || false,
+    });
+    setEditingDeliverable(deliverable);
+    setIsEditDeliverableOpen(true);
+  };
+
+  const handleUpdateDeliverable = async () => {
+    if (!deliverableForm.title.trim()) {
+      toast({
+        title: "Error",
+        description: "Please provide a deliverable title",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!api || !editingDeliverable) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to update deliverables",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsUpdatingDeliverable(true);
+
+      const requestBody = {
+        title: deliverableForm.title,
+        description: deliverableForm.description,
+        type: deliverableForm.type,
+        platforms: deliverableForm.platforms.map((p) => p.value),
+        duration: deliverableForm.duration,
+        aspectRatio: deliverableForm.aspectRatio,
+        editDeadline: deliverableForm.editDeadline
+          ? new Date(deliverableForm.editDeadline).toISOString()
+          : undefined,
+        releaseDate: deliverableForm.releaseDate
+          ? new Date(deliverableForm.releaseDate).toISOString()
+          : undefined,
+        assignedTo:
+          deliverableForm.assignedTo === "unassigned"
+            ? undefined
+            : deliverableForm.assignedTo,
+        carId: deliverableForm.carId || undefined,
+        scheduled: deliverableForm.scheduled,
+      };
+
+      await api.put(
+        `projects/${project._id}/deliverables/${editingDeliverable._id}`,
+        requestBody
+      );
+
+      // Refresh project data and deliverables
+      await onProjectUpdate();
+      await fetchProjectDeliverables();
+
+      // Reset form and close modal
+      setDeliverableForm({
+        title: "",
+        description: "",
+        type: "Video",
+        platforms: [],
+        duration: 30,
+        aspectRatio: "16:9",
+        editDeadline: "",
+        releaseDate: "",
+        assignedTo: "unassigned",
+        carId: "",
+        scheduled: false,
+      });
+      setEditingDeliverable(null);
+      setIsEditDeliverableOpen(false);
+
+      toast({
+        title: "Success",
+        description: "Deliverable updated successfully",
+      });
+    } catch (error) {
+      console.error("Error updating deliverable:", error);
+
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to update deliverable",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingDeliverable(false);
     }
   };
 
@@ -848,195 +1007,323 @@ export function ProjectDeliverablesTab({
                   Add Deliverable
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Add New Deliverable</DialogTitle>
+              <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full">
+                <DialogHeader className="flex-shrink-0 pb-2 border-b border-[hsl(var(--border-subtle))]">
+                  <DialogTitle className="text-xl font-bold text-[hsl(var(--foreground))] dark:text-white">
+                    Add New Deliverable
+                  </DialogTitle>
                   <DialogDescription>
                     Create a new deliverable for this project.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="deliverableTitle">Title</Label>
-                    <Input
-                      id="deliverableTitle"
-                      value={deliverableForm.title}
-                      onChange={(e) =>
-                        setDeliverableForm({
-                          ...deliverableForm,
-                          title: e.target.value,
-                        })
-                      }
-                      placeholder="Enter deliverable title"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="deliverableDescription">Description</Label>
-                    <Textarea
-                      id="deliverableDescription"
-                      value={deliverableForm.description}
-                      onChange={(e) =>
-                        setDeliverableForm({
-                          ...deliverableForm,
-                          description: e.target.value,
-                        })
-                      }
-                      placeholder="Enter deliverable description (optional)"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Type</Label>
-                    <CustomDropdown
-                      value={deliverableForm.type}
-                      onChange={(value) =>
-                        setDeliverableForm({
-                          ...deliverableForm,
-                          type: value as any,
-                        })
-                      }
-                      options={[
-                        { value: "Video", label: "Video" },
-                        { value: "Photo Gallery", label: "Photo Gallery" },
-                        { value: "Mixed Gallery", label: "Mixed Gallery" },
-                        { value: "Video Gallery", label: "Video Gallery" },
-                      ]}
-                      placeholder="Select type"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Platform</Label>
-                    <CustomDropdown
-                      value={deliverableForm.platform}
-                      onChange={(value) =>
-                        setDeliverableForm({
-                          ...deliverableForm,
-                          platform: value,
-                        })
-                      }
-                      options={[
-                        { value: "Instagram Reels", label: "Instagram Reels" },
-                        { value: "Instagram Post", label: "Instagram Post" },
-                        { value: "Instagram Story", label: "Instagram Story" },
-                        { value: "YouTube", label: "YouTube" },
-                        { value: "YouTube Shorts", label: "YouTube Shorts" },
-                        { value: "TikTok", label: "TikTok" },
-                        { value: "Facebook", label: "Facebook" },
-                        { value: "Bring a Trailer", label: "Bring a Trailer" },
-                        { value: "Other", label: "Other" },
-                      ]}
-                      placeholder="Select platform"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="duration">Duration (seconds)</Label>
-                    <Input
-                      id="duration"
-                      type="number"
-                      min="1"
-                      value={deliverableForm.duration}
-                      onChange={(e) =>
-                        setDeliverableForm({
-                          ...deliverableForm,
-                          duration: parseInt(e.target.value) || 30,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Aspect Ratio</Label>
-                    <CustomDropdown
-                      value={deliverableForm.aspectRatio}
-                      onChange={(value) =>
-                        setDeliverableForm({
-                          ...deliverableForm,
-                          aspectRatio: value,
-                        })
-                      }
-                      options={[
-                        { value: "16:9", label: "16:9" },
-                        { value: "9:16", label: "9:16" },
-                        { value: "1:1", label: "1:1" },
-                        { value: "4:3", label: "4:3" },
-                        { value: "4:5", label: "4:5" },
-                        { value: "3:4", label: "3:4" },
-                      ]}
-                      placeholder="Select aspect ratio"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Due Date</Label>
-                    <Input
-                      type="date"
-                      value={format(deliverableForm.dueDate, "yyyy-MM-dd")}
-                      onChange={(e) =>
-                        setDeliverableForm({
-                          ...deliverableForm,
-                          dueDate: new Date(e.target.value),
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Assigned To (Optional)</Label>
-                    <CustomDropdown
-                      value={deliverableForm.assignedTo}
-                      onChange={(value) =>
-                        setDeliverableForm({
-                          ...deliverableForm,
-                          assignedTo: value,
-                        })
-                      }
-                      options={[
-                        { value: "unassigned", label: "Unassigned" },
-                        ...(project?.members.map((member) => ({
-                          value: member.userId,
-                          label:
-                            memberDetails[member.userId]?.name ||
-                            `User ${member.userId}`,
-                        })) || []),
-                      ]}
-                      placeholder="Select team member"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Car (Optional)</Label>
-                    <CustomDropdown
-                      value={deliverableForm.carId}
-                      onChange={(value) =>
-                        setDeliverableForm({
-                          ...deliverableForm,
-                          carId: value,
-                        })
-                      }
-                      options={[
-                        { value: "auto", label: "Auto-select from project" },
-                        ...(project?.carIds.map((carId) => ({
-                          value: carId,
-                          label: `Car ${carId}`,
-                        })) || []),
-                      ]}
-                      placeholder="Select car"
-                    />
+                <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4">
+                  <div className="space-y-3 pt-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1">
+                        <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                        <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                          Basic Information
+                        </span>
+                        <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="space-y-1.5">
+                          <label
+                            htmlFor="deliverableTitle"
+                            className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                          >
+                            Title
+                          </label>
+                          <Input
+                            id="deliverableTitle"
+                            value={deliverableForm.title}
+                            onChange={(e) =>
+                              setDeliverableForm({
+                                ...deliverableForm,
+                                title: e.target.value,
+                              })
+                            }
+                            placeholder="Enter deliverable title"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label
+                            htmlFor="deliverableDescription"
+                            className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                          >
+                            Description
+                          </label>
+                          <Textarea
+                            id="deliverableDescription"
+                            value={deliverableForm.description}
+                            onChange={(e) =>
+                              setDeliverableForm({
+                                ...deliverableForm,
+                                description: e.target.value,
+                              })
+                            }
+                            placeholder="Enter deliverable description (optional)"
+                            rows={3}
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                              Platforms
+                            </label>
+                            <MultiSelect
+                              value={deliverableForm.platforms}
+                              onChange={(values) =>
+                                setDeliverableForm({
+                                  ...deliverableForm,
+                                  platforms: values,
+                                })
+                              }
+                              options={availablePlatforms.map((p) => ({
+                                label: p.name,
+                                value: p._id,
+                              }))}
+                              placeholder="Select platforms"
+                              className="text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                              Type
+                            </label>
+                            <CustomDropdown
+                              value={deliverableForm.type}
+                              onChange={(value) =>
+                                setDeliverableForm({
+                                  ...deliverableForm,
+                                  type: value as any,
+                                })
+                              }
+                              options={[
+                                {
+                                  value: "Photo Gallery",
+                                  label: "Photo Gallery",
+                                },
+                                { value: "Video", label: "Video" },
+                                {
+                                  value: "Mixed Gallery",
+                                  label: "Mixed Gallery",
+                                },
+                                {
+                                  value: "Video Gallery",
+                                  label: "Video Gallery",
+                                },
+                                { value: "Still", label: "Still" },
+                                { value: "Graphic", label: "Graphic" },
+                                { value: "feature", label: "Feature" },
+                                { value: "promo", label: "Promo" },
+                                { value: "review", label: "Review" },
+                                { value: "walkthrough", label: "Walkthrough" },
+                                { value: "highlights", label: "Highlights" },
+                                {
+                                  value: "Marketing Email",
+                                  label: "Marketing Email",
+                                },
+                                { value: "Blog", label: "Blog" },
+                                { value: "other", label: "Other" },
+                              ]}
+                              placeholder="Select type"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                              Duration (seconds)
+                            </label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={deliverableForm.duration}
+                              onChange={(e) =>
+                                setDeliverableForm({
+                                  ...deliverableForm,
+                                  duration: parseInt(e.target.value) || 30,
+                                })
+                              }
+                              className="text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                              Aspect Ratio
+                            </label>
+                            <CustomDropdown
+                              value={deliverableForm.aspectRatio}
+                              onChange={(value) =>
+                                setDeliverableForm({
+                                  ...deliverableForm,
+                                  aspectRatio: value,
+                                })
+                              }
+                              options={[
+                                { value: "16:9", label: "16:9" },
+                                { value: "9:16", label: "9:16" },
+                                { value: "1:1", label: "1:1" },
+                                { value: "4:5", label: "4:5" },
+                                { value: "5:4", label: "5:4" },
+                                { value: "3:2", label: "3:2" },
+                                { value: "2:3", label: "2:3" },
+                                { value: "custom", label: "Custom" },
+                              ]}
+                              placeholder="Select aspect ratio"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1">
+                        <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                        <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                          Assignment & Dates
+                        </span>
+                        <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                            Assigned To (Optional)
+                          </label>
+                          <CustomDropdown
+                            value={deliverableForm.assignedTo}
+                            onChange={(value) =>
+                              setDeliverableForm({
+                                ...deliverableForm,
+                                assignedTo: value,
+                              })
+                            }
+                            options={[
+                              { value: "unassigned", label: "Unassigned" },
+                              ...(project?.members.map((member) => ({
+                                value: member.userId,
+                                label:
+                                  memberDetails[member.userId]?.name ||
+                                  `User ${member.userId}`,
+                              })) || []),
+                            ]}
+                            placeholder="Select team member"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                              Edit Deadline
+                            </label>
+                            <DateTimePicker
+                              value={deliverableForm.editDeadline}
+                              onChange={(value) =>
+                                setDeliverableForm({
+                                  ...deliverableForm,
+                                  editDeadline: value,
+                                })
+                              }
+                              placeholder="Select edit deadline"
+                              className="text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                              Release Date
+                            </label>
+                            <DateTimePicker
+                              value={deliverableForm.releaseDate}
+                              onChange={(value) =>
+                                setDeliverableForm({
+                                  ...deliverableForm,
+                                  releaseDate: value,
+                                })
+                              }
+                              placeholder="Select release date"
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                            Car (Optional)
+                          </label>
+                          <CustomDropdown
+                            value={deliverableForm.carId}
+                            onChange={(value) =>
+                              setDeliverableForm({
+                                ...deliverableForm,
+                                carId: value,
+                              })
+                            }
+                            options={[
+                              { value: "", label: "No Car Selected" },
+                              ...(project?.carIds?.map((carId) => ({
+                                value: carId,
+                                label: `Car ${carId}`,
+                              })) || []),
+                            ]}
+                            placeholder="Select car (optional)"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="scheduled-add"
+                              checked={deliverableForm.scheduled}
+                              onCheckedChange={(checked) =>
+                                setDeliverableForm({
+                                  ...deliverableForm,
+                                  scheduled: checked === true,
+                                })
+                              }
+                            />
+                            <label
+                              htmlFor="scheduled-add"
+                              className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide cursor-pointer"
+                            >
+                              Scheduled
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <DialogFooter>
+                <div className="flex-shrink-0 flex justify-end gap-3 pt-4 border-t border-[hsl(var(--border-subtle))]">
                   <Button
+                    type="button"
                     variant="outline"
                     onClick={() => {
                       setDeliverableForm({
                         title: "",
                         description: "",
                         type: "Video",
-                        platform: "Other",
+                        platforms: [],
                         duration: 30,
                         aspectRatio: "16:9",
-                        dueDate: new Date(),
+                        editDeadline: "",
+                        releaseDate: "",
                         assignedTo: "unassigned",
                         carId: "",
+                        scheduled: false,
                       });
                       setIsAddDeliverableOpen(false);
                     }}
+                    size="sm"
                   >
                     Cancel
                   </Button>
@@ -1045,10 +1332,351 @@ export function ProjectDeliverablesTab({
                     disabled={
                       isAddingDeliverable || !deliverableForm.title.trim()
                     }
+                    size="sm"
                   >
                     {isAddingDeliverable ? "Adding..." : "Add Deliverable"}
                   </Button>
-                </DialogFooter>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Edit Deliverable Dialog */}
+            <Dialog
+              open={isEditDeliverableOpen}
+              onOpenChange={setIsEditDeliverableOpen}
+            >
+              <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full">
+                <DialogHeader className="flex-shrink-0 pb-2 border-b border-[hsl(var(--border-subtle))]">
+                  <DialogTitle className="text-xl font-bold text-[hsl(var(--foreground))] dark:text-white">
+                    Edit Deliverable
+                  </DialogTitle>
+                  <DialogDescription>
+                    Update the deliverable details.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4">
+                  <div className="space-y-3 pt-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1">
+                        <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                        <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                          Basic Information
+                        </span>
+                        <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="space-y-1.5">
+                          <label
+                            htmlFor="editDeliverableTitle"
+                            className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                          >
+                            Title
+                          </label>
+                          <Input
+                            id="editDeliverableTitle"
+                            value={deliverableForm.title}
+                            onChange={(e) =>
+                              setDeliverableForm({
+                                ...deliverableForm,
+                                title: e.target.value,
+                              })
+                            }
+                            placeholder="Enter deliverable title"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label
+                            htmlFor="editDeliverableDescription"
+                            className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                          >
+                            Description
+                          </label>
+                          <Textarea
+                            id="editDeliverableDescription"
+                            value={deliverableForm.description}
+                            onChange={(e) =>
+                              setDeliverableForm({
+                                ...deliverableForm,
+                                description: e.target.value,
+                              })
+                            }
+                            placeholder="Enter deliverable description (optional)"
+                            rows={3}
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                              Platforms
+                            </label>
+                            <MultiSelect
+                              value={deliverableForm.platforms}
+                              onChange={(values) =>
+                                setDeliverableForm({
+                                  ...deliverableForm,
+                                  platforms: values,
+                                })
+                              }
+                              options={availablePlatforms.map((p) => ({
+                                label: p.name,
+                                value: p._id,
+                              }))}
+                              placeholder="Select platforms"
+                              className="text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                              Type
+                            </label>
+                            <CustomDropdown
+                              value={deliverableForm.type}
+                              onChange={(value) =>
+                                setDeliverableForm({
+                                  ...deliverableForm,
+                                  type: value as any,
+                                })
+                              }
+                              options={[
+                                {
+                                  value: "Photo Gallery",
+                                  label: "Photo Gallery",
+                                },
+                                { value: "Video", label: "Video" },
+                                {
+                                  value: "Mixed Gallery",
+                                  label: "Mixed Gallery",
+                                },
+                                {
+                                  value: "Video Gallery",
+                                  label: "Video Gallery",
+                                },
+                                { value: "Still", label: "Still" },
+                                { value: "Graphic", label: "Graphic" },
+                                { value: "feature", label: "Feature" },
+                                { value: "promo", label: "Promo" },
+                                { value: "review", label: "Review" },
+                                { value: "walkthrough", label: "Walkthrough" },
+                                { value: "highlights", label: "Highlights" },
+                                {
+                                  value: "Marketing Email",
+                                  label: "Marketing Email",
+                                },
+                                { value: "Blog", label: "Blog" },
+                                { value: "other", label: "Other" },
+                              ]}
+                              placeholder="Select type"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                              Duration (seconds)
+                            </label>
+                            <Input
+                              type="number"
+                              value={deliverableForm.duration}
+                              onChange={(e) =>
+                                setDeliverableForm({
+                                  ...deliverableForm,
+                                  duration: parseInt(e.target.value) || 30,
+                                })
+                              }
+                              min={1}
+                              className="text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                              Aspect Ratio
+                            </label>
+                            <CustomDropdown
+                              value={deliverableForm.aspectRatio}
+                              onChange={(value) =>
+                                setDeliverableForm({
+                                  ...deliverableForm,
+                                  aspectRatio: value,
+                                })
+                              }
+                              options={[
+                                { value: "16:9", label: "16:9" },
+                                { value: "9:16", label: "9:16" },
+                                { value: "1:1", label: "1:1" },
+                                { value: "4:5", label: "4:5" },
+                                { value: "5:4", label: "5:4" },
+                                { value: "3:2", label: "3:2" },
+                                { value: "2:3", label: "2:3" },
+                                { value: "custom", label: "Custom" },
+                              ]}
+                              placeholder="Select aspect ratio"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1">
+                        <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                        <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                          Assignment & Dates
+                        </span>
+                        <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                            Assigned To
+                          </label>
+                          <CustomDropdown
+                            value={deliverableForm.assignedTo}
+                            onChange={(value) =>
+                              setDeliverableForm({
+                                ...deliverableForm,
+                                assignedTo: value,
+                              })
+                            }
+                            options={[
+                              { value: "unassigned", label: "Unassigned" },
+                              ...Object.entries(memberDetails).map(
+                                ([uid, member]) => ({
+                                  value: uid,
+                                  label: member.name,
+                                })
+                              ),
+                            ]}
+                            placeholder="Select assignee"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                            Car (Optional)
+                          </label>
+                          <CustomDropdown
+                            value={deliverableForm.carId}
+                            onChange={(value) =>
+                              setDeliverableForm({
+                                ...deliverableForm,
+                                carId: value,
+                              })
+                            }
+                            options={[
+                              { value: "", label: "No Car Selected" },
+                              ...(project?.carIds?.map((carId) => ({
+                                value: carId,
+                                label: `Car ${carId}`,
+                              })) || []),
+                            ]}
+                            placeholder="Select car (optional)"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                            Edit Deadline
+                          </label>
+                          <DateTimePicker
+                            value={deliverableForm.editDeadline || ""}
+                            onChange={(value) =>
+                              setDeliverableForm({
+                                ...deliverableForm,
+                                editDeadline: value,
+                              })
+                            }
+                            placeholder="Select edit deadline"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                            Release Date
+                          </label>
+                          <DateTimePicker
+                            value={deliverableForm.releaseDate || ""}
+                            onChange={(value) =>
+                              setDeliverableForm({
+                                ...deliverableForm,
+                                releaseDate: value,
+                              })
+                            }
+                            placeholder="Select release date"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="scheduled-edit"
+                            checked={deliverableForm.scheduled}
+                            onCheckedChange={(checked) =>
+                              setDeliverableForm({
+                                ...deliverableForm,
+                                scheduled: checked === true,
+                              })
+                            }
+                          />
+                          <label
+                            htmlFor="scheduled-edit"
+                            className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide cursor-pointer"
+                          >
+                            Scheduled
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-shrink-0 flex justify-end gap-3 pt-4 border-t border-[hsl(var(--border-subtle))]">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setDeliverableForm({
+                        title: "",
+                        description: "",
+                        type: "Video",
+                        platforms: [],
+                        duration: 30,
+                        aspectRatio: "16:9",
+                        editDeadline: "",
+                        releaseDate: "",
+                        assignedTo: "unassigned",
+                        carId: "",
+                        scheduled: false,
+                      });
+                      setEditingDeliverable(null);
+                      setIsEditDeliverableOpen(false);
+                    }}
+                    size="sm"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleUpdateDeliverable}
+                    disabled={
+                      isUpdatingDeliverable || !deliverableForm.title.trim()
+                    }
+                    size="sm"
+                  >
+                    {isUpdatingDeliverable
+                      ? "Updating..."
+                      : "Update Deliverable"}
+                  </Button>
+                </div>
               </DialogContent>
             </Dialog>
           </div>
@@ -1142,6 +1770,11 @@ export function ProjectDeliverablesTab({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => handleEditDeliverable(deliverable)}
+                      >
+                        Edit Deliverable
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() =>
                           handleUpdateDeliverableStatus(

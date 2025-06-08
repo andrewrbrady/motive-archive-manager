@@ -366,36 +366,28 @@ export default function NewDeliverableForm({
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem key="feature" value="feature">
-                          Feature
-                        </SelectItem>
-                        <SelectItem key="promo" value="promo">
-                          Promo
-                        </SelectItem>
-                        <SelectItem key="review" value="review">
-                          Review
-                        </SelectItem>
-                        <SelectItem key="walkthrough" value="walkthrough">
-                          Walkthrough
-                        </SelectItem>
-                        <SelectItem key="highlights" value="highlights">
-                          Highlights
-                        </SelectItem>
-                        <SelectItem key="photo_gallery" value="photo_gallery">
+                        <SelectItem value="Photo Gallery">
                           Photo Gallery
                         </SelectItem>
-                        <SelectItem
-                          key="marketing-email"
-                          value="Marketing Email"
-                        >
+                        <SelectItem value="Video">Video</SelectItem>
+                        <SelectItem value="Mixed Gallery">
+                          Mixed Gallery
+                        </SelectItem>
+                        <SelectItem value="Video Gallery">
+                          Video Gallery
+                        </SelectItem>
+                        <SelectItem value="Still">Still</SelectItem>
+                        <SelectItem value="Graphic">Graphic</SelectItem>
+                        <SelectItem value="feature">Feature</SelectItem>
+                        <SelectItem value="promo">Promo</SelectItem>
+                        <SelectItem value="review">Review</SelectItem>
+                        <SelectItem value="walkthrough">Walkthrough</SelectItem>
+                        <SelectItem value="highlights">Highlights</SelectItem>
+                        <SelectItem value="Marketing Email">
                           Marketing Email
                         </SelectItem>
-                        <SelectItem key="blog" value="Blog">
-                          Blog
-                        </SelectItem>
-                        <SelectItem key="other-type" value="other">
-                          Other
-                        </SelectItem>
+                        <SelectItem value="Blog">Blog</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -441,21 +433,14 @@ export default function NewDeliverableForm({
                         <SelectValue placeholder="Select aspect ratio" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem key="16:9" value="16:9">
-                          16:9
-                        </SelectItem>
-                        <SelectItem key="9:16" value="9:16">
-                          9:16
-                        </SelectItem>
-                        <SelectItem key="1:1" value="1:1">
-                          1:1
-                        </SelectItem>
-                        <SelectItem key="4:3" value="4:3">
-                          4:3
-                        </SelectItem>
-                        <SelectItem key="4:5" value="4:5">
-                          4:5
-                        </SelectItem>
+                        <SelectItem value="16:9">16:9</SelectItem>
+                        <SelectItem value="9:16">9:16</SelectItem>
+                        <SelectItem value="1:1">1:1</SelectItem>
+                        <SelectItem value="4:5">4:5</SelectItem>
+                        <SelectItem value="5:4">5:4</SelectItem>
+                        <SelectItem value="3:2">3:2</SelectItem>
+                        <SelectItem value="2:3">2:3</SelectItem>
+                        <SelectItem value="custom">Custom</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
