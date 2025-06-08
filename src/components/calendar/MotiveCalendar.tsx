@@ -531,32 +531,6 @@ export function MotiveCalendar({
   ]);
 
   // Helper function to format event title for project calendar
-  // Helper function to parse dates consistently for calendar display
-  const parseCalendarDate = useCallback((date: any): Date => {
-    if (!date) return new Date();
-
-    // If it's already a Date object, return it
-    if (date instanceof Date) return date;
-
-    // For ISO strings, extract date part to avoid timezone conversion issues
-    if (typeof date === "string") {
-      if (date.includes("T")) {
-        // Extract just the date part (YYYY-MM-DD) and create a local date
-        const datePart = date.split("T")[0];
-        if (datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
-          const [year, month, day] = datePart.split("-").map(Number);
-          return new Date(year, month - 1, day, 0, 0, 0, 0);
-        }
-      } else if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        // Already in YYYY-MM-DD format
-        const [year, month, day] = date.split("-").map(Number);
-        return new Date(year, month - 1, day, 0, 0, 0, 0);
-      }
-    }
-
-    // Fallback to normal Date parsing
-    return new Date(date);
-  }, []);
 
   const formatEventTitle = useCallback(
     (
@@ -699,8 +673,8 @@ export function MotiveCalendar({
               const deadlineEvent: MotiveCalendarEvent = {
                 id: `${deliverable._id?.toString()}-deadline`,
                 title: title,
-                start: parseCalendarDate(deliverable.edit_deadline),
-                end: parseCalendarDate(deliverable.edit_deadline),
+                start: new Date(deliverable.edit_deadline),
+                end: new Date(deliverable.edit_deadline),
                 type: "deliverable",
                 resource: {
                   ...deliverable,
@@ -731,8 +705,8 @@ export function MotiveCalendar({
                 const releaseEvent: MotiveCalendarEvent = {
                   id: `${deliverable._id?.toString()}-release`,
                   title: title,
-                  start: parseCalendarDate(deliverable.release_date),
-                  end: parseCalendarDate(deliverable.release_date),
+                  start: new Date(deliverable.release_date),
+                  end: new Date(deliverable.release_date),
                   type: "deliverable",
                   resource: {
                     ...deliverable,
@@ -793,7 +767,6 @@ export function MotiveCalendar({
     showMilestones,
     showOnlyScheduled,
     formatEventTitle,
-    parseCalendarDate, // Add parseCalendarDate dependency
   ]);
 
   // FIXED: Early return AFTER all hooks - this fixes the hooks ordering issue
