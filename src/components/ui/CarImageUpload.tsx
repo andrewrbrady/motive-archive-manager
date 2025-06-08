@@ -124,35 +124,93 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
 
   // Handle file selection or drop
   const handleFiles = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0) {
+      console.log("No files provided");
+      return;
+    }
+
+    console.log("handleFiles called with:", files.length, "files");
 
     const fileArray = Array.from(files);
+    console.log(
+      "File array:",
+      fileArray.map((f) => ({ name: f.name, size: f.size, type: f.type }))
+    );
+
+    // Validate file types
+    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    const invalidFiles = fileArray.filter(
+      (file) => !validTypes.includes(file.type)
+    );
+
+    if (invalidFiles.length > 0) {
+      console.log(
+        "Invalid file types found:",
+        invalidFiles.map((f) => f.type)
+      );
+      onError?.(
+        `Please select valid image files. Invalid files: ${invalidFiles.map((f) => f.name).join(", ")}`
+      );
+      return;
+    }
 
     // Check individual file sizes (8MB limit per file)
     const oversizedFiles = fileArray.filter(
       (file) => file.size > 8 * 1024 * 1024
     );
+
+    console.log("Oversized files:", oversizedFiles.length);
+
     if (oversizedFiles.length > 0) {
+      console.log("Calling onError for oversized files");
       onError?.(
         `The following files are too large (over 8MB): ${oversizedFiles.map((f) => f.name).join(", ")}. Please compress them before uploading.`
       );
       return;
     }
 
-    // Check total batch size (25MB limit for Vercel functions)
+    // For large batches, we'll process them in chunks automatically
     const totalSize = fileArray.reduce((acc, file) => acc + file.size, 0);
-    if (totalSize > 25 * 1024 * 1024) {
-      onError?.(
-        `Total upload size (${(totalSize / 1024 / 1024).toFixed(1)}MB) exceeds 25MB limit. Please upload fewer images at once or compress them.`
-      );
-      return;
-    }
+    console.log("Total size:", (totalSize / 1024 / 1024).toFixed(1), "MB");
+    console.log("Will process", fileArray.length, "files in chunks if needed");
 
     setPendingFiles(fileArray);
     setProgress([]); // Reset progress if new files are selected
   };
 
-  // Start upload with streaming progress
+  // Create chunks of files for upload
+  const createUploadChunks = (files: File[]): File[][] => {
+    const chunks: File[][] = [];
+    let currentChunk: File[] = [];
+    let currentChunkSize = 0;
+    const maxChunkSize = 20 * 1024 * 1024; // 20MB per chunk
+    const maxFilesPerChunk = 10; // Max 10 files per chunk
+
+    for (const file of files) {
+      // If adding this file would exceed limits, start a new chunk
+      if (
+        (currentChunkSize + file.size > maxChunkSize &&
+          currentChunk.length > 0) ||
+        currentChunk.length >= maxFilesPerChunk
+      ) {
+        chunks.push([...currentChunk]);
+        currentChunk = [];
+        currentChunkSize = 0;
+      }
+
+      currentChunk.push(file);
+      currentChunkSize += file.size;
+    }
+
+    // Add the last chunk if it has files
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks;
+  };
+
+  // Start upload with chunked processing
   const startUpload = async () => {
     if (pendingFiles.length === 0) return;
 
@@ -184,16 +242,96 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
     setProgress(initialProgress);
 
     try {
+      // Create chunks for processing
+      const chunks = createUploadChunks(pendingFiles);
+      console.log(
+        `Processing ${pendingFiles.length} files in ${chunks.length} chunks`
+      );
+
+      let completedFiles = 0;
+      const totalFiles = pendingFiles.length;
+
+      // Process each chunk sequentially
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+        const chunk = chunks[chunkIndex];
+        console.log(
+          `Processing chunk ${chunkIndex + 1}/${chunks.length} with ${chunk.length} files`
+        );
+
+        await processChunk(chunk, chunkIndex, completedFiles, totalFiles);
+        completedFiles += chunk.length;
+      }
+
+      console.log("All chunks processed successfully");
+      setUploadSuccess(true);
+
+      // Clear pending files
+      setPendingFiles([]);
+
+      // Trigger onComplete callback after a short delay
+      setTimeout(() => {
+        if (onComplete) {
+          onComplete();
+        }
+      }, 2000);
+    } catch (error) {
+      console.error("Upload error:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Upload failed";
+
+      // Update all pending files to error status
+      setProgress((prev) =>
+        prev.map((p) => ({
+          ...p,
+          status: p.status === "complete" ? "complete" : "error",
+          error: p.status === "complete" ? undefined : errorMessage,
+        }))
+      );
+
+      if (onError) {
+        onError(errorMessage);
+      }
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Process a single chunk of files
+  const processChunk = async (
+    chunk: File[],
+    chunkIndex: number,
+    globalOffset: number,
+    totalFiles: number
+  ) => {
+    // Update chunk files to "uploading" status
+    chunk.forEach((file, localIndex) => {
+      const globalIndex = globalOffset + localIndex;
+      const fileId = `${globalIndex}-${file.name}`;
+
+      setProgress((prev) =>
+        prev.map((p) =>
+          p.fileId === fileId
+            ? {
+                ...p,
+                status: "uploading",
+                currentStep: `Chunk ${chunkIndex + 1}: Uploading...`,
+              }
+            : p
+        )
+      );
+    });
+
+    try {
       // Create FormData with format expected by /api/cloudflare/images
       const formData = new FormData();
 
       // Add files with numbered naming (file0, file1, etc.)
-      pendingFiles.forEach((file, index) => {
+      chunk.forEach((file, index) => {
         formData.append(`file${index}`, file);
       });
 
       formData.append("carId", carId);
-      formData.append("fileCount", pendingFiles.length.toString());
+      formData.append("fileCount", chunk.length.toString());
 
       // Add selected prompt and model
       if (selectedPromptId) {
@@ -247,14 +385,21 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
 
               // Handle individual file progress updates
               if (data.fileId && data.fileName) {
+                // Map the chunk-local fileId to global fileId
+                const chunkFileIndex = parseInt(data.fileId.split("-")[0]);
+                const globalFileIndex = globalOffset + chunkFileIndex;
+                const globalFileId = `${globalFileIndex}-${data.fileName}`;
+
                 setProgress((prev) =>
                   prev.map((p) =>
-                    p.fileId === data.fileId
+                    p.fileId === globalFileId
                       ? {
                           ...p,
                           progress: data.progress || p.progress,
                           status: data.status || p.status,
-                          currentStep: data.currentStep || p.currentStep,
+                          currentStep:
+                            data.currentStep ||
+                            `Chunk ${chunkIndex + 1}: ${data.status}`,
                           error: data.error,
                           imageUrl: data.imageUrl || p.imageUrl,
                           metadata: data.metadata || p.metadata,
@@ -312,25 +457,13 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
                 );
               }
 
-              // Handle completion or error
+              // Handle chunk completion
               if (data.type === "complete") {
-                console.log("Upload batch completed:", data);
-                setUploadSuccess(true);
-
-                // Clear pending files
-                setPendingFiles([]);
-
-                // Trigger onComplete callback after a short delay
-                setTimeout(() => {
-                  if (onComplete) {
-                    onComplete();
-                  }
-                }, 2000);
+                console.log(`Chunk ${chunkIndex + 1} completed:`, data);
+                // Don't set uploadSuccess here - wait for all chunks
               } else if (data.type === "error" || data.error) {
-                console.error("Upload error:", data.error);
-                if (onError) {
-                  onError(data.error || "Upload failed");
-                }
+                console.error(`Chunk ${chunkIndex + 1} error:`, data.error);
+                throw new Error(data.error || "Chunk upload failed");
               }
             } catch (parseError) {
               console.error("Error parsing SSE data:", parseError, line);
@@ -339,24 +472,25 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
         }
       }
     } catch (error) {
-      console.error("Upload error:", error);
+      console.error(`Chunk ${chunkIndex + 1} upload error:`, error);
       const errorMessage =
-        error instanceof Error ? error.message : "Upload failed";
+        error instanceof Error ? error.message : "Chunk upload failed";
 
-      // Update all files to error status
-      setProgress((prev) =>
-        prev.map((p) => ({
-          ...p,
-          status: "error",
-          error: errorMessage,
-        }))
-      );
+      // Update chunk files to error status
+      chunk.forEach((file, localIndex) => {
+        const globalIndex = globalOffset + localIndex;
+        const fileId = `${globalIndex}-${file.name}`;
 
-      if (onError) {
-        onError(errorMessage);
-      }
-    } finally {
-      setIsUploading(false);
+        setProgress((prev) =>
+          prev.map((p) =>
+            p.fileId === fileId
+              ? { ...p, status: "error", error: errorMessage }
+              : p
+          )
+        );
+      });
+
+      throw error; // Re-throw to stop processing subsequent chunks
     }
   };
 

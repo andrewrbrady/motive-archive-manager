@@ -7,9 +7,8 @@ import { analyzeImage } from "@/lib/imageAnalyzer";
 export const maxDuration = 300;
 export const runtime = "nodejs";
 
-// Increase body size limit for Vercel (max 4.5MB for Hobby/Pro)
+// Force dynamic rendering for uploads
 export const dynamic = "force-dynamic";
-export const maxBodySize = "10mb";
 
 // Ensure environment variables are set
 if (

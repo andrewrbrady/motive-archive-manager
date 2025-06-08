@@ -6,9 +6,8 @@ import { ObjectId } from "mongodb";
 export const maxDuration = 300;
 export const runtime = "nodejs";
 
-// Increase body size limit for Vercel
+// Force dynamic rendering for uploads
 export const dynamic = "force-dynamic";
-export const maxBodySize = "10mb";
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
