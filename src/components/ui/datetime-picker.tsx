@@ -48,9 +48,9 @@ export function DateTimePicker({
   const currentDate = value
     ? (() => {
         if (isAllDay && value.match(/^\d{4}-\d{2}-\d{2}$/)) {
-          // For all-day events with date-only format, parse as UTC to avoid timezone shifts
+          // For all-day events with date-only format, parse as local date
           const [year, month, day] = value.split("-").map(Number);
-          return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+          return new Date(year, month - 1, day, 0, 0, 0, 0);
         } else {
           // For datetime strings, parse normally
           return new Date(value);
@@ -160,7 +160,7 @@ export function DateTimePicker({
                   {(() => {
                     let formatted;
                     if (isAllDay && value.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                      // For all-day events, format using UTC methods to avoid timezone conversion
+                      // For all-day events, format using local date methods
                       const months = [
                         "Jan",
                         "Feb",
@@ -175,9 +175,9 @@ export function DateTimePicker({
                         "Nov",
                         "Dec",
                       ];
-                      const month = months[currentDate.getUTCMonth()];
-                      const day = currentDate.getUTCDate();
-                      const year = currentDate.getUTCFullYear();
+                      const month = months[currentDate.getMonth()];
+                      const day = currentDate.getDate();
+                      const year = currentDate.getFullYear();
                       formatted = `${month} ${day}, ${year}`;
                     } else {
                       // For timed events, use date-fns format normally

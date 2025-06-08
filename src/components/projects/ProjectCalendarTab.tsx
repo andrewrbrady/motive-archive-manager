@@ -122,6 +122,11 @@ export function ProjectCalendarTab({ projectId }: ProjectCalendarTabProps) {
     console.log("Event selected:", event);
   };
 
+  const handleDeliverableUpdate = async () => {
+    // Refresh deliverables data when a deliverable is updated
+    await fetchDeliverables();
+  };
+
   return (
     <div className="flex h-full w-full flex-col">
       {isLoading || !api ? (
@@ -135,6 +140,7 @@ export function ProjectCalendarTab({ projectId }: ProjectCalendarTabProps) {
             milestones={milestones}
             onEventDrop={handleEventDrop}
             onEventResize={handleEventResize}
+            onDeliverableUpdate={handleDeliverableUpdate}
             className="flex-1"
             style={{
               minHeight: "700px",

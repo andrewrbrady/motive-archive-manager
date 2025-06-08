@@ -34,6 +34,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useAPI } from "@/hooks/useAPI";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { usePlatforms } from "@/contexts/PlatformContext";
 
 // Define EventInteractionArgs interface
 interface EventInteractionArgs<TEvent> {
@@ -64,6 +65,7 @@ export interface MotiveCalendarProps {
   onEventDrop?: (args: any) => void;
   onEventResize?: (args: any) => void;
   onSelectEvent?: (event: any) => void;
+  onDeliverableUpdate?: () => void; // New callback for deliverable updates
   className?: string;
   style?: React.CSSProperties;
   showFilterControls?: boolean;
@@ -81,6 +83,7 @@ export function MotiveCalendar({
   onEventDrop,
   onEventResize,
   onSelectEvent,
+  onDeliverableUpdate,
   className,
   style,
   showFilterControls = true,
@@ -89,6 +92,7 @@ export function MotiveCalendar({
   calendarRef,
 }: MotiveCalendarProps) {
   const api = useAPI();
+  const { platforms: availablePlatforms } = usePlatforms();
 
   // Create a unique storage key for this calendar context
   const storageKey = `motive-calendar-filters-${projectId || carId || "default"}`;
@@ -359,12 +363,33 @@ export function MotiveCalendar({
     return [...new Set(deliverables.map((deliverable) => deliverable.type))];
   }, [deliverables]);
 
-  // Get unique deliverable platforms
+  // Get unique deliverable platforms (handle both legacy platform field and new platforms array)
   const uniqueDeliverablePlatforms = useMemo(() => {
-    return [
-      ...new Set(deliverables.map((deliverable) => deliverable.platform)),
-    ];
-  }, [deliverables]);
+    const platformSet = new Set<string>();
+
+    deliverables.forEach((deliverable) => {
+      // Handle legacy platform field
+      if (deliverable.platform) {
+        platformSet.add(deliverable.platform);
+      }
+
+      // Handle new platforms array field
+      if (deliverable.platforms && deliverable.platforms.length > 0) {
+        deliverable.platforms.forEach((platformId) => {
+          // Look up platform name from available platforms
+          const platform = availablePlatforms.find((p) => p._id === platformId);
+          if (platform) {
+            platformSet.add(platform.name);
+          } else {
+            // If we don't have the platform name, use the ID for now
+            platformSet.add(platformId);
+          }
+        });
+      }
+    });
+
+    return Array.from(platformSet).filter(Boolean);
+  }, [deliverables, availablePlatforms]);
 
   // Function to reset all filters to defaults
   const resetFilters = useCallback(() => {
@@ -506,6 +531,33 @@ export function MotiveCalendar({
   ]);
 
   // Helper function to format event title for project calendar
+  // Helper function to parse dates consistently for calendar display
+  const parseCalendarDate = useCallback((date: any): Date => {
+    if (!date) return new Date();
+
+    // If it's already a Date object, return it
+    if (date instanceof Date) return date;
+
+    // For ISO strings, extract date part to avoid timezone conversion issues
+    if (typeof date === "string") {
+      if (date.includes("T")) {
+        // Extract just the date part (YYYY-MM-DD) and create a local date
+        const datePart = date.split("T")[0];
+        if (datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          const [year, month, day] = datePart.split("-").map(Number);
+          return new Date(year, month - 1, day, 0, 0, 0, 0);
+        }
+      } else if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // Already in YYYY-MM-DD format
+        const [year, month, day] = date.split("-").map(Number);
+        return new Date(year, month - 1, day, 0, 0, 0, 0);
+      }
+    }
+
+    // Fallback to normal Date parsing
+    return new Date(date);
+  }, []);
+
   const formatEventTitle = useCallback(
     (
       event: Event & { car?: { make: string; model: string; year: number } }
@@ -524,7 +576,7 @@ export function MotiveCalendar({
       const titleMatchesEventType = normalizedTitle === normalizedEventType;
 
       if (projectId && event.car) {
-        const carInfo = `${event.car.year} ${event.car.make} ${event.car.model}`;
+        const carInfo = `${event.car.year ? `${event.car.year} ` : ""}${event.car.make} ${event.car.model}`;
 
         if (titleMatchesEventType || !event.title?.trim()) {
           // If title matches event type or is empty, show: "SOLD | CAR"
@@ -573,10 +625,59 @@ export function MotiveCalendar({
 
     const deliverableItems: MotiveCalendarEvent[] = showDeliverables
       ? deliverables
-          .filter(
-            (deliverable) =>
-              !showOnlyScheduled || deliverable.scheduled === true
-          )
+          .filter((deliverable) => {
+            // Filter by scheduled status
+            if (showOnlyScheduled && !deliverable.scheduled) {
+              return false;
+            }
+
+            // Filter by deliverable type
+            if (
+              deliverableTypeFilters.length > 0 &&
+              !deliverableTypeFilters.includes(deliverable.type)
+            ) {
+              return false;
+            }
+
+            // Filter by deliverable platform (handle both legacy and new platform systems)
+            if (deliverablePlatformFilters.length > 0) {
+              let platformMatches = false;
+
+              // Check legacy platform field
+              if (
+                deliverable.platform &&
+                deliverablePlatformFilters.includes(deliverable.platform)
+              ) {
+                platformMatches = true;
+              }
+
+              // Check new platforms array field
+              if (deliverable.platforms && deliverable.platforms.length > 0) {
+                const platformNames = deliverable.platforms.map(
+                  (platformId) => {
+                    const platform = availablePlatforms.find(
+                      (p) => p._id === platformId
+                    );
+                    return platform ? platform.name : platformId;
+                  }
+                );
+
+                if (
+                  platformNames.some((name) =>
+                    deliverablePlatformFilters.includes(name)
+                  )
+                ) {
+                  platformMatches = true;
+                }
+              }
+
+              if (!platformMatches) {
+                return false;
+              }
+            }
+
+            return true;
+          })
           .flatMap((deliverable): MotiveCalendarEvent[] => {
             const items: MotiveCalendarEvent[] = [];
 
@@ -589,7 +690,7 @@ export function MotiveCalendar({
                 ? deliverableCarCache.get(deliverable.car_id.toString())
                 : undefined;
               const carInfo = carData
-                ? `${carData.year} ${carData.make} ${carData.model}`
+                ? `${carData.year ? `${carData.year} ` : ""}${carData.make} ${carData.model}`
                 : "";
               const title = carInfo
                 ? `${carInfo} | ${deliverable.scheduled ? "🗓️ " : ""}${deliverable.title} (Edit Deadline)`
@@ -598,8 +699,8 @@ export function MotiveCalendar({
               const deadlineEvent: MotiveCalendarEvent = {
                 id: `${deliverable._id?.toString()}-deadline`,
                 title: title,
-                start: new Date(deliverable.edit_deadline),
-                end: new Date(deliverable.edit_deadline),
+                start: parseCalendarDate(deliverable.edit_deadline),
+                end: parseCalendarDate(deliverable.edit_deadline),
                 type: "deliverable",
                 resource: {
                   ...deliverable,
@@ -621,7 +722,7 @@ export function MotiveCalendar({
                   ? deliverableCarCache.get(deliverable.car_id.toString())
                   : undefined;
                 const carInfo = carData
-                  ? `${carData.year} ${carData.make} ${carData.model}`
+                  ? `${carData.year ? `${carData.year} ` : ""}${carData.make} ${carData.model}`
                   : "";
                 const title = carInfo
                   ? `${carInfo} | ${deliverable.scheduled ? "🗓️ " : ""}${deliverable.title} (Release)`
@@ -630,8 +731,8 @@ export function MotiveCalendar({
                 const releaseEvent: MotiveCalendarEvent = {
                   id: `${deliverable._id?.toString()}-release`,
                   title: title,
-                  start: new Date(deliverable.release_date),
-                  end: new Date(deliverable.release_date),
+                  start: parseCalendarDate(deliverable.release_date),
+                  end: parseCalendarDate(deliverable.release_date),
                   type: "deliverable",
                   resource: {
                     ...deliverable,
@@ -692,6 +793,7 @@ export function MotiveCalendar({
     showMilestones,
     showOnlyScheduled,
     formatEventTitle,
+    parseCalendarDate, // Add parseCalendarDate dependency
   ]);
 
   // FIXED: Early return AFTER all hooks - this fixes the hooks ordering issue
@@ -806,7 +908,13 @@ export function MotiveCalendar({
         );
       } else if (event.type === "deliverable") {
         return (
-          <DeliverableTooltip deliverable={event.resource as Deliverable}>
+          <DeliverableTooltip
+            deliverable={event.resource as Deliverable}
+            onDeliverableUpdated={() => {
+              // Call the parent's update callback instead of full page refresh
+              onDeliverableUpdate?.();
+            }}
+          >
             <div className="h-full w-full">
               <div className="truncate text-xs leading-none">{event.title}</div>
             </div>

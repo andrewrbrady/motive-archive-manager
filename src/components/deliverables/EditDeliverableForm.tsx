@@ -95,11 +95,28 @@ export default function EditDeliverableForm({
     if (!date) return "";
 
     try {
+      // Handle the case where the date is already in YYYY-MM-DD format
+      if (typeof date === "string" && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return date;
+      }
+
       const d = new Date(date);
       if (isNaN(d.getTime())) return "";
 
-      // Format as YYYY-MM-DD for date input
-      return d.toISOString().split("T")[0];
+      // Parse the date components from the original date string to avoid timezone issues
+      if (typeof date === "string" && date.includes("T")) {
+        // For ISO strings, extract the date part directly
+        const datePart = date.split("T")[0];
+        if (datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          return datePart;
+        }
+      }
+
+      // Fallback: use the local date components to construct YYYY-MM-DD
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
     } catch (error) {
       console.warn("Invalid date format:", date);
       return "";
@@ -187,8 +204,30 @@ export default function EditDeliverableForm({
         aspect_ratio: aspectRatio || "",
         editor: editorName || "",
         firebase_uid: editorId,
-        edit_deadline: editDeadline ? new Date(editDeadline).toISOString() : "",
-        release_date: releaseDate ? new Date(releaseDate).toISOString() : "",
+        edit_deadline: editDeadline
+          ? (() => {
+              // For date-only format (YYYY-MM-DD), treat as local date at midnight
+              if (editDeadline.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [year, month, day] = editDeadline.split("-").map(Number);
+                const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+                return localDate.toISOString();
+              }
+              // For datetime format, parse normally
+              return new Date(editDeadline).toISOString();
+            })()
+          : "",
+        release_date: releaseDate
+          ? (() => {
+              // For date-only format (YYYY-MM-DD), treat as local date at midnight
+              if (releaseDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [year, month, day] = releaseDate.split("-").map(Number);
+                const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+                return localDate.toISOString();
+              }
+              // For datetime format, parse normally
+              return new Date(releaseDate).toISOString();
+            })()
+          : "",
         dropbox_link: dropboxLink || "",
         social_media_link: socialMediaLink || "",
       };
@@ -221,7 +260,7 @@ export default function EditDeliverableForm({
         </Button>
       </DialogTrigger>
       <DialogContent
-        className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full"
+        className="max-w-4xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full z-[100]"
         onEscapeKeyDown={(e) => isAnySelectOpen && e.preventDefault()}
         onPointerDownOutside={(e) => isAnySelectOpen && e.preventDefault()}
       >
@@ -423,6 +462,7 @@ export default function EditDeliverableForm({
                       value={editDeadline}
                       onChange={(value) => setEditDeadline(value)}
                       className="text-sm"
+                      isAllDay={true}
                     />
                   </div>
 
@@ -437,6 +477,7 @@ export default function EditDeliverableForm({
                       value={releaseDate}
                       onChange={(value) => setReleaseDate(value)}
                       className="text-sm"
+                      isAllDay={true}
                     />
                   </div>
                 </div>
