@@ -70,7 +70,12 @@ export default function DeliverableTooltip({
         closeDelay={100}
       >
         <HoverCardTrigger asChild>{children}</HoverCardTrigger>
-        <HoverCardContent className="w-96 p-4">
+        <HoverCardContent
+          className="w-96 p-4"
+          side="right"
+          align="start"
+          sideOffset={10}
+        >
           <div className="space-y-4">
             {/* Car thumbnail and title section */}
             {!deliverable.hideTitle && (
