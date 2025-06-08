@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   useGallery,
   updateGallery,
@@ -44,6 +44,7 @@ import JSZip from "jszip";
 export default function GalleryPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params?.id?.toString() || "";
   const { data: gallery, isLoading, error, mutate } = useGallery(id);
   const [isEditing, setIsEditing] = useState(false);
@@ -53,6 +54,26 @@ export default function GalleryPage() {
     description: "",
   });
   const [isAddingImages, setIsAddingImages] = useState(false);
+
+  // Clean up URL parameters when viewing gallery (these should only be used during image selection)
+  React.useEffect(() => {
+    const currentUrl = new URL(window.location.href);
+    const hasUrlParams =
+      currentUrl.searchParams.has("page") ||
+      currentUrl.searchParams.has("carId");
+
+    // If we have pagination/filter params but we're not in adding mode, clean them up
+    if (hasUrlParams && !isAddingImages) {
+      currentUrl.searchParams.delete("page");
+      currentUrl.searchParams.delete("carId");
+      currentUrl.searchParams.delete("search");
+      currentUrl.searchParams.delete("angle");
+      currentUrl.searchParams.delete("movement");
+      currentUrl.searchParams.delete("tod");
+      currentUrl.searchParams.delete("view");
+      window.history.replaceState({}, "", currentUrl.toString());
+    }
+  }, [isAddingImages]);
   const [isDownloading, setIsDownloading] = useState(false);
   const queryClient = useQueryClient();
 
@@ -147,6 +168,8 @@ export default function GalleryPage() {
         orderedImages: updatedOrderedImages,
       });
 
+      // Keep user on current page when adding images for better UX
+
       // Then update the local state
       if (!isRemoving) {
         setIsAddingImages(true); // Keep the selector open only when adding images
@@ -173,7 +196,7 @@ export default function GalleryPage() {
 
   const handleDoneAddingImages = () => {
     setIsAddingImages(false);
-    // Just clear URL search params without triggering additional refreshes
+    // Clear all URL search params to return to clean gallery view
     router.push(`/galleries/${id}`, { scroll: false });
   };
 
@@ -1021,11 +1044,21 @@ ${(() => {
             </div>
 
             {isAddingImages ? (
+              /* 
+                GalleryImageSelector: Used for selecting images to add to the gallery.
+                URL parameters (page, carId, search, etc.) control pagination and filtering 
+                of available images to select from.
+              */
               <GalleryImageSelector
                 selectedImageIds={gallery.imageIds}
                 onImageSelect={handleImageSelect}
               />
             ) : gallery.images && gallery.images.length > 0 ? (
+              /* 
+                DraggableGalleryGrid: Displays ALL images in the gallery without pagination.
+                Images can be reordered via drag & drop. The URL should not have pagination 
+                parameters when viewing this component.
+              */
               <DraggableGalleryGrid
                 gallery={gallery}
                 onOrderChange={handleOrderChange}

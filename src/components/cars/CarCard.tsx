@@ -79,11 +79,7 @@ const CarCard = memo(function CarCard({
   useEffect(() => {
     // Simplified image selection logic
     const findPrimaryImage = () => {
-      console.log("[CarCard] URL transformation:", {
-        carId: car._id,
-        primaryImageId: car.primaryImageId,
-        imagesCount: car.images?.length || 0,
-      });
+      // ✅ Removed console.log to prevent infinite loops
 
       // Case 1: We have loaded images with URLs
       if (car.images && car.images.length > 0) {
@@ -92,11 +88,7 @@ const CarCard = memo(function CarCard({
           const baseUrl = fixCloudflareImageUrl(primary.url);
           const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
 
-          console.log("[CarCard] URL transformation:", {
-            baseUrl,
-            transformedUrl: enhancedUrl,
-            params: "w=400,q=85",
-          });
+          // ✅ Removed console.log to prevent infinite loops
 
           setPrimaryImage({
             id: primary._id,
@@ -107,11 +99,7 @@ const CarCard = memo(function CarCard({
           const baseUrl = fixCloudflareImageUrl(car.images[0].url);
           const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
 
-          console.log("[CarCard] URL transformation (first image):", {
-            baseUrl,
-            transformedUrl: enhancedUrl,
-            params: "w=400,q=85",
-          });
+          // ✅ Removed console.log to prevent infinite loops
 
           setPrimaryImage({
             id: car.images[0]._id,
@@ -131,11 +119,7 @@ const CarCard = memo(function CarCard({
             const baseUrl = fixCloudflareImageUrl((imageData as any).url);
             const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
 
-            console.log("[CarCard] URL transformation (API fetch):", {
-              baseUrl,
-              transformedUrl: enhancedUrl,
-              params: "w=400,q=85",
-            });
+            // ✅ Removed console.log to prevent infinite loops
 
             setPrimaryImage({
               id: (imageData as any)._id,
@@ -157,11 +141,7 @@ const CarCard = memo(function CarCard({
                 );
                 const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
 
-                console.log("[CarCard] URL transformation (fallback):", {
-                  baseUrl,
-                  transformedUrl: enhancedUrl,
-                  params: "w=400,q=85",
-                });
+                // ✅ Removed console.log to prevent infinite loops
 
                 setPrimaryImage({
                   id: (fallbackImageData as any)._id,

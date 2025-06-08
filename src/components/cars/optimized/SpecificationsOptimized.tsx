@@ -62,9 +62,8 @@ export function SpecificationsOptimized({
     refetch: refetchCarData,
   } = useAPIQuery<CarData>(`cars/${carId}`, {
     enabled: !vehicleInfo, // Only fetch if vehicleInfo is not provided
-    staleTime: 3 * 60 * 1000, // 3 minutes cache for car data
-    retry: 2,
-    retryDelay: 1000,
+    staleTime: 3 * 60 * 1000, // 3 minutes cache for critical data
+    retry: 1, // ✅ Phase 2A: Reduce retry for better performance
     refetchOnWindowFocus: false,
   });
 

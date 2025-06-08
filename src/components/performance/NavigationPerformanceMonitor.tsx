@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useFastRouter } from "@/lib/navigation/simple-cache";
 import { usePathname } from "next/navigation";
 
@@ -42,7 +42,7 @@ export function NavigationPerformanceMonitor({
     return null;
   }
 
-  // Update metrics periodically
+  // Update metrics periodically - remove problematic dependency
   useEffect(() => {
     const updateMetrics = () => {
       const currentMetrics = getPerformanceMetrics();
@@ -55,7 +55,7 @@ export function NavigationPerformanceMonitor({
     const interval = setInterval(updateMetrics, 2000);
 
     return () => clearInterval(interval);
-  }, [getPerformanceMetrics]);
+  }, []); // ✅ Empty dependency array to prevent infinite re-renders
 
   // Track recent navigation
   useEffect(() => {
@@ -215,6 +215,7 @@ export function useNavigationPerformance() {
   const { getPerformanceMetrics } = useFastRouter();
   const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
 
+  // Update metrics periodically - remove problematic dependency
   useEffect(() => {
     const updateMetrics = () => {
       const currentMetrics = getPerformanceMetrics();
@@ -225,7 +226,7 @@ export function useNavigationPerformance() {
     const interval = setInterval(updateMetrics, 1000);
 
     return () => clearInterval(interval);
-  }, [getPerformanceMetrics]);
+  }, []); // ✅ Empty dependency array to prevent infinite re-renders
 
   return {
     metrics,

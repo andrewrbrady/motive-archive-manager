@@ -36,9 +36,8 @@ export function BaseGalleries({
   } = useAPIQuery<{ galleries?: Gallery[] }>(
     `cars/${carId}?includeGalleries=true`,
     {
-      staleTime: 3 * 60 * 1000, // 3 minutes cache
-      retry: 2,
-      retryDelay: 1000,
+      staleTime: 3 * 60 * 1000, // 3 minutes cache for critical data
+      retry: 1, // ✅ Phase 2A: Reduce retry for better performance
       // This ensures the query is enabled and won't block tab switching
       refetchOnWindowFocus: false,
     }

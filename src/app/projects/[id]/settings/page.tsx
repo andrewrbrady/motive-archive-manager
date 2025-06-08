@@ -53,7 +53,7 @@ export default function ProjectSettingsPage({
     try {
       setLoading(true);
 
-      const data = (await api.get(`/api/projects/${resolvedParams.id}`)) as {
+      const data = (await api.get(`projects/${resolvedParams.id}`)) as {
         project: Project;
       };
       setProject(data.project);

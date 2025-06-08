@@ -2,9 +2,9 @@ import React from "react";
 import { Metadata } from "next";
 import CarsPageOptimized from "./CarsPageOptimized";
 
-// Make this page dynamic to avoid database connection issues during build
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+// ✅ PERFORMANCE OPTIMIZATION: Enable static generation with revalidation
+// This allows Next.js to cache the page and revalidate every 5 minutes
+export const revalidate = 300; // 5 minutes
 
 export const metadata: Metadata = {
   title: "Cars Collection | Motive Archive Manager",

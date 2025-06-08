@@ -11,7 +11,9 @@ import { MongoPipelineStage } from "@/types/mongodb";
 import { StandardizedCar } from "@/types/routes/cars";
 import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 
-export const dynamic = "force-dynamic";
+// ✅ PERFORMANCE OPTIMIZATION: Use ISR with 3-minute revalidation for cars data
+// This provides a good balance between fresh data and performance
+export const revalidate = 180; // 3 minutes
 
 export async function POST(request: NextRequest) {
   try {

@@ -47,10 +47,9 @@ export function BaseEvents({
     isLoading: localLoading,
     error,
     refetch: refreshEvents,
-  } = useAPIQuery<Event[]>(`cars/${carId}/events`, {
-    staleTime: 3 * 60 * 1000, // 3 minutes cache
-    retry: 2,
-    retryDelay: 1000,
+  } = useAPIQuery<Event[]>(`cars/${carId}/events?limit=500`, {
+    staleTime: 3 * 60 * 1000, // 3 minutes cache for critical data
+    retry: 1, // ✅ Phase 2A: Reduce retry for better performance
     // This ensures the query is enabled and won't block tab switching
     refetchOnWindowFocus: false,
     // Only fetch locally if no events are provided from parent

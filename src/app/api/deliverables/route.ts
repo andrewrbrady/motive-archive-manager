@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       parseInt(
         searchParams.get("pageSize") || searchParams.get("limit") || "50"
       ),
-      100 // Maximum page size for performance
+      1000 // Maximum page size for performance
     );
 
     const search = searchParams.get("search") || "";

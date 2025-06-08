@@ -7,8 +7,7 @@ import { fixCloudflareImageUrl } from "@/lib/image-utils";
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
 
-// ✅ PERFORMANCE FIX: Use ISR instead of force-dynamic
-export const revalidate = 300; // 5 minutes
+export const dynamic = "force-dynamic";
 
 if (!MONGODB_URI) {
   throw new Error("Please add your Mongo URI to .env.local");

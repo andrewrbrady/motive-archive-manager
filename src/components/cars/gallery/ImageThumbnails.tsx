@@ -409,54 +409,52 @@ export function ImageThumbnails({
   const currentImageStart = startIndex + 1;
   const currentImageEnd = Math.min(startIndex + ITEMS_PER_PAGE, images.length);
 
-  // Early trigger for loading more - when user is close to the end of loaded images
-  const shouldTriggerEarlyLoad = useCallback(() => {
-    if (!totalImagesAvailable || !onLoadMore || isLoadingMore || isNavigating)
-      return false;
+  // Removed shouldTriggerEarlyLoad callback - logic moved inline to prevent infinite loops
 
-    // Don't trigger early loading if we have any active filters - user should see filtered results first
-    const hasActiveFilters =
-      Object.keys(filters || {}).length > 0 || searchQuery?.trim();
+  // Effect to trigger early loading with debouncing - FIXED infinite loop
+  useEffect(() => {
+    // Extract the logic from shouldTriggerEarlyLoad to avoid callback dependency
+    if (!totalImagesAvailable || !onLoadMore || isLoadingMore || isNavigating) {
+      return;
+    }
+
+    // Check for active filters (inline to avoid dependency)
+    const hasActiveFilters = Boolean(
+      (filters && Object.keys(filters).length > 0) ||
+        (searchQuery && searchQuery.trim())
+    );
+
     if (hasActiveFilters) {
-      return false;
+      return;
     }
 
     const hasMoreImages = images.length < totalImagesAvailable;
     if (!hasMoreImages) {
-      return false; // No more images to load from server
+      return; // No more images to load from server
     }
 
     // OPTIMIZED: Only trigger when user is on the last page AND near the end of all loaded content
-    // This prevents premature loading that can interfere with normal pagination
     const isOnLastAvailablePage =
       currentPage >= Math.ceil(images.length / ITEMS_PER_PAGE) - 1;
 
     if (!isOnLastAvailablePage) {
-      return false; // User is not on the last page of loaded content yet
+      return; // User is not on the last page of loaded content yet
     }
 
     // Only trigger when we're truly running low on total content (less than 1 page remaining)
     const imagesRemaining = totalImagesAvailable - images.length;
-    return imagesRemaining > 0 && imagesRemaining <= ITEMS_PER_PAGE;
-  }, [
-    totalImagesAvailable,
-    onLoadMore,
-    isLoadingMore,
-    isNavigating,
-    images.length,
-    currentPage,
-    filters,
-    searchQuery,
-  ]);
+    const shouldLoad = imagesRemaining > 0 && imagesRemaining <= ITEMS_PER_PAGE;
 
-  // Effect to trigger early loading with debouncing
-  useEffect(() => {
-    if (shouldTriggerEarlyLoad()) {
+    if (shouldLoad) {
       // Add a small delay to prevent triggering during rapid page changes
       const timer = setTimeout(() => {
-        if (shouldTriggerEarlyLoad()) {
-          // Check again after delay
-          onLoadMore?.();
+        // Double-check conditions haven't changed during timeout
+        if (
+          !isLoadingMore &&
+          !isNavigating &&
+          images.length < totalImagesAvailable
+        ) {
+          onLoadMore();
         }
       }, 300);
 
@@ -464,7 +462,16 @@ export function ImageThumbnails({
     }
     // Return undefined when no cleanup is needed
     return undefined;
-  }, [shouldTriggerEarlyLoad, onLoadMore]);
+  }, [
+    totalImagesAvailable,
+    isLoadingMore,
+    isNavigating,
+    images.length,
+    currentPage,
+    filters,
+    searchQuery,
+    onLoadMore,
+  ]); // Fixed: Use stable dependencies instead of callback dependency
 
   // Intersection Observer for infinite scroll - FIXED to prevent auto-pagination
   const handleIntersection = useCallback(
@@ -514,63 +521,56 @@ export function ImageThumbnails({
     };
   }, [handleIntersection]);
 
-  // Phase 2B Task 2: Enhanced preload adjacent images when current image changes (for gallery navigation)
-  const preloadAdjacentImages = useCallback(() => {
-    if (!currentImage) return;
+  // Removed preloadAdjacentImages callback - logic moved inline to prevent infinite loops
 
-    const currentIndex = images.findIndex(
-      (img) => (img.id || img._id) === (currentImage.id || currentImage._id)
-    );
-
-    if (currentIndex === -1) return;
-
-    const adjacentImages: string[] = [];
-
-    // Preload previous image
-    if (currentIndex > 0) {
-      adjacentImages.push(images[currentIndex - 1].url);
-    }
-
-    // Preload next image
-    if (currentIndex < images.length - 1) {
-      adjacentImages.push(images[currentIndex + 1].url);
-    }
-
-    if (adjacentImages.length > 0) {
-      // Phase 2B Task 2: Use requestIdleCallback for non-blocking adjacent image preloading
-      const preloadAdjacent = () => {
-        preloadImages(adjacentImages, "medium").catch((error) => {
-          console.error("Failed to preload adjacent images:", error);
-        });
-
-        console.log(
-          `🚀 Phase 2B: Preloaded ${adjacentImages.length} adjacent images for gallery navigation`
-        );
-      };
-
-      // Use requestIdleCallback if available, otherwise setTimeout
-      if (typeof requestIdleCallback !== "undefined") {
-        requestIdleCallback(preloadAdjacent, { timeout: 1000 });
-      } else {
-        setTimeout(preloadAdjacent, 50);
-      }
-    }
-  }, [currentImage?.id || currentImage?._id, images.length]); // Phase 2B Fix: Only depend on currentImage ID and images length to prevent excessive re-renders
-
-  // Phase 2B Task 2: Re-enable adjacent image preloading effect with optimized dependencies
+  // Phase 2B Task 2: Re-enable adjacent image preloading effect with optimized dependencies - FIXED infinite loop
   useEffect(() => {
     // Only preload if we have a current image and it's stable (prevent rapid changes during navigation)
-    if (currentImage) {
-      const debounceTimer = setTimeout(() => {
-        preloadAdjacentImages();
-      }, 100); // Small debounce to prevent rapid re-triggers during navigation
+    if (!currentImage) return;
 
-      return () => clearTimeout(debounceTimer);
-    }
+    const debounceTimer = setTimeout(() => {
+      // Inline the preloading logic to avoid callback dependency
+      const currentIndex = images.findIndex(
+        (img) => (img.id || img._id) === (currentImage.id || currentImage._id)
+      );
 
-    // Return undefined when no cleanup is needed
-    return undefined;
-  }, [currentImage?.id || currentImage?._id]); // Phase 2B Fix: Only depend on currentImage ID, not the full callback
+      if (currentIndex === -1) return;
+
+      const adjacentImages: string[] = [];
+
+      // Preload previous image
+      if (currentIndex > 0) {
+        adjacentImages.push(images[currentIndex - 1].url);
+      }
+
+      // Preload next image
+      if (currentIndex < images.length - 1) {
+        adjacentImages.push(images[currentIndex + 1].url);
+      }
+
+      if (adjacentImages.length > 0) {
+        // Phase 2B Task 2: Use requestIdleCallback for non-blocking adjacent image preloading
+        const preloadAdjacent = () => {
+          preloadImages(adjacentImages, "medium").catch((error) => {
+            console.error("Failed to preload adjacent images:", error);
+          });
+
+          console.log(
+            `🚀 Phase 2B: Preloaded ${adjacentImages.length} adjacent images for gallery navigation`
+          );
+        };
+
+        // Use requestIdleCallback if available, otherwise setTimeout
+        if (typeof requestIdleCallback !== "undefined") {
+          requestIdleCallback(preloadAdjacent, { timeout: 1000 });
+        } else {
+          setTimeout(preloadAdjacent, 50);
+        }
+      }
+    }, 100); // Small debounce to prevent rapid re-triggers during navigation
+
+    return () => clearTimeout(debounceTimer);
+  }, [currentImage?.id || currentImage?._id, images]); // Fixed: Include images array but avoid callback dependency
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -837,17 +837,10 @@ const ThumbnailItem = React.memo<{
 
     const imageId = image.id || image._id;
 
-    // Add debugging for URL transformation in thumbnails
+    // ✅ Optimized URL transformation without console spam
     const enhancedThumbnailUrl = useMemo(() => {
-      const transformed = getEnhancedImageUrl(image.url, "400", "85");
-      console.log("ImageThumbnails URL transformation:", {
-        original: image.url,
-        transformed: transformed,
-        imageId: imageId,
-        filename: image.filename,
-      });
-      return transformed;
-    }, [image.url, imageId, image.filename]);
+      return getEnhancedImageUrl(image.url, "400", "85");
+    }, [image.url]);
 
     const handleDeleteClick = (e: React.MouseEvent) => {
       e.stopPropagation();

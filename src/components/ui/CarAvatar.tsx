@@ -152,7 +152,7 @@ export function CarAvatar({
         }, 5000); // 5 second timeout
 
         // Use authenticated API client instead of raw fetch
-        const data = (await api.get(`/api/images/${idString}`)) as {
+        const data = (await api.get(`images/${idString}`)) as {
           url?: string;
         };
 

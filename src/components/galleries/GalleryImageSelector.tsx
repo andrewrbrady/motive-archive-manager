@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useState } from "react";
+"use client";
+
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import { useImages } from "@/hooks/use-images";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,59 +38,34 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useAPI } from "@/hooks/useAPI";
 
-// Update images per page to match 5x4 grid
-const IMAGES_PER_PAGE = 20; // 5 columns x 4 rows
+// Increase images per load for better UX
+const IMAGES_PER_LOAD = 40;
 
-// URL transformation function - copied from ImageThumbnails.tsx lines 84-110
+// Enhanced image URL with optimizations
 const getEnhancedImageUrl = (
   baseUrl: string,
   width?: string,
   quality?: string
 ) => {
   let params = [];
-  // Always check for truthy values and non-empty strings
   if (width && width.trim() !== "") params.push(`w=${width}`);
   if (quality && quality.trim() !== "") params.push(`q=${quality}`);
 
   if (params.length === 0) return baseUrl;
 
-  // Handle different Cloudflare URL formats
-  // Format: https://imagedelivery.net/account/image-id/public
-  // Should become: https://imagedelivery.net/account/image-id/w=400,q=85
   if (baseUrl.includes("imagedelivery.net")) {
-    // Check if URL already has transformations (contains variant like 'public')
     if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
-      // Replace the last segment (usually 'public') with our parameters
       const urlParts = baseUrl.split("/");
       urlParts[urlParts.length - 1] = params.join(",");
-      const transformedUrl = urlParts.join("/");
-      console.log("GalleryImageSelector URL transformation:", {
-        baseUrl,
-        transformedUrl,
-        params,
-      });
-      return transformedUrl;
+      return urlParts.join("/");
     } else {
-      // URL doesn't have a variant, append transformations
-      const transformedUrl = `${baseUrl}/${params.join(",")}`;
-      console.log("GalleryImageSelector URL transformation:", {
-        baseUrl,
-        transformedUrl,
-        params,
-      });
-      return transformedUrl;
+      return `${baseUrl}/${params.join(",")}`;
     }
   }
 
-  // Fallback for other URL formats - try to replace /public if it exists
-  const transformedUrl = baseUrl.replace(/\/public$/, `/${params.join(",")}`);
-  console.log("GalleryImageSelector URL transformation (fallback):", {
-    baseUrl,
-    transformedUrl,
-    params,
-  });
-  return transformedUrl;
+  return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
 };
 
 interface GalleryImageSelectorProps {
@@ -194,19 +171,30 @@ export function GalleryImageSelector({
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const api = useAPI();
+
   // Fetch all cars by setting a high limit
   const { data: carsData } = useCars({ limit: 1000, sortDirection: "desc" });
   const [carSearchOpen, setCarSearchOpen] = useState(false);
   const [carSearchQuery, setCarSearchQuery] = useState("");
 
-  // Get current filter values from URL
+  // State for infinite loading
+  const [allImages, setAllImages] = useState<ImageData[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreImages, setHasMoreImages] = useState(true);
+  const [nextPage, setNextPage] = useState(2); // Start at 2 since first page loads via useImages
+
+  // Refs for intersection observer
+  const loadingTriggerRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  // Get current filter values from URL (remove page param as we don't need it)
   const currentSearch = searchParams?.get("search") || undefined;
   const currentAngle = searchParams?.get("angle") || undefined;
   const currentMovement = searchParams?.get("movement") || undefined;
   const currentTod = searchParams?.get("tod") || undefined;
   const currentView = searchParams?.get("view") || undefined;
   const currentCarId = searchParams?.get("carId") || undefined;
-  const currentPage = parseInt(searchParams?.get("page") || "1");
 
   // Filter cars based on search query
   const filteredCars = React.useMemo(() => {
@@ -237,14 +225,15 @@ export function GalleryImageSelector({
     return car ? `${car.year} ${car.make} ${car.model}` : "All Cars";
   }, [currentCarId, carsData?.cars]);
 
-  const { data, isLoading, error, setFilter, mutate } = useImages({
-    limit: IMAGES_PER_PAGE,
+  // Load initial page
+  const { data, isLoading, error, mutate } = useImages({
+    limit: IMAGES_PER_LOAD,
     carId: currentCarId || "all",
     angle: currentAngle,
     movement: currentMovement,
     tod: currentTod,
     view: currentView,
-    page: currentPage,
+    page: 1, // Always start with page 1
     search: currentSearch,
   });
 
@@ -261,12 +250,15 @@ export function GalleryImageSelector({
     [debouncedSetSearch]
   );
 
-  // Handle filter changes
+  // Handle filter changes (reset to first page when filters change)
   const handleFilterChange = useCallback(
     (key: string, value: string | null) => {
       const newSearchParams = new URLSearchParams(
         searchParams?.toString() || ""
       );
+
+      // Remove page parameter completely - we handle this with infinite loading
+      newSearchParams.delete("page");
 
       if (value === null) {
         newSearchParams.delete(key);
@@ -274,47 +266,231 @@ export function GalleryImageSelector({
         newSearchParams.set(key, value);
       }
 
-      if (key !== "page") {
-        newSearchParams.set("page", "1");
-      }
-
       router.replace(`${pathname}?${newSearchParams.toString()}`, {
         scroll: false,
       });
+
+      // Reset infinite loading state when filters change
+      setAllImages([]);
+      setNextPage(2);
+      setHasMoreImages(true);
     },
     [searchParams, router, pathname]
   );
 
-  // Handle page changes
-  const handlePageChange = useCallback(
-    (page: number) => {
-      handleFilterChange("page", page.toString());
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    },
-    [handleFilterChange]
-  );
+  // Load more images function - FIXED: Use authenticated API client instead of direct fetch
+  const loadMoreImages = useCallback(async () => {
+    if (
+      isLoadingMore ||
+      !hasMoreImages ||
+      isLoading ||
+      !data?.pagination ||
+      !api
+    )
+      return;
 
-  // Get cars safely
-  const cars = carsData?.cars ?? [];
+    console.log("🔄 Loading more images, page:", nextPage);
+    setIsLoadingMore(true);
+
+    try {
+      // Build query parameters for next page
+      const queryParams = new URLSearchParams({
+        page: nextPage.toString(),
+        limit: IMAGES_PER_LOAD.toString(),
+      });
+
+      if (currentSearch) queryParams.append("search", currentSearch);
+      if (currentCarId && currentCarId !== "all")
+        queryParams.append("carId", currentCarId);
+      if (currentAngle) queryParams.append("angle", currentAngle);
+      if (currentMovement) queryParams.append("movement", currentMovement);
+      if (currentTod) queryParams.append("tod", currentTod);
+      if (currentView) queryParams.append("view", currentView);
+
+      // Use authenticated API client instead of direct fetch
+      const nextData = await api.get<{
+        images: any[];
+        pagination: {
+          total: number;
+          page: number;
+          limit: number;
+          pages: number;
+        };
+      }>(`/images?${queryParams}`);
+
+      console.log("📥 Received next page data:", {
+        page: nextPage,
+        imagesReceived: nextData?.images?.length || 0,
+        totalImages: nextData?.pagination?.total || 0,
+        currentTotal: allImages.length,
+      });
+
+      if (nextData?.images?.length > 0) {
+        // Convert newly loaded images to ImageData format
+        const convertedNewImages = nextData.images.map((image: any) =>
+          "id" in image
+            ? {
+                _id: image.id as string,
+                cloudflareId: image.id as string,
+                url: image.url,
+                filename: image.filename,
+                width: 0,
+                height: 0,
+                metadata: image.metadata || {},
+                carId: "",
+                createdAt: image.createdAt,
+                updatedAt: image.updatedAt,
+              }
+            : (image as ImageData)
+        );
+
+        // Deduplicate images before adding to prevent React key conflicts
+        const existingIds = new Set(allImages.map((img) => img._id));
+        const newUniqueImages = convertedNewImages.filter(
+          (img) => !existingIds.has(img._id)
+        );
+        console.log(
+          `📋 Deduplication: ${convertedNewImages.length} received, ${newUniqueImages.length} unique, ${convertedNewImages.length - newUniqueImages.length} duplicates filtered`
+        );
+
+        if (newUniqueImages.length > 0) {
+          const updatedImages = [...allImages, ...newUniqueImages];
+          const totalLoaded = updatedImages.length;
+          const totalAvailable = nextData.pagination.total;
+          const hasMore = totalLoaded < totalAvailable;
+
+          console.log("📊 Update state:", {
+            totalLoaded,
+            totalAvailable,
+            hasMore,
+            nextPageWillBe: nextPage + 1,
+          });
+
+          // Update state in one batch to prevent cascading updates
+          setAllImages(updatedImages);
+          setNextPage((prev) => prev + 1);
+          setHasMoreImages(hasMore);
+        } else {
+          console.log("🚫 No new unique images to add");
+          setNextPage((prev) => prev + 1);
+        }
+      } else {
+        console.log("🚫 No more images to load");
+        setHasMoreImages(false);
+      }
+    } catch (error) {
+      console.error("❌ Error loading more images:", error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [
+    isLoadingMore,
+    hasMoreImages,
+    isLoading,
+    nextPage,
+    // Removed allImages.length to prevent infinite re-renders
+    currentSearch,
+    currentCarId,
+    currentAngle,
+    currentMovement,
+    currentTod,
+    currentView,
+    data?.pagination,
+    api,
+  ]);
+
+  // REMOVED: Refs for intersection observer (temporarily disabled)
+
+  // TEMPORARILY DISABLED: Set up intersection observer for infinite scroll
+  // TODO: Re-enable after fixing infinite render loops
+  /*
+  useEffect(() => {
+    if (!loadingTriggerRef.current) return;
+
+    // Disconnect existing observer
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    // Create new observer with stable callback using refs
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          // Use setTimeout to prevent direct state updates during render
+          setTimeout(() => {
+            if (
+              hasMoreImagesRef.current &&
+              !isLoadingMoreRef.current &&
+              !isLoadingRef.current &&
+              loadMoreImagesRef.current
+            ) {
+              console.log("🎯 Intersection detected, loading more images...");
+              loadMoreImagesRef.current();
+            }
+          }, 0);
+        }
+      },
+      {
+        rootMargin: "200px", // Load when 200px away from the trigger
+        threshold: 0.1,
+      }
+    );
+
+    observerRef.current.observe(loadingTriggerRef.current);
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, []); // Empty dependency array to prevent re-creation
+  */
+
+  // Reset and load first page when data changes
+  useEffect(() => {
+    if (data?.images) {
+      console.log("🔄 Initial data loaded:", {
+        imagesCount: data.images.length,
+        totalAvailable: data.pagination.total,
+      });
+
+      // Convert Image[] to ImageData[]
+      const convertedImages = data.images.map((image) =>
+        "id" in image
+          ? {
+              _id: image.id as string,
+              cloudflareId: image.id as string,
+              url: image.url,
+              filename: image.filename,
+              width: 0,
+              height: 0,
+              metadata: image.metadata || {},
+              carId: "",
+              createdAt: image.createdAt,
+              updatedAt: image.updatedAt,
+            }
+          : (image as ImageData)
+      );
+
+      // Deduplicate initial images to prevent any key conflicts
+      const uniqueImages = convertedImages.filter(
+        (img, index, arr) => arr.findIndex((i) => i._id === img._id) === index
+      );
+      console.log(
+        `📋 Initial load deduplication: ${convertedImages.length} converted, ${uniqueImages.length} unique`
+      );
+
+      setAllImages(uniqueImages);
+      setNextPage(2); // Next page to load is page 2
+      setHasMoreImages(data.images.length < data.pagination.total);
+    }
+  }, [data]);
 
   // Effect to handle selection state changes
   useEffect(() => {
     mutate();
   }, [selectedImageIds, mutate]);
-
-  // Effect to refresh data when filters change
-  useEffect(() => {
-    mutate();
-  }, [
-    currentSearch,
-    currentAngle,
-    currentMovement,
-    currentTod,
-    currentView,
-    currentCarId,
-    currentPage,
-    mutate,
-  ]);
 
   // Handle image selection with optimistic update
   const handleImageSelection = useCallback(
@@ -324,6 +500,21 @@ export function GalleryImageSelector({
     },
     [onImageSelect, mutate]
   );
+
+  // Use allImages for display (no need for complex merging since we control the flow)
+  const displayImages = allImages;
+
+  // Show loading while API client is initializing
+  if (!api) {
+    return (
+      <div className={cn("space-y-4", className)}>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-muted-foreground">Authenticating...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -509,43 +700,33 @@ export function GalleryImageSelector({
         </div>
       ) : error ? (
         <div className="text-center text-destructive">Error loading images</div>
-      ) : !data?.images.length ? (
+      ) : !displayImages?.length ? (
         <div className="text-center text-muted-foreground">No images found</div>
       ) : (
-        <div className="space-y-8">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {data.images.map((image) => {
-              // Convert Image type to ImageData if needed
-              const imageData =
-                "id" in image
-                  ? {
-                      _id: image.id,
-                      cloudflareId: image.id,
-                      url: image.url,
-                      filename: image.filename,
-                      width: 0,
-                      height: 0,
-                      metadata: image.metadata || {},
-                      carId: "",
-                      createdAt: image.createdAt,
-                      updatedAt: image.updatedAt,
-                    }
-                  : image;
+        <div className="space-y-6">
+          {/* Display total count */}
+          <div className="text-sm text-muted-foreground">
+            Showing {displayImages.length} of {data?.pagination?.total || 0}{" "}
+            images
+            {hasMoreImages && " • Scroll down to load more"}
+          </div>
 
-              const isSelected = selectedImageIds.includes(imageData._id);
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {displayImages.map((image, index) => {
+              const isSelected = selectedImageIds.includes(image._id);
               return (
                 <div
-                  key={imageData._id}
+                  key={image._id}
                   className={cn(
                     "group relative rounded-md overflow-hidden bg-muted cursor-pointer min-h-[200px] flex flex-col",
                     isSelected && "ring-2 ring-primary"
                   )}
-                  onClick={() => handleImageSelection(imageData)}
+                  onClick={() => handleImageSelection(image)}
                 >
                   <div className="relative flex-1 flex items-center justify-center bg-background">
                     <img
-                      src={getEnhancedImageUrl(imageData.url, "400", "85")}
-                      alt={imageData.filename}
+                      src={getEnhancedImageUrl(image.url, "400", "85")}
+                      alt={image.filename}
                       className="max-w-full max-h-[300px] w-auto h-auto object-contain"
                       loading="lazy"
                     />
@@ -557,11 +738,11 @@ export function GalleryImageSelector({
                   </div>
                   <div className="w-full p-2 bg-muted/80 backdrop-blur-sm text-xs border-t border-border">
                     <div className="truncate text-muted-foreground">
-                      {imageData.metadata?.angle && (
-                        <span className="mr-2">{imageData.metadata.angle}</span>
+                      {image.metadata?.angle && (
+                        <span className="mr-2">{image.metadata.angle}</span>
                       )}
-                      {imageData.metadata?.view && (
-                        <span>{imageData.metadata.view}</span>
+                      {image.metadata?.view && (
+                        <span>{image.metadata.view}</span>
                       )}
                     </div>
                   </div>
@@ -570,12 +751,32 @@ export function GalleryImageSelector({
             })}
           </div>
 
-          {data.pagination.pages > 1 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={data.pagination.pages}
-              onPageChange={handlePageChange}
-            />
+          {/* Manual Load More Button (temporary replacement for infinite scroll) */}
+          {hasMoreImages && (
+            <div className="flex justify-center">
+              <Button
+                onClick={loadMoreImages}
+                disabled={isLoadingMore || isLoading}
+                variant="outline"
+                className="px-8"
+              >
+                {isLoadingMore ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Loading more...
+                  </>
+                ) : (
+                  "Load More Images"
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* End message when all images are loaded */}
+          {!hasMoreImages && displayImages.length > 0 && (
+            <div className="text-center text-sm text-muted-foreground py-4">
+              All images loaded • {displayImages.length} total images
+            </div>
           )}
         </div>
       )}

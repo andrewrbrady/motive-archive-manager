@@ -263,10 +263,16 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
   const { prefetch } = usePrefetchAPI();
 
   // Performance optimization: Memoize vehicleInfo to prevent unnecessary re-renders
-  const memoizedVehicleInfo = useMemo(
-    () => vehicleInfo,
-    [vehicleInfo?.updatedAt]
-  );
+  // Use a stable key that only changes when the data actually changes
+  const memoizedVehicleInfo = useMemo(() => {
+    if (!vehicleInfo) return null;
+    return vehicleInfo;
+  }, [
+    vehicleInfo?._id,
+    vehicleInfo?.make,
+    vehicleInfo?.model,
+    vehicleInfo?.year,
+  ]); // Only update when core car data changes
 
   // Optimized prefetch function with debouncing to prevent excessive calls
   const prefetchTabData = useCallback(

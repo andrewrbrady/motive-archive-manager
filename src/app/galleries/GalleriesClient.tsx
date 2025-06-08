@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useRef,
   useCallback,
+  startTransition,
 } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
@@ -78,7 +79,7 @@ export default function GalleriesClient() {
     mounted.current = true;
     return () => {
       mounted.current = false;
-      // Cancel any pending debounced operations
+      // Cancel any pending debounced operations immediately
       if (debouncedSearchRef.current?.cancel) {
         debouncedSearchRef.current.cancel();
       }
@@ -141,39 +142,53 @@ export default function GalleriesClient() {
 
   // Handle search with debounce - ENHANCED MOUNTED CHECK
   const [debouncedSetSearch, debouncedSetSearchState] = useDebounce(
-    (value: string) => {
-      // DOUBLE CHECK: Component must be mounted AND React must allow updates
-      if (!mounted.current) {
-        console.log(
-          "🛡️ Preventing debounced search update - component unmounted"
-        );
-        return;
-      }
-
-      try {
-        const params = new URLSearchParams(searchParams?.toString() || "");
-        params.set("page", "1"); // Reset to first page on new search
-
-        if (value) {
-          params.set("search", value);
-        } else {
-          params.delete("search");
+    useCallback(
+      (value: string) => {
+        // DOUBLE CHECK: Component must be mounted AND React must allow updates
+        if (!mounted.current) {
+          console.log(
+            "🛡️ Preventing debounced search update - component unmounted"
+          );
+          return;
         }
 
-        router.push(`${pathname}?${params.toString()}`, { scroll: false });
-      } catch (error) {
-        console.warn(
-          "🛡️ Router navigation failed (component may be unmounted):",
-          error
-        );
-      }
-    },
-    500
+        try {
+          const params = new URLSearchParams(searchParams?.toString() || "");
+          params.set("page", "1"); // Reset to first page on new search
+
+          if (value) {
+            params.set("search", value);
+          } else {
+            params.delete("search");
+          }
+
+          router.push(`${pathname}?${params.toString()}`, { scroll: false });
+        } catch (error) {
+          console.warn(
+            "🛡️ Router navigation failed (component may be unmounted):",
+            error
+          );
+        }
+      },
+      [router, pathname, searchParams]
+    ), // Stable dependencies
+    500,
+    {
+      leading: false,
+      trailing: true,
+    }
   );
 
   // Store the debounced function reference for cleanup
   useEffect(() => {
     debouncedSearchRef.current = { cancel: debouncedSetSearchState.cancel };
+
+    // Additional cleanup - cancel any pending operations when dependencies change
+    return () => {
+      if (debouncedSetSearchState?.cancel) {
+        debouncedSetSearchState.cancel();
+      }
+    };
   }, [debouncedSetSearchState]);
 
   // Handle search input - make it more defensive
@@ -186,7 +201,14 @@ export default function GalleriesClient() {
       }
 
       const value = e.target.value;
-      setSearchInput(value);
+
+      // Use startTransition to make this a non-urgent update
+      startTransition(() => {
+        if (mounted.current) {
+          setSearchInput(value);
+        }
+      });
+
       debouncedSetSearch(value);
     },
     [debouncedSetSearch]

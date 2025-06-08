@@ -29,21 +29,31 @@ export function ReactQueryErrorHandler({
   const isSetupRef = useRef(false);
   const originalConsoleErrorRef = useRef<typeof console.error | null>(null);
 
-  // Stable error handler using useCallback
+  // Store captureError in a ref to avoid dependency issues and infinite loops
+  const captureErrorRef = useRef(captureError);
+  useEffect(() => {
+    captureErrorRef.current = captureError;
+  }, [captureError]);
+
+  // Stable error handler using useCallback - FIXED infinite loop
   const handleQueryError = useCallback(
     (error: Error) => {
       console.error("🚨 React Query Error:", error);
 
       // Check if it's an authentication error
       if (isAuthenticationError(error)) {
-        // Forward to error boundary
-        captureError(error);
+        // Forward to error boundary using ref to avoid dependency
+        captureErrorRef.current(error);
       }
     },
-    [captureError]
+    [] // No dependencies to prevent infinite loops
   );
 
   useEffect(() => {
+    // DISABLE ERROR INTERCEPTION COMPLETELY TO STOP INFINITE LOOPS
+    // TODO: Re-implement with a more robust approach that doesn't interfere with React's error handling
+    return;
+
     // Prevent multiple setups
     if (isSetupRef.current) {
       return;
@@ -77,6 +87,17 @@ export function ReactQueryErrorHandler({
         errorMessage.includes("React state update") ||
         errorMessage.includes("hasn't mounted yet") ||
         errorMessage.includes("component that hasn't mounted") ||
+        errorMessage.includes("side-effect in your render function") ||
+        errorMessage.includes("Move this work to useEffect") ||
+        // Maximum update depth errors
+        errorMessage.includes("Maximum update depth exceeded") ||
+        errorMessage.includes("update depth") ||
+        // React warnings and errors that should pass through
+        errorMessage.includes("Warning:") ||
+        errorMessage.includes("React warning") ||
+        errorMessage.includes("createConsoleError") ||
+        errorMessage.includes("handleConsoleError") ||
+        errorMessage.includes("warnAboutUpdateOnNotYetMountedFiberInDEV") ||
         // Other image-related patterns
         errorMessage.includes("Image failed to load") ||
         errorMessage.includes("Failed to load image") ||
@@ -89,15 +110,13 @@ export function ReactQueryErrorHandler({
         errorMessage.includes("CarAvatar:") ||
         errorMessage.includes("Avatar") ||
         // Next.js and React patterns
-        errorMessage.includes("createConsoleError") ||
         errorMessage.includes("React error boundary") ||
         errorMessage.includes("Image component") ||
-        errorMessage.includes("side-effect in your render function") ||
-        errorMessage.includes("Move this work to useEffect") ||
         // Debounce and hook-related errors
         errorMessage.includes("use-debounce") ||
         errorMessage.includes("useDebounce") ||
         errorMessage.includes("dispatchSetState") ||
+        errorMessage.includes("enqueueConcurrentHookUpdate") ||
         // Check for HTML Image Element errors
         args.some(
           (arg) =>
@@ -122,7 +141,9 @@ export function ReactQueryErrorHandler({
         !errorMessage.includes("Image") &&
         !errorMessage.includes("Avatar") &&
         !errorMessage.includes("load") &&
-        !errorMessage.includes("Cloudflare")
+        !errorMessage.includes("Cloudflare") &&
+        !errorMessage.includes("React state update") &&
+        !errorMessage.includes("hasn't mounted")
       ) {
         isIntercepting = true; // Set flag to prevent recursion
 
@@ -145,7 +166,7 @@ export function ReactQueryErrorHandler({
         console.error = originalConsoleErrorRef.current;
       }
     };
-  }, [handleQueryError]); // Use stable handleQueryError instead of captureError
+  }, []); // ✅ Empty dependency array - setup should only run once
 
   // ✅ REMOVED problematic cleanup function that was causing infinite loops
   // React Query error reset should be handled explicitly, not in cleanup

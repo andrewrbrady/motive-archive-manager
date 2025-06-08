@@ -222,7 +222,7 @@ export function MotiveCalendar({
       }
 
       try {
-        const car = (await api.get(`/api/cars/${carId}`)) as {
+        const car = (await api.get(`cars/${carId}`)) as {
           make: string;
           model: string;
           year: number;
@@ -250,7 +250,7 @@ export function MotiveCalendar({
       }
 
       try {
-        const car = (await api.get(`/api/cars/${carId}`)) as {
+        const car = (await api.get(`cars/${carId}`)) as {
           make: string;
           model: string;
           year: number;
@@ -681,8 +681,9 @@ export function MotiveCalendar({
   const eventPropGetter = (event: MotiveCalendarEvent) => {
     if (event.type === "event") {
       const eventResource = event.resource as Event;
-      // Use event type for primary color grouping
-      const backgroundColor = `hsl(var(--event-${eventResource.type.toLowerCase()}))`;
+      // Use event type for primary color grouping with null safety
+      const eventType = eventResource?.type || "default";
+      const backgroundColor = `hsl(var(--event-${eventType.toLowerCase()}))`;
 
       return {
         style: {
@@ -701,14 +702,15 @@ export function MotiveCalendar({
     } else if (event.type === "deliverable") {
       // Deliverable styling
       const deliverableResource = event.resource as DeliverableWithEventType;
-      let backgroundColor = `hsl(var(--deliverable-${deliverableResource.type
+      const deliverableType = deliverableResource?.type || "default";
+      let backgroundColor = `hsl(var(--deliverable-${deliverableType
         .toLowerCase()
         .replace(/\s+/g, "-")}))`;
 
       // Use event type (deadline/release) as a secondary indicator
-      if (deliverableResource.eventType === "deadline") {
+      if (deliverableResource?.eventType === "deadline") {
         backgroundColor = `hsl(var(--deliverable-deadline))`;
-      } else if (deliverableResource.eventType === "release") {
+      } else if (deliverableResource?.eventType === "release") {
         backgroundColor = `hsl(var(--deliverable-release))`;
       }
 
@@ -1254,8 +1256,8 @@ export function MotiveCalendar({
       eventPropGetter={eventPropGetter}
       components={components}
       popup={false} // Show all events inline, no popup
-      popupOffset={15} // Show up to 15 events before "show more" link
-      showAllEvents={false} // Disable to maintain drag/drop functionality
+      popupOffset={200} // Massive increase to force more events per date cell
+      showAllEvents={true} // FORCE all events to display - override drag/drop limitation
       showFilterControls={showFilterControls}
       showVisibilityControls={showVisibilityControls}
       filterOptions={{

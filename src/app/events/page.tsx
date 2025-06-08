@@ -105,7 +105,7 @@ export default function EventsPage() {
               });
               return event;
             }
-            const car = (await api.get(`/api/cars/${carId}`)) as Car;
+            const car = (await api.get(`cars/${carId}`)) as Car;
             return { ...event, car };
           } catch (error) {
             console.error("Error fetching car for event:", event.id, error);

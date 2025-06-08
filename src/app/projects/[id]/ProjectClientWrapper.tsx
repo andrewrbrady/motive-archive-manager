@@ -551,7 +551,7 @@ export function ProjectClientWrapper({ project }: ProjectClientWrapperProps) {
   const fetchGalleriesData = async (): Promise<any[]> => {
     if (!api) throw new Error("No API available");
 
-    const data = (await api.get(`/api/projects/${project._id}/galleries`)) as {
+    const data = (await api.get(`projects/${project._id}/galleries`)) as {
       galleries: any[];
     };
     return data.galleries || [];

@@ -6,8 +6,7 @@ import {
   verifyFirebaseToken,
 } from "@/lib/firebase-auth-middleware";
 
-// ✅ PERFORMANCE FIX: Use ISR for project preload data
-export const revalidate = 180; // 3 minutes
+export const dynamic = "force-dynamic";
 
 interface PreloadTabsRouteParams {
   params: Promise<{ id: string }>;

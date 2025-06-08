@@ -8,8 +8,7 @@ import {
   verifyFirebaseToken,
 } from "@/lib/firebase-auth-middleware";
 
-// ✅ PERFORMANCE FIX: Use ISR for project events
-export const revalidate = 300; // 5 minutes
+export const dynamic = "force-dynamic";
 
 async function getProjectEvents(
   request: NextRequest,

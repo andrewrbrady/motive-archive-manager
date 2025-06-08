@@ -51,10 +51,9 @@ export function EventsOptimized({ carId }: EventsOptimizedProps) {
     isLoading,
     error,
     refetch: fetchEvents,
-  } = useAPIQuery<Event[]>(`cars/${carId}/events`, {
-    staleTime: 0, // No cache to ensure fresh data
-    retry: 2,
-    retryDelay: 1000,
+  } = useAPIQuery<Event[]>(`cars/${carId}/events?limit=500`, {
+    staleTime: 3 * 60 * 1000, // 3 minutes cache for events data
+    retry: 1, // Reduce retry attempts for better performance
     // Only fetch when authenticated
     enabled: status === "authenticated" && !!session?.user,
   });

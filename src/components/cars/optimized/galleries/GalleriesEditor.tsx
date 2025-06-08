@@ -59,9 +59,8 @@ export function GalleriesEditor({
   const { data: carData, refetch: refreshAttachedGalleries } = useAPIQuery<{
     galleries?: Gallery[];
   }>(`cars/${carId}?includeGalleries=true`, {
-    staleTime: 3 * 60 * 1000, // 3 minutes cache
-    retry: 2,
-    retryDelay: 1000,
+    staleTime: 3 * 60 * 1000, // 3 minutes cache for critical data
+    retry: 1, // ✅ Phase 2A: Reduce retry for better performance
     refetchOnWindowFocus: false,
     enabled: open, // Only fetch when dialog is open
   });
@@ -75,9 +74,8 @@ export function GalleriesEditor({
     isLoading: isLoadingAvailable,
     error: availableGalleriesError,
   } = useAPIQuery<{ galleries?: Gallery[] }>(`galleries${searchParams}`, {
-    staleTime: 5 * 60 * 1000, // 5 minutes cache for static gallery data
-    retry: 2,
-    retryDelay: 1000,
+    staleTime: 10 * 60 * 1000, // ✅ Phase 2A: 10min cache for static gallery data
+    retry: 1, // ✅ Phase 2A: Reduce retry for non-critical static data
     refetchOnWindowFocus: false,
     enabled: open, // Only fetch when dialog is open
     // Handle API response variations and limit to 50 for performance

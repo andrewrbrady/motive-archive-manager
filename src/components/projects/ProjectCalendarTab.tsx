@@ -26,7 +26,10 @@ export function ProjectCalendarTab({ projectId }: ProjectCalendarTabProps) {
 
     try {
       console.time("ProjectCalendarTab-fetch-events");
-      const response = (await api.get(`projects/${projectId}/events`)) as {
+      // Request more events for calendar display - increase limit to show more events
+      const response = (await api.get(
+        `projects/${projectId}/events?limit=500&includeCars=true`
+      )) as {
         events: Event[];
         total: number;
         limit: number;

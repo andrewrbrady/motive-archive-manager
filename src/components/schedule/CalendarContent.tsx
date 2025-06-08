@@ -21,7 +21,8 @@ export default function CalendarContent() {
 
   const fetchEvents = async () => {
     try {
-      const data = (await api.get(`/api/events`)) as Event[];
+      // Request more events for calendar display - increase limit to show more events
+      const data = (await api.get(`events?limit=500`)) as Event[];
       setEvents(data);
     } catch (error) {
       console.error("Error fetching events:", error);
@@ -31,7 +32,7 @@ export default function CalendarContent() {
 
   const fetchDeliverables = async () => {
     try {
-      const data = (await api.get(`/api/deliverables`)) as
+      const data = (await api.get(`deliverables`)) as
         | { deliverables?: Deliverable[] }
         | Deliverable[];
       setDeliverables(Array.isArray(data) ? data : data.deliverables || []);

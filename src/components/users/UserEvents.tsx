@@ -114,7 +114,7 @@ export default function UserEvents({ userId }: UserEventsProps) {
       const carPromises = uniqueCarIds.map(async (carId) => {
         try {
           // ✅ NUCLEAR AUTH FIX: Replace unauthenticated fetch with useAPI
-          const car = (await api.get(`/api/cars/${carId}`)) as Car;
+          const car = (await api.get(`cars/${carId}`)) as Car;
           return { carId, car };
         } catch (error) {
           console.error(`Error fetching car ${carId}:`, error);

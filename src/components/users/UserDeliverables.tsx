@@ -111,7 +111,7 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
         if (platform && platform !== "all") params.append("platform", platform);
         if (type && type !== "all") params.append("type", type);
 
-        const data = (await api.get(`/api/deliverables?${params}`)) as {
+        const data = (await api.get(`deliverables?${params}`)) as {
           deliverables: Deliverable[];
         };
         setDeliverables(data.deliverables);

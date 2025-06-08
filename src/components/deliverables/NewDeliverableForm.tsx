@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -74,58 +74,63 @@ export default function NewDeliverableForm({
 
   const isAnySelectOpen = Object.values(openSelects).some(Boolean);
 
+  // Memoize fetch functions to prevent infinite re-renders
+  const fetchUsers = useCallback(async () => {
+    if (!api) {
+      console.log("API client not available for fetching users");
+      return;
+    }
+
+    try {
+      const response = await api.get("users/editors");
+      const data = response as any;
+
+      console.log("NewDeliverableForm: Raw API response:", data);
+      console.log("NewDeliverableForm: Data is array:", Array.isArray(data));
+
+      if (Array.isArray(data)) {
+        const activeUsers = data.filter(
+          (user: FirestoreUser) => user.status === "active"
+        );
+        console.log("NewDeliverableForm: Active users:", activeUsers.length);
+        console.log("NewDeliverableForm: Sample user:", activeUsers[0]);
+        setUsers(activeUsers);
+      } else {
+        console.error("Unexpected API response structure:", data);
+        toast.error("Failed to load users properly");
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      toast.error("Failed to fetch users");
+    }
+  }, [api]);
+
+  const fetchCars = useCallback(async () => {
+    if (!api) return;
+
+    try {
+      const response = await api.get("cars");
+      const data = response as any;
+      setCars(data.cars || []);
+    } catch (error) {
+      console.error("Error fetching cars:", error);
+      toast.error("Failed to fetch cars");
+    }
+  }, [api]);
+
+  // Separate useEffect for users
   useEffect(() => {
-    const fetchUsers = async () => {
-      if (!api) {
-        console.log("API client not available for fetching users");
-        return;
-      }
-
-      try {
-        const response = await api.get("users/editors");
-        const data = response as any;
-
-        console.log("NewDeliverableForm: Raw API response:", data);
-        console.log("NewDeliverableForm: Data is array:", Array.isArray(data));
-
-        if (Array.isArray(data)) {
-          const activeUsers = data.filter(
-            (user: FirestoreUser) => user.status === "active"
-          );
-          console.log("NewDeliverableForm: Active users:", activeUsers.length);
-          console.log("NewDeliverableForm: Sample user:", activeUsers[0]);
-          setUsers(activeUsers);
-        } else {
-          console.error("Unexpected API response structure:", data);
-          toast.error("Failed to load users properly");
-        }
-      } catch (error) {
-        console.error("Error fetching users:", error);
-        toast.error("Failed to fetch users");
-      }
-    };
-
     if (users.length === 0 && api) {
       fetchUsers();
     }
+  }, [fetchUsers, users.length, api]);
 
-    if (!carId && api) {
-      const fetchCars = async () => {
-        try {
-          const response = await api.get("cars");
-          const data = response as any;
-          setCars(data.cars || []);
-        } catch (error) {
-          console.error("Error fetching cars:", error);
-          toast.error("Failed to fetch cars");
-        }
-      };
-
-      if (cars.length === 0) {
-        fetchCars();
-      }
+  // Separate useEffect for cars
+  useEffect(() => {
+    if (!carId && cars.length === 0 && api) {
+      fetchCars();
     }
-  }, [api]);
+  }, [fetchCars, carId, cars.length, api]);
 
   const resetForm = () => {
     setTitle("");
@@ -447,6 +452,9 @@ export default function NewDeliverableForm({
                         </SelectItem>
                         <SelectItem key="4:3" value="4:3">
                           4:3
+                        </SelectItem>
+                        <SelectItem key="4:5" value="4:5">
+                          4:5
                         </SelectItem>
                       </SelectContent>
                     </Select>

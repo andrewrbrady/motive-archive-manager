@@ -204,7 +204,7 @@ export function ProjectDeliverablesTab({
 
       try {
         setIsLoadingDeliverables(true);
-        const data = (await api.get("deliverables?pageSize=100")) as {
+        const data = (await api.get("deliverables?pageSize=1000")) as {
           deliverables: any[];
         };
 
@@ -958,6 +958,7 @@ export function ProjectDeliverablesTab({
                         { value: "9:16", label: "9:16" },
                         { value: "1:1", label: "1:1" },
                         { value: "4:3", label: "4:3" },
+                        { value: "4:5", label: "4:5" },
                         { value: "3:4", label: "3:4" },
                       ]}
                       placeholder="Select aspect ratio"
@@ -1079,14 +1080,10 @@ export function ProjectDeliverablesTab({
                             ?.primaryImageId
                         }
                         entityName={`${carDetails[deliverable.car_id.toString()]?.year || ""} ${carDetails[deliverable.car_id.toString()]?.make || ""} ${carDetails[deliverable.car_id.toString()]?.model || ""}`.trim()}
-                        size="sm"
+                        size="md"
                         className="flex-shrink-0"
                       />
                     )}
-
-                  <div className="text-2xl flex-shrink-0">
-                    {getDeliverableTypeIcon(deliverable.type)}
-                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium">{deliverable.title}</div>
                     {deliverable.description && (

@@ -54,7 +54,7 @@ export default function ContactsTable({ filters }: ContactsTableProps) {
       if (filters.company) params.append("company", filters.company);
       if (filters.role) params.append("role", filters.role);
 
-      const data = (await api.get(`/api/contacts?${params.toString()}`)) as {
+      const data = (await api.get(`contacts?${params.toString()}`)) as {
         contacts: Contact[];
       };
       setContacts(data.contacts || []);

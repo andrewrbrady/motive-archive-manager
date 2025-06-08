@@ -3,57 +3,7 @@ import { CloudflareImage } from "@/components/ui/CloudflareImage";
 import { ChevronLeft, ChevronRight, ZoomIn, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ExtendedImageType } from "@/types/gallery";
-
-// URL transformation function - copied from ImageThumbnails.tsx lines 84-110
-const getEnhancedImageUrl = (
-  baseUrl: string,
-  width?: string,
-  quality?: string
-) => {
-  let params = [];
-  // Always check for truthy values and non-empty strings
-  if (width && width.trim() !== "") params.push(`w=${width}`);
-  if (quality && quality.trim() !== "") params.push(`q=${quality}`);
-
-  if (params.length === 0) return baseUrl;
-
-  // Handle different Cloudflare URL formats
-  // Format: https://imagedelivery.net/account/image-id/public
-  // Should become: https://imagedelivery.net/account/image-id/w=800,q=90
-  if (baseUrl.includes("imagedelivery.net")) {
-    // Check if URL already has transformations (contains variant like 'public')
-    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
-      // Replace the last segment (usually 'public') with our parameters
-      const urlParts = baseUrl.split("/");
-      urlParts[urlParts.length - 1] = params.join(",");
-      const transformedUrl = urlParts.join("/");
-      console.log("ImageViewer URL transformation:", {
-        baseUrl,
-        transformedUrl,
-        params,
-      });
-      return transformedUrl;
-    } else {
-      // URL doesn't have a variant, append transformations
-      const transformedUrl = `${baseUrl}/${params.join(",")}`;
-      console.log("ImageViewer URL transformation:", {
-        baseUrl,
-        transformedUrl,
-        params,
-      });
-      return transformedUrl;
-    }
-  }
-
-  // Fallback for other URL formats - try to replace /public if it exists
-  const transformedUrl = baseUrl.replace(/\/public$/, `/${params.join(",")}`);
-  console.log("ImageViewer URL transformation (fallback):", {
-    baseUrl,
-    transformedUrl,
-    params,
-  });
-  return transformedUrl;
-};
+import { getEnhancedImageUrlBySize } from "@/lib/imageUtils";
 
 interface ImageViewerProps {
   currentImage: ExtendedImageType | undefined;
@@ -79,7 +29,7 @@ export function ImageViewer({
     <div className="bg-background rounded-lg h-full">
       <div className="relative w-full h-full">
         <CloudflareImage
-          src={getEnhancedImageUrl(currentImage!.url, "2000", "90")}
+          src={getEnhancedImageUrlBySize(currentImage!.url, "viewer")}
           alt={currentImage!.metadata?.description || `Image`}
           fill
           className="object-contain"

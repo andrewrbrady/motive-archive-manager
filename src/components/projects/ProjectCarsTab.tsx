@@ -19,9 +19,18 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Car, MoreHorizontal, Search } from "lucide-react";
+import {
+  Plus,
+  Car,
+  MoreHorizontal,
+  Search,
+  Grid3X3,
+  Columns,
+} from "lucide-react";
 import { format } from "date-fns";
 import { Project } from "@/types/project";
 import { toast } from "@/components/ui/use-toast";
@@ -30,6 +39,7 @@ import Link from "next/link";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { fixCloudflareImageUrl } from "@/lib/image-utils";
+import { getEnhancedImageUrlBySize } from "@/lib/imageUtils";
 import { CarGridSelector } from "../cars/CarGridSelector";
 import { useAPI } from "@/hooks/useAPI";
 
@@ -58,6 +68,8 @@ interface ProjectCarsTabProps {
   onProjectUpdate: () => void;
   initialCars?: Car[]; // Optional pre-fetched cars data for SSR optimization
 }
+
+// ✅ Using centralized image utility from @/lib/imageUtils
 
 // Car Card Component for Project Cars
 function ProjectCarCard({
@@ -92,7 +104,10 @@ function ProjectCarCard({
 
         setPrimaryImage({
           id: imageToUse._id,
-          url: fixCloudflareImageUrl(imageToUse.url),
+          url: getEnhancedImageUrlBySize(
+            fixCloudflareImageUrl(imageToUse.url),
+            "thumbnail"
+          ),
         });
 
         setLoading(false);
@@ -109,7 +124,10 @@ function ProjectCarCard({
             )) as any;
             setPrimaryImage({
               id: imageData._id,
-              url: fixCloudflareImageUrl(imageData.url),
+              url: getEnhancedImageUrlBySize(
+                fixCloudflareImageUrl(imageData.url),
+                "thumbnail"
+              ),
             });
           } catch (error) {
             // If primary image fetch fails, try the first image
@@ -124,7 +142,10 @@ function ProjectCarCard({
                 )) as any;
                 setPrimaryImage({
                   id: fallbackImageData._id,
-                  url: fixCloudflareImageUrl(fallbackImageData.url),
+                  url: getEnhancedImageUrlBySize(
+                    fixCloudflareImageUrl(fallbackImageData.url),
+                    "thumbnail"
+                  ),
                 });
               } catch (fallbackError) {
                 console.error("Error fetching fallback image:", fallbackError);
@@ -261,6 +282,8 @@ export function ProjectCarsTab({
   const [isLinkCarOpen, setIsLinkCarOpen] = useState(false);
   const [selectedCarIds, setSelectedCarIds] = useState<string[]>([]);
   const [isLinkingCar, setIsLinkingCar] = useState(false);
+  const [dialogContentReady, setDialogContentReady] = useState(false);
+  const [gridColumns, setGridColumns] = useState(4); // Default to 4 columns
 
   const fetchProjectCars = useCallback(async () => {
     try {
@@ -272,7 +295,10 @@ export function ProjectCarsTab({
         throw new Error("No authenticated API found");
       }
 
-      const data = (await api.get(`projects/${project._id}/cars`)) as {
+      // ✅ Fix: Include image data in project cars API call
+      const data = (await api.get(
+        `projects/${project._id}/cars?includeImages=true`
+      )) as {
         cars?: Car[];
       };
       setProjectCars(data.cars || []);
@@ -295,6 +321,15 @@ export function ProjectCarsTab({
       fetchProjectCars();
     }
   }, [fetchProjectCars, api, project._id, initialCars]);
+
+  // ✅ Fix: Cleanup dialog state on unmount to prevent react-remove-scroll errors
+  useEffect(() => {
+    return () => {
+      setIsLinkCarOpen(false);
+      setSelectedCarIds([]);
+      setDialogContentReady(false);
+    };
+  }, []);
 
   const handleLinkCars = async () => {
     if (selectedCarIds.length === 0) {
@@ -371,74 +406,137 @@ export function ProjectCarsTab({
   // Get currently linked car IDs to exclude from selection
   const linkedCarIds = project?.carIds || [];
 
+  // Generate grid class based on selected column count
+  const getGridClass = (columns: number) => {
+    switch (columns) {
+      case 3:
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
+      case 4:
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
+      case 5:
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5";
+      case 6:
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6";
+      default:
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle>Project Cars</CardTitle>
-          <Dialog
-            open={isLinkCarOpen}
-            onOpenChange={(open) => {
-              setIsLinkCarOpen(open);
-              if (!open) {
-                setSelectedCarIds([]);
-              }
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button size="sm" disabled={!api}>
-                <Plus className="h-4 w-4 mr-2" />
-                Link Cars
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-              <DialogHeader>
-                <DialogTitle>Link Cars to Project</DialogTitle>
-                <DialogDescription>
-                  Select cars to link to this project. Use the filters to find
-                  specific cars.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="flex-1 overflow-y-auto">
-                <CarGridSelector
-                  selectionMode="multiple"
-                  selectedCarIds={selectedCarIds}
-                  onCarsSelect={setSelectedCarIds}
-                  excludeCarIds={linkedCarIds}
-                  showFilters={true}
-                  showPagination={true}
-                  pageSize={12}
-                  gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-                />
-              </div>
-
-              <DialogFooter className="flex-shrink-0">
-                <Button
-                  variant="outline"
-                  onClick={() => {
+          <div className="flex items-center gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Columns className="h-4 w-4 mr-2" />
+                  {gridColumns} Columns
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Grid Layout</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {[3, 4, 5, 6].map((columns) => (
+                  <DropdownMenuItem
+                    key={columns}
+                    onClick={() => setGridColumns(columns)}
+                    className={gridColumns === columns ? "bg-gray-100" : ""}
+                  >
+                    <Grid3X3 className="h-4 w-4 mr-2" />
+                    {columns} Columns
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Dialog
+              open={isLinkCarOpen}
+              onOpenChange={(open) => {
+                // ✅ Fix: Add safety check to prevent react-remove-scroll errors
+                try {
+                  setIsLinkCarOpen(open);
+                  if (!open) {
                     setSelectedCarIds([]);
-                    setIsLinkCarOpen(false);
-                  }}
-                >
-                  Cancel
+                    setDialogContentReady(false);
+                  } else {
+                    // Small delay to ensure dialog is properly mounted
+                    setTimeout(() => setDialogContentReady(true), 100);
+                  }
+                } catch (error) {
+                  console.error("Dialog onOpenChange error:", error);
+                  setIsLinkCarOpen(false);
+                  setSelectedCarIds([]);
+                  setDialogContentReady(false);
+                }
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button size="sm" disabled={!api}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Link Cars
                 </Button>
-                <Button
-                  onClick={handleLinkCars}
-                  disabled={isLinkingCar || selectedCarIds.length === 0 || !api}
-                >
-                  {isLinkingCar ? (
-                    <>
-                      <LoadingSpinner size="sm" className="mr-2" />
-                      Linking...
-                    </>
-                  ) : (
-                    `Link ${selectedCarIds.length} Car${selectedCarIds.length !== 1 ? "s" : ""}`
+              </DialogTrigger>
+              <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>Link Cars to Project</DialogTitle>
+                  <DialogDescription>
+                    Select cars to link to this project. Use the filters to find
+                    specific cars.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="flex-1 overflow-y-auto">
+                  {/* ✅ Fix: Only render CarGridSelector when dialog is open, API is ready, and content is ready */}
+                  {isLinkCarOpen && api && dialogContentReady && (
+                    <CarGridSelector
+                      selectionMode="multiple"
+                      selectedCarIds={selectedCarIds}
+                      onCarsSelect={setSelectedCarIds}
+                      excludeCarIds={linkedCarIds}
+                      showFilters={true}
+                      showPagination={true}
+                      pageSize={12}
+                      gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+                    />
                   )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                  {isLinkCarOpen && (!api || !dialogContentReady) && (
+                    <div className="flex items-center justify-center h-64">
+                      <LoadingSpinner size="lg" />
+                      <span className="ml-2">Loading car selector...</span>
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter className="flex-shrink-0">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedCarIds([]);
+                      setIsLinkCarOpen(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleLinkCars}
+                    disabled={
+                      isLinkingCar || selectedCarIds.length === 0 || !api
+                    }
+                  >
+                    {isLinkingCar ? (
+                      <>
+                        <LoadingSpinner size="sm" className="mr-2" />
+                        Linking...
+                      </>
+                    ) : (
+                      `Link ${selectedCarIds.length} Car${selectedCarIds.length !== 1 ? "s" : ""}`
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pt-4">
@@ -459,7 +557,7 @@ export function ProjectCarsTab({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className={`grid ${getGridClass(gridColumns)} gap-6`}>
             {projectCars.map((car) => (
               <ProjectCarCard
                 key={car._id}

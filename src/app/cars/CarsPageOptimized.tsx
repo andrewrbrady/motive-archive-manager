@@ -251,14 +251,14 @@ function CarCard({ car, view }: CarCardProps) {
     }
   }, [hoverTimeoutId]);
 
-  // ✅ Cleanup timeout on unmount
+  // ✅ Cleanup timeout on unmount - use ref to avoid dependency issues
   useEffect(() => {
     return () => {
       if (hoverTimeoutId) {
         clearTimeout(hoverTimeoutId);
       }
     };
-  }, [hoverTimeoutId]);
+  }, []); // ✅ Empty dependency array to prevent infinite re-renders
 
   if (view === "grid") {
     return (
@@ -432,9 +432,8 @@ export default function CarsPageOptimized({
     };
   }>(`cars?${queryParams}`, {
     queryKey: ["cars", queryKey], // ✅ PHASE 1B: Use optimized query key for better caching
-    staleTime: 3 * 60 * 1000, // ✅ Phase 1A: 3min cache for cars data per guidelines
-    retry: 2,
-    retryDelay: 1000,
+    staleTime: 3 * 60 * 1000, // ✅ Phase 2A: 3min cache for critical cars data
+    retry: 1, // ✅ Phase 2A: Reduce retry attempts for better performance
     refetchOnWindowFocus: false,
     // ✅ PHASE 1B: Enable background refetch for seamless updates
     refetchOnMount: false,
@@ -446,9 +445,8 @@ export default function CarsPageOptimized({
     isLoading: makesLoading,
     error: makesError,
   } = useAPIQuery<{ makes: string[] } | string[]>("cars/makes", {
-    staleTime: 5 * 60 * 1000, // ✅ Phase 1A: 5min cache for shared data per guidelines
-    retry: 2,
-    retryDelay: 1000,
+    staleTime: 10 * 60 * 1000, // ✅ Phase 2A: 10min cache for static data
+    retry: 1, // ✅ Phase 2A: Reduce retry for non-critical static data
     refetchOnWindowFocus: false,
   });
 
@@ -457,9 +455,8 @@ export default function CarsPageOptimized({
     isLoading: clientsLoading,
     error: clientsError,
   } = useAPIQuery<{ clients: Client[] }>("clients", {
-    staleTime: 5 * 60 * 1000, // ✅ Phase 1A: 5min cache for shared data per guidelines
-    retry: 2,
-    retryDelay: 1000,
+    staleTime: 10 * 60 * 1000, // ✅ Phase 2A: 10min cache for static data
+    retry: 1, // ✅ Phase 2A: Reduce retry for non-critical static data
     refetchOnWindowFocus: false,
     select: (data: any) => data?.clients || [],
   });

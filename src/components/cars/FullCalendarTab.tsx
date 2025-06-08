@@ -24,7 +24,7 @@ export default function FullCalendarTab({ carId }: FullCalendarTabProps) {
     isLoading: isLoadingEvents,
     error: eventsError,
     refetch: refetchEvents,
-  } = useAPIQuery<Event[]>(`cars/${carId}/events`, {
+  } = useAPIQuery<Event[]>(`cars/${carId}/events?limit=500`, {
     staleTime: 3 * 60 * 1000, // 3 minutes cache for events data
     retry: 2,
     retryDelay: 1000,
