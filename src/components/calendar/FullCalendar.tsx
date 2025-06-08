@@ -361,7 +361,7 @@ export function FullCalendarComponent({
         };
 
         // Update to use the correct API path structure with carId
-        const apiUrl = `/api/cars/${deliverable.car_id}/deliverables/${deliverable._id}`;
+        const apiUrl = `/api/deliverables/${deliverable._id}`;
         // [REMOVED] // [REMOVED] console.log("PUT request to:", apiUrl);
 
         const response = await fetch(apiUrl, {

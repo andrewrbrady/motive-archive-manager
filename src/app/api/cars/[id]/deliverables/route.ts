@@ -95,54 +95,6 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PUT(request: Request) {
-  try {
-    const url = new URL(request.url);
-    const pathParts = url.pathname.split("/");
-    const deliverableId = pathParts[pathParts.length - 1];
-
-    if (!deliverableId) {
-      return NextResponse.json(
-        { error: "Deliverable ID is required" },
-        { status: 400 }
-      );
-    }
-
-    const db = await getDatabase();
-    const data = await request.json();
-    const { _id, car_id, ...updateData } = data;
-
-    const updateFields = {
-      ...updateData,
-      updated_at: new Date(),
-    };
-
-    const result = await db
-      .collection("deliverables")
-      .updateOne({ _id: new ObjectId(deliverableId) }, { $set: updateFields });
-
-    if (result.matchedCount === 0) {
-      return NextResponse.json(
-        { error: "Deliverable not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error updating deliverable:", error);
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to update deliverable",
-      },
-      { status: 500 }
-    );
-  }
-}
-
 export async function DELETE(request: Request) {
   try {
     const url = new URL(request.url);
@@ -201,7 +153,7 @@ export async function OPTIONS(request: Request) {
   return new NextResponse(null, {
     status: 204,
     headers: {
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
       "Access-Control-Allow-Origin": "*",
     },

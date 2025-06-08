@@ -17,9 +17,12 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; deliverableId: string }> }
 ) {
+  console.log("⚠️⚠️⚠️ OLD PROJECT ENDPOINT HIT! ⚠️⚠️⚠️");
   console.log(
-    "🔒 PUT /api/projects/[id]/deliverables/[deliverableId]: Starting request"
+    "🔒 PUT /api/projects/[id]/deliverables/[deliverableId]: Starting request [OLD ENDPOINT - SHOULD BE DEPRECATED]"
   );
+  console.log("🔍 REQUEST URL:", request.url);
+  console.log("🔍 REQUEST METHOD:", request.method);
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
@@ -47,6 +50,9 @@ export async function PUT(
 
     const { id: projectId, deliverableId } = await params;
     const body = await request.json();
+
+    console.log("🔍 REQUEST BODY:", JSON.stringify(body, null, 2));
+    console.log("🔍 CAR_ID IN BODY:", body.carId);
 
     await connectToDatabase();
 
@@ -97,6 +103,22 @@ export async function PUT(
       updateData.release_date = new Date(body.releaseDate);
     }
 
+    // Handle car association updates - CRITICAL FIX for empty string
+    if ("carId" in body) {
+      console.log(`🚗 Car association update: carId=${body.carId}`);
+      if (
+        body.carId === undefined ||
+        body.carId === null ||
+        body.carId === ""
+      ) {
+        updateData.car_id = null; // Explicitly remove car association
+        console.log(`🚗 Removing car association: setting car_id to null`);
+      } else {
+        updateData.car_id = body.carId; // Set car association
+        console.log(`🚗 Setting car association: car_id=${body.carId}`);
+      }
+    }
+
     // Handle other updates
     if (body.title) updateData.title = body.title.trim();
     if (body.description !== undefined)
@@ -108,6 +130,11 @@ export async function PUT(
     if (body.aspectRatio) updateData.aspect_ratio = body.aspectRatio;
     if (body.platforms) updateData.platforms = body.platforms;
     if (body.scheduled !== undefined) updateData.scheduled = body.scheduled;
+
+    console.log(
+      `📝 Final updateData for deliverable ${deliverableId}:`,
+      updateData
+    );
 
     const updatedDeliverable = await Deliverable.findByIdAndUpdate(
       deliverableId,

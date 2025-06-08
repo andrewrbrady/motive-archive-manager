@@ -1193,10 +1193,8 @@ export function MotiveCalendar({
           throw new Error("Deliverable ID is missing");
         }
 
-        // Determine the correct API endpoint based on context
-        const apiEndpoint = carId
-          ? `/api/cars/${carId}/deliverables/${deliverableId}`
-          : `/api/projects/${projectId}/deliverables/${deliverableId}`;
+        // Use centralized deliverable endpoint
+        const apiEndpoint = `/api/deliverables/${deliverableId}`;
 
         await api.put(
           apiEndpoint,

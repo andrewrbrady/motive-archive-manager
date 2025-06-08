@@ -19,12 +19,29 @@ export async function PUT(request: Request) {
     const db = await getDatabase();
 
     const data = await request.json();
-    const { _id, car_id, ...updateData } = data;
+    const { _id, ...updateData } = data;
+
+    // Handle car association updates (carId field from frontend)
+    if ("carId" in data) {
+      console.log(`🚗 Car association update: carId=${data.carId}`);
+      if (data.carId === undefined || data.carId === null) {
+        updateData.car_id = null; // Explicitly remove car association
+        console.log(`🚗 Removing car association: setting car_id to null`);
+      } else {
+        updateData.car_id = data.carId; // Set car association
+        console.log(`🚗 Setting car association: car_id=${data.carId}`);
+      }
+    }
 
     const updateFields = {
       ...updateData,
       updated_at: new Date(),
     };
+
+    console.log(
+      `📝 Final updateFields for deliverable ${deliverableId}:`,
+      updateFields
+    );
 
     const result = await db
       .collection("deliverables")

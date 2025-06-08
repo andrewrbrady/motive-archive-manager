@@ -194,7 +194,7 @@ export default function EditDeliverableForm({
       };
 
       const response = await api.put<UpdateDeliverableResponse>(
-        `cars/${deliverable.car_id}/deliverables/${deliverable._id}`,
+        `deliverables/${deliverable._id}`,
         updateData
       );
 

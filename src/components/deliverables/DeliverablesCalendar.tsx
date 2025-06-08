@@ -431,13 +431,10 @@ export default function DeliverablesCalendar() {
     if (!api) return;
     try {
       const deliverable = event.resource;
-      await api.put(
-        `cars/${deliverable.car_id}/deliverables/${deliverable._id}`,
-        {
-          edit_deadline: format(start, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
-          updated_at: new Date(),
-        }
-      );
+      await api.put(`deliverables/${deliverable._id}`, {
+        edit_deadline: format(start, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
+        updated_at: new Date(),
+      });
 
       toast.success("Deadline updated successfully");
       refetchDeliverables();
@@ -456,13 +453,10 @@ export default function DeliverablesCalendar() {
         (end.getTime() - start.getTime()) / 1000
       );
 
-      await api.put(
-        `cars/${deliverable.car_id}/deliverables/${deliverable._id}`,
-        {
-          duration: durationInSeconds,
-          updated_at: new Date(),
-        }
-      );
+      await api.put(`deliverables/${deliverable._id}`, {
+        duration: durationInSeconds,
+        updated_at: new Date(),
+      });
 
       toast.success("Duration updated successfully");
       refetchDeliverables();

@@ -86,9 +86,10 @@ export function ProjectDeliverablesTab({
     editDeadline: "",
     releaseDate: "",
     assignedTo: "unassigned",
-    carId: "",
+    carId: "", // Explicitly no car selected by default
     scheduled: false,
   });
+
   const [isAddingDeliverable, setIsAddingDeliverable] = useState(false);
   const [isUpdatingDeliverable, setIsUpdatingDeliverable] = useState(false);
   const [projectDeliverables, setProjectDeliverables] = useState<any[]>(
@@ -369,14 +370,30 @@ export function ProjectDeliverablesTab({
           deliverableForm.assignedTo === "unassigned"
             ? undefined
             : deliverableForm.assignedTo,
-        carId: deliverableForm.carId || undefined,
+        carId:
+          deliverableForm.carId && deliverableForm.carId.trim() !== ""
+            ? deliverableForm.carId
+            : null,
         scheduled: deliverableForm.scheduled,
       };
+
+      console.log("🚀 SENDING REQUEST:", {
+        url: `projects/${project._id}/deliverables`,
+        body: requestBody,
+        formCarId: deliverableForm.carId,
+        carIdIsEmpty: deliverableForm.carId === "",
+        processedCarId:
+          deliverableForm.carId && deliverableForm.carId.trim() !== ""
+            ? deliverableForm.carId
+            : null,
+      });
 
       const response = await api.post(
         `projects/${project._id}/deliverables`,
         requestBody
       );
+
+      console.log("✅ RESPONSE RECEIVED:", response);
 
       // Refresh project data and deliverables
       await onProjectUpdate();
@@ -403,7 +420,13 @@ export function ProjectDeliverablesTab({
         description: "Deliverable added successfully",
       });
     } catch (error) {
-      console.error("Error adding deliverable:", error);
+      console.error("💥 ERROR ADDING DELIVERABLE:", error);
+      console.error("💥 ERROR DETAILS:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+        response: (error as any)?.response?.data,
+        status: (error as any)?.response?.status,
+      });
 
       toast({
         title: "Error",
@@ -464,6 +487,7 @@ export function ProjectDeliverablesTab({
       setIsUpdatingDeliverable(true);
 
       const requestBody = {
+        deliverableId: editingDeliverable._id, // Add deliverableId to body for backend routing
         title: deliverableForm.title,
         description: deliverableForm.description,
         type: deliverableForm.type,
@@ -480,13 +504,38 @@ export function ProjectDeliverablesTab({
           deliverableForm.assignedTo === "unassigned"
             ? undefined
             : deliverableForm.assignedTo,
-        carId: deliverableForm.carId || undefined,
+        carId:
+          deliverableForm.carId && deliverableForm.carId.trim() !== ""
+            ? deliverableForm.carId
+            : null,
         scheduled: deliverableForm.scheduled,
       };
 
-      await api.put(
-        `projects/${project._id}/deliverables/${editingDeliverable._id}`,
+      console.log("🚀 EDIT - SENDING REQUEST:", {
+        url: `deliverables/${editingDeliverable._id}`,
+        body: requestBody,
+        formCarId: deliverableForm.carId,
+        carIdIsEmpty: deliverableForm.carId === "",
+        processedCarId:
+          deliverableForm.carId && deliverableForm.carId.trim() !== ""
+            ? deliverableForm.carId
+            : null,
+        originalDeliverableCarId: editingDeliverable.car_id,
+      });
+
+      const response = await api.put(
+        `deliverables/${editingDeliverable._id}`,
         requestBody
+      );
+
+      console.log("✅ EDIT - RESPONSE RECEIVED:", response);
+      console.log(
+        "✅ EDIT - UPDATED DELIVERABLE:",
+        (response as any).deliverable
+      );
+      console.log(
+        "✅ EDIT - CAR_ID IN RESPONSE:",
+        (response as any).deliverable?.car_id
       );
 
       // Refresh project data and deliverables
@@ -515,7 +564,13 @@ export function ProjectDeliverablesTab({
         description: "Deliverable updated successfully",
       });
     } catch (error) {
-      console.error("Error updating deliverable:", error);
+      console.error("💥 ERROR UPDATING DELIVERABLE:", error);
+      console.error("💥 UPDATE ERROR DETAILS:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+        response: (error as any)?.response?.data,
+        status: (error as any)?.response?.status,
+      });
 
       toast({
         title: "Error",
@@ -594,8 +649,7 @@ export function ProjectDeliverablesTab({
     }
 
     try {
-      await api.put(`projects/${project._id}/deliverables`, {
-        deliverableId,
+      await api.put(`deliverables/${deliverableId}`, {
         status,
       });
 
@@ -1258,25 +1312,27 @@ export function ProjectDeliverablesTab({
 
                         <div className="space-y-1.5">
                           <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
-                            Car (Optional)
+                            Vehicle (Optional)
                           </label>
-                          <CustomDropdown
-                            value={deliverableForm.carId}
-                            onChange={(value) =>
+                          <select
+                            value={deliverableForm.carId || ""}
+                            onChange={(e) => {
                               setDeliverableForm({
                                 ...deliverableForm,
-                                carId: value,
-                              })
-                            }
-                            options={[
-                              { value: "", label: "No Car Selected" },
-                              ...(project?.carIds?.map((carId) => ({
-                                value: carId,
-                                label: `Car ${carId}`,
-                              })) || []),
-                            ]}
-                            placeholder="Select car (optional)"
-                          />
+                                carId: e.target.value,
+                              });
+                            }}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <option value="">
+                              🚫 No Vehicle - Project Only
+                            </option>
+                            {project?.carIds?.map((carId) => (
+                              <option key={carId} value={carId}>
+                                🚗 Car {carId}
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
                         <div className="space-y-1.5">
@@ -1559,25 +1615,27 @@ export function ProjectDeliverablesTab({
 
                         <div className="space-y-1.5">
                           <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
-                            Car (Optional)
+                            Vehicle (Optional)
                           </label>
-                          <CustomDropdown
-                            value={deliverableForm.carId}
-                            onChange={(value) =>
+                          <select
+                            value={deliverableForm.carId || ""}
+                            onChange={(e) => {
                               setDeliverableForm({
                                 ...deliverableForm,
-                                carId: value,
-                              })
-                            }
-                            options={[
-                              { value: "", label: "No Car Selected" },
-                              ...(project?.carIds?.map((carId) => ({
-                                value: carId,
-                                label: `Car ${carId}`,
-                              })) || []),
-                            ]}
-                            placeholder="Select car (optional)"
-                          />
+                                carId: e.target.value,
+                              });
+                            }}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <option value="">
+                              🚫 No Vehicle - Project Only
+                            </option>
+                            {project?.carIds?.map((carId) => (
+                              <option key={carId} value={carId}>
+                                🚗 Car {carId}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       </div>
 
