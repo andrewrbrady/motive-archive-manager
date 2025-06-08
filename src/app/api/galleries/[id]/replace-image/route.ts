@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 
 interface ReplaceImageRequest {
   originalImageId: string;
-  processingType: "canvas-extension" | "image-matte" | "crop";
+  processingType: "canvas-extension" | "image-matte" | "crop" | "image-crop";
   parameters: any;
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      return authResult;
+    }
     const url = new URL(request.url);
     const segments = url.pathname.split("/");
     const galleryId = segments[segments.indexOf("galleries") + 1];
@@ -67,75 +73,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Process and upload the image to Cloudflare
-    let processingEndpoint: string;
-    let processingParams: any;
+    // Use the unified processing API which handles Cloudflare upload
+    const processingEndpoint = "/api/images/process";
 
-    if (processingType === "canvas-extension") {
-      processingEndpoint = "/api/images/extend-canvas";
-
-      processingParams = {
-        imageUrl: parameters.imageUrl,
-        desiredHeight: parameters.desiredHeight,
-        paddingPct: parameters.paddingPct,
-        whiteThresh: parameters.whiteThresh,
-        processingMethod: parameters.processingMethod,
-        uploadToCloudflare: true,
+    const processingParams = {
+      imageId: originalImage._id.toString(),
+      processingType: processingType === "crop" ? "image-crop" : processingType, // Normalize crop -> image-crop
+      parameters: {
+        ...parameters,
+        imageUrl: originalImage.url, // Use the original image URL from database
         originalFilename: originalImage.filename,
         originalCarId: originalImage.carId,
-        requestedWidth: parameters.requestedWidth,
-        requestedHeight: parameters.requestedHeight,
-        scaleMultiplier: parameters.scaleMultiplier,
-      };
-    } else if (processingType === "crop") {
-      processingEndpoint = "/api/images/crop-image";
-
-      processingParams = {
-        imageUrl: parameters.imageUrl,
-        cropX: parameters.cropX,
-        cropY: parameters.cropY,
-        cropWidth: parameters.cropWidth,
-        cropHeight: parameters.cropHeight,
-        outputWidth: parameters.outputWidth,
-        outputHeight: parameters.outputHeight,
-        scale: parameters.scale,
-        processingMethod: parameters.processingMethod,
-        uploadToCloudflare: true,
-        originalFilename: originalImage.filename,
-        originalCarId: originalImage.carId,
-        requestedWidth: parameters.requestedWidth,
-        requestedHeight: parameters.requestedHeight,
-      };
-    } else {
-      processingEndpoint = "/api/images/create-matte";
-
-      processingParams = {
-        imageUrl: parameters.imageUrl,
-        canvasWidth: parameters.canvasWidth,
-        canvasHeight: parameters.canvasHeight,
-        paddingPercent: parameters.paddingPercent,
-        matteColor: parameters.matteColor,
-        processingMethod: parameters.processingMethod,
-        uploadToCloudflare: true,
-        originalFilename: originalImage.filename,
-        originalCarId: originalImage.carId,
-        requestedWidth: parameters.requestedWidth,
-        requestedHeight: parameters.requestedHeight,
-        scaleMultiplier: parameters.scaleMultiplier,
-      };
-    }
+      },
+    };
 
     // Process the image and upload to Cloudflare
-    const processingResponse = await fetch(
-      `${request.nextUrl.origin}${processingEndpoint}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(processingParams),
-      }
-    );
+    // For development, always use localhost. For production, use the request's origin
+    const baseUrl =
+      process.env.NODE_ENV === "development"
+        ? "http://localhost:3000"
+        : request.nextUrl.origin;
+
+    const processingResponse = await fetch(`${baseUrl}${processingEndpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(processingParams),
+    });
 
     if (!processingResponse.ok) {
       const errorData = await processingResponse.json();
@@ -147,23 +112,48 @@ export async function POST(request: NextRequest) {
 
     const processingResult = await processingResponse.json();
 
-    if (!processingResult.cloudflareUpload?.success) {
+    console.log("🔍 Gallery Replace - Processing result received:", {
+      success: processingResult.success,
+      hasProcessedImage: !!processingResult.processedImage,
+      processedImageId: processingResult.processedImage?._id,
+      hasCloudflareUpload:
+        !!processingResult.processingResult?.cloudflareUpload,
+      cloudflareUploadMongoId:
+        processingResult.processingResult?.cloudflareUpload?.mongoId,
+    });
+
+    if (!processingResult.success) {
+      console.error(
+        "❌ Gallery Replace - Processing failed:",
+        processingResult.error
+      );
       return NextResponse.json(
-        { error: "Failed to upload processed image to Cloudflare" },
+        { error: processingResult.error || "Failed to process image" },
         { status: 500 }
       );
     }
 
-    // Get the new image data - fix the structure lookup
-    const newImageId = processingResult.cloudflareUpload.mongoId;
+    // Get the new image data from the unified API response
+    const newImageId = processingResult.processedImage?._id;
+
+    console.log("🔍 Gallery Replace - Extracted newImageId:", {
+      newImageId,
+      processedImageStructure: Object.keys(
+        processingResult.processedImage || {}
+      ),
+    });
 
     if (!newImageId) {
       console.error(
-        "No image ID found in upload result:",
-        processingResult.cloudflareUpload
+        "❌ Gallery Replace - No image ID found in processing result:",
+        {
+          processingResult: processingResult,
+          processedImage: processingResult.processedImage,
+          cloudflareUpload: processingResult.processingResult?.cloudflareUpload,
+        }
       );
       return NextResponse.json(
-        { error: "Failed to get processed image ID from upload result" },
+        { error: "Failed to get processed image ID from processing result" },
         { status: 500 }
       );
     }
@@ -204,15 +194,29 @@ export async function POST(request: NextRequest) {
     const originalImageIndex = galleryImageIds.indexOf(originalImageIdString);
 
     // Replace the original image ID with the processed image ID in the gallery
+    console.log("🔄 Gallery Replace - Updating gallery:", {
+      galleryId,
+      originalImageIndex,
+      originalImageIdString,
+      newImageId: newImageId.toString(),
+      updatePath: `imageIds.${originalImageIndex}`,
+    });
+
     const updateResult = await galleriesCollection.updateOne(
       { _id: new ObjectId(galleryId) },
       {
         $set: {
-          [`imageIds.${originalImageIndex}`]: newImageId,
+          [`imageIds.${originalImageIndex}`]: new ObjectId(newImageId),
           updatedAt: new Date().toISOString(),
         },
       }
     );
+
+    console.log("📝 Gallery Replace - Main imageIds update result:", {
+      matchedCount: updateResult.matchedCount,
+      modifiedCount: updateResult.modifiedCount,
+      acknowledged: updateResult.acknowledged,
+    });
 
     // Also update orderedImages if it exists
     if (gallery.orderedImages && Array.isArray(gallery.orderedImages)) {
@@ -220,24 +224,48 @@ export async function POST(request: NextRequest) {
         (item: any) => item.id.toString() === originalImageIdString
       );
 
+      console.log("🔄 Gallery Replace - Updating orderedImages:", {
+        hasOrderedImages: true,
+        orderedImageIndex,
+        orderedImagesLength: gallery.orderedImages.length,
+      });
+
       if (orderedImageIndex !== -1) {
-        await galleriesCollection.updateOne(
+        const orderedUpdateResult = await galleriesCollection.updateOne(
           { _id: new ObjectId(galleryId) },
           {
             $set: {
-              [`orderedImages.${orderedImageIndex}.id`]: newImageId,
+              [`orderedImages.${orderedImageIndex}.id`]: new ObjectId(
+                newImageId
+              ),
             },
           }
         );
+
+        console.log("📝 Gallery Replace - OrderedImages update result:", {
+          matchedCount: orderedUpdateResult.matchedCount,
+          modifiedCount: orderedUpdateResult.modifiedCount,
+          acknowledged: orderedUpdateResult.acknowledged,
+        });
       }
+    } else {
+      console.log("🔄 Gallery Replace - No orderedImages to update");
     }
 
     if (updateResult.modifiedCount === 0) {
+      console.error("❌ Gallery Replace - Failed to update gallery:", {
+        updateResult,
+        galleryId,
+        originalImageIndex,
+        newImageId,
+      });
       return NextResponse.json(
         { error: "Failed to update gallery" },
         { status: 500 }
       );
     }
+
+    console.log("✅ Gallery Replace - Successfully updated gallery!");
 
     return NextResponse.json({
       success: true,

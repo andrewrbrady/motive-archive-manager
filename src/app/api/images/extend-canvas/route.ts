@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exec } from "child_process";
-import { promisify } from "util";
-import fs from "fs/promises";
-import path from "path";
-import { v4 as uuidv4 } from "uuid";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-
-const execAsync = promisify(exec);
 
 interface ExtendCanvasRequest {
   imageUrl: string;
@@ -79,576 +72,258 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create temporary directory for processing
-    const tempDir = path.join("/tmp", "canvas-extension");
-    await fs.mkdir(tempDir, { recursive: true });
+    // Try the remote canvas extension service
+    const remoteServiceUrl = process.env.CANVAS_EXTENSION_SERVICE_URL;
 
-    const sessionId = uuidv4();
-    const inputPath = path.join(tempDir, `input_${sessionId}.jpg`);
-    const outputPath = path.join(tempDir, `output_${sessionId}.jpg`);
+    console.log("🔍 Remote service configuration:", {
+      processingMethod,
+      hasRemoteServiceUrl: !!remoteServiceUrl,
+      remoteServiceUrl: remoteServiceUrl
+        ? `${remoteServiceUrl.substring(0, 30)}...`
+        : "not set",
+    });
+
+    // If no remote service URL is configured, return error
+    if (!remoteServiceUrl) {
+      return NextResponse.json(
+        {
+          error:
+            "Canvas extension requires cloud processing. CANVAS_EXTENSION_SERVICE_URL environment variable is not configured.",
+          details:
+            "Local binary processing has been deprecated. Please contact support to configure cloud processing.",
+          processingMethod: processingMethod || "auto",
+          hasRemoteServiceUrl: false,
+        },
+        { status: 500 }
+      );
+    }
 
     try {
-      // Try the remote canvas extension service if configured and requested
-      const remoteServiceUrl = process.env.CANVAS_EXTENSION_SERVICE_URL;
-      const shouldTryRemote = processingMethod !== "local" && remoteServiceUrl;
+      console.log("🌐 Trying remote canvas extension service...");
+      console.log("🔗 Remote service URL:", remoteServiceUrl);
 
-      console.log("🔍 Remote service decision:", {
-        processingMethod,
-        hasRemoteServiceUrl: !!remoteServiceUrl,
-        shouldTryRemote,
-        processingMethodNotLocal: processingMethod !== "local",
+      const remoteResponse = await fetch(`${remoteServiceUrl}/extend-canvas`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          imageUrl,
+          desiredHeight,
+          paddingPct,
+          whiteThresh,
+        }),
       });
 
-      if (shouldTryRemote) {
-        try {
-          console.log("🌐 Trying remote canvas extension service...");
-          console.log("🔗 Remote service URL:", remoteServiceUrl);
+      if (remoteResponse.ok) {
+        const remoteResult = await remoteResponse.json();
+        console.log("✅ Successfully processed with remote Cloud Run service");
 
-          const remoteResponse = await fetch(
-            `${remoteServiceUrl}/extend-canvas`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                imageUrl,
-                desiredHeight,
-                paddingPct,
-                whiteThresh,
-              }),
+        // If uploadToCloudflare is requested, upload the result
+        if (uploadToCloudflare && remoteResult.processedImageUrl) {
+          try {
+            // Convert base64 data URL to buffer
+            const base64Data = remoteResult.processedImageUrl.replace(
+              /^data:image\/[a-z]+;base64,/,
+              ""
+            );
+            const imageBuffer = Buffer.from(base64Data, "base64");
+
+            // Validate Cloudflare environment variables
+            if (
+              !process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID ||
+              !process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN
+            ) {
+              throw new Error("Cloudflare credentials not configured");
             }
-          );
 
-          if (remoteResponse.ok) {
-            const remoteResult = await remoteResponse.json();
-            console.log(
-              "✅ Successfully processed with remote Cloud Run service"
+            // Create filename for the processed image
+            const baseFilename = originalFilename || "image";
+            const nameWithoutExt = baseFilename.replace(/\.[^/.]+$/, "");
+
+            // Generate filename based on the new naming convention
+            let processedFilename;
+            if (scaleMultiplier && scaleMultiplier >= 2) {
+              const reqWidth =
+                requestedWidth || Math.round((desiredHeight * 16) / 9); // Default aspect ratio
+              const reqHeight = requestedHeight || desiredHeight;
+              processedFilename = `${nameWithoutExt}-EXTENDED-${reqWidth}x${reqHeight}-${scaleMultiplier}X.jpg`;
+            } else {
+              const reqWidth =
+                requestedWidth || Math.round((desiredHeight * 16) / 9);
+              const reqHeight = requestedHeight || desiredHeight;
+              processedFilename = `${nameWithoutExt}-EXTENDED-${reqWidth}x${reqHeight}.jpg`;
+            }
+
+            // Create a File object from the buffer
+            const processedFile = new File([imageBuffer], processedFilename, {
+              type: "image/jpeg",
+            });
+
+            // Upload to Cloudflare
+            const cloudflareForm = new FormData();
+            cloudflareForm.append("file", processedFile);
+            cloudflareForm.append("requireSignedURLs", "false");
+
+            const cloudflareResponse = await fetch(
+              `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1`,
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
+                },
+                body: cloudflareForm,
+              }
             );
 
-            // If uploadToCloudflare is requested, upload the result
-            if (uploadToCloudflare && remoteResult.processedImageUrl) {
+            if (!cloudflareResponse.ok) {
+              throw new Error(
+                `Cloudflare upload failed: ${cloudflareResponse.statusText}`
+              );
+            }
+
+            const cloudflareResult = await cloudflareResponse.json();
+            if (!cloudflareResult.success) {
+              throw new Error(
+                `Cloudflare API error: ${cloudflareResult.errors[0]?.message || "Unknown error"}`
+              );
+            }
+
+            const cloudflareImageUrl =
+              cloudflareResult.result.variants[0].replace(/\/public$/, "");
+
+            // Store in MongoDB
+            const db = await getDatabase();
+            const now = new Date().toISOString();
+
+            const imageDoc = {
+              _id: new ObjectId(),
+              cloudflareId: cloudflareResult.result.id,
+              url: cloudflareImageUrl,
+              filename: processedFilename,
+              metadata: {
+                category: "processed",
+                processing: "canvas_extension",
+                originalImage: imageUrl,
+                parameters: {
+                  desiredHeight,
+                  paddingPct,
+                  whiteThresh,
+                },
+                processedAt: now,
+              },
+              carId: originalCarId ? new ObjectId(originalCarId) : null,
+              createdAt: now,
+              updatedAt: now,
+            };
+
+            await db.collection("images").insertOne(imageDoc);
+
+            // If this processed image is associated with a car, add it to the car's processedImageIds array
+            if (originalCarId) {
               try {
-                // Convert base64 data URL to buffer
-                const base64Data = remoteResult.processedImageUrl.replace(
-                  /^data:image\/[a-z]+;base64,/,
-                  ""
-                );
-                const imageBuffer = Buffer.from(base64Data, "base64");
-
-                // Validate Cloudflare environment variables
-                if (
-                  !process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID ||
-                  !process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN
-                ) {
-                  throw new Error("Cloudflare credentials not configured");
-                }
-
-                // Create filename for the processed image
-                const baseFilename = originalFilename || "image";
-                const nameWithoutExt = baseFilename.replace(/\.[^/.]+$/, "");
-
-                // Generate filename based on the new naming convention
-                let processedFilename;
-                if (scaleMultiplier && scaleMultiplier >= 2) {
-                  const reqWidth =
-                    requestedWidth || Math.round((desiredHeight * 16) / 9); // Default aspect ratio
-                  const reqHeight = requestedHeight || desiredHeight;
-                  processedFilename = `${nameWithoutExt}-EXTENDED-${reqWidth}x${reqHeight}-${scaleMultiplier}X.jpg`;
-                } else {
-                  const reqWidth =
-                    requestedWidth || Math.round((desiredHeight * 16) / 9);
-                  const reqHeight = requestedHeight || desiredHeight;
-                  processedFilename = `${nameWithoutExt}-EXTENDED-${reqWidth}x${reqHeight}.jpg`;
-                }
-
-                // Create a File object from the buffer
-                const processedFile = new File(
-                  [imageBuffer],
-                  processedFilename,
+                await db.collection("cars").updateOne(
+                  { _id: new ObjectId(originalCarId) },
                   {
-                    type: "image/jpeg",
+                    $addToSet: { processedImageIds: imageDoc._id },
+                    $set: { updatedAt: now },
                   }
                 );
-
-                // Upload to Cloudflare
-                const cloudflareForm = new FormData();
-                cloudflareForm.append("file", processedFile);
-                cloudflareForm.append("requireSignedURLs", "false");
-
-                const cloudflareResponse = await fetch(
-                  `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1`,
-                  {
-                    method: "POST",
-                    headers: {
-                      Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
-                    },
-                    body: cloudflareForm,
-                  }
+                console.log(
+                  `Added processed image ${imageDoc._id} to car ${originalCarId}`
                 );
-
-                if (!cloudflareResponse.ok) {
-                  throw new Error(
-                    `Cloudflare upload failed: ${cloudflareResponse.statusText}`
-                  );
-                }
-
-                const cloudflareResult = await cloudflareResponse.json();
-                if (!cloudflareResult.success) {
-                  throw new Error(
-                    `Cloudflare API error: ${cloudflareResult.errors[0]?.message || "Unknown error"}`
-                  );
-                }
-
-                const cloudflareImageUrl =
-                  cloudflareResult.result.variants[0].replace(/\/public$/, "");
-
-                // Store in MongoDB
-                const db = await getDatabase();
-                const now = new Date().toISOString();
-
-                const imageDoc = {
-                  _id: new ObjectId(),
-                  cloudflareId: cloudflareResult.result.id,
-                  url: cloudflareImageUrl,
-                  filename: processedFilename,
-                  metadata: {
-                    category: "processed",
-                    processing: "canvas_extension",
-                    originalImage: imageUrl,
-                    parameters: {
-                      desiredHeight,
-                      paddingPct,
-                      whiteThresh,
-                    },
-                    processedAt: now,
-                  },
-                  carId: originalCarId ? new ObjectId(originalCarId) : null,
-                  createdAt: now,
-                  updatedAt: now,
-                };
-
-                await db.collection("images").insertOne(imageDoc);
-
-                // If this processed image is associated with a car, add it to the car's processedImageIds array
-                if (originalCarId) {
-                  try {
-                    await db.collection("cars").updateOne(
-                      { _id: new ObjectId(originalCarId) },
-                      {
-                        $addToSet: { processedImageIds: imageDoc._id },
-                        $set: { updatedAt: now },
-                      }
-                    );
-                    console.log(
-                      `Added processed image ${imageDoc._id} to car ${originalCarId}`
-                    );
-                  } catch (carUpdateError) {
-                    console.error(
-                      "Failed to update car with processed image:",
-                      carUpdateError
-                    );
-                    // Don't fail the whole operation if car update fails
-                  }
-                }
-
-                // Return the result with Cloudflare upload info
-                return NextResponse.json({
-                  success: true,
-                  message:
-                    "Image processed successfully with Cloud Run service and uploaded to Cloudflare",
-                  processedImageUrl: remoteResult.processedImageUrl,
-                  remoteServiceUsed: true,
-                  cloudflareUpload: {
-                    success: true,
-                    imageId: cloudflareResult.result.id,
-                    imageUrl: cloudflareImageUrl,
-                    filename: processedFilename,
-                    mongoId: imageDoc._id.toString(),
-                  },
-                });
-              } catch (uploadError) {
+              } catch (carUpdateError) {
                 console.error(
-                  "Failed to upload Cloud Run result to Cloudflare:",
-                  uploadError
+                  "Failed to update car with processed image:",
+                  carUpdateError
                 );
-                return NextResponse.json({
-                  success: true,
-                  message:
-                    "Image processed successfully with Cloud Run service",
-                  processedImageUrl: remoteResult.processedImageUrl,
-                  remoteServiceUsed: true,
-                  cloudflareUpload: {
-                    success: false,
-                    error:
-                      uploadError instanceof Error
-                        ? uploadError.message
-                        : "Unknown upload error",
-                  },
-                });
+                // Don't fail the whole operation if car update fails
               }
             }
 
-            // Return the result with additional metadata (no Cloudflare upload)
+            // Return the result with Cloudflare upload info
+            return NextResponse.json({
+              success: true,
+              message:
+                "Image processed successfully with Cloud Run service and uploaded to Cloudflare",
+              processedImageUrl: remoteResult.processedImageUrl,
+              remoteServiceUsed: true,
+              cloudflareUpload: {
+                success: true,
+                imageId: cloudflareResult.result.id,
+                imageUrl: cloudflareImageUrl,
+                filename: processedFilename,
+                mongoId: imageDoc._id.toString(),
+              },
+            });
+          } catch (uploadError) {
+            console.error(
+              "Failed to upload Cloud Run result to Cloudflare:",
+              uploadError
+            );
             return NextResponse.json({
               success: true,
               message: "Image processed successfully with Cloud Run service",
               processedImageUrl: remoteResult.processedImageUrl,
               remoteServiceUsed: true,
-              uploadToCloudflare,
-              originalFilename,
-              originalCarId,
+              cloudflareUpload: {
+                success: false,
+                error:
+                  uploadError instanceof Error
+                    ? uploadError.message
+                    : "Unknown upload error",
+              },
             });
-          } else {
-            const errorText = await remoteResponse.text();
-            console.log(
-              "⚠️ Remote service failed:",
-              remoteResponse.status,
-              errorText
-            );
-
-            // If user explicitly chose cloud but it failed, don't fall back to local
-            if (processingMethod === "cloud") {
-              throw new Error(`Cloud Run service failed: ${errorText}`);
-            }
-
-            console.log(
-              "⚠️ Remote service failed, falling back to local processing"
-            );
-            console.log("Remote service error:", errorText);
           }
-        } catch (remoteError) {
-          console.log(
-            "⚠️ Remote service error, falling back to local processing"
-          );
-          console.error("Remote service error details:", remoteError);
         }
-      } else if (processingMethod === "local") {
-        console.log(
-          "🔧 Local processing explicitly requested, skipping remote service..."
-        );
+
+        // Return the result with additional metadata (no Cloudflare upload)
+        return NextResponse.json({
+          success: true,
+          message: "Image processed successfully with Cloud Run service",
+          processedImageUrl: remoteResult.processedImageUrl,
+          remoteServiceUsed: true,
+          uploadToCloudflare,
+          originalFilename,
+          originalCarId,
+        });
       } else {
+        const errorText = await remoteResponse.text();
         console.log(
-          "🔧 No remote service URL configured, using local binary..."
+          "⚠️ Remote service failed:",
+          remoteResponse.status,
+          errorText
+        );
+
+        return NextResponse.json(
+          {
+            error: `Cloud Run service failed: ${errorText}`,
+            details:
+              "The remote image processing service is unavailable. Please try again later or contact support.",
+            processingMethod,
+            remoteServiceUrl: remoteServiceUrl
+              ? `${remoteServiceUrl.substring(0, 30)}...`
+              : "not set",
+          },
+          { status: 500 }
         );
       }
+    } catch (remoteError) {
+      console.log("⚠️ Remote service error");
+      console.error("Remote service error details:", remoteError);
 
-      // Download the image
-      console.log("🔍 Attempting to download image from:", imageUrl);
-      let imageResponse = await fetch(imageUrl);
-      console.log("🔍 Image download response:", {
-        status: imageResponse.status,
-        statusText: imageResponse.statusText,
-        ok: imageResponse.ok,
-        headers: Object.fromEntries(imageResponse.headers.entries()),
-      });
-
-      // If the enhanced URL fails, try the original URL without parameters
-      if (
-        !imageResponse.ok &&
-        imageUrl.includes("imagedelivery.net") &&
-        imageUrl.includes(",")
-      ) {
-        const originalUrl = imageUrl.replace(/\/[^\/]*$/, "/public");
-        console.log(
-          "🔍 Enhanced URL failed, trying original URL:",
-          originalUrl
-        );
-        imageResponse = await fetch(originalUrl);
-        console.log("🔍 Original URL response:", {
-          status: imageResponse.status,
-          statusText: imageResponse.statusText,
-          ok: imageResponse.ok,
-        });
-      }
-
-      if (!imageResponse.ok) {
-        throw new Error(
-          `Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`
-        );
-      }
-
-      const imageBuffer = await imageResponse.arrayBuffer();
-      await fs.writeFile(inputPath, Buffer.from(imageBuffer));
-
-      // Local binary processing
-      console.log("🔧 Attempting local binary processing...");
-
-      // Determine the correct binary path based on platform
-      const platform = process.platform;
-      const binaryName =
-        platform === "darwin"
-          ? "extend_canvas_macos"
-          : platform === "linux"
-            ? "extend_canvas_linux"
-            : "extend_canvas";
-
-      let binaryPath = path.join(process.cwd(), binaryName);
-
-      console.log("🔍 Platform detected:", platform);
-      console.log("🔍 Binary name:", binaryName);
-      console.log("🔍 Binary path:", binaryPath);
-
-      try {
-        await fs.access(binaryPath);
-        console.log("✅ Binary found at:", binaryPath);
-      } catch (accessError) {
-        console.error("❌ Binary not found at:", binaryPath);
-        console.error("Access error:", accessError);
-
-        // Try alternative names in the current directory
-        const altBinaries = [
-          path.join(process.cwd(), "extend_canvas"),
-          path.join(process.cwd(), "extend_canvas_macos"),
-          path.join(process.cwd(), "extend_canvas_linux"),
-        ];
-
-        let foundBinary = null;
-        for (const altPath of altBinaries) {
-          try {
-            await fs.access(altPath);
-            console.log("✅ Alternative binary found at:", altPath);
-            foundBinary = altPath;
-            break;
-          } catch (e) {
-            console.log("❌ Binary not found at:", altPath);
-          }
-        }
-
-        if (!foundBinary) {
-          throw new Error(
-            `extend-canvas binary not found. Expected: ${binaryPath}`
-          );
-        }
-
-        // Update binaryPath to the found binary
-        binaryPath = foundBinary;
-        console.log("Using found binary:", binaryPath);
-      }
-
-      // Build command arguments
-      const args = [
-        inputPath,
-        outputPath,
-        desiredHeight.toString(),
-        paddingPct.toString(),
-        whiteThresh.toString(),
-      ];
-
-      // Execute the C++ program
-      const command = `${binaryPath} ${args.join(" ")}`;
-      console.log("Executing command:", command);
-
-      try {
-        const { stdout, stderr } = await execAsync(command, {
-          timeout: 30000, // 30 second timeout
-        });
-
-        if (stderr) {
-          console.warn("Canvas extension stderr:", stderr);
-        }
-
-        console.log("Canvas extension stdout:", stdout);
-      } catch (execError: any) {
-        console.error("Canvas extension execution error:", execError);
-
-        // Check if this is an OpenCV library dependency error
-        if (
-          execError &&
-          (execError.stderr?.includes("error while loading shared libraries") ||
-            execError.message?.includes(
-              "error while loading shared libraries"
-            )) &&
-          (execError.stderr?.includes("libopencv") ||
-            execError.message?.includes("libopencv"))
-        ) {
-          throw new Error(
-            "Canvas extension binary is missing required OpenCV libraries. Please use the Cloud Run service instead, or ensure OpenCV is properly installed for local processing."
-          );
-        }
-
-        throw new Error(
-          `Canvas extension execution failed: ${execError.message || execError}`
-        );
-      }
-
-      // Check if output file was created
-      try {
-        await fs.access(outputPath);
-      } catch {
-        throw new Error("Output image was not generated");
-      }
-
-      // Read the processed image
-      const processedImageBuffer = await fs.readFile(outputPath);
-
-      let result: any = {
-        success: true,
-        message: "Image processed successfully",
-      };
-
-      if (uploadToCloudflare) {
-        try {
-          // Validate Cloudflare environment variables
-          if (
-            !process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID ||
-            !process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN
-          ) {
-            throw new Error("Cloudflare credentials not configured");
-          }
-
-          // Create filename for the processed image
-          const baseFilename = originalFilename || "image";
-          const nameWithoutExt = baseFilename.replace(/\.[^/.]+$/, "");
-
-          // Generate filename based on the new naming convention
-          let processedFilename;
-          if (scaleMultiplier && scaleMultiplier >= 2) {
-            const reqWidth =
-              requestedWidth || Math.round((desiredHeight * 16) / 9); // Default aspect ratio
-            const reqHeight = requestedHeight || desiredHeight;
-            processedFilename = `${nameWithoutExt}-EXTENDED-${reqWidth}x${reqHeight}-${scaleMultiplier}X.jpg`;
-          } else {
-            const reqWidth =
-              requestedWidth || Math.round((desiredHeight * 16) / 9);
-            const reqHeight = requestedHeight || desiredHeight;
-            processedFilename = `${nameWithoutExt}-EXTENDED-${reqWidth}x${reqHeight}.jpg`;
-          }
-
-          // Create a File object from the buffer
-          const processedFile = new File(
-            [processedImageBuffer],
-            processedFilename,
-            {
-              type: "image/jpeg",
-            }
-          );
-
-          // Upload to Cloudflare
-          const cloudflareForm = new FormData();
-          cloudflareForm.append("file", processedFile);
-          cloudflareForm.append("requireSignedURLs", "false");
-
-          const cloudflareResponse = await fetch(
-            `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1`,
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
-              },
-              body: cloudflareForm,
-            }
-          );
-
-          if (!cloudflareResponse.ok) {
-            throw new Error(
-              `Cloudflare upload failed: ${cloudflareResponse.statusText}`
-            );
-          }
-
-          const cloudflareResult = await cloudflareResponse.json();
-          if (!cloudflareResult.success) {
-            throw new Error(
-              `Cloudflare API error: ${cloudflareResult.errors[0]?.message || "Unknown error"}`
-            );
-          }
-
-          const cloudflareImageUrl =
-            cloudflareResult.result.variants[0].replace(/\/public$/, "");
-
-          // Store in MongoDB
-          const db = await getDatabase();
-          const now = new Date().toISOString();
-
-          const imageDoc = {
-            _id: new ObjectId(),
-            cloudflareId: cloudflareResult.result.id,
-            url: cloudflareImageUrl,
-            filename: processedFilename,
-            metadata: {
-              category: "processed",
-              processing: "canvas_extension",
-              originalImage: imageUrl,
-              parameters: {
-                desiredHeight,
-                paddingPct,
-                whiteThresh,
-              },
-              processedAt: now,
-            },
-            carId: originalCarId ? new ObjectId(originalCarId) : null,
-            createdAt: now,
-            updatedAt: now,
-          };
-
-          await db.collection("images").insertOne(imageDoc);
-
-          // If this processed image is associated with a car, add it to the car's processedImageIds array
-          if (originalCarId) {
-            try {
-              await db.collection("cars").updateOne(
-                { _id: new ObjectId(originalCarId) },
-                {
-                  $addToSet: { processedImageIds: imageDoc._id },
-                  $set: { updatedAt: now },
-                }
-              );
-              console.log(
-                `Added processed image ${imageDoc._id} to car ${originalCarId}`
-              );
-            } catch (carUpdateError) {
-              console.error(
-                "Failed to update car with processed image:",
-                carUpdateError
-              );
-              // Don't fail the whole operation if car update fails
-            }
-          }
-
-          result.cloudflareUpload = {
-            success: true,
-            imageId: cloudflareResult.result.id,
-            imageUrl: cloudflareImageUrl,
-            filename: processedFilename,
-            mongoId: imageDoc._id.toString(),
-          };
-
-          console.log(
-            "Successfully uploaded to Cloudflare and stored in MongoDB:",
-            processedFilename
-          );
-        } catch (uploadError) {
-          console.error("Failed to upload to Cloudflare:", uploadError);
-          result.cloudflareUpload = {
-            success: false,
-            error:
-              uploadError instanceof Error
-                ? uploadError.message
-                : "Unknown upload error",
-          };
-        }
-      }
-
-      // Always return the base64 data URL as well
-      const base64Image = processedImageBuffer.toString("base64");
-      const dataUrl = `data:image/jpeg;base64,${base64Image}`;
-      result.processedImageUrl = dataUrl;
-
-      // Clean up temporary files
-      await Promise.all([
-        fs.unlink(inputPath).catch(() => {}),
-        fs.unlink(outputPath).catch(() => {}),
-      ]);
-
-      return NextResponse.json(result);
-    } catch (error) {
-      // Clean up temporary files on error
-      await Promise.all([
-        fs.unlink(inputPath).catch(() => {}),
-        fs.unlink(outputPath).catch(() => {}),
-      ]);
-
-      throw error;
+      return NextResponse.json(
+        {
+          error: `Cloud Run service failed: ${remoteError instanceof Error ? remoteError.message : "Unknown error"}`,
+          details:
+            "The remote image processing service is unavailable. Please try again later or contact support.",
+          processingMethod,
+          remoteServiceUrl: remoteServiceUrl
+            ? `${remoteServiceUrl.substring(0, 30)}...`
+            : "not set",
+        },
+        { status: 500 }
+      );
     }
   } catch (error) {
     console.error("Canvas extension error:", error);

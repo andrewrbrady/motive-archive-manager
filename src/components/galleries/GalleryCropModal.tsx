@@ -117,6 +117,7 @@ interface CropImageData {
   cropWidth?: number;
   cropHeight?: number;
   previewImageDimensions?: ImageDimensions | null;
+  sourceImageWidth?: number; // For high-quality processing, specify source resolution
 }
 
 interface CropImageResponse {
@@ -397,9 +398,21 @@ export function GalleryCropModal({
         if (result.processingTime) {
           setPreviewProcessingTime(result.processingTime);
         }
+      } else {
+        console.warn(
+          "Live preview failed:",
+          result.error || "No error details provided"
+        );
       }
     } catch (error: any) {
-      console.error("Failed to generate live preview:", error);
+      // Improve error logging to handle empty objects
+      const errorMessage = error?.message || error?.error || "Unknown error";
+      const errorDetails = error?.response?.data || error?.data || error;
+      console.error("Failed to generate live preview:", {
+        message: errorMessage,
+        details: errorDetails,
+        timestamp: new Date().toISOString(),
+      });
       hotToast.error("Failed to generate live preview");
     } finally {
       setIsGeneratingPreview(false);
@@ -409,7 +422,10 @@ export function GalleryCropModal({
     livePreviewEnabled,
     cachedImagePath,
     originalDimensions,
-    cropArea,
+    cropArea.x,
+    cropArea.y,
+    cropArea.width,
+    cropArea.height,
     scale,
     outputWidth,
     outputHeight,
@@ -523,9 +539,11 @@ export function GalleryCropModal({
     }
   }, [
     originalDimensions,
-    cropArea,
+    cropArea.x,
+    cropArea.y,
+    cropArea.width,
+    cropArea.height,
     shouldTriggerLivePreview,
-    debouncedGeneratePreview,
     api,
   ]);
 
@@ -906,6 +924,7 @@ export function GalleryCropModal({
         originalFilename: image?.filename || "",
         scaleMultiplier: multiplier,
         previewImageDimensions: originalDimensions,
+        sourceImageWidth: multiplier >= 2 ? 3000 : undefined, // Use high-res source for 2x+
       };
 
       const result = await api.post<CropImageResponse>(
@@ -962,6 +981,7 @@ export function GalleryCropModal({
   };
 
   const handleReplaceImage = async (multiplier: 1 | 2) => {
+    console.log("🚨🚨🚨 REPLACE IMAGE FUNCTION CALLED 🚨🚨🚨", multiplier);
     if (!api) return; // Add conditional check inside async function
     if (!image || !processedImageUrl) return;
 
@@ -1022,7 +1042,16 @@ export function GalleryCropModal({
         originalFilename: image?.filename || "",
         scaleMultiplier: multiplier,
         previewImageDimensions: originalDimensions,
+        ...(multiplier >= 2 && { sourceImageWidth: 3000 }), // Only include for 2x+ to avoid undefined
       };
+
+      // 🐛 DEBUG: Log the actual request data being sent
+      console.log(`🚨🚨🚨 2X DEBUG ${multiplier}x REQUEST 🚨🚨🚨`);
+      console.log(
+        `sourceImageWidth in request:`,
+        processingRequestData.sourceImageWidth
+      );
+      console.log(`Full request:`, processingRequestData);
 
       const processingResult = await api.post<CropImageResponse>(
         "images/crop-image",

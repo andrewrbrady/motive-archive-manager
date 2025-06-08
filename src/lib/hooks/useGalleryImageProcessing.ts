@@ -5,7 +5,7 @@ import { useAPI } from "@/hooks/useAPI";
 interface ProcessImageParams {
   galleryId: string;
   imageId: string;
-  processingType: "canvas-extension" | "image-matte";
+  processingType: "canvas-extension" | "image-matte" | "image-crop";
   parameters: any;
 }
 
@@ -58,37 +58,20 @@ export function useGalleryImageProcessing() {
       return null;
     }
 
-    console.log("🔄 Gallery image processing starting:", {
-      galleryId: params.galleryId,
-      imageId: params.imageId,
-      processingType: params.processingType,
-      parametersPreview: {
-        imageUrl: params.parameters.imageUrl?.substring(0, 100) + "...",
-        processingMethod: params.parameters.processingMethod,
-        desiredHeight: params.parameters.desiredHeight,
-        paddingPct: params.parameters.paddingPct,
-        whiteThresh: params.parameters.whiteThresh,
-      },
-    });
-
     setIsProcessing(true);
 
     try {
-      const result = await api.post<PreviewProcessImageResult>(
-        `galleries/${params.galleryId}/preview-process-image`,
-        {
-          imageId: params.imageId,
-          processingType: params.processingType,
-          parameters: params.parameters,
-        }
-      );
+      const endpoint = `galleries/${params.galleryId}/preview-process-image`;
+      const payload = {
+        imageId: params.imageId,
+        processingType: params.processingType,
+        parameters: params.parameters,
+      };
 
-      console.log("✅ Gallery image processing succeeded:", {
-        success: result.success,
-        hasProcessedImage: !!result.processedImage,
-        processedImageUrl:
-          result.processedImage?.url?.substring(0, 100) + "...",
-      });
+      const result = await api.post<PreviewProcessImageResult>(
+        endpoint,
+        payload
+      );
 
       toast({
         title: "Preview Ready",
@@ -96,56 +79,25 @@ export function useGalleryImageProcessing() {
       });
 
       return result;
-    } catch (error) {
-      // Enhanced error logging
-      console.error("❌ Gallery image processing error details:", {
-        error: error,
-        errorType: typeof error,
-        errorConstructor: error?.constructor?.name,
-        errorMessage: error instanceof Error ? error.message : "No message",
-        errorStack: error instanceof Error ? error.stack : "No stack",
-        errorStringified: JSON.stringify(error, null, 2),
-        hasMessage: !!(error as any)?.message,
-        hasStatus: !!(error as any)?.status,
-        hasCode: !!(error as any)?.code,
-        fullErrorObject: error,
+    } catch (error: any) {
+      // Extract meaningful error information from API error
+      const errorMessage = error?.message || "Unknown error occurred";
+      const errorStatus = error?.status;
+
+      console.error("Gallery image processing failed:", {
+        message: errorMessage,
+        status: errorStatus,
         galleryId: params.galleryId,
         imageId: params.imageId,
         processingType: params.processingType,
       });
 
-      let errorMessage = "Failed to process image";
-      let detailedError = "";
-
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === "object" && error !== null) {
-        // Handle API error objects
-        const apiError = error as any;
-        if (apiError.message) {
-          errorMessage = apiError.message;
-        } else if (apiError.error) {
-          errorMessage = apiError.error;
-        } else if (apiError.status) {
-          errorMessage = `Request failed with status ${apiError.status}`;
-        }
-
-        // Add detailed error info
-        detailedError = JSON.stringify(error, null, 2);
-      } else if (typeof error === "string") {
-        errorMessage = error;
-      }
-
-      console.error("❌ Processed error message:", {
-        finalErrorMessage: errorMessage,
-        detailedError: detailedError,
-      });
-
       toast({
-        title: "Processing Error",
+        title: "Processing Failed",
         description: errorMessage,
         variant: "destructive",
       });
+
       return null;
     } finally {
       setIsProcessing(false);
@@ -155,7 +107,7 @@ export function useGalleryImageProcessing() {
   const replaceImageInGallery = async (
     galleryId: string,
     originalImageId: string,
-    processingType: "canvas-extension" | "image-matte",
+    processingType: "canvas-extension" | "image-matte" | "image-crop",
     parameters: any
   ): Promise<ReplaceImageResult | null> => {
     if (!api) {
@@ -169,15 +121,35 @@ export function useGalleryImageProcessing() {
 
     setIsReplacing(true);
 
+    const payload = {
+      originalImageId,
+      processingType,
+      parameters,
+    };
+
+    console.log(
+      "🚨🚨🚨 useGalleryImageProcessing - CALLING REPLACE API 🚨🚨🚨",
+      {
+        endpoint: `galleries/${galleryId}/replace-image`,
+        payload,
+        galleryId,
+        originalImageId,
+        processingType,
+      }
+    );
+
     try {
       const result = await api.post<ReplaceImageResult>(
         `galleries/${galleryId}/replace-image`,
-        {
-          originalImageId,
-          processingType,
-          parameters,
-        }
+        payload
       );
+
+      console.log("✅ useGalleryImageProcessing - REPLACE API SUCCESS:", {
+        result,
+        hasProcessedImage: !!result?.processedImage,
+        processedImageId: result?.processedImage?._id,
+        processedImageUrl: result?.processedImage?.url,
+      });
 
       toast({
         title: "Success",

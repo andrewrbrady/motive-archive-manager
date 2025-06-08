@@ -52,12 +52,15 @@ import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
 import { CloudflareImage } from "@/components/ui/CloudflareImage";
 import { useAPI } from "@/hooks/useAPI";
+import { useGalleryImageProcessing } from "@/lib/hooks/useGalleryImageProcessing";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ImageProcessingModalHeader } from "./shared/ImageProcessingModalHeader";
+import { ImageProcessingModalFooter } from "./shared/ImageProcessingModalFooter";
 
 interface ImageCropModalProps {
   isOpen: boolean;
@@ -90,6 +93,14 @@ interface CloudflareUploadResult {
   error?: string;
 }
 
+interface ProcessedImageData {
+  _id: string;
+  url: string;
+  filename: string;
+  metadata: any;
+  carId: string;
+}
+
 export function ImageCropModal({
   isOpen,
   onClose,
@@ -99,6 +110,19 @@ export function ImageCropModal({
   onImageReplaced,
 }: ImageCropModalProps) {
   const api = useAPI();
+
+  // Gallery processing hooks
+  const {
+    previewProcessImage,
+    replaceImageInGallery,
+    isProcessing: isGalleryProcessing,
+    isReplacing,
+  } = useGalleryImageProcessing();
+
+  // Gallery preview workflow state
+  const [processedImage, setProcessedImage] =
+    useState<ProcessedImageData | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Crop settings
   const [cropArea, setCropArea] = useState<CropArea>({
@@ -263,6 +287,21 @@ export function ImageCropModal({
     [cloudflareWidth]
   );
 
+  // Get gallery processing URL (strips Cloudflare transforms for API calls)
+  const getGalleryProcessingImageUrl = useCallback(
+    (baseUrl: string): string => {
+      if (!baseUrl.includes("imagedelivery.net")) {
+        return baseUrl;
+      }
+
+      // For Cloudflare URLs, ensure we use the /public variant for processing
+      const urlParts = baseUrl.split("/");
+      const baseUrlWithoutVariant = urlParts.slice(0, -1).join("/");
+      return `${baseUrlWithoutVariant}/public`;
+    },
+    []
+  );
+
   // Get preview image URL (medium resolution for caching)
   const getPreviewImageUrl = useCallback((baseUrl: string) => {
     if (!baseUrl.includes("imagedelivery.net")) return baseUrl;
@@ -360,9 +399,21 @@ export function ImageCropModal({
         if (result.processingTime) {
           setPreviewProcessingTime(result.processingTime);
         }
+      } else {
+        console.warn(
+          "Live preview failed:",
+          result.error || "No error details provided"
+        );
       }
     } catch (error: any) {
-      console.error("Failed to generate live preview:", error);
+      // Improve error logging to handle empty objects
+      const errorMessage = error?.message || error?.error || "Unknown error";
+      const errorDetails = error?.response?.data || error?.data || error;
+      console.error("Failed to generate live preview:", {
+        message: errorMessage,
+        details: errorDetails,
+        timestamp: new Date().toISOString(),
+      });
     } finally {
       setIsGeneratingPreview(false);
     }
@@ -371,7 +422,10 @@ export function ImageCropModal({
     livePreviewEnabled,
     cachedImagePath,
     originalDimensions,
-    cropArea,
+    cropArea.x,
+    cropArea.y,
+    cropArea.width,
+    cropArea.height,
     scale,
     outputWidth,
     outputHeight,
@@ -685,9 +739,11 @@ export function ImageCropModal({
     }
   }, [
     originalDimensions,
-    cropArea,
+    cropArea.x,
+    cropArea.y,
+    cropArea.width,
+    cropArea.height,
     shouldTriggerLivePreview,
-    debouncedGeneratePreview,
   ]);
 
   // Trigger live preview when output dimensions change
@@ -695,13 +751,7 @@ export function ImageCropModal({
     if (shouldTriggerLivePreview()) {
       debouncedGeneratePreview();
     }
-  }, [
-    outputWidth,
-    outputHeight,
-    scale,
-    shouldTriggerLivePreview,
-    debouncedGeneratePreview,
-  ]);
+  }, [outputWidth, outputHeight, scale, shouldTriggerLivePreview]);
 
   // Cleanup preview URL on unmount
   useEffect(() => {
@@ -1033,6 +1083,9 @@ export function ImageCropModal({
     setProcessingStatus("");
     setError(null);
     setRemoteServiceUsed(false);
+    // Reset gallery preview workflow state
+    setProcessedImage(null);
+    setShowPreview(false);
 
     // Reinitialize crop area if we have dimensions
     if (originalDimensions) {
@@ -1049,7 +1102,303 @@ export function ImageCropModal({
 
   const handleClose = () => {
     handleReset();
+    // Reset gallery preview workflow state
+    setProcessedImage(null);
+    setShowPreview(false);
     onClose();
+  };
+
+  // Gallery preview and replace handlers
+  const handlePreview = async () => {
+    if (!image || !enhancedImageUrl) return;
+    if (!enablePreview || !galleryId || !previewProcessImage) return;
+
+    // Use gallery processing URL for API calls
+    const processingImageUrl = getGalleryProcessingImageUrl(image.url);
+
+    console.log("🖼️ Image Crop processing starting:", {
+      originalUrl: image.url,
+      enhancedUrl: enhancedImageUrl.substring(0, 100) + "...",
+      processingUrl: processingImageUrl,
+      cropArea,
+      outputDimensions: {
+        width: parseInt(outputWidth),
+        height: parseInt(outputHeight),
+      },
+    });
+
+    const parameters = {
+      imageUrl: processingImageUrl,
+      cropX: cropArea.x,
+      cropY: cropArea.y,
+      cropWidth: cropArea.width,
+      cropHeight: cropArea.height,
+      outputWidth: parseInt(outputWidth),
+      outputHeight: parseInt(outputHeight),
+      scale,
+    };
+
+    try {
+      const result = await previewProcessImage({
+        galleryId,
+        imageId: image._id,
+        processingType: "image-crop",
+        parameters,
+      });
+
+      if (result && result.success) {
+        console.log("✅ Image Crop processing completed successfully");
+        setProcessedImage(result.processedImage);
+        setShowPreview(true);
+      } else {
+        console.error("❌ Image Crop processing failed:", {
+          hasResult: !!result,
+          success: result?.success,
+          result: result,
+          message: result
+            ? "Processing returned false success"
+            : "No result returned",
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (error: any) {
+      const errorMessage = error?.message || "Failed to process image";
+      console.error("Image Crop processing error:", errorMessage);
+
+      toast({
+        title: "Processing Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReplaceImage = async () => {
+    if (!api) return;
+    if (!image || !processedImage) return;
+    if (
+      !enablePreview ||
+      !galleryId ||
+      !replaceImageInGallery ||
+      !onImageReplaced
+    )
+      return;
+
+    const processingImageUrl = getGalleryProcessingImageUrl(image.url);
+
+    console.log("🔄 Image Crop replacement starting:", {
+      originalUrl: image.url,
+      processingUrl: processingImageUrl,
+    });
+
+    const parameters = {
+      imageUrl: processingImageUrl,
+      cropX: cropArea.x,
+      cropY: cropArea.y,
+      cropWidth: cropArea.width,
+      cropHeight: cropArea.height,
+      outputWidth: parseInt(outputWidth),
+      outputHeight: parseInt(outputHeight),
+      scale,
+    };
+
+    try {
+      const result = await replaceImageInGallery(
+        galleryId,
+        image._id,
+        "image-crop",
+        parameters
+      );
+
+      if (result && result.success && onImageReplaced) {
+        console.log("✅ Image Crop replacement completed successfully");
+        onImageReplaced(result.originalImageId, result.processedImage);
+        handleClose();
+      } else {
+        console.error("❌ Image Crop replacement failed:", {
+          hasResult: !!result,
+          success: result?.success,
+          hasCallback: !!onImageReplaced,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (error: any) {
+      const errorMessage = error?.message || "Failed to replace image";
+      console.error("Image Crop replacement error:", errorMessage);
+
+      toast({
+        title: "Replacement Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDiscardPreview = () => {
+    setProcessedImage(null);
+    setShowPreview(false);
+  };
+
+  const handleDownloadLocal = async (scale: number = 1) => {
+    console.log(
+      "🚨🚨🚨 ImageCropModal.handleDownloadLocal CALLED 🚨🚨🚨",
+      scale
+    );
+    console.log("🔍 Current cropArea state:", cropArea);
+    console.log("🔍 Original dimensions:", originalDimensions);
+    console.log("🔍 Output dimensions:", { outputWidth, outputHeight });
+    console.log("🔍 Scale factor:", scale);
+
+    if (
+      !image ||
+      !originalDimensions ||
+      !validateCropArea(cropArea, originalDimensions)
+    ) {
+      console.log("❌ Validation failed:", {
+        hasImage: !!image,
+        hasOriginalDimensions: !!originalDimensions,
+        cropAreaValid: validateCropArea(
+          cropArea,
+          originalDimensions || { width: 0, height: 0 }
+        ),
+        cropArea,
+      });
+      toast({
+        title: "Error",
+        description: "Valid crop area required to download image",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessingStatus(`Generating ${scale}x download...`);
+
+    try {
+      const processingImageUrl = getProcessingImageUrl(image.url || "");
+
+      // Prepare crop coordinates for processing
+      let scaledCropX = Math.round(cropArea.x);
+      let scaledCropY = Math.round(cropArea.y);
+      let scaledCropWidth = Math.round(cropArea.width);
+      let scaledCropHeight = Math.round(cropArea.height);
+
+      console.log(
+        "🔍 ImageCropModal - Debug crop coordinates for scale:",
+        scale,
+        {
+          originalCropArea: cropArea,
+          originalDimensions,
+          cloudflareWidth,
+          processingImageUrl,
+          scale,
+          enhancedImageUrl,
+        }
+      );
+
+      // For 2x+ processing, coordinates may need scaling depending on the backend expectations
+      if (scale >= 2 && originalDimensions) {
+        // The crop coordinates are currently in the enhanced image space (cloudflareWidth dimensions)
+        // Check if the processing URL uses the same dimensions as the preview URL
+
+        console.log("🔍 ImageCropModal - High-res processing debug:", {
+          scale,
+          originalDimensions: originalDimensions,
+          cloudflareWidth: cloudflareWidth,
+          cropCoordinates: {
+            x: cropArea.x,
+            y: cropArea.y,
+            width: cropArea.width,
+            height: cropArea.height,
+          },
+          "coordinates as percentage of image": {
+            x: ((cropArea.x / originalDimensions.width) * 100).toFixed(2) + "%",
+            y:
+              ((cropArea.y / originalDimensions.height) * 100).toFixed(2) + "%",
+            width:
+              ((cropArea.width / originalDimensions.width) * 100).toFixed(2) +
+              "%",
+            height:
+              ((cropArea.height / originalDimensions.height) * 100).toFixed(2) +
+              "%",
+          },
+        });
+
+        // For now, use coordinates as-is and let backend handle any necessary scaling
+        // This assumes that the processingImageUrl and preview use the same dimensions
+      }
+
+      console.log("🔍 ImageCropModal - Final coordinates for API:", {
+        scaledCropX,
+        scaledCropY,
+        scaledCropWidth,
+        scaledCropHeight,
+        scale,
+      });
+
+      const payload = {
+        imageUrl: processingImageUrl,
+        cropX: scaledCropX,
+        cropY: scaledCropY,
+        cropWidth: scaledCropWidth,
+        cropHeight: scaledCropHeight,
+        outputWidth: parseInt(outputWidth) * scale,
+        outputHeight: parseInt(outputHeight) * scale,
+        scale: scale * parseFloat(String(scale)),
+        uploadToCloudflare: false,
+        sourceImageWidth: scale >= 2 ? parseInt(cloudflareWidth) : undefined, // Use cloudflareWidth for source
+      };
+
+      console.log("🚨🚨🚨 ImageCropModal - SENDING API REQUEST 🚨🚨🚨", {
+        endpoint: "/api/images/crop-image",
+        method: "POST",
+        payload: payload,
+      });
+
+      const response = await fetch("/api/images/crop-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Processing failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.imageData) {
+        // Create download link
+        const link = document.createElement("a");
+        link.href = `data:image/jpeg;base64,${result.imageData}`;
+        link.download = `${image.filename || "cropped"}_${scale}x.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast({
+          title: "Success",
+          description: `${scale}x image downloaded successfully`,
+        });
+      } else {
+        throw new Error("No image data received");
+      }
+
+      setProcessingStatus("Download completed");
+    } catch (error: any) {
+      const errorMessage = error?.message || "Download failed";
+      setError(errorMessage);
+
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Get the current enhanced image URL for display
@@ -1057,17 +1406,16 @@ export function ImageCropModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[85vh] mx-4 overflow-hidden flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="flex items-center gap-2">
-            <Crop className="h-5 w-5" />
-            Image Crop Tool
-          </DialogTitle>
-          <DialogDescription>
-            Crop and scale your image for social media formats. Drag the crop
-            area on the preview to adjust.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-6xl max-h-[85vh] mx-4 overflow-hidden flex flex-col">
+        <ImageProcessingModalHeader
+          icon={<Crop className="h-5 w-5" />}
+          title="Image Crop Tool"
+          description="Crop and scale your image for social media formats. Drag the crop area on the preview to adjust."
+          image={image}
+          processingStatus={processingStatus}
+          error={error}
+          cloudflareResult={cloudflareResult}
+        />
 
         <div className="flex-1 overflow-y-auto">
           <div className="space-y-4 p-1">
@@ -1395,68 +1743,63 @@ export function ImageCropModal({
                     </div>
                   </div>
 
-                  {/* Aspect Ratio Preset Buttons */}
-                  <div className="flex gap-2 flex-wrap">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setOutputWidth("1080");
-                        setOutputHeight("1920");
-                        if (originalDimensions) {
-                          initializeCropArea(originalDimensions, 1080, 1920);
-                        }
-                      }}
-                      className="text-xs"
-                    >
-                      9:16 (1080×1920)
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setOutputWidth("1080");
-                        setOutputHeight("1350");
-                        if (originalDimensions) {
-                          initializeCropArea(originalDimensions, 1080, 1350);
-                        }
-                      }}
-                      className="text-xs"
-                    >
-                      4:5 (1080×1350)
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setOutputWidth("1080");
-                        setOutputHeight("1080");
-                        if (originalDimensions) {
-                          initializeCropArea(originalDimensions, 1080, 1080);
-                        }
-                      }}
-                      className="text-xs"
-                    >
-                      1:1 (1080×1080)
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setOutputWidth("1920");
-                        setOutputHeight("1080");
-                        if (originalDimensions) {
-                          initializeCropArea(originalDimensions, 1920, 1080);
-                        }
-                      }}
-                      className="text-xs"
-                    >
-                      16:9 (1920×1080)
-                    </Button>
+                  {/* Aspect Ratio Presets */}
+                  <div className="space-y-2">
+                    <Label>Aspect Ratio Presets</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setOutputWidth("1080");
+                          setOutputHeight("1920");
+                          if (originalDimensions) {
+                            initializeCropArea(originalDimensions, 1080, 1920);
+                          }
+                        }}
+                      >
+                        9:16 (1080×1920)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setOutputWidth("1080");
+                          setOutputHeight("1080");
+                          if (originalDimensions) {
+                            initializeCropArea(originalDimensions, 1080, 1080);
+                          }
+                        }}
+                      >
+                        1:1 (1080×1080)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setOutputWidth("1920");
+                          setOutputHeight("1080");
+                          if (originalDimensions) {
+                            initializeCropArea(originalDimensions, 1920, 1080);
+                          }
+                        }}
+                      >
+                        16:9 (1920×1080)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setOutputWidth("1080");
+                          setOutputHeight("1350");
+                          if (originalDimensions) {
+                            initializeCropArea(originalDimensions, 1080, 1350);
+                          }
+                        }}
+                      >
+                        4:5 (1080×1350)
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
@@ -1581,136 +1924,71 @@ export function ImageCropModal({
                     </div>
                   </div>
                 )}
+
+                {/* Gallery Preview Result */}
+                {enablePreview &&
+                  galleryId &&
+                  processedImage &&
+                  showPreview && (
+                    <div className="space-y-2">
+                      <Label>Gallery Preview</Label>
+                      <div className="border rounded-lg p-2 bg-blue-50 border-blue-200">
+                        <Image
+                          src={processedImage.url}
+                          alt="Gallery processed image"
+                          width={200}
+                          height={200}
+                          className="w-full h-auto max-h-32 object-contain rounded"
+                          unoptimized={true}
+                        />
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs text-blue-700 font-medium">
+                            Ready to replace in gallery
+                          </p>
+                          <p className="text-xs text-blue-600">
+                            Filename: {processedImage.filename}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
               </div>
             </div>
           </div>
         </div>
 
-        <DialogFooter className="flex flex-wrap gap-2 flex-shrink-0 border-t pt-4">
-          <div className="flex gap-2 flex-wrap">
-            {/* Process Button */}
-            <Button
-              onClick={handleProcess}
-              disabled={
-                isProcessing ||
-                !image ||
-                !originalDimensions ||
-                !validateCropArea(cropArea, originalDimensions)
-              }
-              className="bg-black hover:bg-gray-800 text-white"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Crop className="mr-2 h-4 w-4" />
-                  Crop Image
-                </>
-              )}
-            </Button>
-
-            {/* High-res Processing Buttons */}
-            {processedImageUrl && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => handleHighResProcess(2)}
-                  disabled={isProcessingHighRes}
-                  className="border-gray-300 hover:bg-gray-50"
-                >
-                  {isProcessingHighRes && highResMultiplier === 2 ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      2x Processing...
-                    </>
-                  ) : (
-                    <>
-                      <ZoomIn className="mr-2 h-4 w-4" />
-                      2x High-Res
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={() => handleHighResProcess(4)}
-                  disabled={isProcessingHighRes}
-                  className="border-gray-300 hover:bg-gray-50"
-                >
-                  {isProcessingHighRes && highResMultiplier === 4 ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      4x Processing...
-                    </>
-                  ) : (
-                    <>
-                      <ZoomIn className="mr-2 h-4 w-4" />
-                      4x High-Res
-                    </>
-                  )}
-                </Button>
-              </>
-            )}
-
-            {/* Download Buttons */}
-            {processedImageUrl && (
-              <Button variant="outline" onClick={handleDownload}>
-                <Download className="mr-2 h-4 w-4" />
-                Download
-              </Button>
-            )}
-
-            {highResImageUrl && (
-              <Button variant="outline" onClick={handleHighResDownload}>
-                <Download className="mr-2 h-4 w-4" />
-                Download High-Res
-              </Button>
-            )}
-
-            {/* Upload Button */}
-            {(processedImageUrl || highResImageUrl) && !cloudflareResult && (
-              <Button
-                variant="outline"
-                onClick={handleUploadToCloudflare}
-                disabled={isUploading}
-                className="border-gray-300 hover:bg-gray-50"
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload to Gallery
-                  </>
-                )}
-              </Button>
-            )}
-
-            {/* View in Gallery Button */}
-            {cloudflareResult && (
-              <Button variant="outline" onClick={handleViewInGallery}>
-                <ExternalLink className="mr-2 h-4 w-4" />
-                View in Gallery
-              </Button>
-            )}
-
-            {/* Reset Button */}
-            <Button variant="outline" onClick={handleReset}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Reset
-            </Button>
-          </div>
-
-          <Button variant="outline" onClick={handleClose}>
-            Close
-          </Button>
-        </DialogFooter>
+        <ImageProcessingModalFooter
+          enablePreview={enablePreview}
+          galleryId={galleryId}
+          showPreview={showPreview}
+          processedImage={processedImage}
+          isGalleryProcessing={false}
+          isReplacing={false}
+          isProcessing={isProcessing}
+          isProcessingHighRes={isProcessingHighRes}
+          highResMultiplier={highResMultiplier}
+          isUploading={isUploading}
+          processedImageUrl={processedImageUrl}
+          highResImageUrl={highResImageUrl}
+          cloudflareResult={cloudflareResult}
+          onReplaceImage={handleReplaceImage}
+          onSaveToImages={handleUploadToCloudflare}
+          onDownloadLocal={handleDownloadLocal}
+          onReset={handleReset}
+          onClose={handleClose}
+          canProcess={
+            !!image &&
+            !!originalDimensions &&
+            validateCropArea(cropArea, originalDimensions)
+          }
+          processButtonContent={{
+            idle: {
+              icon: <Crop className="mr-2 h-4 w-4" />,
+              text: "Crop Image",
+            },
+            processing: { text: "Processing..." },
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

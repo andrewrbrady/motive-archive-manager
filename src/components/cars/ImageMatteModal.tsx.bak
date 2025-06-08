@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { ImageData } from "@/app/images/columns";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Loader2,
   Download,
@@ -19,6 +20,9 @@ import {
   XCircle,
   ExternalLink,
   Car,
+  Settings,
+  Cloud,
+  Monitor,
   Palette,
   Check,
   X,
@@ -71,6 +75,8 @@ interface CreateMatteResponse {
   cloudflareUpload?: CloudflareUploadResult;
 }
 
+type ProcessingMethod = "cloud" | "local";
+
 export function ImageMatteModal({
   isOpen,
   onClose,
@@ -79,7 +85,12 @@ export function ImageMatteModal({
   galleryId,
   onImageReplaced,
 }: ImageMatteModalProps) {
-  // All hooks must be declared first - no early returns allowed
+  // Early return if modal is not open - must be before ALL hooks
+  if (!isOpen) {
+    return null;
+  }
+
+  // All hooks must come after the early return check and BEFORE any other conditional returns
   const api = useAPI();
 
   // Gallery processing hooks
@@ -101,7 +112,8 @@ export function ImageMatteModal({
   const [matteColor, setMatteColor] = useState<string>("#000000");
   const [cloudflareWidth, setCloudflareWidth] = useState<string>("2000");
   const [cloudflareQuality, setCloudflareQuality] = useState<string>("100");
-
+  const [processingMethod, setProcessingMethod] =
+    useState<ProcessingMethod>("cloud");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessingHighRes, setIsProcessingHighRes] = useState(false);
@@ -157,6 +169,16 @@ export function ImageMatteModal({
       setHighResDimensions(null);
     }
   }, [highResImageUrl]);
+
+  // Load processing method preference from localStorage
+  useEffect(() => {
+    const savedMethod = localStorage.getItem(
+      "imageMatteMethod"
+    ) as ProcessingMethod;
+    if (savedMethod && (savedMethod === "cloud" || savedMethod === "local")) {
+      setProcessingMethod(savedMethod);
+    }
+  }, []);
 
   // Helper function to build enhanced Cloudflare URL
   const getEnhancedImageUrl = (
@@ -350,7 +372,25 @@ export function ImageMatteModal({
     setProcessedImageLoadError(false);
   }, [image?.url]);
 
-  // Note: api is now guaranteed to be available from useAPI hook
+  // Authentication check after ALL hooks are declared
+  if (!api) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Loading...</DialogTitle>
+            <DialogDescription>Authenticating...</DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Save processing method preference to localStorage
+  const handleProcessingMethodChange = (method: ProcessingMethod) => {
+    setProcessingMethod(method);
+    localStorage.setItem("imageMatteMethod", method);
+  };
 
   const handleProcess = async () => {
     if (!image || !enhancedImageUrl || !api) return;
@@ -374,6 +414,7 @@ export function ImageMatteModal({
         matteColor,
         uploadToCloudflare: false,
         originalFilename: image.filename,
+        processingMethod,
       })) as CreateMatteResponse;
 
       setProcessedImageUrl(result.processedImageUrl);
@@ -454,6 +495,7 @@ export function ImageMatteModal({
         matteColor,
         uploadToCloudflare: false,
         originalFilename: image.filename,
+        processingMethod,
       })) as CreateMatteResponse;
 
       setHighResImageUrl(result.processedImageUrl);
@@ -516,6 +558,7 @@ export function ImageMatteModal({
         uploadToCloudflare: true,
         originalFilename: uploadFilename,
         originalCarId: image.carId,
+        processingMethod,
       })) as CreateMatteResponse;
 
       if (result.cloudflareUpload?.success) {
@@ -732,7 +775,7 @@ export function ImageMatteModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-6xl max-h-[85vh] mx-4 overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[85vh] mx-4 overflow-hidden flex flex-col">
         <ImageProcessingModalHeader
           icon={<Palette className="h-5 w-5" />}
           title="Image Matte Tool"
@@ -801,12 +844,7 @@ export function ImageMatteModal({
                   </div>
                 }
                 showGalleryPreview={
-                  !!(
-                    enablePreview &&
-                    galleryId &&
-                    showPreview &&
-                    processedImage
-                  )
+                  enablePreview && galleryId && showPreview && !!processedImage
                 }
                 galleryPreviewImage={processedImage}
               >
@@ -887,10 +925,7 @@ export function ImageMatteModal({
 
                 {/* Matte Color */}
                 <div>
-                  <Label
-                    htmlFor="matteColor"
-                    className="flex items-center gap-2"
-                  >
+                  <Label htmlFor="matteColor" className="flex items-center gap-2">
                     <Palette className="h-4 w-4" />
                     Matte Color
                   </Label>
@@ -946,11 +981,39 @@ export function ImageMatteModal({
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Processing Settings</h3>
 
+                {/* Processing Method */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    <Label className="text-sm font-medium">Processing Method</Label>
+                  </div>
+                  <Select
+                    value={processingMethod}
+                    onValueChange={handleProcessingMethodChange}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select processing method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cloud">
+                        <div className="flex items-center gap-2">
+                          <Cloud className="h-4 w-4" />
+                          <span>Cloud Run</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="local">
+                        <div className="flex items-center gap-2">
+                          <Monitor className="h-4 w-4" />
+                          <span>Local Binary</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Cloudflare Settings */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    Original Image Quality
-                  </Label>
+                  <Label className="text-sm font-medium">Original Image Quality</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <Label htmlFor="cloudflareWidth" className="text-xs">
@@ -1016,13 +1079,299 @@ export function ImageMatteModal({
           onClose={handleClose}
           canProcess={!!image}
           processButtonContent={{
-            idle: {
-              icon: <Palette className="mr-2 h-4 w-4" />,
-              text: "Create Matte",
-            },
+            idle: { icon: <Palette className="mr-2 h-4 w-4" />, text: "Create Matte" },
             processing: { text: "Creating Matte..." },
           }}
         />
+      </DialogContent>
+    </Dialog>
+  );
+}
+              {currentImageUrl && (
+                <div className="mt-2 border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
+                  <div className="relative max-w-full max-h-[600px]">
+                    {!imageLoadError ? (
+                      <Image
+                        src={currentImageUrl}
+                        alt={image?.filename || "Original image"}
+                        width={0}
+                        height={0}
+                        sizes="100vw"
+                        className="w-auto h-auto max-w-full max-h-[600px] object-contain"
+                        style={{ width: "auto", height: "auto" }}
+                        key={currentImageUrl} // Force reload when URL changes
+                        onError={(e) => {
+                          console.error(
+                            "🚨 DETAILED IMAGE LOAD ERROR ANALYSIS:",
+                            {
+                              errorType: "Next.js Image component",
+                              attemptedSrc: currentImageUrl,
+                              imageObject: image,
+                              errorEvent: e,
+                              errorEventType: e.type,
+                              errorEventTarget: e.currentTarget,
+                              targetSrc: e.currentTarget.src,
+                              targetComplete: e.currentTarget.complete,
+                              targetNaturalWidth: e.currentTarget.naturalWidth,
+                              targetNaturalHeight:
+                                e.currentTarget.naturalHeight,
+                              currentImageUrl,
+                              enhancedImageUrl,
+                              useTestImage,
+                              isTestImage: currentImageUrl === testImageUrl,
+                              urlValidation: {
+                                isString: typeof currentImageUrl === "string",
+                                isNotEmpty:
+                                  !!currentImageUrl &&
+                                  currentImageUrl.length > 0,
+                                startsWithHttp:
+                                  currentImageUrl?.startsWith("http"),
+                                containsImageDelivery:
+                                  currentImageUrl?.includes(
+                                    "imagedelivery.net"
+                                  ),
+                                containsPlaceholder:
+                                  currentImageUrl?.includes("placehold.co"),
+                              },
+                            }
+                          );
+                          setImageLoadError(true);
+                          // Try to fallback to original URL without transformations
+                          if (currentImageUrl !== image?.url && image?.url) {
+                            console.log(
+                              "🔄 Attempting fallback to original URL:",
+                              image.url
+                            );
+                            e.currentTarget.src = image.url;
+                          }
+                        }}
+                        onLoad={(e) => {
+                          console.log("✅ SUCCESSFUL IMAGE LOAD ANALYSIS:", {
+                            src: currentImageUrl,
+                            naturalWidth: e.currentTarget.naturalWidth,
+                            naturalHeight: e.currentTarget.naturalHeight,
+                            isTestImage: currentImageUrl === testImageUrl,
+                            loadedSuccessfully: true,
+                            useTestImage,
+                            imageObject: image,
+                          });
+                          setImageLoadError(false);
+                        }}
+                        unoptimized={
+                          !currentImageUrl.includes("imagedelivery.net")
+                        }
+                      />
+                    ) : (
+                      <img
+                        src={image?.url || currentImageUrl}
+                        alt={image?.filename || "Original image"}
+                        className="w-auto h-auto max-w-full max-h-[600px] object-contain"
+                        style={{ width: "auto", height: "auto" }}
+                        onError={(e) => {
+                          console.error("🚨 FALLBACK IMG TAG ERROR ANALYSIS:", {
+                            errorType: "HTML img tag fallback",
+                            attemptedSrc: e.currentTarget.src,
+                            imageObject: image,
+                            originalSrc: image?.url,
+                            currentImageUrl,
+                            fallbackAttempted: true,
+                            urlValidation: {
+                              isString: typeof e.currentTarget.src === "string",
+                              isNotEmpty:
+                                !!e.currentTarget.src &&
+                                e.currentTarget.src.length > 0,
+                              startsWithHttp:
+                                e.currentTarget.src?.startsWith("http"),
+                              containsImageDelivery:
+                                e.currentTarget.src?.includes(
+                                  "imagedelivery.net"
+                                ),
+                            },
+                          });
+                        }}
+                        onLoad={(e) => {
+                          console.log("✅ FALLBACK IMG TAG SUCCESS:", {
+                            src: e.currentTarget.src,
+                            naturalWidth: e.currentTarget.naturalWidth,
+                            naturalHeight: e.currentTarget.naturalHeight,
+                            fallbackWorked: true,
+                            imageObject: image,
+                          });
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+              {!currentImageUrl && (
+                <div className="mt-2 border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
+                  <div className="text-center text-muted-foreground">
+                    <Eye className="h-8 w-8 mx-auto mb-2" />
+                    <p className="text-sm">No image URL available</p>
+                    {image?.url && (
+                      <p className="text-xs mt-1">Original: {image.url}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right side - Processed Image */}
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">
+                  {highResImageUrl
+                    ? `High-Res Matte (${highResMultiplier}x)`
+                    : "Processed Matte"}
+                </Label>
+                {(highResDimensions || processedDimensions) && (
+                  <span className="text-xs text-muted-foreground">
+                    {highResDimensions
+                      ? `${highResDimensions.width} × ${highResDimensions.height}`
+                      : processedDimensions
+                        ? `${processedDimensions.width} × ${processedDimensions.height}`
+                        : ""}
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
+                {highResImageUrl || processedImageUrl ? (
+                  <div className="relative max-w-full max-h-[600px]">
+                    {!processedImageLoadError ? (
+                      <Image
+                        src={(highResImageUrl || processedImageUrl)!}
+                        alt={
+                          highResImageUrl
+                            ? "High-resolution matte"
+                            : "Processed matte"
+                        }
+                        width={0}
+                        height={0}
+                        sizes="100vw"
+                        className="w-auto h-auto max-w-full max-h-[600px] object-contain"
+                        style={{ width: "auto", height: "auto" }}
+                        onError={(e) => {
+                          const src = (highResImageUrl || processedImageUrl)!;
+                          console.error("Processed image failed to load:", {
+                            src: src,
+                            isHighRes: !!highResImageUrl,
+                            error: e,
+                          });
+                          setProcessedImageLoadError(true);
+                        }}
+                        onLoad={(e) => {
+                          console.log("Processed image loaded successfully:", {
+                            src: (highResImageUrl || processedImageUrl)!,
+                            naturalWidth: e.currentTarget.naturalWidth,
+                            naturalHeight: e.currentTarget.naturalHeight,
+                            isHighRes: !!highResImageUrl,
+                          });
+                          setProcessedImageLoadError(false);
+                        }}
+                        unoptimized={true} // Processed images are likely data URLs or local files
+                      />
+                    ) : (
+                      <img
+                        src={(highResImageUrl || processedImageUrl)!}
+                        alt={
+                          highResImageUrl
+                            ? "High-resolution matte"
+                            : "Processed matte"
+                        }
+                        className="w-auto h-auto max-w-full max-h-[600px] object-contain"
+                        style={{ width: "auto", height: "auto" }}
+                        onError={(e) => {
+                          console.error("🚨 FALLBACK IMG TAG ERROR ANALYSIS:", {
+                            errorType: "HTML img tag fallback",
+                            attemptedSrc: e.currentTarget.src,
+                            imageObject: image,
+                            originalSrc: image?.url,
+                            currentImageUrl,
+                            fallbackAttempted: true,
+                            urlValidation: {
+                              isString: typeof e.currentTarget.src === "string",
+                              isNotEmpty:
+                                !!e.currentTarget.src &&
+                                e.currentTarget.src.length > 0,
+                              startsWithHttp:
+                                e.currentTarget.src?.startsWith("http"),
+                              containsImageDelivery:
+                                e.currentTarget.src?.includes(
+                                  "imagedelivery.net"
+                                ),
+                            },
+                          });
+                        }}
+                        onLoad={(e) => {
+                          console.log("✅ FALLBACK IMG TAG SUCCESS:", {
+                            src: e.currentTarget.src,
+                            naturalWidth: e.currentTarget.naturalWidth,
+                            naturalHeight: e.currentTarget.naturalHeight,
+                            fallbackWorked: true,
+                            imageObject: image,
+                          });
+                        }}
+                      />
+                    )}
+                    {highResImageUrl && (
+                      <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
+                        {highResMultiplier}x High-Res
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                    <div className="text-center">
+                      <Eye className="h-8 w-8 mx-auto mb-2" />
+                      <p className="text-sm">
+                        Processed matte will appear here
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Gallery Preview Image */}
+              {enablePreview && galleryId && showPreview && processedImage && (
+                <div className="space-y-2">
+                  <Label>Gallery Preview</Label>
+                  <div className="border rounded-lg p-2 bg-blue-50 border-blue-200">
+                    <Image
+                      src={processedImage.url}
+                      alt="Gallery processed image"
+                      width={200}
+                      height={200}
+                      className="w-full h-auto max-h-32 object-contain rounded"
+                      unoptimized={true}
+                    />
+                    <div className="mt-2 space-y-1">
+                      <p className="text-xs text-blue-700 font-medium">
+                        Ready to replace in gallery
+                      </p>
+                      <p className="text-xs text-blue-600">
+                        Filename: {processedImage.filename}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* High-res download button */}
+              {highResImageUrl && (
+                <Button
+                  onClick={handleHighResDownload}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download {highResMultiplier}x High-Res
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

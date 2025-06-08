@@ -2,9 +2,10 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { SimpleImageGallery } from "@/components/cars/SimpleImageGallery";
-import { CanvasExtensionModal } from "@/components/cars/CanvasExtensionModal";
-import { ImageMatteModal } from "@/components/cars/ImageMatteModal";
-import { ImageCropModal } from "@/components/cars/ImageCropModal";
+import {
+  ImageProcessingModal,
+  ProcessingType,
+} from "@/components/ui/image-processing";
 import { ImageViewModal } from "@/components/cars/ImageViewModal";
 import { useImages } from "@/hooks/use-images";
 import { ImageData } from "@/app/images/columns";
@@ -103,20 +104,12 @@ export default function ImagesClient() {
   const [carSearchQuery, setCarSearchQuery] = useState("");
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
 
-  // Canvas extension modal state
-  const [isCanvasModalOpen, setIsCanvasModalOpen] = useState(false);
-  const [selectedImageForCanvas, setSelectedImageForCanvas] =
+  // Unified image processing modal state
+  const [isProcessingModalOpen, setIsProcessingModalOpen] = useState(false);
+  const [selectedImageForProcessing, setSelectedImageForProcessing] =
     useState<ImageData | null>(null);
-
-  // Image matte modal state
-  const [isMatteModalOpen, setIsMatteModalOpen] = useState(false);
-  const [selectedImageForMatte, setSelectedImageForMatte] =
-    useState<ImageData | null>(null);
-
-  // Image crop modal state
-  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
-  const [selectedImageForCrop, setSelectedImageForCrop] =
-    useState<ImageData | null>(null);
+  const [processingType, setProcessingType] =
+    useState<ProcessingType>("image-crop");
 
   // Image view modal state
   const [isImageViewModalOpen, setIsImageViewModalOpen] = useState(false);
@@ -289,18 +282,21 @@ export default function ImagesClient() {
 
   // Modal handlers
   const handleCanvasExtension = (image: ImageData) => {
-    setSelectedImageForCanvas(image);
-    setIsCanvasModalOpen(true);
+    setSelectedImageForProcessing(image);
+    setProcessingType("canvas-extension");
+    setIsProcessingModalOpen(true);
   };
 
   const handleImageMatte = (image: ImageData) => {
-    setSelectedImageForMatte(image);
-    setIsMatteModalOpen(true);
+    setSelectedImageForProcessing(image);
+    setProcessingType("image-matte");
+    setIsProcessingModalOpen(true);
   };
 
   const handleImageCrop = (image: ImageData) => {
-    setSelectedImageForCrop(image);
-    setIsCropModalOpen(true);
+    setSelectedImageForProcessing(image);
+    setProcessingType("image-crop");
+    setIsProcessingModalOpen(true);
   };
 
   const handleImageView = (image: ImageData) => {
@@ -656,39 +652,16 @@ export default function ImagesClient() {
           )}
 
           {/* Modals */}
-          {selectedImageForCanvas && (
-            <CanvasExtensionModal
-              isOpen={isCanvasModalOpen}
+          {selectedImageForProcessing && (
+            <ImageProcessingModal
+              isOpen={isProcessingModalOpen}
               onClose={() => {
-                setIsCanvasModalOpen(false);
-                setSelectedImageForCanvas(null);
+                setIsProcessingModalOpen(false);
+                setSelectedImageForProcessing(null);
                 mutate();
               }}
-              image={selectedImageForCanvas}
-            />
-          )}
-
-          {selectedImageForMatte && (
-            <ImageMatteModal
-              isOpen={isMatteModalOpen}
-              onClose={() => {
-                setIsMatteModalOpen(false);
-                setSelectedImageForMatte(null);
-                mutate();
-              }}
-              image={selectedImageForMatte}
-            />
-          )}
-
-          {selectedImageForCrop && (
-            <ImageCropModal
-              isOpen={isCropModalOpen}
-              onClose={() => {
-                setIsCropModalOpen(false);
-                setSelectedImageForCrop(null);
-                mutate();
-              }}
-              image={selectedImageForCrop}
+              image={selectedImageForProcessing}
+              processingType={processingType}
             />
           )}
 

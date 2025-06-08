@@ -13,6 +13,7 @@ interface CropImageRequest {
   uploadToCloudflare?: boolean;
   originalFilename?: string;
   originalCarId?: string;
+  sourceImageWidth?: number; // For high-quality processing, specify source resolution
   previewImageDimensions?: {
     width: number;
     height: number;
@@ -48,6 +49,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body: CropImageRequest = await request.json();
+
+    // 🐛 SIMPLIFIED DEBUG: Check sourceImageWidth
+    console.log("🚨🚨🚨 BACKEND RECEIVED 🚨🚨🚨");
+    console.log("sourceImageWidth:", body.sourceImageWidth);
+    console.log("uploadToCloudflare:", body.uploadToCloudflare);
+    console.log("scale:", body.scale);
+
     console.log("📝 Request body received:", {
       imageUrl: body.imageUrl?.substring(0, 100) + "...",
       cropX: body.cropX,
@@ -57,6 +65,7 @@ export async function POST(request: NextRequest) {
       outputWidth: body.outputWidth,
       outputHeight: body.outputHeight,
       scale: body.scale,
+      sourceImageWidth: body.sourceImageWidth,
       previewImageDimensions: body.previewImageDimensions,
     });
 
@@ -75,6 +84,7 @@ export async function POST(request: NextRequest) {
       previewImageDimensions,
       requestedWidth,
       requestedHeight,
+      sourceImageWidth,
     } = body;
 
     if (!imageUrl) {
@@ -83,6 +93,49 @@ export async function POST(request: NextRequest) {
         { error: "Image URL is required" },
         { status: 400 }
       );
+    }
+
+    // For Cloudflare URLs, construct the proper URL based on requirements
+    let processableImageUrl = imageUrl;
+
+    if (imageUrl.includes("imagedelivery.net")) {
+      // Extract the base Cloudflare URL (account + image ID) regardless of current format
+      const cloudflareMatch = imageUrl.match(
+        /https:\/\/imagedelivery\.net\/([^\/]+)\/([^\/]+)/
+      );
+
+      if (cloudflareMatch) {
+        const [, accountHash, imageId] = cloudflareMatch;
+        const baseCloudflareUrl = `https://imagedelivery.net/${accountHash}/${imageId}`;
+
+        if (sourceImageWidth) {
+          // For high-quality processing, use specified resolution
+          processableImageUrl = `${baseCloudflareUrl}/w=${sourceImageWidth},q=95`;
+          console.log(
+            "🎯 Using high-resolution source for quality processing:",
+            {
+              original: imageUrl,
+              baseUrl: baseCloudflareUrl,
+              highRes: processableImageUrl,
+              sourceWidth: sourceImageWidth,
+            }
+          );
+        } else {
+          // For standard processing, use /public variant
+          processableImageUrl = `${baseCloudflareUrl}/public`;
+          console.log("🔧 Using standard resolution with /public variant:", {
+            original: imageUrl,
+            baseUrl: baseCloudflareUrl,
+            standard: processableImageUrl,
+          });
+        }
+      } else {
+        console.warn("⚠️ Could not parse Cloudflare URL format:", imageUrl);
+        // Fallback: if URL doesn't match expected format, use as-is or add /public
+        if (!imageUrl.includes("/public") && !imageUrl.match(/\/w=\d+/)) {
+          processableImageUrl = `${imageUrl}/public`;
+        }
+      }
     }
 
     // Validate crop parameters
@@ -115,24 +168,75 @@ export async function POST(request: NextRequest) {
       console.log("🔧 Using Sharp for image processing");
 
       // Local processing using Sharp (in-memory)
-      console.log("📥 Downloading image from:", imageUrl);
+      console.log("📥 Downloading image from:", processableImageUrl);
+      console.log("🔍 Image URL details:", {
+        url: processableImageUrl,
+        length: processableImageUrl?.length,
+        protocol: processableImageUrl?.split("://")[0],
+        domain: processableImageUrl?.split("/")[2],
+        isCloudflare: processableImageUrl?.includes("cloudflare"),
+        isImageDelivery: processableImageUrl?.includes("imagedelivery"),
+      });
 
       let imageResponse;
       try {
-        imageResponse = await fetch(imageUrl);
+        // Add headers for Cloudflare Images if needed
+        const fetchHeaders: Record<string, string> = {
+          "User-Agent": "Mozilla/5.0 (compatible; Next.js Image Processor)",
+        };
+
+        // If it's a Cloudflare Image Delivery URL, we might need special handling
+        if (processableImageUrl.includes("imagedelivery.net")) {
+          console.log("🔧 Detected Cloudflare Image Delivery URL");
+          // Add any necessary headers for Cloudflare
+          fetchHeaders["Accept"] = "image/*";
+        }
+
+        console.log("🌐 Making fetch request with headers:", fetchHeaders);
+
+        imageResponse = await fetch(processableImageUrl, {
+          headers: fetchHeaders,
+          method: "GET",
+        });
+
+        console.log("📊 Fetch response details:", {
+          status: imageResponse.status,
+          statusText: imageResponse.statusText,
+          headers: Object.fromEntries(imageResponse.headers.entries()),
+          url: imageResponse.url,
+        });
       } catch (fetchError) {
-        console.error("❌ Failed to fetch image:", fetchError);
+        console.error("❌ Fetch error details:", {
+          error: fetchError,
+          message: fetchError instanceof Error ? fetchError.message : "Unknown",
+          stack: fetchError instanceof Error ? fetchError.stack : undefined,
+          imageUrl: imageUrl,
+        });
         throw new Error(
-          `Failed to fetch image: ${fetchError instanceof Error ? fetchError.message : "Unknown fetch error"}`
+          `Failed to fetch image from ${processableImageUrl}: ${fetchError instanceof Error ? fetchError.message : "Unknown fetch error"}`
         );
       }
 
       if (!imageResponse.ok) {
-        console.error(
-          "❌ Image fetch failed with status:",
-          imageResponse.status
+        console.error("❌ Image fetch failed:", {
+          status: imageResponse.status,
+          statusText: imageResponse.statusText,
+          url: processableImageUrl,
+          responseHeaders: Object.fromEntries(imageResponse.headers.entries()),
+        });
+
+        // Try to get response body for more details
+        let responseBody = "";
+        try {
+          responseBody = await imageResponse.text();
+          console.error("❌ Response body:", responseBody.substring(0, 500));
+        } catch (bodyError) {
+          console.error("❌ Could not read response body:", bodyError);
+        }
+
+        throw new Error(
+          `Failed to download image: ${imageResponse.status} ${imageResponse.statusText}. URL: ${processableImageUrl}. Response: ${responseBody.substring(0, 200)}`
         );
-        throw new Error(`Failed to download image: ${imageResponse.status}`);
       }
 
       console.log("📦 Converting image response to buffer...");
@@ -164,12 +268,13 @@ export async function POST(request: NextRequest) {
       const actualHeight = imageMetadata.height!;
 
       console.log("📏 Actual image dimensions:", { actualWidth, actualHeight });
-      console.log("📐 Original crop coordinates:", {
+      console.log("📐 Original crop coordinates (from frontend):", {
         cropX,
         cropY,
         cropWidth,
         cropHeight,
       });
+      console.log("📱 Preview image dimensions:", previewImageDimensions);
 
       // Calculate scaling factor if we have preview dimensions
       let scaledCropX = cropX;
@@ -181,14 +286,53 @@ export async function POST(request: NextRequest) {
         const scaleFactorX = actualWidth / previewImageDimensions.width;
         const scaleFactorY = actualHeight / previewImageDimensions.height;
 
-        console.log("🔢 Scale factors:", { scaleFactorX, scaleFactorY });
+        console.log("🔢 Scale factors calculated:", {
+          scaleFactorX,
+          scaleFactorY,
+          calculation: `${actualWidth}/${previewImageDimensions.width} = ${scaleFactorX.toFixed(3)}`,
+        });
 
-        scaledCropX = Math.round(cropX * scaleFactorX);
-        scaledCropY = Math.round(cropY * scaleFactorY);
-        scaledCropWidth = Math.round(cropWidth * scaleFactorX);
-        scaledCropHeight = Math.round(cropHeight * scaleFactorY);
+        // Apply conservative scaling with safety margin
+        const conservativeFactorX = scaleFactorX * 0.999;
+        const conservativeFactorY = scaleFactorY * 0.999;
 
-        console.log("📐 Scaled crop coordinates:", {
+        scaledCropX = Math.round(cropX * conservativeFactorX);
+        scaledCropY = Math.round(cropY * conservativeFactorY);
+        scaledCropWidth = Math.round(cropWidth * conservativeFactorX);
+        scaledCropHeight = Math.round(cropHeight * conservativeFactorY);
+
+        console.log(
+          "📐 Scaled crop coordinates (after conservative scaling):",
+          {
+            scaledCropX,
+            scaledCropY,
+            scaledCropWidth,
+            scaledCropHeight,
+            conservativeFactorX: conservativeFactorX.toFixed(4),
+            conservativeFactorY: conservativeFactorY.toFixed(4),
+          }
+        );
+
+        // Apply additional safety bounds checking after scaling
+        if (scaledCropX + scaledCropWidth > actualWidth) {
+          const excess = scaledCropX + scaledCropWidth - actualWidth;
+          scaledCropWidth = Math.max(100, scaledCropWidth - excess - 1);
+          console.log("⚠️ Applied width safety adjustment:", {
+            excess,
+            newWidth: scaledCropWidth,
+          });
+        }
+
+        if (scaledCropY + scaledCropHeight > actualHeight) {
+          const excess = scaledCropY + scaledCropHeight - actualHeight;
+          scaledCropHeight = Math.max(100, scaledCropHeight - excess - 1);
+          console.log("⚠️ Applied height safety adjustment:", {
+            excess,
+            newHeight: scaledCropHeight,
+          });
+        }
+
+        console.log("✅ Final crop coordinates after safety checks:", {
           scaledCropX,
           scaledCropY,
           scaledCropWidth,
@@ -205,19 +349,43 @@ export async function POST(request: NextRequest) {
       ) {
         console.error("❌ Scaled crop area validation failed:", {
           actualDimensions: { actualWidth, actualHeight },
+          previewDimensions: previewImageDimensions,
+          originalCrop: { cropX, cropY, cropWidth, cropHeight },
           scaledCrop: {
             scaledCropX,
             scaledCropY,
             scaledCropWidth,
             scaledCropHeight,
           },
+          validationChecks: {
+            leftBound: scaledCropX >= 0,
+            topBound: scaledCropY >= 0,
+            rightBound: scaledCropX + scaledCropWidth <= actualWidth,
+            bottomBound: scaledCropY + scaledCropHeight <= actualHeight,
+          },
           exceedsRight: scaledCropX + scaledCropWidth > actualWidth,
           exceedsBottom: scaledCropY + scaledCropHeight > actualHeight,
+          rightExcess: Math.max(0, scaledCropX + scaledCropWidth - actualWidth),
+          bottomExcess: Math.max(
+            0,
+            scaledCropY + scaledCropHeight - actualHeight
+          ),
         });
 
         return NextResponse.json(
           {
             error: `Crop area exceeds image boundaries. Image: ${actualWidth}×${actualHeight}, Crop: ${scaledCropX},${scaledCropY} ${scaledCropWidth}×${scaledCropHeight}`,
+            details: {
+              actualDimensions: { width: actualWidth, height: actualHeight },
+              previewDimensions: previewImageDimensions,
+              originalCoordinates: { cropX, cropY, cropWidth, cropHeight },
+              scaledCoordinates: {
+                scaledCropX,
+                scaledCropY,
+                scaledCropWidth,
+                scaledCropHeight,
+              },
+            },
           },
           { status: 400 }
         );
@@ -346,7 +514,44 @@ export async function POST(request: NextRequest) {
           if (uploadResponse.ok) {
             const uploadResult = await uploadResponse.json();
             console.log("✅ Upload result:", uploadResult);
-            result.cloudflareUpload = uploadResult;
+            console.log("🔍 Upload result structure:", {
+              success: uploadResult.success,
+              hasImages: !!uploadResult.images,
+              imagesLength: uploadResult.images?.length,
+              firstImageKeys: uploadResult.images?.[0]
+                ? Object.keys(uploadResult.images[0])
+                : [],
+              firstImageId: uploadResult.images?.[0]?.id,
+              uploadResultKeys: Object.keys(uploadResult),
+            });
+
+            // Extract the actual image data from the upload response
+            if (
+              uploadResult.success &&
+              uploadResult.images &&
+              uploadResult.images.length > 0
+            ) {
+              const uploadedImage = uploadResult.images[0];
+              result.cloudflareUpload = {
+                success: true,
+                imageId: uploadedImage.cloudflareId,
+                imageUrl: uploadedImage.url,
+                filename: uploadedImage.filename,
+                mongoId: uploadedImage.id, // This is the MongoDB _id from the upload response
+              };
+              console.log(
+                "✅ Processed upload result:",
+                result.cloudflareUpload
+              );
+              console.log("🔍 MongoDB ID extracted:", uploadedImage.id);
+            } else {
+              console.error(
+                "❌ Upload result missing images array:",
+                uploadResult
+              );
+              result.cloudflareUpload = uploadResult;
+            }
+
             console.log("✅ Cloudflare upload successful");
           } else {
             const errorText = await uploadResponse.text();
@@ -367,10 +572,13 @@ export async function POST(request: NextRequest) {
             error: `Upload error: ${uploadError instanceof Error ? uploadError.message : "Unknown error"}`,
           };
         }
-      } else {
-        // Return the image as base64 for preview
+      }
+
+      // Always return the image as base64 for preview/download
+      if (!uploadToCloudflare) {
         try {
           result.imageData = processedImageBuffer.toString("base64");
+          result.processedImageUrl = `data:image/jpeg;base64,${result.imageData}`;
           console.log(
             "📤 Returning image data for preview, base64 length:",
             result.imageData.length

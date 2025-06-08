@@ -26,41 +26,11 @@ let refreshPromise: Promise<string> | null = null;
 // Global token request state to prevent multiple simultaneous token requests
 let isGettingToken = false;
 let tokenPromise: Promise<string> | null = null;
-const TOKEN_CACHE_MS = 120000; // ✅ PHASE 4E: Extended cache to 2 minutes to reduce token requests
-
-// ✅ PHASE 4E: Add console logging throttle to prevent spam
-let lastConsoleLogTime = 0;
-const CONSOLE_LOG_THROTTLE_MS = 120000; // Only log every 2 minutes
-
-// ✅ PHASE 4F: Add console throttling to prevent massive api-client spam
-const apiClientThrottleCache: { [messageType: string]: number } = {};
-const API_CLIENT_THROTTLE_MS = 120000; // Only log each message type every 2 minutes
-
-// Helper function for throttled console logging in api-client
-function throttledLog(messageType: string, message: string, ...args: any[]) {
-  const now = Date.now();
-  const lastLogTime = apiClientThrottleCache[messageType] || 0;
-
-  if (now - lastLogTime > API_CLIENT_THROTTLE_MS) {
-    console.log(message, ...args);
-    apiClientThrottleCache[messageType] = now;
-  }
-}
-
-function throttledError(messageType: string, message: string, ...args: any[]) {
-  const now = Date.now();
-  const lastLogTime = apiClientThrottleCache[messageType] || 0;
-
-  if (now - lastLogTime > API_CLIENT_THROTTLE_MS) {
-    console.error(message, ...args);
-    apiClientThrottleCache[messageType] = now;
-  }
-}
+const TOKEN_CACHE_MS = 120000; // 2 minutes cache
 
 /**
  * Gets a valid authentication token
  * This is the SINGLE source of truth for authentication tokens across the entire app
- * Now includes enhanced caching and throttling to prevent excessive Firebase calls
  */
 export async function getValidToken(): Promise<string> {
   const now = Date.now();
@@ -72,14 +42,6 @@ export async function getValidToken(): Promise<string> {
 
   // If a token request is already in progress, wait for it
   if (isGettingToken && tokenPromise) {
-    // ✅ PHASE 4E: Throttle console logging
-    if (
-      process.env.NODE_ENV === "development" &&
-      now - lastConsoleLogTime > CONSOLE_LOG_THROTTLE_MS
-    ) {
-      console.log("🔄 getValidToken: Waiting for existing token request...");
-      lastConsoleLogTime = now;
-    }
     return tokenPromise;
   }
 
@@ -105,14 +67,10 @@ export async function getValidToken(): Promise<string> {
 
       return token;
     } catch (error: any) {
-      // ✅ PHASE 4E: Throttle error logging to reduce console spam
-      if (now - lastConsoleLogTime > CONSOLE_LOG_THROTTLE_MS) {
-        console.error(
-          "💥 getValidToken: Failed to get authentication token:",
-          error
-        );
-        lastConsoleLogTime = now;
-      }
+      console.error(
+        "Failed to get authentication token:",
+        error.message || error
+      );
       throw new Error("Authentication required - please sign in");
     } finally {
       // Reset request state
@@ -126,16 +84,10 @@ export async function getValidToken(): Promise<string> {
 
 /**
  * Throttled token refresh that prevents multiple simultaneous refresh requests
- * This solves the "thundering herd" problem when many components call useAPI() at once
  */
 export async function refreshToken(): Promise<string> {
   // If a refresh is already in progress, wait for it instead of starting a new one
   if (isRefreshing && refreshPromise) {
-    // ✅ PHASE 4F: Use throttled logging to prevent massive console spam
-    throttledLog(
-      "refresh-waiting",
-      "🔄 refreshToken: Waiting for existing refresh to complete..."
-    );
     return refreshPromise;
   }
 
@@ -155,23 +107,15 @@ export async function refreshToken(): Promise<string> {
         throw new Error("Authentication required - failed to refresh token");
       }
 
-      // ✅ PHASE 4F: Use throttled logging to prevent massive console spam
-      throttledLog(
-        "refresh-success",
-        "✅ refreshToken: Successfully refreshed token"
-      );
-
       // Clear any cached token since we just refreshed
       cachedToken = null;
       lastTokenTime = 0;
 
       return token;
     } catch (error: any) {
-      // ✅ PHASE 4F: Use throttled error logging to prevent massive console spam
-      throttledError(
-        "refresh-error",
-        "💥 refreshToken: Failed to refresh authentication token:",
-        error
+      console.error(
+        "Failed to refresh authentication token:",
+        error.message || error
       );
       throw new Error("Authentication required - please sign in again");
     } finally {
@@ -278,23 +222,47 @@ class APIClient {
       url = `${this.baseURL}/${endpoint}`;
     }
 
+    // 🔍 DEBUG: Enhanced request debugging for gallery image processing issue
+    console.log("🚀 APIClient.request() DEBUG - Starting request:", {
+      originalEndpoint: endpoint,
+      constructedUrl: url,
+      method: requestOptions.method || "GET",
+      skipAuth,
+      hasBody: !!requestOptions.body,
+      bodyLength: requestOptions.body ? String(requestOptions.body).length : 0,
+      timestamp: new Date().toISOString(),
+    });
+
     try {
       // Get authentication headers (or skip if requested)
       const authHeaders = await this.getAuthHeaders(skipAuth);
 
-      const response = await fetch(url, {
-        ...requestOptions,
-        headers: {
-          ...authHeaders,
-          ...headers, // Allow override of auth headers if needed
-        },
+      // 🔍 DEBUG: Log authentication headers (without sensitive data)
+      console.log("🔑 APIClient.request() DEBUG - Auth headers prepared:", {
+        hasAuthHeader: !!(authHeaders as any)?.Authorization,
+        authHeaderLength: (authHeaders as any)?.Authorization
+          ? String((authHeaders as any).Authorization).length
+          : 0,
+        contentType: (authHeaders as any)?.["Content-Type"],
+        skipAuth,
       });
+
+      const finalHeaders = {
+        ...authHeaders,
+        ...headers, // Allow override of auth headers if needed
+      };
+
+      const requestPayload = {
+        ...requestOptions,
+        headers: finalHeaders,
+      };
+
+      const response = await fetch(url, requestPayload);
 
       // ✅ Enhanced 401 error handling with better retry logic
       if (response.status === 401 && !skipAuth && this.retryAttempts > 0) {
         // ✅ PHASE 4F: Use throttled logging to prevent massive console spam
-        throttledLog(
-          "401-retry",
+        console.log(
           "🔄 APIClient: Got 401, attempting token refresh and retry..."
         );
 
@@ -318,25 +286,23 @@ class APIClient {
 
           return this.handleResponse<T>(retryResponse);
         } catch (refreshError: any) {
-          // ✅ PHASE 4F: Use throttled error logging to prevent massive console spam
-          throttledError(
-            "401-refresh-failed",
-            "💥 APIClient: Token refresh failed:",
-            refreshError
-          );
+          console.error("💥 APIClient: Token refresh failed:", refreshError);
           throw new Error("Session expired - please sign in again");
         }
       }
 
       return this.handleResponse<T>(response);
     } catch (error: any) {
-      // ✅ PHASE 4F: Use throttled error logging to prevent massive console spam
-      throttledError(
-        "request-failed",
-        `💥 APIClient: Request failed for ${url}:`,
-        error
-      );
-      throw this.createAPIError(error, url);
+      const apiError = this.createAPIError(error, url);
+      console.error(`API request failed for ${url}:`, apiError.message);
+
+      // Create a proper Error object that serializes correctly
+      const errorObj = new Error(apiError.message);
+      (errorObj as any).status = apiError.status;
+      (errorObj as any).code = apiError.code;
+      (errorObj as any).originalError = error;
+
+      throw errorObj;
     }
   }
 
@@ -350,24 +316,28 @@ class APIClient {
       try {
         const errorData = await response.json();
         errorMessage = errorData.message || errorData.error || errorMessage;
-      } catch {
+      } catch (errorParseError) {
         // If we can't parse error as JSON, use status text
         errorMessage = response.statusText || errorMessage;
       }
 
-      const error: APIError = {
-        message: errorMessage,
-        status: response.status,
-      };
+      const errorObj = new Error(errorMessage);
+      (errorObj as any).status = response.status;
 
-      throw error;
+      throw errorObj;
     }
 
     // Handle responses that might not have a body (like 204 No Content)
     const contentType = response.headers.get("content-type");
 
     if (contentType && contentType.includes("application/json")) {
-      return response.json();
+      try {
+        const jsonResult = await response.json();
+        return jsonResult;
+      } catch (jsonParseError) {
+        console.error("Failed to parse JSON response:", jsonParseError);
+        throw new Error(`Failed to parse JSON response: ${jsonParseError}`);
+      }
     } else {
       // For API routes, if we get HTML instead of JSON, it's likely an error page
       const text = await response.text();
@@ -377,23 +347,23 @@ class APIClient {
         text.trim().startsWith("<!DOCTYPE html>") ||
         text.trim().startsWith("<html")
       ) {
-        console.error("🚨 API returned HTML instead of JSON:", {
-          url: response.url,
-          status: response.status,
-          contentType,
-          textPreview: text.substring(0, 200) + "...",
-        });
+        console.error(
+          "API returned HTML instead of JSON:",
+          response.url,
+          response.status
+        );
 
-        const error: APIError = {
-          message: `API endpoint returned HTML instead of JSON (likely a server error)`,
-          status: response.status,
-        };
+        const errorObj = new Error(
+          `API endpoint returned HTML instead of JSON (likely a server error)`
+        );
+        (errorObj as any).status = response.status;
 
-        throw error;
+        throw errorObj;
       }
 
       // For legitimate non-JSON responses, return the text wrapped in data
-      return (text ? { data: text } : {}) as T;
+      const textResult = (text ? { data: text } : {}) as T;
+      return textResult;
     }
   }
 

@@ -21,10 +21,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { CanvasExtensionModal } from "../cars/CanvasExtensionModal";
-import { ImageMatteModal } from "../cars/ImageMatteModal";
-import { ImageCropModal } from "../cars/ImageCropModal";
-import { ImageData } from "@/app/images/columns";
+import {
+  ImageProcessingModal,
+  ProcessingType,
+} from "@/components/ui/image-processing";
 import { useAPI } from "@/hooks/useAPI";
 import { toast } from "react-hot-toast";
 
@@ -122,9 +122,9 @@ export function SortableGalleryItem({
   const api = useAPI();
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [isCanvasExtensionOpen, setIsCanvasExtensionOpen] = useState(false);
-  const [isImageMatteOpen, setIsImageMatteOpen] = useState(false);
-  const [isCropOpen, setIsCropOpen] = useState(false);
+  const [isProcessingModalOpen, setIsProcessingModalOpen] = useState(false);
+  const [processingType, setProcessingType] =
+    useState<ProcessingType>("image-crop");
   const [isRestoring, setIsRestoring] = useState(false);
   const [imageDimensions, setImageDimensions] = useState<{
     width: number;
@@ -204,15 +204,18 @@ export function SortableGalleryItem({
   };
 
   const handleCanvasExtension = () => {
-    setIsCanvasExtensionOpen(true);
+    setProcessingType("canvas-extension");
+    setIsProcessingModalOpen(true);
   };
 
   const handleImageMatte = () => {
-    setIsImageMatteOpen(true);
+    setProcessingType("image-matte");
+    setIsProcessingModalOpen(true);
   };
 
   const handleCrop = () => {
-    setIsCropOpen(true);
+    setProcessingType("image-crop");
+    setIsProcessingModalOpen(true);
   };
 
   // Check if this image is a processed image with original metadata
@@ -278,18 +281,13 @@ export function SortableGalleryItem({
     }
   };
 
-  // Convert image to ImageData format for the modals
-  const imageData: ImageData = {
+  // Convert image to ProcessableImageData format for the modals
+  const imageData = {
     _id: image._id,
-    cloudflareId: image._id, // Using _id as cloudflareId for now
     url: image.url,
-    filename: image.filename || "",
-    width: imageDimensions?.width || 0,
-    height: imageDimensions?.height || 0,
-    metadata: image.metadata || {},
-    carId: image.carId || "",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    filename: image.filename,
+    metadata: image.metadata,
+    carId: image.carId,
   };
 
   return (
@@ -475,36 +473,13 @@ export function SortableGalleryItem({
         </DialogContent>
       </Dialog>
 
-      {/* Canvas Extension Modal */}
+      {/* Unified Image Processing Modal */}
       {galleryId && (
-        <CanvasExtensionModal
-          isOpen={isCanvasExtensionOpen}
-          onClose={() => setIsCanvasExtensionOpen(false)}
+        <ImageProcessingModal
+          isOpen={isProcessingModalOpen}
+          onClose={() => setIsProcessingModalOpen(false)}
           image={imageData}
-          enablePreview={true}
-          galleryId={galleryId}
-          onImageReplaced={onImageProcessed}
-        />
-      )}
-
-      {/* Image Matte Modal */}
-      {galleryId && (
-        <ImageMatteModal
-          isOpen={isImageMatteOpen}
-          onClose={() => setIsImageMatteOpen(false)}
-          image={imageData}
-          enablePreview={true}
-          galleryId={galleryId}
-          onImageReplaced={onImageProcessed}
-        />
-      )}
-
-      {/* Crop Modal */}
-      {galleryId && (
-        <ImageCropModal
-          isOpen={isCropOpen}
-          onClose={() => setIsCropOpen(false)}
-          image={imageData}
+          processingType={processingType}
           enablePreview={true}
           galleryId={galleryId}
           onImageReplaced={onImageProcessed}
