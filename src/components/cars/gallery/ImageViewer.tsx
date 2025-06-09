@@ -29,7 +29,7 @@ export function ImageViewer({
     <div className="bg-background rounded-lg h-full">
       <div className="relative w-full h-full">
         <CloudflareImage
-          src={getEnhancedImageUrlBySize(currentImage!.url, "viewer")}
+          src={getEnhancedImageUrlBySize(currentImage!.url, "large")}
           alt={currentImage!.metadata?.description || `Image`}
           fill
           className="object-contain"
