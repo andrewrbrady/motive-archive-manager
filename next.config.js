@@ -2,6 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
+  experimental: {
+    // Increase body size limit for uploads
+    isrMemoryCacheSize: 0, // Disable ISR cache to free up memory for uploads
+  },
   transpilePackages: [
     "@tanstack/react-query",
     "@tanstack/react-query-devtools",

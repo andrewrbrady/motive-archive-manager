@@ -51,7 +51,7 @@ export function StatusSelector({
     setError(null);
 
     try {
-      await api.patch(`/api/deliverables/${deliverableId}`, {
+      await api.put(`/api/deliverables/${deliverableId}`, {
         status: newStatus,
       });
 

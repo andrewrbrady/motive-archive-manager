@@ -9,6 +9,9 @@ export const runtime = "nodejs";
 // Force dynamic rendering for uploads
 export const dynamic = "force-dynamic";
 
+// Configure body size limit (this works in conjunction with vercel.json)
+export const preferredRegion = "auto";
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   console.log("[API] Images upload called at", new Date().toISOString());

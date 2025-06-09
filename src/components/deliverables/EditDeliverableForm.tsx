@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil } from "lucide-react";
 import { toast } from "react-hot-toast";
 import {
@@ -53,6 +54,7 @@ interface UpdateDeliverableData {
   release_date: string;
   dropbox_link: string;
   social_media_link: string;
+  scheduled: boolean;
 }
 
 interface UpdateDeliverableResponse {
@@ -80,6 +82,7 @@ export default function EditDeliverableForm({
   const [releaseDate, setReleaseDate] = useState("");
   const [dropboxLink, setDropboxLink] = useState("");
   const [socialMediaLink, setSocialMediaLink] = useState("");
+  const [scheduled, setScheduled] = useState(false);
 
   const { platforms: availablePlatforms, isLoading: platformsLoading } =
     usePlatforms();
@@ -142,6 +145,7 @@ export default function EditDeliverableForm({
     setReleaseDate(safeFormatDate(deliverable.release_date));
     setDropboxLink(deliverable.dropbox_link || "");
     setSocialMediaLink(deliverable.social_media_link || "");
+    setScheduled(deliverable.scheduled || false);
   }, [deliverable, editors]);
 
   // Separate useEffect for platform handling to avoid infinite loops
@@ -226,6 +230,7 @@ export default function EditDeliverableForm({
           : "",
         dropbox_link: dropboxLink || "",
         social_media_link: socialMediaLink || "",
+        scheduled: scheduled,
       };
 
       const response = await api.put<UpdateDeliverableResponse>(
@@ -521,6 +526,41 @@ export default function EditDeliverableForm({
                     placeholder="Enter Social Media link"
                     className="text-sm"
                   />
+                </div>
+              </div>
+            </div>
+
+            {/* Options Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                  Options
+                </span>
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="scheduled"
+                      checked={scheduled}
+                      onCheckedChange={(checked) =>
+                        setScheduled(checked === true)
+                      }
+                    />
+                    <label
+                      htmlFor="scheduled"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide cursor-pointer"
+                    >
+                      Scheduled
+                    </label>
+                  </div>
+                  <p className="text-xs text-[hsl(var(--foreground-muted))]">
+                    Mark this deliverable as scheduled to distinguish it in
+                    calendar views
+                  </p>
                 </div>
               </div>
             </div>
