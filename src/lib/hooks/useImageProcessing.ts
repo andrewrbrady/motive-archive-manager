@@ -123,6 +123,8 @@ export function useImageProcessing({
           imageUrl: image.url,
           originalFilename: image.filename,
           originalCarId: image.carId,
+          scaleMultiplier: 1, // Add scale multiplier for canvas extension
+          previewImageDimensions: originalDimensions, // Add preview dimensions for coordinate scaling
         },
       };
 
@@ -193,6 +195,10 @@ export function useImageProcessing({
           outputWidth: (parseInt(parameters.outputWidth) || 1080) * multiplier,
           outputHeight:
             (parseInt(parameters.outputHeight) || 1920) * multiplier,
+          scaleMultiplier: multiplier, // Add scale multiplier for canvas extension
+          previewImageDimensions: originalDimensions, // Add preview dimensions for coordinate scaling
+          // For canvas extension, dimensions should already be correctly set
+          // The multiplier is used for filename generation and variant selection
         },
       };
 
@@ -381,33 +387,45 @@ export function useImageProcessing({
         sourceImageWidth: scale >= 2 ? 3000 : undefined,
       };
 
-      // Apply the same coordinate scaling logic as download for crop operations
+      // Apply the same coordinate scaling logic as download for crop and canvas extension operations
       // For gallery replacement, send raw coordinates to backend - let backend handle ALL scaling
       if (
-        processingType === "image-crop" &&
+        (processingType === "image-crop" ||
+          processingType === "canvas-extension") &&
         scale >= 2 &&
-        originalDimensions &&
-        parameters.cropArea
+        originalDimensions
       ) {
-        const cropX = parameters.cropArea.x || 0;
-        const cropY = parameters.cropArea.y || 0;
-        const cropWidth = parameters.cropArea.width || 100;
-        const cropHeight = parameters.cropArea.height || 100;
+        if (processingType === "image-crop" && parameters.cropArea) {
+          const cropX = parameters.cropArea.x || 0;
+          const cropY = parameters.cropArea.y || 0;
+          const cropWidth = parameters.cropArea.width || 100;
+          const cropHeight = parameters.cropArea.height || 100;
 
-        console.log(
-          "🔍 useImageProcessing - Sending raw coordinates for gallery replacement (backend will handle scaling):",
-          {
-            rawCoordinates: {
-              x: cropX,
-              y: cropY,
-              width: cropWidth,
-              height: cropHeight,
-            },
-            previewDimensions: originalDimensions,
-            scale,
-            processingType,
-          }
-        );
+          console.log(
+            "🔍 useImageProcessing - Sending raw coordinates for gallery replacement (backend will handle scaling):",
+            {
+              rawCoordinates: {
+                x: cropX,
+                y: cropY,
+                width: cropWidth,
+                height: cropHeight,
+              },
+              previewDimensions: originalDimensions,
+              scale,
+              processingType,
+            }
+          );
+        } else if (processingType === "canvas-extension") {
+          console.log(
+            "🔍 useImageProcessing - Canvas extension gallery replacement with scaling:",
+            {
+              scale,
+              previewDimensions: originalDimensions,
+              processingType,
+              desiredHeight: parameters.desiredHeight,
+            }
+          );
+        }
       }
 
       console.log("🔍 useImageProcessing - Replace with scaled parameters:", {
@@ -483,20 +501,16 @@ export function useImageProcessing({
         throw new Error("Authentication required");
       }
 
-      // Create parameters with scale
+      // SIMPLIFIED: Don't pre-scale dimensions, let the unified API handle it
       const scaledParameters = {
         ...parameters,
         scale,
-        outputWidth:
-          scale > 1
-            ? String(parseInt(parameters.outputWidth || "1080") * scale)
-            : parameters.outputWidth,
-        outputHeight:
-          scale > 1
-            ? String(parseInt(parameters.outputHeight || "1920") * scale)
-            : parameters.outputHeight,
+        // Pass original dimensions - let backend handle scaling based on scaleMultiplier
+        outputWidth: parameters.outputWidth,
+        outputHeight: parameters.outputHeight,
         // For 2x+ processing, use higher resolution source
         sourceImageWidth: scale >= 2 ? 3000 : undefined,
+        scaleMultiplier: scale, // Add explicit scale multiplier for backend
       };
 
       const result = await api.post<any>(`images/process`, {
@@ -508,6 +522,8 @@ export function useImageProcessing({
           originalFilename: image.filename,
           originalCarId: image.carId,
           uploadToCloudflare: true,
+          scaleMultiplier: scale, // Add scale multiplier for canvas extension
+          previewImageDimensions: originalDimensions, // Add preview dimensions for coordinate scaling
         },
       });
 
@@ -572,153 +588,68 @@ export function useImageProcessing({
         case "image-crop":
           endpoint = "/api/images/crop-image";
 
-          // Get the crop coordinates from parameters
-          const cropX = scaledParameters.cropArea?.x || 0;
-          const cropY = scaledParameters.cropArea?.y || 0;
-          const cropWidth = scaledParameters.cropArea?.width || 100;
-          const cropHeight = scaledParameters.cropArea?.height || 100;
+          // SIMPLIFIED APPROACH: Let the backend handle all scaling
+          // Just pass the original parameters and scale multiplier
+          const cropX = parameters.cropArea?.x || 0;
+          const cropY = parameters.cropArea?.y || 0;
+          const cropWidth = parameters.cropArea?.width || 100;
+          const cropHeight = parameters.cropArea?.height || 100;
 
-          console.log(
-            "🔍 useImageProcessing - Debug crop coordinates for scale:",
+          console.log("🔍 useImageProcessing - SIMPLIFIED crop processing:", {
             scale,
-            {
-              originalCropArea: parameters.cropArea,
-              scaledCropArea: scaledParameters.cropArea,
-              originalDimensions,
-              scale,
-              imageUrl: image.url,
-            }
-          );
-
-          // For 2x+ processing, we may need to scale coordinates
-          // The coordinates in parameters.cropArea come from the canvas UI
-          // They need to be scaled to match the high-resolution source image
-          let finalCropX = cropX;
-          let finalCropY = cropY;
-          let finalCropWidth = cropWidth;
-          let finalCropHeight = cropHeight;
-          let sourceImageWidth = undefined;
-
-          if (scale >= 2 && originalDimensions) {
-            // Check if coordinates need scaling by examining if they're already in high-res space
-            // If originalDimensions.width is already ~3000, coordinates are likely already correct
-            const previewWidth = originalDimensions.width;
-            const isAlreadyHighRes = previewWidth >= 2500; // If preview is already high-res
-
-            if (isAlreadyHighRes) {
-              // Coordinates are already in the correct high-resolution space, no scaling needed
-              console.log(
-                "🔍 useImageProcessing - Coordinates already in high-res space, no scaling needed:",
-                {
-                  cropArea: {
-                    x: cropX,
-                    y: cropY,
-                    width: cropWidth,
-                    height: cropHeight,
-                  },
-                  originalDimensions,
-                  scale,
-                  previewWidth,
-                  reason: "previewWidth >= 2500px indicates high-res source",
-                }
-              );
-              sourceImageWidth = previewWidth; // Use actual image width
-            } else {
-              // Coordinates are in preview space, need scaling to high-res
-              const targetSourceWidth = 3000; // Target source resolution
-              const scaleFactor = targetSourceWidth / previewWidth;
-
-              // Apply scaling but use a slightly conservative factor to account for aspect ratio differences
-              // The issue is that preview dimensions might not exactly match source aspect ratio
-              const conservativeScaleFactor = scaleFactor * 0.999; // Reduce by 0.1% to prevent edge cases
-
-              finalCropX = Math.round(cropX * conservativeScaleFactor);
-              finalCropY = Math.round(cropY * conservativeScaleFactor);
-              finalCropWidth = Math.round(cropWidth * conservativeScaleFactor);
-              finalCropHeight = Math.round(
-                cropHeight * conservativeScaleFactor
-              );
-              sourceImageWidth = targetSourceWidth;
-
-              // Additional safety: ensure crop area doesn't exceed preview bounds when scaled
-              const previewHeight = originalDimensions.height;
-              const maxScaledHeight = Math.round(previewHeight * scaleFactor);
-              if (finalCropY + finalCropHeight > maxScaledHeight) {
-                const excess = finalCropY + finalCropHeight - maxScaledHeight;
-                finalCropHeight = Math.max(100, finalCropHeight - excess); // Ensure minimum height
-                console.log(
-                  "🔧 Adjusted crop height to fit source aspect ratio:",
-                  {
-                    originalScaledHeight: Math.round(cropHeight * scaleFactor),
-                    adjustedHeight: finalCropHeight,
-                    excessPixels: excess,
-                    maxScaledHeight,
-                  }
-                );
-              }
-
-              console.log(
-                "🔍 useImageProcessing - Coordinate scaling applied:",
-                {
-                  original: {
-                    x: cropX,
-                    y: cropY,
-                    width: cropWidth,
-                    height: cropHeight,
-                  },
-                  scaled: {
-                    x: finalCropX,
-                    y: finalCropY,
-                    width: finalCropWidth,
-                    height: finalCropHeight,
-                  },
-                  scaleFactor,
-                  previewWidth,
-                  targetSourceWidth,
-                  scale,
-                }
-              );
-            }
-          } else {
-            console.log(
-              "🔍 useImageProcessing - No coordinate scaling for 1x:",
-              {
-                cropArea: {
-                  x: cropX,
-                  y: cropY,
-                  width: cropWidth,
-                  height: cropHeight,
-                },
-                scale,
-                originalDimensions,
-              }
-            );
-          }
+            originalOutputDimensions: {
+              width: parameters.outputWidth,
+              height: parameters.outputHeight,
+            },
+            cropArea: { cropX, cropY, cropWidth, cropHeight },
+            note: "Backend will handle all scaling logic",
+          });
 
           payload = {
             imageUrl: image.url,
-            cropX: finalCropX,
-            cropY: finalCropY,
-            cropWidth: finalCropWidth,
-            cropHeight: finalCropHeight,
-            outputWidth: parseInt(scaledParameters.outputWidth) || 1080,
-            outputHeight: parseInt(scaledParameters.outputHeight) || 1920,
-            scale: scaledParameters.scale || 1.0,
+            cropX,
+            cropY,
+            cropWidth,
+            cropHeight,
+            outputWidth: parseInt(parameters.outputWidth) || 1080,
+            outputHeight: parseInt(parameters.outputHeight) || 1920,
+            scale: scale,
             uploadToCloudflare: false,
-            sourceImageWidth: sourceImageWidth,
+            sourceImageWidth: scale >= 2 ? 3000 : undefined, // Use highres variant for 2x+
+            previewImageDimensions: originalDimensions,
+            scaleMultiplier: scale, // Let backend handle output scaling
           };
           break;
 
         case "canvas-extension":
           endpoint = "/api/images/extend-canvas";
+
+          // SIMPLIFIED: Apply scaling in direct API call (since it bypasses unified API)
+          const baseDesiredHeight = parseInt(parameters.desiredHeight) || 1350;
+          const baseRequestedWidth = parseInt(parameters.outputWidth) || 1080;
+
+          console.log(
+            "🔍 useImageProcessing - SIMPLIFIED canvas extension with scaling:",
+            {
+              originalDesiredHeight: parameters.desiredHeight,
+              originalOutputWidth: parameters.outputWidth,
+              scaledDesiredHeight: Math.round(baseDesiredHeight * scale),
+              scaledRequestedWidth: Math.round(baseRequestedWidth * scale),
+              scale,
+              note: "Direct API call - applying scaling here",
+            }
+          );
+
           payload = {
             imageUrl: image.url,
-            desiredHeight: parseInt(scaledParameters.desiredHeight) || 1350,
-            paddingPct: parseFloat(scaledParameters.paddingPercentage) || 0.05,
-            whiteThresh: parseInt(scaledParameters.whiteThreshold) || 90,
+            desiredHeight: Math.round(baseDesiredHeight * scale),
+            paddingPct: parseFloat(parameters.paddingPercentage) || 0.05,
+            whiteThresh: parseInt(parameters.whiteThreshold) || 90,
             uploadToCloudflare: false,
-            requestedWidth: parseInt(scaledParameters.outputWidth) || 1080,
-            requestedHeight: parseInt(scaledParameters.desiredHeight) || 1350,
+            requestedWidth: Math.round(baseRequestedWidth * scale),
+            requestedHeight: Math.round(baseDesiredHeight * scale),
+            scaleMultiplier: scale,
+            previewImageDimensions: originalDimensions,
           };
           break;
 
@@ -744,6 +675,9 @@ export function useImageProcessing({
         endpoint,
         method: "POST",
         payload: payload,
+        processingType,
+        scale,
+        payloadKeys: Object.keys(payload),
       });
 
       const response = await fetch(endpoint, {
@@ -760,14 +694,44 @@ export function useImageProcessing({
 
       const result = await response.json();
 
+      console.log("🔍 useImageProcessing - API Response received:", {
+        processingType,
+        hasImageData: !!result.imageData,
+        hasProcessedImageUrl: !!result.processedImageUrl,
+        success: result.success,
+        resultKeys: Object.keys(result),
+      });
+
+      // Handle different response formats based on processing type
+      let downloadUrl: string;
+      let hasData = false;
+
       if (result.imageData) {
+        // Crop tool format - base64 string
+        downloadUrl = `data:image/jpeg;base64,${result.imageData}`;
+        hasData = true;
+      } else if (result.processedImageUrl) {
+        // Canvas extension format - already a data URL
+        downloadUrl = result.processedImageUrl;
+        hasData = true;
+      } else {
+        throw new Error("No image data received");
+      }
+
+      if (hasData) {
         // Create download link
         const link = document.createElement("a");
-        link.href = `data:image/jpeg;base64,${result.imageData}`;
+        link.href = downloadUrl;
         link.download = `${image.filename || "processed"}_${processingType}${scale > 1 ? `_${scale}x` : ""}.jpg`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+
+        console.log("✅ useImageProcessing - Download successful:", {
+          processingType,
+          filename: link.download,
+          scale,
+        });
 
         toast({
           title: "Success",

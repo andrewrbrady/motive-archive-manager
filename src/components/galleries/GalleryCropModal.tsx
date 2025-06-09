@@ -1028,7 +1028,7 @@ export function GalleryCropModal({
       // Use the selected multiplier for the processing
       const processingImageUrl = getProcessingImageUrl(image.url || "");
 
-      // First, process the image and upload to Cloudflare
+      // Process the image and upload to Cloudflare
       const processingRequestData: CropImageData = {
         imageUrl: processingImageUrl,
         cropX: Math.round(cropArea.x),

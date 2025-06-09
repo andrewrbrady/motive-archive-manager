@@ -41,52 +41,76 @@ export async function POST(request: NextRequest) {
     switch (processingType) {
       case "image-crop":
         endpoint = "/api/images/crop-image";
+
+        // SIMPLIFIED: Apply scaling here in unified API
+        const baseOutputWidth = parseInt(parameters.outputWidth) || 1080;
+        const baseOutputHeight = parseInt(parameters.outputHeight) || 1920;
+        const scaleMultiplier =
+          parameters.scaleMultiplier || parameters.scale || 1.0;
+
         payload = {
           imageUrl: parameters.imageUrl,
           cropX: parameters.cropArea?.x || 0,
           cropY: parameters.cropArea?.y || 0,
           cropWidth: parameters.cropArea?.width || 100,
           cropHeight: parameters.cropArea?.height || 100,
-          outputWidth: parseInt(parameters.outputWidth) || 1080,
-          outputHeight: parseInt(parameters.outputHeight) || 1920,
+          outputWidth: Math.round(baseOutputWidth * scaleMultiplier),
+          outputHeight: Math.round(baseOutputHeight * scaleMultiplier),
           scale: parameters.scale || 1.0,
           uploadToCloudflare: true,
           originalFilename: parameters.originalFilename,
           originalCarId: parameters.originalCarId,
           sourceImageWidth: parameters.sourceImageWidth, // Pass through high-res source width
           previewImageDimensions: parameters.previewImageDimensions, // Pass through preview dimensions for coordinate scaling
+          scaleMultiplier: scaleMultiplier, // Pass through for filename generation
         };
         break;
 
       case "canvas-extension":
         endpoint = "/api/images/extend-canvas";
+
+        // SIMPLIFIED: Apply scaling here in unified API for canvas extension
+        // NOTE: Only use desiredHeight - do NOT send requestedWidth/Height as they cause distortion
+        const baseDesiredHeight = parseInt(parameters.desiredHeight) || 1350;
+        const canvasScaleMultiplier =
+          parameters.scaleMultiplier || parameters.scale || 1.0;
+
         payload = {
           imageUrl: parameters.imageUrl,
-          desiredHeight: parseInt(parameters.desiredHeight) || 1350,
+          desiredHeight: Math.round(baseDesiredHeight * canvasScaleMultiplier),
           paddingPct: parseFloat(parameters.paddingPercentage) || 0.05,
           whiteThresh: parseInt(parameters.whiteThreshold) || 90,
           uploadToCloudflare: true,
           originalFilename: parameters.originalFilename,
           originalCarId: parameters.originalCarId,
-          requestedWidth: parseInt(parameters.outputWidth) || 1080,
-          requestedHeight: parseInt(parameters.desiredHeight) || 1350,
-          scaleMultiplier: 1,
+          scaleMultiplier: canvasScaleMultiplier,
+          previewImageDimensions: parameters.previewImageDimensions,
+          // DO NOT SEND requestedWidth/requestedHeight - let canvas extension work naturally!
         };
         break;
 
       case "image-matte":
         endpoint = "/api/images/create-matte";
+
+        // FIXED: Use canvasWidth/Height for both processing and filename generation
+        // Apply scaling here in unified API for image matte
+        const baseCanvasWidth = parseInt(parameters.canvasWidth) || 1827;
+        const baseCanvasHeight = parseInt(parameters.canvasHeight) || 1080;
+        const matteScaleMultiplier =
+          parameters.scaleMultiplier || parameters.scale || 1.0;
+
         payload = {
           imageUrl: parameters.imageUrl,
-          canvasWidth: parseInt(parameters.canvasWidth) || 1827,
-          canvasHeight: parseInt(parameters.canvasHeight) || 1080,
+          canvasWidth: Math.round(baseCanvasWidth * matteScaleMultiplier),
+          canvasHeight: Math.round(baseCanvasHeight * matteScaleMultiplier),
           paddingPercent: parseFloat(parameters.paddingPercentage) || 0,
           matteColor: parameters.matteColor || "#000000",
           uploadToCloudflare: true,
           originalFilename: parameters.originalFilename,
           originalCarId: parameters.originalCarId,
-          requestedWidth: parseInt(parameters.outputWidth) || 1080,
-          requestedHeight: parseInt(parameters.canvasHeight) || 1080,
+          requestedWidth: Math.round(baseCanvasWidth * matteScaleMultiplier),
+          requestedHeight: Math.round(baseCanvasHeight * matteScaleMultiplier),
+          scaleMultiplier: matteScaleMultiplier,
         };
         break;
 
@@ -161,12 +185,15 @@ export async function POST(request: NextRequest) {
       "processed";
 
     console.log("🔍 Unified Process API - Extracted values:", {
+      processingType,
       mongoId,
       processedImageUrl,
       filename,
       cloudflareUploadExists: !!result.cloudflareUpload,
       cloudflareUploadMongoId: result.cloudflareUpload?.mongoId,
       originalImageId: imageId,
+      scaleMultiplier: parameters.scaleMultiplier,
+      hasPreviewImageDimensions: !!parameters.previewImageDimensions,
       fullResult: JSON.stringify(result, null, 2),
     });
 

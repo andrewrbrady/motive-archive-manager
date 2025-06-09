@@ -83,57 +83,6 @@ export function CanvasExtensionControls({
           />
         </div>
 
-        {/* Aspect Ratio Presets */}
-        <div className="space-y-2">
-          <Label>Aspect Ratio Presets</Label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => {
-                setOutputWidth("1080");
-                setDesiredHeight("1920");
-              }}
-              className="p-2 text-sm border rounded hover:bg-muted transition-colors"
-            >
-              9:16
-              <br />
-              <span className="text-xs text-muted-foreground">1080×1920</span>
-            </button>
-            <button
-              onClick={() => {
-                setOutputWidth("1080");
-                setDesiredHeight("1350");
-              }}
-              className="p-2 text-sm border rounded hover:bg-muted transition-colors"
-            >
-              4:5
-              <br />
-              <span className="text-xs text-muted-foreground">1080×1350</span>
-            </button>
-            <button
-              onClick={() => {
-                setOutputWidth("1920");
-                setDesiredHeight("1080");
-              }}
-              className="p-2 text-sm border rounded hover:bg-muted transition-colors"
-            >
-              16:9
-              <br />
-              <span className="text-xs text-muted-foreground">1920×1080</span>
-            </button>
-            <button
-              onClick={() => {
-                setOutputWidth("1440");
-                setDesiredHeight("1080");
-              }}
-              className="p-2 text-sm border rounded hover:bg-muted transition-colors"
-            >
-              4:3
-              <br />
-              <span className="text-xs text-muted-foreground">1440×1080</span>
-            </button>
-          </div>
-        </div>
-
         {/* Padding Percentage */}
         <div className="space-y-2">
           <Label>

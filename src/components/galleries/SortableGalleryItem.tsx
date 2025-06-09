@@ -157,7 +157,7 @@ export function SortableGalleryItem({
     return getEnhancedImageUrl(image.url, "1200", "90");
   }, [image.url]);
 
-  // Load image dimensions to determine if it's horizontal
+  // Load image dimensions to determine if it's horizontal (for button visibility)
   React.useEffect(() => {
     if (!api) return; // Add conditional check inside async function
     console.log(`🖼️ Image URL updated for ${image.filename}: ${image.url}`);
@@ -168,8 +168,8 @@ export function SortableGalleryItem({
         height: img.naturalHeight,
       });
     };
-    img.src = thumbnailUrl; // Use the enhanced URL for loading dimensions
-  }, [thumbnailUrl, image.filename, api]);
+    img.src = image.url; // Use the ORIGINAL image URL, not the thumbnail
+  }, [image.url, image.filename, api]);
 
   // Authentication guard moved to the end
   if (!api) {
@@ -180,10 +180,8 @@ export function SortableGalleryItem({
     ? imageDimensions.width > imageDimensions.height
     : false;
 
-  // Calculate native aspect ratio
-  const aspectRatio = imageDimensions
-    ? imageDimensions.width / imageDimensions.height
-    : 16 / 9; // fallback to 16:9 while loading
+  // Use consistent aspect ratio for all gallery images to prevent layout shifts
+  const aspectRatio = 0.8; // 4:5 aspect ratio for consistent gallery layout
 
   const handleCopyUrl = async () => {
     try {

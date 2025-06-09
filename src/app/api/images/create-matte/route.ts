@@ -102,13 +102,48 @@ export async function POST(request: NextRequest) {
       console.log("🌐 Trying remote matte service...");
       console.log("🔗 Remote service URL:", remoteServiceUrl);
 
+      // ADDED: Transform Cloudflare URLs for remote service compatibility (copied from canvas extension)
+      let processableImageUrl = imageUrl;
+
+      if (imageUrl.includes("imagedelivery.net")) {
+        // Extract the base Cloudflare URL (account + image ID) regardless of current format
+        const cloudflareMatch = imageUrl.match(
+          /https:\/\/imagedelivery\.net\/([^\/]+)\/([^\/]+)/
+        );
+
+        if (cloudflareMatch) {
+          const [, accountHash, imageId] = cloudflareMatch;
+          const baseCloudflareUrl = `https://imagedelivery.net/${accountHash}/${imageId}`;
+
+          // Use custom variant with correct width for remote service compatibility
+          processableImageUrl = `${baseCloudflareUrl}/w=2160,fit=scale-down`;
+          console.log("🔧 Image Matte - Using scale-down variant:", {
+            original: imageUrl,
+            baseUrl: baseCloudflareUrl,
+            variant: "w=2160,fit=scale-down",
+            note: "For remote service compatibility",
+          });
+        } else {
+          console.warn("⚠️ Could not parse Cloudflare URL format:", imageUrl);
+          // Fallback: if URL doesn't match expected format, use as-is or add /public
+          if (!imageUrl.includes("/public") && !imageUrl.match(/\/w=\d+/)) {
+            processableImageUrl = `${imageUrl}/public`;
+          }
+        }
+      }
+
+      console.log("🔗 Image Matte - Using processable URL:", {
+        original: imageUrl?.substring(0, 100) + "...",
+        processable: processableImageUrl?.substring(0, 100) + "...",
+      });
+
       const remoteResponse = await fetch(`${remoteServiceUrl}/create-matte`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          imageUrl,
+          imageUrl: processableImageUrl,
           canvasWidth,
           canvasHeight,
           paddingPercent,

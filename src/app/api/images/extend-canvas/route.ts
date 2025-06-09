@@ -14,6 +14,7 @@ interface ExtendCanvasRequest {
   requestedWidth?: number;
   requestedHeight?: number;
   scaleMultiplier?: number;
+  previewImageDimensions?: { width: number; height: number };
 }
 
 export async function POST(request: NextRequest) {
@@ -34,13 +35,21 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Debug logging
-    console.log("🔍 Canvas extension request received:", {
+    console.log("🚨🚨🚨 Canvas extension request received 🚨🚨🚨:", {
       processingMethod,
       hasImageUrl: !!imageUrl,
       desiredHeight,
       paddingPct,
       whiteThresh,
       uploadToCloudflare,
+      requestedWidth,
+      requestedHeight,
+      scaleMultiplier,
+      originalFilename,
+      originalCarId,
+      hasPreviewImageDimensions: !!body.previewImageDimensions,
+      allBodyKeys: Object.keys(body),
+      bodyPreviewImageDimensions: body.previewImageDimensions,
     });
 
     // Validate input parameters
@@ -72,25 +81,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Try the remote canvas extension service
+    // Get remote service URL
     const remoteServiceUrl = process.env.CANVAS_EXTENSION_SERVICE_URL;
 
-    console.log("🔍 Remote service configuration:", {
-      processingMethod,
-      hasRemoteServiceUrl: !!remoteServiceUrl,
-      remoteServiceUrl: remoteServiceUrl
-        ? `${remoteServiceUrl.substring(0, 30)}...`
-        : "not set",
-    });
-
-    // If no remote service URL is configured, return error
     if (!remoteServiceUrl) {
       return NextResponse.json(
         {
-          error:
-            "Canvas extension requires cloud processing. CANVAS_EXTENSION_SERVICE_URL environment variable is not configured.",
+          error: "Canvas extension requires remote processing service",
           details:
-            "Local binary processing has been deprecated. Please contact support to configure cloud processing.",
+            "CANVAS_EXTENSION_SERVICE_URL environment variable not configured",
           processingMethod: processingMethod || "auto",
           hasRemoteServiceUrl: false,
         },
@@ -98,26 +97,134 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log("🔧 Canvas Extension - Using remote C service processing:", {
+      remoteServiceUrl: remoteServiceUrl?.substring(0, 50) + "...",
+      imageUrl: imageUrl?.substring(0, 50) + "...",
+      desiredHeight,
+    });
+
     try {
-      console.log("🌐 Trying remote canvas extension service...");
-      console.log("🔗 Remote service URL:", remoteServiceUrl);
+      // DO NOT SCALE HERE - frontend already scaled the dimensions
+      // The scaleMultiplier is only used for filename generation
+      const finalDesiredHeight = desiredHeight;
+
+      console.log(
+        "🔍 Canvas Extension - Using original dimensions (no double scaling):",
+        {
+          originalDesiredHeight: desiredHeight,
+          finalDesiredHeight,
+          scaleMultiplier,
+          note: "Frontend already scaled dimensions, backend should not scale again",
+        }
+      );
+
+      // For Cloudflare URLs, construct the proper URL based on requirements (COPIED FROM CROP TOOL)
+      let processableImageUrl = imageUrl;
+
+      if (imageUrl.includes("imagedelivery.net")) {
+        // Extract the base Cloudflare URL (account + image ID) regardless of current format
+        const cloudflareMatch = imageUrl.match(
+          /https:\/\/imagedelivery\.net\/([^\/]+)\/([^\/]+)/
+        );
+
+        if (cloudflareMatch) {
+          const [, accountHash, imageId] = cloudflareMatch;
+          const baseCloudflareUrl = `https://imagedelivery.net/${accountHash}/${imageId}`;
+
+          // Use custom variant with correct width for 4:5 aspect ratio
+          processableImageUrl = `${baseCloudflareUrl}/w=2160,fit=scale-down`;
+          console.log("🔧 Canvas Extension - Using public variant:", {
+            original: imageUrl,
+            baseUrl: baseCloudflareUrl,
+            variant: "public",
+            scaleMultiplier,
+            note: "Simple public variant for canvas extension",
+          });
+        } else {
+          console.warn("⚠️ Could not parse Cloudflare URL format:", imageUrl);
+          // Fallback: if URL doesn't match expected format, use as-is or add /public
+          if (!imageUrl.includes("/public") && !imageUrl.match(/\/w=\d+/)) {
+            processableImageUrl = `${imageUrl}/public`;
+          }
+        }
+      }
+
+      console.log("🔍 Canvas Extension - Preparing for remote C service:", {
+        originalDesiredHeight: desiredHeight,
+        finalDesiredHeight,
+        scaleMultiplier,
+        requestedWidth,
+        requestedHeight,
+        imageUrl: processableImageUrl?.substring(0, 100) + "...",
+      });
+
+      // Use the Cloudflare variant URL directly since variants are publicly accessible
+      let serviceImageUrl = processableImageUrl;
+
+      console.log("🔗 Canvas Extension - Using Cloudflare variant URL:", {
+        serviceImageUrl: serviceImageUrl?.substring(0, 100) + "...",
+        note: "Variants are configured as Always Public",
+      });
+
+      // Use the requested dimensions directly since the service supports them
+      const adjustedDesiredHeight = finalDesiredHeight;
+
+      if (requestedWidth && requestedHeight) {
+        console.log(
+          "🔧 Canvas Extension - Using requested dimensions directly:",
+          {
+            desiredHeight: adjustedDesiredHeight,
+            requestedDimensions: `${requestedWidth}×${requestedHeight}`,
+            note: "Remote service supports requestedWidth/Height parameters",
+          }
+        );
+      }
+
+      console.log("📤 Canvas Extension - Sending to remote C service:", {
+        remoteServiceUrl,
+        serviceImageUrl: serviceImageUrl?.substring(0, 100) + "...",
+        payload: {
+          imageUrl: serviceImageUrl,
+          desiredHeight: adjustedDesiredHeight,
+          paddingPct,
+          whiteThresh,
+          requestedWidth,
+          note: "Using requestedWidth only to preserve aspect ratio, extend height naturally",
+        },
+      });
+
+      const remotePayload = {
+        imageUrl: serviceImageUrl,
+        desiredHeight: adjustedDesiredHeight,
+        paddingPct,
+        whiteThresh,
+        requestedWidth,
+        requestedHeight,
+      };
+
+      console.log(
+        "🔍 ACTUAL payload being sent to canvas service:",
+        remotePayload
+      );
 
       const remoteResponse = await fetch(`${remoteServiceUrl}/extend-canvas`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          imageUrl,
-          desiredHeight,
-          paddingPct,
-          whiteThresh,
-        }),
+        body: JSON.stringify(remotePayload),
+        // Add timeout for remote service
+        signal: AbortSignal.timeout(60000), // 60 second timeout
       });
+
+      console.log(
+        `📥 Remote service response: ${remoteResponse.status} ${remoteResponse.statusText}`
+      );
 
       if (remoteResponse.ok) {
         const remoteResult = await remoteResponse.json();
-        console.log("✅ Successfully processed with remote Cloud Run service");
+        console.log("✅ Successfully processed with remote C service");
+        console.log("📊 Remote result keys:", Object.keys(remoteResult));
 
         // If uploadToCloudflare is requested, upload the result
         if (uploadToCloudflare && remoteResult.processedImageUrl) {
@@ -241,11 +348,20 @@ export async function POST(request: NextRequest) {
               }
             }
 
+            console.log("🔍 Canvas Extension - Cloudflare upload successful:", {
+              mongoId: imageDoc._id.toString(),
+              cloudflareImageUrl,
+              processedFilename,
+              cloudflareId: cloudflareResult.result.id,
+              scaleMultiplier,
+              originalCarId,
+            });
+
             // Return the result with Cloudflare upload info
             return NextResponse.json({
               success: true,
               message:
-                "Image processed successfully with Cloud Run service and uploaded to Cloudflare",
+                "Image processed successfully with remote C service and uploaded to Cloudflare",
               processedImageUrl: remoteResult.processedImageUrl,
               remoteServiceUsed: true,
               cloudflareUpload: {
@@ -258,12 +374,12 @@ export async function POST(request: NextRequest) {
             });
           } catch (uploadError) {
             console.error(
-              "Failed to upload Cloud Run result to Cloudflare:",
+              "Failed to upload remote service result to Cloudflare:",
               uploadError
             );
             return NextResponse.json({
               success: true,
-              message: "Image processed successfully with Cloud Run service",
+              message: "Image processed successfully with remote C service",
               processedImageUrl: remoteResult.processedImageUrl,
               remoteServiceUsed: true,
               cloudflareUpload: {
@@ -280,7 +396,7 @@ export async function POST(request: NextRequest) {
         // Return the result with additional metadata (no Cloudflare upload)
         return NextResponse.json({
           success: true,
-          message: "Image processed successfully with Cloud Run service",
+          message: "Image processed successfully with remote C service",
           processedImageUrl: remoteResult.processedImageUrl,
           remoteServiceUsed: true,
           uploadToCloudflare,
@@ -289,38 +405,40 @@ export async function POST(request: NextRequest) {
         });
       } else {
         const errorText = await remoteResponse.text();
-        console.log(
-          "⚠️ Remote service failed:",
+        console.error(
+          "❌ Remote C service failed:",
           remoteResponse.status,
           errorText
         );
 
         return NextResponse.json(
           {
-            error: `Cloud Run service failed: ${errorText}`,
-            details:
-              "The remote image processing service is unavailable. Please try again later or contact support.",
+            error: `Remote C service processing failed: ${errorText}`,
+            details: "Remote image processing failed. Please try again.",
             processingMethod,
-            remoteServiceUrl: remoteServiceUrl
-              ? `${remoteServiceUrl.substring(0, 30)}...`
-              : "not set",
+            remoteServiceUrl: remoteServiceUrl?.substring(0, 50) + "...",
           },
           { status: 500 }
         );
       }
     } catch (remoteError) {
-      console.log("⚠️ Remote service error");
-      console.error("Remote service error details:", remoteError);
+      console.error("❌ Remote C service error:", remoteError);
+
+      let errorMessage = "Remote processing failed";
+      if (remoteError instanceof Error) {
+        errorMessage = remoteError.message;
+
+        if (remoteError.name === "AbortError") {
+          errorMessage = "Remote service timeout. Please try again.";
+        }
+      }
 
       return NextResponse.json(
         {
-          error: `Cloud Run service failed: ${remoteError instanceof Error ? remoteError.message : "Unknown error"}`,
-          details:
-            "The remote image processing service is unavailable. Please try again later or contact support.",
+          error: `Remote C service error: ${errorMessage}`,
+          details: "Remote image processing failed. Please try again.",
           processingMethod,
-          remoteServiceUrl: remoteServiceUrl
-            ? `${remoteServiceUrl.substring(0, 30)}...`
-            : "not set",
+          remoteServiceUrl: remoteServiceUrl?.substring(0, 50) + "...",
         },
         { status: 500 }
       );

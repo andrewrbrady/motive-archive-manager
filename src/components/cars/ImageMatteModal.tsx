@@ -29,8 +29,8 @@ import { useAPI } from "@/hooks/useAPI";
 import { useGalleryImageProcessing } from "@/lib/hooks/useGalleryImageProcessing";
 import { ImageProcessingModalHeader } from "./shared/ImageProcessingModalHeader";
 import { ImageProcessingModalFooter } from "./shared/ImageProcessingModalFooter";
-import { ImageDisplayWindow } from "./shared/ImageDisplayWindow";
-import { PresetSizes } from "./shared/PresetSizes";
+import { ImageDisplayWindow } from "@/components/ui/image-processing/ImageDisplayWindow";
+import { PresetSizes } from "@/components/ui/image-processing/PresetSizes";
 
 interface ImageMatteModalProps {
   isOpen: boolean;
@@ -1003,15 +1003,9 @@ export function ImageMatteModal({
           processedImageUrl={processedImageUrl}
           highResImageUrl={highResImageUrl}
           cloudflareResult={cloudflareResult}
-          onPreview={handlePreview}
-          onReplaceImage={handleReplaceImage}
-          onDiscardPreview={handleDiscardPreview}
-          onProcess={handleProcess}
-          onHighResProcess={handleHighResProcess}
-          onDownload={handleDownload}
-          onHighResDownload={handleHighResDownload}
-          onUploadToCloudflare={handleUploadToCloudflare}
-          onViewInGallery={handleViewInGallery}
+          onReplaceImage={() => handleReplaceImage()}
+          onSaveToImages={() => handleUploadToCloudflare()}
+          onDownloadLocal={() => handleDownload()}
           onReset={handleReset}
           onClose={handleClose}
           canProcess={!!image}

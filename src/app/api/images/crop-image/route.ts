@@ -108,25 +108,25 @@ export async function POST(request: NextRequest) {
         const [, accountHash, imageId] = cloudflareMatch;
         const baseCloudflareUrl = `https://imagedelivery.net/${accountHash}/${imageId}`;
 
-        if (sourceImageWidth) {
-          // For high-quality processing, use specified resolution
-          processableImageUrl = `${baseCloudflareUrl}/w=${sourceImageWidth},q=95`;
-          console.log(
-            "🎯 Using high-resolution source for quality processing:",
-            {
-              original: imageUrl,
-              baseUrl: baseCloudflareUrl,
-              highRes: processableImageUrl,
-              sourceWidth: sourceImageWidth,
-            }
-          );
-        } else {
-          // For standard processing, use /public variant
-          processableImageUrl = `${baseCloudflareUrl}/public`;
-          console.log("🔧 Using standard resolution with /public variant:", {
+        // SIMPLIFIED: Use our new variants instead of flexible sizing
+        const scaleMultiplier = scale || 1.0;
+        if (scaleMultiplier >= 2) {
+          // For 2x+ processing, use highres variant
+          processableImageUrl = `${baseCloudflareUrl}/highres`;
+          console.log("🎯 Using highres variant for 2x+ processing:", {
             original: imageUrl,
-            baseUrl: baseCloudflareUrl,
-            standard: processableImageUrl,
+            variant: "highres",
+            scaleMultiplier,
+            processableImageUrl,
+          });
+        } else {
+          // For 1x processing, use large variant
+          processableImageUrl = `${baseCloudflareUrl}/large`;
+          console.log("🔧 Using large variant for 1x processing:", {
+            original: imageUrl,
+            variant: "large",
+            scaleMultiplier,
+            processableImageUrl,
           });
         }
       } else {

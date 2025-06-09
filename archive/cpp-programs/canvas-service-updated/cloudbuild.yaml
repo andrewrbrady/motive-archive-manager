@@ -1,0 +1,34 @@
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "--platform=linux/amd64"
+      - "-f"
+      - "Dockerfile.canvas-service-simple"
+      - "-t"
+      - "us-central1-docker.pkg.dev/motive-archive-manager-460909/cloud-run-source-deploy/canvas-service:v6.1"
+      - "."
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "us-central1-docker.pkg.dev/motive-archive-manager-460909/cloud-run-source-deploy/canvas-service:v6.1"
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "canvas-service-public"
+      - "--image=us-central1-docker.pkg.dev/motive-archive-manager-460909/cloud-run-source-deploy/canvas-service:v6.1"
+      - "--platform=managed"
+      - "--region=us-central1"
+      - "--allow-unauthenticated"
+      - "--port=3001"
+      - "--memory=2Gi"
+      - "--cpu=1"
+      - "--timeout=300"
+
+images:
+  - "us-central1-docker.pkg.dev/motive-archive-manager-460909/cloud-run-source-deploy/canvas-service:v6.1"
+
+options:
+  substitution_option: ALLOW_LOOSE

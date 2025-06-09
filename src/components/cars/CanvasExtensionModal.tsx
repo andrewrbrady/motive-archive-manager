@@ -31,8 +31,8 @@ import { toast as hotToast } from "react-hot-toast";
 import { getFormattedImageUrl } from "@/lib/cloudflare";
 import { ImageProcessingModalHeader } from "./shared/ImageProcessingModalHeader";
 import { ImageProcessingModalFooter } from "./shared/ImageProcessingModalFooter";
-import { ImageDisplayWindow } from "./shared/ImageDisplayWindow";
-import { PresetSizes } from "./shared/PresetSizes";
+import { ImageDisplayWindow } from "@/components/ui/image-processing/ImageDisplayWindow";
+import { PresetSizes } from "@/components/ui/image-processing/PresetSizes";
 
 interface CanvasExtensionModalProps {
   isOpen: boolean;
@@ -325,16 +325,17 @@ export function CanvasExtensionModal({
       let uploadHeight = parseInt(desiredHeight);
       let uploadSourceUrl = enhancedImageUrl;
       let uploadFilename = image.filename;
+      let uploadRequestedWidth: number | undefined = undefined;
+      let uploadRequestedHeight: number | undefined = undefined;
 
       if (highResImageUrl && highResMultiplier && processedDimensions) {
-        uploadHeight = processedDimensions.height * highResMultiplier;
-        const highResCloudflareWidth =
-          parseInt(cloudflareWidth) * highResMultiplier;
-        uploadSourceUrl = getEnhancedImageUrl(
-          image.url,
-          highResCloudflareWidth.toString(),
-          cloudflareQuality
-        );
+        // For high-res uploads, calculate target dimensions
+        uploadRequestedWidth = processedDimensions.width * highResMultiplier;
+        uploadRequestedHeight = processedDimensions.height * highResMultiplier;
+        uploadHeight = uploadRequestedHeight;
+
+        // Use the processing image URL (without Cloudflare transforms) to avoid input distortion
+        uploadSourceUrl = getProcessingImageUrl(image.url);
 
         const baseFilename = image.filename || "image";
         const nameWithoutExt = baseFilename.replace(/\.[^/.]+$/, "");
@@ -352,6 +353,9 @@ export function CanvasExtensionModal({
         uploadToCloudflare: true,
         originalFilename: uploadFilename,
         originalCarId: image.carId,
+        requestedWidth: uploadRequestedWidth,
+        requestedHeight: uploadRequestedHeight,
+        scaleMultiplier: highResMultiplier,
       })) as ExtendCanvasResponse;
 
       if (result.cloudflareUpload) {
@@ -853,15 +857,9 @@ export function CanvasExtensionModal({
           processedImageUrl={processedImageUrl}
           highResImageUrl={highResImageUrl}
           cloudflareResult={cloudflareResult}
-          onPreview={handlePreview}
-          onReplaceImage={handleReplaceImage}
-          onDiscardPreview={handleDiscardPreview}
-          onProcess={handleProcess}
-          onHighResProcess={handleHighResProcess}
-          onDownload={handleDownload}
-          onHighResDownload={handleHighResDownload}
-          onUploadToCloudflare={handleUploadToCloudflare}
-          onViewInGallery={handleViewInGallery}
+          onReplaceImage={() => handleReplaceImage()}
+          onSaveToImages={() => handleUploadToCloudflare()}
+          onDownloadLocal={() => handleDownload()}
           onReset={handleReset}
           onClose={handleClose}
           canProcess={!!image}

@@ -615,3 +615,4 @@ process.on("SIGINT", () => {
   process.exit(0);
 });
 // v2.5 - Fixed coordinate scaling by using consistent image dimensions
+// Updated Sun Jun  8 17:28:01 CDT 2025 with requestedWidth/Height support
