@@ -6,107 +6,154 @@ Getting 413 "Payload Too Large" errors when uploading images on Vercel, while up
 
 ## Root Cause
 
-Vercel has default request body size limits that are lower than what your application needs for image uploads. The default limit is around 4.5MB for the Pro plan and 1MB for the Hobby plan.
+Vercel has a **hardcoded request body size limit of 4.5MB** for all plans that **cannot be increased through configuration**. This is a platform limitation, not a configurable setting.
 
-## Solution Applied
+## Important: What Doesn't Work
 
-### 1. Updated `vercel.json` Configuration
+❌ **`maxRequestBodySize` in `vercel.json`** - This property doesn't exist and causes schema validation errors  
+❌ **Increasing limits through configuration** - The 4.5MB limit is hardcoded  
+❌ **Different limits for different plans** - All plans have the same 4.5MB limit
 
-Added `maxRequestBodySize` to all image upload API routes:
+## Solutions Applied
+
+### 1. Optimized Function Configuration
+
+Updated `vercel.json` to optimize performance for uploads:
 
 ```json
 {
   "functions": {
     "app/api/images/upload/route.ts": {
       "maxDuration": 300,
-      "memory": 1536,
-      "maxRequestBodySize": "50mb"
-    },
-    "app/api/cloud-upload/route.ts": {
-      "maxDuration": 60,
-      "memory": 1536,
-      "maxRequestBodySize": "25mb"
+      "memory": 1536
     }
-    // ... other routes with 25mb or 15mb limits
   }
 }
 ```
 
-### 2. Updated Next.js Configuration
+### 2. Architecture Changes for Large Files
 
-Added experimental settings to `next.config.js`:
+Since we can't increase the 4.5MB limit, the solution is to avoid sending large files through Vercel Functions:
+
+#### Option A: Client-Side Compression (Immediate Fix)
+
+- Compress images on the client before upload
+- Use libraries like `browser-image-compression`
+- Target < 4MB file size after compression
+
+#### Option B: Direct Cloud Upload (Recommended)
+
+- Upload directly to Cloudflare Images/R2 from client
+- Use pre-signed URLs for secure uploads
+- Bypass Vercel Functions entirely for large files
+
+#### Option C: Chunked Upload
+
+- Split large files into < 4MB chunks
+- Upload chunks separately
+- Reassemble on the server
+
+### 3. Updated Next.js Configuration
+
+Added experimental settings to optimize memory usage:
 
 ```javascript
 experimental: {
-  isrMemoryCacheSize: 0, // Disable ISR cache to free up memory for uploads
+  isrMemoryCacheSize: 0, // Free up memory for uploads
 },
 ```
 
-### 3. Created API Configuration File
+## Real Solution: Implement Direct Upload
 
-Added `app/api/config.ts` with consistent upload limits across all routes.
+### Step 1: Update Upload Route for Token Generation
 
-### 4. Enhanced Runtime Configuration
+Instead of processing uploads, generate secure upload tokens:
 
-Updated upload routes with proper runtime and region settings.
+```typescript
+// app/api/images/upload/route.ts
+export async function POST(request: Request) {
+  // Generate pre-signed URL for direct Cloudflare upload
+  // Return URL to client for direct upload
+}
+```
 
-## Limits Set
+### Step 2: Client-Side Direct Upload
 
-- **Main upload route**: 50MB total request size
-- **Image processing routes**: 25MB total request size
-- **Thumbnail routes**: 15MB total request size
-- **Individual file limit**: 8MB per file (already enforced in code)
+```typescript
+// Upload directly to Cloudflare, not through Vercel
+const response = await fetch(presignedUrl, {
+  method: "PUT",
+  body: file,
+});
+```
 
 ## After Deployment
 
-1. **Redeploy to Vercel** - The `vercel.json` changes only take effect after a new deployment
-2. **Test with different file sizes** to ensure the limits work correctly
-3. **Monitor function logs** in Vercel dashboard for any remaining issues
+1. **Test with 4MB files** - This is the practical limit
+2. **Monitor function logs** for any remaining issues
+3. **Implement compression** for files > 4MB
+4. **Consider direct upload** for better performance
 
-## Troubleshooting
+## Alternative Quick Fixes
 
-If you still get 413 errors after deployment:
+### 1. Client-Side Image Compression
 
-### Check Your Vercel Plan Limits
+```javascript
+import imageCompression from "browser-image-compression";
 
-- **Hobby Plan**: Max 1MB request body (not suitable for image uploads)
-- **Pro Plan**: Max 4.5MB by default, configurable up to 50MB
-- **Enterprise**: Higher limits available
+const compressedFile = await imageCompression(originalFile, {
+  maxSizeMB: 3.5, // Stay under 4MB limit
+  maxWidthOrHeight: 1920,
+  useWebWorker: true,
+});
+```
 
-### Verify Deployment
+### 2. Server-Side Image Optimization
 
-1. Go to Vercel Dashboard > Your Project > Functions
-2. Check that your upload functions show the correct `maxRequestBodySize`
-3. Look at the function logs during failed uploads
+- Use `sharp` to reduce image quality/size after upload
+- Convert to more efficient formats (WebP, AVIF)
+- Generate multiple sizes for responsive images
 
-### Test with Smaller Files First
+### 3. CDN Integration
 
-1. Try uploading a 1MB image first
-2. Gradually increase file size to find the actual limit
-3. Check browser network tab for exact error details
+- Upload small files through Vercel
+- Redirect large file uploads to CDN
+- Use Cloudflare Images API directly
 
-### Alternative Solutions
+## Error Types and Solutions
 
-If the limits still don't work:
+### 413 FUNCTION_PAYLOAD_TOO_LARGE
 
-1. **Client-side compression**: Compress images before upload
-2. **Chunked uploads**: Split large files into smaller chunks
-3. **Direct Cloudflare upload**: Use Cloudflare's direct upload API
-4. **Upgrade Vercel plan**: Consider Pro or Enterprise plan
+- **Cause**: Request body > 4.5MB
+- **Solution**: Compress files or use direct upload
 
-## Code Changes Made
+### Build Error: Invalid vercel.json
 
-### Files Modified:
+- **Cause**: Using `maxRequestBodySize` property
+- **Solution**: Remove invalid properties from `vercel.json`
 
-- `vercel.json` - Added body size limits
-- `next.config.js` - Added experimental settings
-- `src/app/api/images/upload/route.ts` - Added region preference
-- `app/api/config.ts` - New configuration file
+### Timeout Errors
 
-### Files NOT Modified:
+- **Cause**: Long processing times
+- **Solution**: Increase `maxDuration` in `vercel.json`
 
-- Upload logic remains the same
-- Error handling unchanged
-- Client-side code unchanged
+## Files Modified
 
-The fix is purely configuration-based and doesn't change your application logic.
+### Configuration Files:
+
+- ✅ `vercel.json` - Optimized function settings (removed invalid properties)
+- ✅ `next.config.js` - Added memory optimization
+- ✅ `app/api/config.ts` - Created configuration constants
+
+### Runtime Files:
+
+- ✅ `src/app/api/images/upload/route.ts` - Enhanced with proper exports
+
+## Next Steps
+
+1. **Test the current fix** with files < 4MB
+2. **Implement client-side compression** for larger files
+3. **Consider migrating to direct cloud upload** for the best user experience
+4. **Monitor Vercel function logs** for any remaining issues
+
+The key takeaway: **Work within the 4.5MB limit** rather than trying to increase it, as it's not configurable on Vercel.

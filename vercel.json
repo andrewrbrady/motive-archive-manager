@@ -24,43 +24,35 @@
   "functions": {
     "app/api/images/upload/route.ts": {
       "maxDuration": 300,
-      "memory": 1536,
-      "maxRequestBodySize": "50mb"
+      "memory": 1536
     },
     "app/api/images/extend-canvas/route.ts": {
       "maxDuration": 60,
-      "memory": 1536,
-      "maxRequestBodySize": "25mb"
+      "memory": 1536
     },
     "app/api/images/extend-canvas-js/route.ts": {
       "maxDuration": 60,
-      "memory": 1536,
-      "maxRequestBodySize": "25mb"
+      "memory": 1536
     },
     "app/api/images/extend-canvas-remote/route.ts": {
       "maxDuration": 60,
-      "memory": 1536,
-      "maxRequestBodySize": "25mb"
+      "memory": 1536
     },
     "app/api/cars/*/images/route.ts": {
       "maxDuration": 60,
-      "memory": 1536,
-      "maxRequestBodySize": "25mb"
+      "memory": 1536
     },
     "app/api/cloudflare/images/route.ts": {
       "maxDuration": 60,
-      "memory": 1536,
-      "maxRequestBodySize": "25mb"
+      "memory": 1536
     },
     "app/api/cloud-upload/route.ts": {
       "maxDuration": 60,
-      "memory": 1536,
-      "maxRequestBodySize": "25mb"
+      "memory": 1536
     },
     "app/api/cloudflare/thumbnails/route.ts": {
       "maxDuration": 60,
-      "memory": 1024,
-      "maxRequestBodySize": "15mb"
+      "memory": 1024
     },
     "app/api/openai/generate-project-caption/route.ts": {
       "maxDuration": 60,
