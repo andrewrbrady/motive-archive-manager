@@ -48,6 +48,8 @@ export interface IDeliverable extends Document {
   };
   assets_location?: string;
   priority_level?: number;
+  gallery_ids?: string[]; // Array of gallery IDs for linked galleries
+  caption_ids?: string[]; // Array of caption IDs for linked captions
   created_at: Date;
   updated_at: Date;
   toPublicJSON(): Record<string, any>;
@@ -166,6 +168,8 @@ const deliverableSchema = new mongoose.Schema(
       min: 1,
       max: 5,
     },
+    gallery_ids: [String],
+    caption_ids: [String],
   },
   {
     timestamps: {

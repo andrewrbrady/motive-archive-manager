@@ -8,7 +8,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { CheckSquare, Square, Cloud, Share2, Copy, Trash2 } from "lucide-react";
+import {
+  CheckSquare,
+  Square,
+  Cloud,
+  Share2,
+  Copy,
+  Trash2,
+  CheckCircle,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
+} from "lucide-react";
 import { Deliverable } from "@/types/deliverable";
 import { DeliverableActions, BatchModeState } from "../types";
 import { safeFormat, formatDeliverableDuration } from "../utils";
@@ -24,6 +35,10 @@ interface DeliverablesTableProps {
   actions: DeliverableActions;
   batchMode: BatchModeState;
   showCarColumn?: boolean;
+  onOpenModal?: (deliverable: Deliverable) => void;
+  sortField?: string;
+  sortDirection?: "asc" | "desc";
+  onSort?: (field: string) => void;
 }
 
 export default function DeliverablesTable({
@@ -32,6 +47,10 @@ export default function DeliverablesTable({
   actions,
   batchMode,
   showCarColumn = false,
+  onOpenModal,
+  sortField,
+  sortDirection,
+  onSort,
 }: DeliverablesTableProps) {
   const { getCarDetails } = useCarDetails();
 
@@ -42,13 +61,58 @@ export default function DeliverablesTable({
     toggleAllDeliverables,
   } = batchMode;
 
+  // Helper function to render sortable table header
+  const renderSortableHeader = (
+    field: string,
+    label: string,
+    className?: string
+  ) => {
+    if (!onSort) {
+      return <TableHead className={className}>{label}</TableHead>;
+    }
+
+    const isActive = sortField === field;
+    const Icon = isActive
+      ? sortDirection === "asc"
+        ? ChevronUp
+        : ChevronDown
+      : ChevronsUpDown;
+
+    return (
+      <TableHead className={className}>
+        <button
+          className="flex items-center gap-1 hover:text-foreground transition-colors"
+          onClick={() => onSort(field)}
+        >
+          <span>{label}</span>
+          <Icon className="h-3 w-3" />
+        </button>
+      </TableHead>
+    );
+  };
+
   const renderCell = (deliverable: Deliverable, field: keyof Deliverable) => {
     const value = deliverable[field];
 
+    if (field === "title") {
+      return (
+        <div className="cursor-pointer flex items-center gap-1">
+          <span className="truncate">{value?.toString() || ""}</span>
+        </div>
+      );
+    }
+
     if (field === "edit_deadline" || field === "release_date") {
       return (
-        <div className="cursor-pointer">
-          {value ? safeFormat(value, "MMM d, yyyy") : "Not set"}
+        <div className="cursor-pointer flex items-center gap-1">
+          <span className="truncate">
+            {value ? safeFormat(value, "MMM d, yyyy") : "Not set"}
+          </span>
+          {field === "release_date" && deliverable.scheduled && (
+            <div title="Scheduled">
+              <CheckCircle className="h-3 w-3 text-green-600 flex-shrink-0" />
+            </div>
+          )}
         </div>
       );
     }
@@ -63,14 +127,19 @@ export default function DeliverablesTable({
 
     if (field === "status") {
       return (
-        <StatusSelector
-          deliverableId={deliverable._id?.toString() || ""}
-          initialStatus={deliverable.status}
-          size="sm"
-          onStatusChange={(newStatus) =>
-            actions.onStatusChange(deliverable._id?.toString() || "", newStatus)
-          }
-        />
+        <div onClick={(e) => e.stopPropagation()}>
+          <StatusSelector
+            deliverableId={deliverable._id?.toString() || ""}
+            initialStatus={deliverable.status}
+            size="sm"
+            onStatusChange={(newStatus) =>
+              actions.onStatusChange(
+                deliverable._id?.toString() || "",
+                newStatus
+              )
+            }
+          />
+        </div>
       );
     }
 
@@ -105,32 +174,47 @@ export default function DeliverablesTable({
                 </Button>
               </TableHead>
             )}
-            <TableHead className="w-[15%] px-2 py-1.5 text-xs font-medium">
-              Title
-            </TableHead>
-            {showCarColumn && (
-              <TableHead className="w-[12%] px-2 py-1.5 text-xs font-medium">
-                Car
-              </TableHead>
+            {renderSortableHeader(
+              "title",
+              "Title",
+              "w-[15%] px-2 py-1.5 text-xs font-medium"
             )}
-            <TableHead className="w-[24%] px-2 py-1.5 text-xs font-medium">
-              Platform
-            </TableHead>
-            <TableHead className="w-[10%] px-2 py-1.5 text-xs font-medium">
-              Status
-            </TableHead>
-            <TableHead className="w-[8%] px-2 py-1.5 text-xs font-medium">
-              Duration
-            </TableHead>
-            <TableHead className="w-[13%] px-2 py-1.5 text-xs font-medium">
-              Editor
-            </TableHead>
-            <TableHead className="w-[13%] px-2 py-1.5 text-xs font-medium">
-              Deadline
-            </TableHead>
-            <TableHead className="w-[13%] px-2 py-1.5 text-xs font-medium">
-              Release Date
-            </TableHead>
+            {showCarColumn &&
+              renderSortableHeader(
+                "car",
+                "Car",
+                "w-[12%] px-2 py-1.5 text-xs font-medium"
+              )}
+            {renderSortableHeader(
+              "platform",
+              "Platform",
+              "w-[24%] px-2 py-1.5 text-xs font-medium"
+            )}
+            {renderSortableHeader(
+              "status",
+              "Status",
+              "w-[10%] px-2 py-1.5 text-xs font-medium"
+            )}
+            {renderSortableHeader(
+              "duration",
+              "Duration",
+              "w-[8%] px-2 py-1.5 text-xs font-medium"
+            )}
+            {renderSortableHeader(
+              "editor",
+              "Editor",
+              "w-[13%] px-2 py-1.5 text-xs font-medium"
+            )}
+            {renderSortableHeader(
+              "edit_deadline",
+              "Deadline",
+              "w-[13%] px-2 py-1.5 text-xs font-medium"
+            )}
+            {renderSortableHeader(
+              "release_date",
+              "Release Date",
+              "w-[13%] px-2 py-1.5 text-xs font-medium"
+            )}
             <TableHead className="w-[12%] text-right px-2 py-1.5 text-xs font-medium">
               Actions
             </TableHead>
@@ -163,17 +247,24 @@ export default function DeliverablesTable({
                   : null;
 
               return (
-                <TableRow key={deliverable._id?.toString()}>
+                <TableRow
+                  key={deliverable._id?.toString()}
+                  className={
+                    onOpenModal ? "cursor-pointer hover:bg-muted/50" : ""
+                  }
+                  onClick={() => onOpenModal?.(deliverable)}
+                >
                   {isBatchMode && (
                     <TableCell className="px-2 py-1.5">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() =>
+                        onClick={(e) => {
+                          e.stopPropagation();
                           toggleDeliverableSelection(
                             deliverable._id?.toString() || ""
-                          )
-                        }
+                          );
+                        }}
                         className="p-0"
                       >
                         {selectedDeliverables.includes(
@@ -224,7 +315,10 @@ export default function DeliverablesTable({
                     {renderCell(deliverable, "release_date")}
                   </TableCell>
                   <TableCell className="px-2 py-1.5">
-                    <div className="flex justify-end items-center gap-1">
+                    <div
+                      className="flex justify-end items-center gap-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {!isBatchMode && (
                         <>
                           {/* Dropbox Link Icon */}

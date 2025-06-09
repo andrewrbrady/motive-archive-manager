@@ -198,13 +198,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const carId = searchParams.get("carId");
-
-    if (!carId) {
-      return NextResponse.json(
-        { error: "Car ID is required" },
-        { status: 400 }
-      );
-    }
+    const limit = parseInt(searchParams.get("limit") || "50");
 
     const client = await clientPromise;
     if (!client) {
@@ -216,9 +210,15 @@ export async function GET(request: NextRequest) {
     const db = client.db("motive_archive");
     const captions = db.collection("captions");
 
+    let query = {};
+    if (carId) {
+      query = { carId: new ObjectId(carId) };
+    }
+
     const results = await captions
-      .find({ carId: new ObjectId(carId) })
+      .find(query)
       .sort({ createdAt: -1 })
+      .limit(limit)
       .toArray();
 
     // Convert ObjectIds to strings and format dates for frontend
@@ -227,6 +227,8 @@ export async function GET(request: NextRequest) {
       _id: caption._id!.toString(),
       carId: caption.carId.toString(),
       createdAt: caption.createdAt.toISOString(),
+      caption_text: caption.caption, // Add caption_text field for consistency
+      platform: caption.platform,
     }));
 
     return NextResponse.json(formattedResults);

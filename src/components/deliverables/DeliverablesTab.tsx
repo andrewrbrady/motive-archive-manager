@@ -146,6 +146,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         isLoading={isLoading}
         actions={actions}
         batchMode={batchMode}
+        onOpenModal={handleOpenModal}
       />
 
       {/* Detail Modal */}

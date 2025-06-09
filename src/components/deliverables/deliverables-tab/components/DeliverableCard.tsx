@@ -1,5 +1,12 @@
 import React from "react";
-import { Calendar, Clock, ExternalLink, Copy, Trash2 } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  ExternalLink,
+  Copy,
+  Trash2,
+  CheckCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Deliverable } from "@/types/deliverable";
 import { DeliverableActions } from "../types";
@@ -38,9 +45,11 @@ export default function DeliverableCard({
     >
       <div className="flex justify-between items-start gap-3 mb-3">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] truncate mb-1">
-            {deliverable.title}
-          </p>
+          <div className="flex items-center gap-1 mb-1">
+            <p className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] truncate">
+              {deliverable.title}
+            </p>
+          </div>
           <div className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] flex items-center gap-2">
             <PlatformBadges
               platform={deliverable.platform}
@@ -118,6 +127,23 @@ export default function DeliverableCard({
             <span>{formatDeliverableDuration(deliverable)}</span>
           </div>
         )}
+      </div>
+
+      <div className="flex items-center gap-3 text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mb-2">
+        <div className="flex items-center gap-1">
+          <Calendar className="h-3 w-3 flex-shrink-0" />
+          <span className="truncate">
+            Release:{" "}
+            {deliverable.release_date
+              ? safeFormat(deliverable.release_date, "M/d/yy")
+              : "Not set"}
+          </span>
+          {deliverable.scheduled && (
+            <div title="Scheduled">
+              <CheckCircle className="h-3 w-3 text-green-600 flex-shrink-0" />
+            </div>
+          )}
+        </div>
       </div>
 
       {deliverable.editor && (

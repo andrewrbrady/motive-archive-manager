@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,11 @@ import {
   Link,
   Share2,
   Cloud,
+  ImageIcon,
+  MessageSquare,
+  CheckCircle,
 } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
 import { Deliverable } from "@/types/deliverable";
 import { DeliverableActions } from "../types";
 import {
@@ -55,6 +59,79 @@ export default function DeliverableModal({
   showCarInfo = false,
   carInfo,
 }: DeliverableModalProps) {
+  const api = useAPI();
+  const [linkedGalleries, setLinkedGalleries] = useState<any[]>([]);
+  const [linkedCaptions, setLinkedCaptions] = useState<any[]>([]);
+  const [loadingGalleries, setLoadingGalleries] = useState(false);
+  const [loadingCaptions, setLoadingCaptions] = useState(false);
+
+  // Fetch linked galleries and captions when deliverable changes
+  useEffect(() => {
+    if (!deliverable || !api) return;
+
+    const fetchLinkedContent = async () => {
+      // Fetch galleries
+      if (
+        (deliverable as any).gallery_ids &&
+        (deliverable as any).gallery_ids.length > 0
+      ) {
+        setLoadingGalleries(true);
+        try {
+          const galleryPromises = (deliverable as any).gallery_ids.map(
+            async (galleryId: string) => {
+              try {
+                const gallery = await api.get(`galleries/${galleryId}`);
+                return gallery;
+              } catch (error) {
+                console.warn(`Failed to fetch gallery ${galleryId}:`, error);
+                return null;
+              }
+            }
+          );
+          const galleries = await Promise.all(galleryPromises);
+          setLinkedGalleries(galleries.filter(Boolean));
+        } catch (error) {
+          console.error("Error fetching galleries:", error);
+        } finally {
+          setLoadingGalleries(false);
+        }
+      } else {
+        setLinkedGalleries([]);
+      }
+
+      // Fetch captions
+      if (
+        (deliverable as any).caption_ids &&
+        (deliverable as any).caption_ids.length > 0
+      ) {
+        setLoadingCaptions(true);
+        try {
+          const captionPromises = (deliverable as any).caption_ids.map(
+            async (captionId: string) => {
+              try {
+                const caption = await api.get(`captions/${captionId}`);
+                return caption;
+              } catch (error) {
+                console.warn(`Failed to fetch caption ${captionId}:`, error);
+                return null;
+              }
+            }
+          );
+          const captions = await Promise.all(captionPromises);
+          setLinkedCaptions(captions.filter(Boolean));
+        } catch (error) {
+          console.error("Error fetching captions:", error);
+        } finally {
+          setLoadingCaptions(false);
+        }
+      } else {
+        setLinkedCaptions([]);
+      }
+    };
+
+    fetchLinkedContent();
+  }, [deliverable, api]);
+
   if (!deliverable) return null;
 
   const InfoRow = ({
@@ -82,7 +159,9 @@ export default function DeliverableModal({
             {value}
           </a>
         ) : (
-          <p className="text-sm text-muted-foreground break-words">{value}</p>
+          <div className="text-sm text-muted-foreground break-words">
+            {value}
+          </div>
         )}
       </div>
     </div>
@@ -92,8 +171,13 @@ export default function DeliverableModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold pr-8">
+          <DialogTitle className="text-xl font-semibold pr-8 flex items-center gap-2">
             {deliverable.title}
+            {deliverable.scheduled && (
+              <div title="Scheduled">
+                <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+              </div>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -167,7 +251,7 @@ export default function DeliverableModal({
                 <Badge
                   className={getPillColor("platform", deliverable.platform)}
                 >
-                  {deliverable.platform}
+                  {deliverable.platform || "Not specified"}
                 </Badge>
               }
             />
@@ -183,8 +267,30 @@ export default function DeliverableModal({
                 />
               )}
 
+            <InfoRow
+              icon={Monitor}
+              label="Aspect Ratio"
+              value={deliverable.aspect_ratio || "Not specified"}
+            />
+
             {deliverable.editor && (
               <InfoRow icon={User} label="Editor" value={deliverable.editor} />
+            )}
+
+            {deliverable.target_audience && (
+              <InfoRow
+                icon={User}
+                label="Target Audience"
+                value={deliverable.target_audience}
+              />
+            )}
+
+            {deliverable.music_track && (
+              <InfoRow
+                icon={Tag}
+                label="Music Track"
+                value={deliverable.music_track}
+              />
             )}
           </div>
 
@@ -245,6 +351,144 @@ export default function DeliverableModal({
                   value="View Published Content"
                   href={deliverable.publishing_url}
                 />
+              )}
+            </div>
+          )}
+
+          {/* Content References */}
+          {(linkedGalleries.length > 0 ||
+            linkedCaptions.length > 0 ||
+            loadingGalleries ||
+            loadingCaptions) && (
+            <div className="space-y-4">
+              <h3 className="font-medium text-foreground mb-3">
+                Content References
+              </h3>
+
+              {/* Linked Galleries */}
+              {(linkedGalleries.length > 0 || loadingGalleries) && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    Galleries{" "}
+                    {linkedGalleries.length > 0 &&
+                      `(${linkedGalleries.length})`}
+                  </h4>
+                  {loadingGalleries ? (
+                    <div className="text-sm text-muted-foreground">
+                      Loading galleries...
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {linkedGalleries.map((gallery, index) => (
+                        <div
+                          key={gallery._id || index}
+                          className="p-3 bg-muted/30 rounded-lg"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-foreground">
+                                {gallery.name || `Gallery ${index + 1}`}
+                              </p>
+                              {gallery.description && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {gallery.description}
+                                </p>
+                              )}
+                              {gallery.total_images && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {gallery.total_images} image
+                                  {gallery.total_images !== 1 ? "s" : ""}
+                                </p>
+                              )}
+                            </div>
+                            {gallery._id && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="ml-2"
+                              >
+                                <a
+                                  href={`/galleries/${gallery._id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Linked Captions */}
+              {(linkedCaptions.length > 0 || loadingCaptions) && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Captions{" "}
+                    {linkedCaptions.length > 0 && `(${linkedCaptions.length})`}
+                  </h4>
+                  {loadingCaptions ? (
+                    <div className="text-sm text-muted-foreground">
+                      Loading captions...
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {linkedCaptions.map((caption, index) => (
+                        <div
+                          key={caption._id || index}
+                          className="p-3 bg-muted/30 rounded-lg"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="secondary" className="text-xs">
+                                  {caption.platform || "Unknown Platform"}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-foreground line-clamp-3">
+                                {caption.caption_text || "No caption text"}
+                              </p>
+                              {caption.hashtags &&
+                                caption.hashtags.length > 0 && (
+                                  <p className="text-xs text-blue-600 mt-1">
+                                    {caption.hashtags
+                                      .slice(0, 3)
+                                      .map((tag: string) => `#${tag}`)
+                                      .join(" ")}
+                                    {caption.hashtags.length > 3 &&
+                                      ` +${caption.hashtags.length - 3} more`}
+                                  </p>
+                                )}
+                            </div>
+                            {caption._id && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="ml-2"
+                              >
+                                <a
+                                  href={`/captions/${caption._id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}

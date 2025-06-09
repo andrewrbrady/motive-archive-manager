@@ -34,6 +34,7 @@ import { useAPI } from "@/hooks/useAPI";
 import { FirestoreUser } from "@/types/firebase";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { usePlatforms } from "@/contexts/PlatformContext";
+import { useGalleries } from "@/hooks/use-galleries";
 
 interface EditDeliverableFormProps {
   deliverable: Deliverable;
@@ -55,6 +56,8 @@ interface UpdateDeliverableData {
   dropbox_link: string;
   social_media_link: string;
   scheduled: boolean;
+  gallery_ids?: string[]; // Array of gallery IDs
+  caption_ids?: string[]; // Array of caption IDs
 }
 
 interface UpdateDeliverableResponse {
@@ -83,12 +86,21 @@ export default function EditDeliverableForm({
   const [dropboxLink, setDropboxLink] = useState("");
   const [socialMediaLink, setSocialMediaLink] = useState("");
   const [scheduled, setScheduled] = useState(false);
+  const [selectedGalleryIds, setSelectedGalleryIds] = useState<string[]>([]);
+  const [selectedCaptionIds, setSelectedCaptionIds] = useState<string[]>([]);
 
   const { platforms: availablePlatforms, isLoading: platformsLoading } =
     usePlatforms();
 
   const api = useAPI();
   const { data: editors = [] } = useEditors();
+
+  // Gallery and caption data
+  const { data: galleriesData, isLoading: galleriesLoading } = useGalleries({
+    limit: 100,
+  });
+  const [captionsData, setCaptionsData] = useState<any[]>([]);
+  const [captionsLoading, setCaptionsLoading] = useState(false);
 
   const [openSelects, setOpenSelects] = useState<{ [key: string]: boolean }>(
     {}
@@ -146,6 +158,8 @@ export default function EditDeliverableForm({
     setDropboxLink(deliverable.dropbox_link || "");
     setSocialMediaLink(deliverable.social_media_link || "");
     setScheduled(deliverable.scheduled || false);
+    setSelectedGalleryIds(deliverable.gallery_ids || []);
+    setSelectedCaptionIds(deliverable.caption_ids || []);
   }, [deliverable, editors]);
 
   // Separate useEffect for platform handling to avoid infinite loops
@@ -173,6 +187,26 @@ export default function EditDeliverableForm({
       }
     }
   }, [availablePlatforms.length, deliverable.platforms, deliverable.platform]);
+
+  // Fetch captions data
+  useEffect(() => {
+    const fetchCaptions = async () => {
+      if (!api) return;
+
+      setCaptionsLoading(true);
+      try {
+        const captions = await api.get("captions?limit=100");
+        setCaptionsData(Array.isArray(captions) ? captions : []);
+      } catch (error) {
+        console.error("Error fetching captions:", error);
+        setCaptionsData([]);
+      } finally {
+        setCaptionsLoading(false);
+      }
+    };
+
+    fetchCaptions();
+  }, [api]);
 
   if (!api) {
     return null;
@@ -231,6 +265,8 @@ export default function EditDeliverableForm({
         dropbox_link: dropboxLink || "",
         social_media_link: socialMediaLink || "",
         scheduled: scheduled,
+        gallery_ids: selectedGalleryIds,
+        caption_ids: selectedCaptionIds,
       };
 
       const response = await api.put<UpdateDeliverableResponse>(
@@ -526,6 +562,96 @@ export default function EditDeliverableForm({
                     placeholder="Enter Social Media link"
                     className="text-sm"
                   />
+                </div>
+              </div>
+            </div>
+
+            {/* Content References Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                  Content References
+                </span>
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="galleries"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Galleries
+                  </label>
+                  <MultiSelect
+                    value={selectedGalleryIds.map((id) => {
+                      const gallery = galleriesData?.galleries?.find(
+                        (g) => g._id === id
+                      );
+                      return gallery
+                        ? { label: gallery.name, value: gallery._id }
+                        : { label: id, value: id };
+                    })}
+                    onChange={(selected) =>
+                      setSelectedGalleryIds(selected.map((s) => s.value))
+                    }
+                    options={
+                      galleriesLoading
+                        ? []
+                        : galleriesData?.galleries?.map((gallery) => ({
+                            label: gallery.name,
+                            value: gallery._id,
+                          })) || []
+                    }
+                    placeholder={
+                      galleriesLoading
+                        ? "Loading galleries..."
+                        : "Select galleries"
+                    }
+                  />
+                  <p className="text-xs text-[hsl(var(--foreground-muted))]">
+                    Link galleries that contain content for this deliverable
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="captions"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Captions
+                  </label>
+                  <MultiSelect
+                    value={selectedCaptionIds.map((id) => {
+                      const caption = captionsData.find((c) => c._id === id);
+                      return caption
+                        ? {
+                            label: `${caption.platform}: ${caption.caption.substring(0, 50)}${caption.caption.length > 50 ? "..." : ""}`,
+                            value: caption._id,
+                          }
+                        : { label: id, value: id };
+                    })}
+                    onChange={(selected) =>
+                      setSelectedCaptionIds(selected.map((s) => s.value))
+                    }
+                    options={
+                      captionsLoading
+                        ? []
+                        : captionsData.map((caption) => ({
+                            label: `${caption.platform}: ${caption.caption.substring(0, 50)}${caption.caption.length > 50 ? "..." : ""}`,
+                            value: caption._id,
+                          }))
+                    }
+                    placeholder={
+                      captionsLoading
+                        ? "Loading captions..."
+                        : "Select captions"
+                    }
+                  />
+                  <p className="text-xs text-[hsl(var(--foreground-muted))]">
+                    Link captions that can be used for this deliverable
+                  </p>
                 </div>
               </div>
             </div>

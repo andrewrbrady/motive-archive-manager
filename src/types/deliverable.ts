@@ -91,6 +91,10 @@ export interface Deliverable {
   assets_location?: string;
   priority_level?: number;
 
+  // Content References
+  gallery_ids?: string[];
+  caption_ids?: string[];
+
   // Metadata
   created_at?: Date;
   updated_at?: Date;

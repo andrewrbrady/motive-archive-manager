@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,11 @@ import { CarAvatar } from "@/components/ui/CarAvatar";
 import { usePlatforms } from "@/contexts/PlatformContext";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
+import { useGalleries } from "@/hooks/use-galleries";
+import DeliverablesTable from "@/components/deliverables/deliverables-tab/components/DeliverablesTable";
+import DeliverableCard from "@/components/deliverables/deliverables-tab/components/DeliverableCard";
+import DeliverableModal from "@/components/deliverables/deliverables-tab/components/DeliverableModal";
+import { Deliverable } from "@/types/deliverable";
 
 interface MemberDetails {
   name: string;
@@ -56,6 +61,14 @@ export function ProjectDeliverablesTab({
 }: ProjectDeliverablesTabProps) {
   const api = useAPI();
   const { platforms: availablePlatforms } = usePlatforms();
+
+  // Gallery and caption data
+  const { data: galleriesData, isLoading: galleriesLoading } = useGalleries({
+    limit: 100,
+  });
+  const [captionsData, setCaptionsData] = useState<any[]>([]);
+  const [captionsLoading, setCaptionsLoading] = useState(false);
+
   const [isAddDeliverableOpen, setIsAddDeliverableOpen] = useState(false);
   const [isEditDeliverableOpen, setIsEditDeliverableOpen] = useState(false);
   const [editingDeliverable, setEditingDeliverable] = useState<any>(null);
@@ -88,6 +101,8 @@ export function ProjectDeliverablesTab({
     assignedTo: "unassigned",
     carId: "", // Explicitly no car selected by default
     scheduled: false,
+    gallery_ids: [] as string[],
+    caption_ids: [] as string[],
   });
 
   const [isAddingDeliverable, setIsAddingDeliverable] = useState(false);
@@ -119,6 +134,22 @@ export function ProjectDeliverablesTab({
 
   // Car details for displaying avatars
   const [carDetails, setCarDetails] = useState<Record<string, any>>({});
+
+  // Modal state for deliverable detail view
+  const [selectedDeliverable, setSelectedDeliverable] =
+    useState<Deliverable | null>(null);
+  const [isDeliverableModalOpen, setIsDeliverableModalOpen] = useState(false);
+
+  // Sorting state
+  const [sortField, setSortField] = useState<string>(() => {
+    return localStorage.getItem("deliverables-sort-field") || "release_date";
+  });
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">(() => {
+    return (
+      (localStorage.getItem("deliverables-sort-direction") as "asc" | "desc") ||
+      "desc"
+    );
+  });
 
   const fetchProjectDeliverables = useCallback(async () => {
     if (!api) {
@@ -217,6 +248,26 @@ export function ProjectDeliverablesTab({
       fetchProjectDeliverables();
     }
   }, [project, initialDeliverables, fetchProjectDeliverables]);
+
+  // Fetch captions data
+  useEffect(() => {
+    const fetchCaptions = async () => {
+      if (!api) return;
+
+      setCaptionsLoading(true);
+      try {
+        const captions = await api.get("captions?limit=100");
+        setCaptionsData(Array.isArray(captions) ? captions : []);
+      } catch (error) {
+        console.error("Error fetching captions:", error);
+        setCaptionsData([]);
+      } finally {
+        setCaptionsLoading(false);
+      }
+    };
+
+    fetchCaptions();
+  }, [api]);
 
   const fetchExistingDeliverables = useCallback(
     async (
@@ -375,6 +426,8 @@ export function ProjectDeliverablesTab({
             ? deliverableForm.carId
             : null,
         scheduled: deliverableForm.scheduled,
+        gallery_ids: deliverableForm.gallery_ids,
+        caption_ids: deliverableForm.caption_ids,
       };
 
       console.log("🚀 SENDING REQUEST:", {
@@ -412,6 +465,8 @@ export function ProjectDeliverablesTab({
         assignedTo: "unassigned",
         carId: "",
         scheduled: false,
+        gallery_ids: [],
+        caption_ids: [],
       });
       setIsAddDeliverableOpen(false);
 
@@ -459,6 +514,8 @@ export function ProjectDeliverablesTab({
       assignedTo: deliverable.firebase_uid || "unassigned",
       carId: deliverable.car_id?.toString() || "",
       scheduled: deliverable.scheduled || false,
+      gallery_ids: deliverable.gallery_ids || [],
+      caption_ids: deliverable.caption_ids || [],
     });
     setEditingDeliverable(deliverable);
     setIsEditDeliverableOpen(true);
@@ -509,6 +566,8 @@ export function ProjectDeliverablesTab({
             ? deliverableForm.carId
             : null,
         scheduled: deliverableForm.scheduled,
+        gallery_ids: deliverableForm.gallery_ids,
+        caption_ids: deliverableForm.caption_ids,
       };
 
       console.log("🚀 EDIT - SENDING REQUEST:", {
@@ -555,6 +614,8 @@ export function ProjectDeliverablesTab({
         assignedTo: "unassigned",
         carId: "",
         scheduled: false,
+        gallery_ids: [],
+        caption_ids: [],
       });
       setEditingDeliverable(null);
       setIsEditDeliverableOpen(false);
@@ -653,9 +714,14 @@ export function ProjectDeliverablesTab({
         status,
       });
 
-      // Refresh project data and deliverables
-      await onProjectUpdate();
-      await fetchProjectDeliverables();
+      // Update local state for just this deliverable - no full refresh!
+      setProjectDeliverables((prev) =>
+        prev.map((deliverable) =>
+          deliverable._id === deliverableId
+            ? { ...deliverable, status }
+            : deliverable
+        )
+      );
 
       toast({
         title: "Success",
@@ -759,6 +825,134 @@ export function ProjectDeliverablesTab({
     );
   };
 
+  // Modal handlers
+  const handleOpenDeliverableModal = (deliverable: Deliverable) => {
+    setSelectedDeliverable(deliverable);
+    setIsDeliverableModalOpen(true);
+  };
+
+  const handleCloseDeliverableModal = () => {
+    setSelectedDeliverable(null);
+    setIsDeliverableModalOpen(false);
+  };
+
+  // Sorting handlers
+  const handleSort = (field: string) => {
+    let newDirection: "asc" | "desc" = "asc";
+
+    if (sortField === field) {
+      newDirection = sortDirection === "asc" ? "desc" : "asc";
+    }
+
+    setSortField(field);
+    setSortDirection(newDirection);
+
+    // Save to localStorage
+    localStorage.setItem("deliverables-sort-field", field);
+    localStorage.setItem("deliverables-sort-direction", newDirection);
+  };
+
+  // Sort deliverables based on current sort settings
+  const sortedDeliverables = useMemo(() => {
+    const deliverablesCopy = [...projectDeliverables];
+
+    return deliverablesCopy.sort((a, b) => {
+      let aValue = a[sortField];
+      let bValue = b[sortField];
+
+      // Handle different field types
+      if (sortField === "release_date" || sortField === "edit_deadline") {
+        aValue = aValue ? new Date(aValue).getTime() : 0;
+        bValue = bValue ? new Date(bValue).getTime() : 0;
+      } else if (
+        sortField === "title" ||
+        sortField === "editor" ||
+        sortField === "status"
+      ) {
+        aValue = (aValue || "").toLowerCase();
+        bValue = (bValue || "").toLowerCase();
+      } else if (sortField === "duration") {
+        aValue = aValue || 0;
+        bValue = bValue || 0;
+      } else if (sortField === "scheduled") {
+        aValue = aValue ? 1 : 0;
+        bValue = bValue ? 1 : 0;
+      } else if (sortField === "car") {
+        // Sort by car details (year make model) or fallback to car_id
+        const aCarDetails = a.car_id ? carDetails[a.car_id.toString()] : null;
+        const bCarDetails = b.car_id ? carDetails[b.car_id.toString()] : null;
+
+        if (aCarDetails && bCarDetails) {
+          const aCarName =
+            `${aCarDetails.year || ""} ${aCarDetails.make || ""} ${aCarDetails.model || ""}`
+              .trim()
+              .toLowerCase();
+          const bCarName =
+            `${bCarDetails.year || ""} ${bCarDetails.make || ""} ${bCarDetails.model || ""}`
+              .trim()
+              .toLowerCase();
+          aValue = aCarName || "zzz"; // Put cars without names at the end
+          bValue = bCarName || "zzz";
+        } else {
+          // If no car details, sort by car_id or put at end
+          aValue = aCarDetails ? "000" : "zzz"; // Cars with details come first
+          bValue = bCarDetails ? "000" : "zzz";
+        }
+      } else if (sortField === "platform") {
+        // Handle platform - could be string or array
+        const aPlatform =
+          a.platform ||
+          (a.platforms && a.platforms.length > 0 ? a.platforms[0] : "");
+        const bPlatform =
+          b.platform ||
+          (b.platforms && b.platforms.length > 0 ? b.platforms[0] : "");
+        aValue = (aPlatform || "").toLowerCase();
+        bValue = (bPlatform || "").toLowerCase();
+      }
+
+      if (aValue < bValue) {
+        return sortDirection === "asc" ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortDirection === "asc" ? 1 : -1;
+      }
+      return 0;
+    });
+  }, [projectDeliverables, sortField, sortDirection]);
+
+  // Actions for the shared deliverable components
+  const deliverableActions = {
+    onEdit: (deliverable: Deliverable) => {
+      handleEditDeliverable(deliverable);
+    },
+    onDelete: (deliverableId: string) => {
+      handleRemoveDeliverable(deliverableId);
+    },
+    onDuplicate: async (deliverable: Deliverable) => {
+      // TODO: Implement duplicate functionality for project deliverables
+      toast({
+        title: "Feature Coming Soon",
+        description: "Deliverable duplication will be available soon.",
+      });
+    },
+    onStatusChange: (deliverableId: string, newStatus: string) => {
+      handleUpdateDeliverableStatus(deliverableId, newStatus);
+    },
+    onRefresh: () => {
+      fetchProjectDeliverables();
+    },
+  };
+
+  // Mock batch mode for compatibility with shared components
+  const mockBatchMode = {
+    isBatchMode: false,
+    selectedDeliverables: [],
+    toggleBatchMode: () => {},
+    toggleDeliverableSelection: () => {},
+    toggleAllDeliverables: () => {},
+    handleBatchDelete: async () => {},
+  };
+
   const getDeliverableTypeIcon = (type: string) => {
     switch (type) {
       case "document":
@@ -795,8 +989,39 @@ export function ProjectDeliverablesTab({
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
-          <CardTitle>Deliverables</CardTitle>
+          <div className="flex items-center gap-3">
+            <CardTitle>Deliverables</CardTitle>
+            <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+              Sorted by{" "}
+              {sortField === "edit_deadline"
+                ? "Deadline"
+                : sortField === "release_date"
+                  ? "Release Date"
+                  : sortField === "car"
+                    ? "Car"
+                    : sortField === "platform"
+                      ? "Platform"
+                      : sortField.charAt(0).toUpperCase() + sortField.slice(1)}
+              (
+              {sortDirection === "asc"
+                ? sortField === "release_date" || sortField === "edit_deadline"
+                  ? "Oldest First"
+                  : "A to Z"
+                : sortField === "release_date" || sortField === "edit_deadline"
+                  ? "Newest First"
+                  : "Z to A"}
+              )
+            </div>
+          </div>
           <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => handleSort("release_date")}
+              className="text-xs"
+            >
+              Reset Sort
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -1307,6 +1532,24 @@ export function ProjectDeliverablesTab({
                               placeholder="Select release date"
                               className="text-sm"
                             />
+                            <div className="flex items-center space-x-2 pt-1">
+                              <Checkbox
+                                id="scheduled-add"
+                                checked={deliverableForm.scheduled}
+                                onCheckedChange={(checked) =>
+                                  setDeliverableForm({
+                                    ...deliverableForm,
+                                    scheduled: checked === true,
+                                  })
+                                }
+                              />
+                              <label
+                                htmlFor="scheduled-add"
+                                className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide cursor-pointer"
+                              >
+                                Scheduled
+                              </label>
+                            </div>
                           </div>
                         </div>
 
@@ -1334,26 +1577,100 @@ export function ProjectDeliverablesTab({
                             ))}
                           </select>
                         </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1">
+                        <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                        <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                          Content References
+                        </span>
+                        <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                            Galleries (Optional)
+                          </label>
+                          <MultiSelect
+                            value={deliverableForm.gallery_ids.map((id) => {
+                              const gallery = galleriesData?.galleries?.find(
+                                (g: any) => g._id === id
+                              );
+                              return gallery
+                                ? {
+                                    label:
+                                      gallery.name || `Gallery ${gallery._id}`,
+                                    value: gallery._id,
+                                  }
+                                : { label: id, value: id };
+                            })}
+                            onChange={(selected) =>
+                              setDeliverableForm({
+                                ...deliverableForm,
+                                gallery_ids: selected.map((s) => s.value),
+                              })
+                            }
+                            options={
+                              galleriesLoading
+                                ? []
+                                : galleriesData?.galleries?.map(
+                                    (gallery: any) => ({
+                                      label:
+                                        gallery.name ||
+                                        `Gallery ${gallery._id}`,
+                                      value: gallery._id,
+                                    })
+                                  ) || []
+                            }
+                            placeholder={
+                              galleriesLoading
+                                ? "Loading galleries..."
+                                : "Select galleries"
+                            }
+                            className="text-sm"
+                          />
+                        </div>
 
                         <div className="space-y-1.5">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="scheduled-add"
-                              checked={deliverableForm.scheduled}
-                              onCheckedChange={(checked) =>
-                                setDeliverableForm({
-                                  ...deliverableForm,
-                                  scheduled: checked === true,
-                                })
-                              }
-                            />
-                            <label
-                              htmlFor="scheduled-add"
-                              className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide cursor-pointer"
-                            >
-                              Scheduled
-                            </label>
-                          </div>
+                          <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                            Captions (Optional)
+                          </label>
+                          <MultiSelect
+                            value={deliverableForm.caption_ids.map((id) => {
+                              const caption = captionsData.find(
+                                (c: any) => c._id === id
+                              );
+                              return caption
+                                ? {
+                                    label: `${caption.platform}: ${caption.caption_text?.substring(0, 50)}${caption.caption_text?.length > 50 ? "..." : ""}`,
+                                    value: caption._id,
+                                  }
+                                : { label: id, value: id };
+                            })}
+                            onChange={(selected) =>
+                              setDeliverableForm({
+                                ...deliverableForm,
+                                caption_ids: selected.map((s) => s.value),
+                              })
+                            }
+                            options={
+                              captionsLoading
+                                ? []
+                                : captionsData?.map((caption: any) => ({
+                                    label: `${caption.platform}: ${caption.caption_text?.substring(0, 50)}${caption.caption_text?.length > 50 ? "..." : ""}`,
+                                    value: caption._id,
+                                  })) || []
+                            }
+                            placeholder={
+                              captionsLoading
+                                ? "Loading captions..."
+                                : "Select captions"
+                            }
+                            className="text-sm"
+                          />
                         </div>
                       </div>
                     </div>
@@ -1376,6 +1693,8 @@ export function ProjectDeliverablesTab({
                         assignedTo: "unassigned",
                         carId: "",
                         scheduled: false,
+                        gallery_ids: [],
+                        caption_ids: [],
                       });
                       setIsAddDeliverableOpen(false);
                     }}
@@ -1672,27 +1991,119 @@ export function ProjectDeliverablesTab({
                             placeholder="Select release date"
                             className="text-sm"
                           />
+                          <div className="flex items-center space-x-2 pt-1">
+                            <Checkbox
+                              id="scheduled-edit"
+                              checked={deliverableForm.scheduled}
+                              onCheckedChange={(checked) =>
+                                setDeliverableForm({
+                                  ...deliverableForm,
+                                  scheduled: checked === true,
+                                })
+                              }
+                            />
+                            <label
+                              htmlFor="scheduled-edit"
+                              className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide cursor-pointer"
+                            >
+                              Scheduled
+                            </label>
+                          </div>
                         </div>
                       </div>
+                    </div>
 
-                      <div className="space-y-1.5">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="scheduled-edit"
-                            checked={deliverableForm.scheduled}
-                            onCheckedChange={(checked) =>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1">
+                        <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                        <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                          Content References
+                        </span>
+                        <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                            Galleries (Optional)
+                          </label>
+                          <MultiSelect
+                            value={deliverableForm.gallery_ids.map((id) => {
+                              const gallery = galleriesData?.galleries?.find(
+                                (g: any) => g._id === id
+                              );
+                              return gallery
+                                ? {
+                                    label:
+                                      gallery.name || `Gallery ${gallery._id}`,
+                                    value: gallery._id,
+                                  }
+                                : { label: id, value: id };
+                            })}
+                            onChange={(selected) =>
                               setDeliverableForm({
                                 ...deliverableForm,
-                                scheduled: checked === true,
+                                gallery_ids: selected.map((s) => s.value),
                               })
                             }
+                            options={
+                              galleriesLoading
+                                ? []
+                                : galleriesData?.galleries?.map(
+                                    (gallery: any) => ({
+                                      label:
+                                        gallery.name ||
+                                        `Gallery ${gallery._id}`,
+                                      value: gallery._id,
+                                    })
+                                  ) || []
+                            }
+                            placeholder={
+                              galleriesLoading
+                                ? "Loading galleries..."
+                                : "Select galleries"
+                            }
+                            className="text-sm"
                           />
-                          <label
-                            htmlFor="scheduled-edit"
-                            className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide cursor-pointer"
-                          >
-                            Scheduled
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                            Captions (Optional)
                           </label>
+                          <MultiSelect
+                            value={deliverableForm.caption_ids.map((id) => {
+                              const caption = captionsData.find(
+                                (c: any) => c._id === id
+                              );
+                              return caption
+                                ? {
+                                    label: `${caption.platform}: ${caption.caption_text?.substring(0, 50)}${caption.caption_text?.length > 50 ? "..." : ""}`,
+                                    value: caption._id,
+                                  }
+                                : { label: id, value: id };
+                            })}
+                            onChange={(selected) =>
+                              setDeliverableForm({
+                                ...deliverableForm,
+                                caption_ids: selected.map((s) => s.value),
+                              })
+                            }
+                            options={
+                              captionsLoading
+                                ? []
+                                : captionsData?.map((caption: any) => ({
+                                    label: `${caption.platform}: ${caption.caption_text?.substring(0, 50)}${caption.caption_text?.length > 50 ? "..." : ""}`,
+                                    value: caption._id,
+                                  })) || []
+                            }
+                            placeholder={
+                              captionsLoading
+                                ? "Loading captions..."
+                                : "Select captions"
+                            }
+                            className="text-sm"
+                          />
                         </div>
                       </div>
                     </div>
@@ -1715,6 +2126,8 @@ export function ProjectDeliverablesTab({
                         assignedTo: "unassigned",
                         carId: "",
                         scheduled: false,
+                        gallery_ids: [],
+                        caption_ids: [],
                       });
                       setEditingDeliverable(null);
                       setIsEditDeliverableOpen(false);
@@ -1741,156 +2154,52 @@ export function ProjectDeliverablesTab({
         </div>
       </CardHeader>
       <CardContent className="pt-4">
-        {projectDeliverables.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium mb-2">No deliverables yet</p>
-            <p className="text-sm">
-              Add deliverables to track project outputs and milestones
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {projectDeliverables.map((deliverable: any) => (
-              <div
-                key={deliverable._id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/20 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  {/* Car Avatar - show if deliverable has a linked car */}
-                  {deliverable.car_id &&
-                    carDetails[deliverable.car_id.toString()] && (
-                      <CarAvatar
-                        primaryImageId={
-                          carDetails[deliverable.car_id.toString()]
-                            ?.primaryImageId
-                        }
-                        entityName={`${carDetails[deliverable.car_id.toString()]?.year || ""} ${carDetails[deliverable.car_id.toString()]?.make || ""} ${carDetails[deliverable.car_id.toString()]?.model || ""}`.trim()}
-                        size="md"
-                        className="flex-shrink-0"
-                      />
-                    )}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium">{deliverable.title}</div>
-                    {deliverable.description && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {deliverable.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                      <span>
-                        Due{" "}
-                        {deliverable.edit_deadline
-                          ? (() => {
-                              try {
-                                const date = new Date(
-                                  deliverable.edit_deadline
-                                );
-                                return isNaN(date.getTime())
-                                  ? "Invalid Date"
-                                  : format(date, "MMM d, yyyy");
-                              } catch {
-                                return "Invalid Date";
-                              }
-                            })()
-                          : "No Date Set"}
-                      </span>
-                      {deliverable.firebase_uid &&
-                        memberDetails[deliverable.firebase_uid] && (
-                          <span>
-                            Assigned to{" "}
-                            {memberDetails[deliverable.firebase_uid].name}
-                          </span>
-                        )}
-                      {/* Car info text - only show if no avatar or car name */}
-                      {deliverable.car_id &&
-                        carDetails[deliverable.car_id.toString()] && (
-                          <span>
-                            Vehicle:{" "}
-                            {carDetails[deliverable.car_id.toString()]?.year}{" "}
-                            {carDetails[deliverable.car_id.toString()]?.make}{" "}
-                            {carDetails[deliverable.car_id.toString()]?.model}
-                          </span>
-                        )}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge
-                    className={getDeliverableStatusColor(deliverable.status)}
-                  >
-                    {deliverable.status.replace("_", " ")}
-                  </Badge>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => handleEditDeliverable(deliverable)}
-                      >
-                        Edit Deliverable
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          handleUpdateDeliverableStatus(
-                            deliverable._id,
-                            "pending"
-                          )
-                        }
-                        disabled={deliverable.status === "not_started"}
-                      >
-                        Mark as Pending
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          handleUpdateDeliverableStatus(
-                            deliverable._id,
-                            "in_progress"
-                          )
-                        }
-                        disabled={deliverable.status === "in_progress"}
-                      >
-                        Mark as In Progress
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          handleUpdateDeliverableStatus(
-                            deliverable._id,
-                            "review"
-                          )
-                        }
-                        disabled={deliverable.status === "in_progress"}
-                      >
-                        Mark as In Review
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          handleUpdateDeliverableStatus(
-                            deliverable._id,
-                            "completed"
-                          )
-                        }
-                        disabled={deliverable.status === "done"}
-                      >
-                        Mark as Completed
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleRemoveDeliverable(deliverable._id)}
-                        className="text-red-600"
-                      >
-                        Remove Deliverable
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Mobile View - Cards */}
+        <div className="block md:hidden space-y-3">
+          {!isLoadingDeliverables && sortedDeliverables.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="text-lg font-medium mb-2">No deliverables yet</p>
+              <p className="text-sm">
+                Add deliverables to track project outputs and milestones
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {sortedDeliverables.map((deliverable) => (
+                <DeliverableCard
+                  key={deliverable._id?.toString()}
+                  deliverable={deliverable}
+                  actions={deliverableActions}
+                  onOpenModal={handleOpenDeliverableModal}
+                  showCarInfo={true}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop View - Table */}
+        <DeliverablesTable
+          deliverables={sortedDeliverables}
+          isLoading={isLoadingDeliverables}
+          actions={deliverableActions}
+          batchMode={mockBatchMode}
+          showCarColumn={true}
+          onOpenModal={handleOpenDeliverableModal}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onSort={handleSort}
+        />
       </CardContent>
+
+      {/* Deliverable Detail Modal */}
+      <DeliverableModal
+        deliverable={selectedDeliverable}
+        isOpen={isDeliverableModalOpen}
+        onClose={handleCloseDeliverableModal}
+        actions={deliverableActions}
+      />
 
       {/* JSON Upload Modal */}
       <JsonUploadPasteModal
