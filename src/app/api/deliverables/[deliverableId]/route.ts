@@ -187,6 +187,12 @@ export async function PUT(
     if (body.social_media_link !== undefined)
       updateData.social_media_link = body.social_media_link;
 
+    // Handle content references (galleries and captions)
+    if (body.gallery_ids !== undefined)
+      updateData.gallery_ids = body.gallery_ids;
+    if (body.caption_ids !== undefined)
+      updateData.caption_ids = body.caption_ids;
+
     console.log(
       `📝 Final updateData for deliverable ${deliverableId}:`,
       updateData
