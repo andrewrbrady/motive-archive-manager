@@ -38,23 +38,11 @@ export function ImageProcessingModalHeader({
   return (
     <>
       <DialogHeader className="flex-shrink-0">
-        <DialogTitle className="flex items-center gap-2">
+        <DialogTitle className="flex items-center gap-2 text-lg">
           {icon}
           {title}
         </DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
-
-      {/* Car Association Indicator */}
-      {image?.carId && (
-        <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <Car className="h-4 w-4 text-blue-600" />
-          <span className="text-sm text-blue-700">
-            This image is associated with a car. Processed images will be linked
-            to the same car.
-          </span>
-        </div>
-      )}
 
       {/* Processing Status */}
       {processingStatus && (

@@ -14,37 +14,9 @@ import { useAPI } from "@/hooks/useAPI";
 import { Badge } from "@/components/ui/badge";
 
 // Helper function to build enhanced Cloudflare URL for car card thumbnails
-const getEnhancedImageUrl = (
-  baseUrl: string,
-  width?: string,
-  quality?: string
-) => {
-  let params = [];
-  // Always check for truthy values and non-empty strings
-  if (width && width.trim() !== "") params.push(`w=${width}`);
-  if (quality && quality.trim() !== "") params.push(`q=${quality}`);
+import { getEnhancedImageUrl } from "@/lib/imageUtils";
 
-  if (params.length === 0) return baseUrl;
-
-  // Handle different Cloudflare URL formats
-  // Format: https://imagedelivery.net/account/image-id/public
-  // Should become: https://imagedelivery.net/account/image-id/w=400,q=85
-  if (baseUrl.includes("imagedelivery.net")) {
-    // Check if URL already has transformations (contains variant like 'public')
-    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
-      // Replace the last segment (usually 'public') with our parameters
-      const urlParts = baseUrl.split("/");
-      urlParts[urlParts.length - 1] = params.join(",");
-      return urlParts.join("/");
-    } else {
-      // URL doesn't have a variant, append transformations
-      return `${baseUrl}/${params.join(",")}`;
-    }
-  }
-
-  // Fallback for other URL formats - try to replace /public if it exists
-  return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
-};
+// Using centralized getEnhancedImageUrl function from @/lib/imageUtils
 
 interface CarCardProps {
   car: Car;

@@ -24,26 +24,30 @@ interface ImageCardProps {
   onImageView?: (image: ImageData) => void;
 }
 
-// Helper function to build enhanced Cloudflare URL for thumbnails
+// Helper function to build enhanced Cloudflare URL for thumbnails - FIXED
 const getThumbnailImageUrl = (baseUrl: string) => {
-  // Use medium resolution for gallery thumbnails (600px width, high quality)
-  const width = "600";
-  const quality = "85";
-
   if (!baseUrl.includes("imagedelivery.net")) {
     return baseUrl;
   }
 
-  // Check if URL already has transformations (contains variant like 'public')
-  if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
-    // Replace the last segment (usually 'public') with thumbnail parameters
-    const urlParts = baseUrl.split("/");
-    urlParts[urlParts.length - 1] = `w=${width},q=${quality}`;
-    return urlParts.join("/");
-  } else {
-    // URL doesn't have a variant, append transformations
-    return `${baseUrl}/w=${width},q=${quality}`;
+  // Map 600px to the appropriate named variant (medium: 600x400)
+  const targetVariant = "medium";
+
+  const urlParts = baseUrl.split("/");
+
+  // If URL already has a variant, replace it
+  if (urlParts.length >= 5) {
+    const lastPart = urlParts[urlParts.length - 1];
+
+    // If it's a named variant or flexible variant, replace it
+    if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+      urlParts[urlParts.length - 1] = targetVariant;
+      return urlParts.join("/");
+    }
   }
+
+  // URL doesn't have a variant, append the named variant
+  return `${baseUrl}/${targetVariant}`;
 };
 
 export function ImageCard({

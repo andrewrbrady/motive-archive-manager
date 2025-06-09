@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
+import { getEnhancedImageUrl } from "@/lib/imageUtils";
 
 interface ImageViewModalProps {
   isOpen: boolean;
@@ -60,22 +61,9 @@ export function ImageViewModal({
   const hasNext = currentIndex < images.length - 1;
 
   // Helper function to get original full-resolution image URL
+  // Use centralized high-resolution URL transformation
   const getOriginalImageUrl = (url: string) => {
-    // If it's a Cloudflare URL, request maximum resolution
-    if (url.includes("imagedelivery.net")) {
-      // Check if URL already has transformations (contains variant like 'public')
-      if (url.endsWith("/public") || url.match(/\/[a-zA-Z]+$/)) {
-        // Replace the last segment (usually 'public') with high-resolution parameters
-        const parts = url.split("/");
-        parts[parts.length - 1] = "w=5000,q=100";
-        return parts.join("/");
-      } else {
-        // URL doesn't have a variant, append transformations
-        return `${url}/w=5000,q=100`;
-      }
-    }
-
-    return url;
+    return getEnhancedImageUrl(url, "3000", "90"); // Maps to highres variant (3000px)
   };
 
   // Get the full-resolution URL for modal display

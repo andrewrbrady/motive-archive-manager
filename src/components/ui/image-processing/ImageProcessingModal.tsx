@@ -34,8 +34,6 @@ import {
   Crop,
   Expand,
   Palette,
-  Play,
-  Pause,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { useImageProcessing } from "@/lib/hooks/useImageProcessing";
@@ -66,7 +64,7 @@ export function ImageProcessingModal({
     onImageReplaced,
   });
 
-  // Live preview settings
+  // Live preview settings - enabled by default
   const [livePreviewEnabled, setLivePreviewEnabled] = useState<boolean>(true);
   const [isGeneratingPreview, setIsGeneratingPreview] =
     useState<boolean>(false);
@@ -107,90 +105,184 @@ export function ImageProcessingModal({
     }
   };
 
-  // Generate live preview (simplified version)
+  // Generate live preview that shows the actual crop result or canvas extension
   const generateLivePreview = useCallback(async () => {
-    if (!livePreviewEnabled || !image?.url || !processing.originalDimensions)
+    if (!livePreviewEnabled || !image?.url || !processing.originalDimensions) {
+      setLivePreviewUrl(null);
       return;
+    }
 
     if (previewTimeoutRef.current) {
       clearTimeout(previewTimeoutRef.current);
     }
 
-    previewTimeoutRef.current = setTimeout(async () => {
-      setIsGeneratingPreview(true);
-      const startTime = Date.now();
+    previewTimeoutRef.current = setTimeout(
+      async () => {
+        const startTime = Date.now();
 
-      try {
-        // Generate actual preview based on processing type
-        if (processingType === "image-crop" && processing.parameters.cropArea) {
-          // Make a real crop preview API call
-          const response = await fetch("/api/images/crop-image", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              imageUrl: image.url,
-              cropX: processing.parameters.cropArea.x,
-              cropY: processing.parameters.cropArea.y,
-              cropWidth: processing.parameters.cropArea.width,
-              cropHeight: processing.parameters.cropArea.height,
-              outputWidth: parseInt(processing.parameters.outputWidth) || 1080,
-              outputHeight:
-                parseInt(processing.parameters.outputHeight) || 1920,
-              scale: processing.parameters.scale || 1.0,
-              uploadToCloudflare: false, // Just preview, don't upload
-            }),
-          });
+        if (
+          processingType === "image-crop" &&
+          processing.parameters?.cropArea
+        ) {
+          // Generate client-side crop preview
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return;
+          const img = new window.Image();
 
-          if (response.ok) {
-            const result = await response.json();
-            if (result.imageData) {
-              setLivePreviewUrl(`data:image/jpeg;base64,${result.imageData}`);
+          img.onload = () => {
+            const { cropArea } = processing.parameters;
+            const outputWidth =
+              parseInt(processing.parameters.outputWidth) || 1080;
+            const outputHeight =
+              parseInt(processing.parameters.outputHeight) || 1920;
+
+            if (cropArea && cropArea.width > 0 && cropArea.height > 0) {
+              // Set canvas to output dimensions
+              canvas.width = outputWidth;
+              canvas.height = outputHeight;
+
+              // Calculate scaling to fit the crop into output dimensions
+              const scaleX = outputWidth / cropArea.width;
+              const scaleY = outputHeight / cropArea.height;
+              const scale = Math.min(scaleX, scaleY);
+
+              // Calculate centered position
+              const scaledWidth = cropArea.width * scale;
+              const scaledHeight = cropArea.height * scale;
+              const offsetX = (outputWidth - scaledWidth) / 2;
+              const offsetY = (outputHeight - scaledHeight) / 2;
+
+              // Clear canvas
+              ctx.fillStyle = "#ffffff";
+              ctx.fillRect(0, 0, outputWidth, outputHeight);
+
+              // Draw the cropped portion
+              ctx.drawImage(
+                img,
+                cropArea.x,
+                cropArea.y,
+                cropArea.width,
+                cropArea.height, // Source
+                offsetX,
+                offsetY,
+                scaledWidth,
+                scaledHeight // Destination
+              );
+
+              // Convert to data URL and set as preview
+              const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+              setLivePreviewUrl(dataUrl);
+            } else {
+              // No valid crop area, show original
+              setLivePreviewUrl(image.url);
             }
-          } else {
-            console.error("Live preview generation failed:", response.status);
-            setLivePreviewUrl(image.url); // Fallback to original
-          }
-        } else if (processingType === "canvas-extension") {
-          // Make a real canvas extension preview API call
-          const response = await fetch("/api/images/extend-canvas", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
+
+            setPreviewProcessingTime(Date.now() - startTime);
+          };
+
+          img.crossOrigin = "anonymous";
+          img.src = image.url;
+        } else if (
+          processingType === "canvas-extension" &&
+          processing.parameters?.desiredHeight &&
+          processing.parameters?.outputWidth
+        ) {
+          // Generate API-based canvas extension preview
+          try {
+            setIsGeneratingPreview(true);
+
+            // Use the exact same payload structure as the working 2x gallery save
+            const baseDesiredHeight =
+              parseInt(processing.parameters.desiredHeight) || 1350;
+            const baseRequestedWidth =
+              parseInt(processing.parameters.outputWidth) || 1080;
+
+            // Use 2x scale like the working gallery save, but don't upload
+            const scale = 2;
+
+            const payload = {
               imageUrl: image.url,
-              desiredHeight:
-                parseInt(processing.parameters.desiredHeight) || 1350,
+              desiredHeight: Math.round(baseDesiredHeight * scale),
               paddingPct:
                 parseFloat(processing.parameters.paddingPercentage) || 0.05,
               whiteThresh: parseInt(processing.parameters.whiteThreshold) || 90,
               uploadToCloudflare: false,
-              requestedWidth:
-                parseInt(processing.parameters.outputWidth) || 1080,
-              requestedHeight:
-                parseInt(processing.parameters.desiredHeight) || 1350,
-            }),
-          });
+              requestedWidth: Math.round(baseRequestedWidth * scale),
+              requestedHeight: Math.round(baseDesiredHeight * scale),
+              scaleMultiplier: scale,
+              previewImageDimensions: processing.originalDimensions,
+            };
 
-          if (response.ok) {
-            const result = await response.json();
-            if (result.imageData) {
-              setLivePreviewUrl(`data:image/jpeg;base64,${result.imageData}`);
+            console.log("🔍 Canvas extension preview payload:", {
+              originalDimensions: processing.originalDimensions,
+              previewPayload: payload,
+              parameters: processing.parameters,
+            });
+
+            const response = await fetch("/api/images/extend-canvas", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(payload),
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              if (result.processedImageUrl) {
+                // Log the data URL format for debugging
+                console.log("🔍 Canvas extension preview result:", {
+                  hasProcessedImageUrl: !!result.processedImageUrl,
+                  isDataUrl: result.processedImageUrl.startsWith("data:"),
+                  urlStart: result.processedImageUrl.substring(0, 50),
+                  urlLength: result.processedImageUrl.length,
+                });
+
+                // Ensure the data URL is properly formatted
+                let processedUrl = result.processedImageUrl;
+                if (
+                  processedUrl.startsWith("data:image") &&
+                  !processedUrl.includes("base64,")
+                ) {
+                  // If it's a data URL but missing base64 indicator, add it
+                  processedUrl = processedUrl.replace(
+                    "data:image/jpeg;",
+                    "data:image/jpeg;base64,"
+                  );
+                  processedUrl = processedUrl.replace(
+                    "data:image/png;",
+                    "data:image/png;base64,"
+                  );
+                }
+
+                setLivePreviewUrl(processedUrl);
+                setPreviewProcessingTime(Date.now() - startTime);
+              } else {
+                // Fallback to original image
+                setLivePreviewUrl(image.url);
+              }
+            } else {
+              // Fallback to original image on error
+              setLivePreviewUrl(image.url);
             }
-          } else {
-            console.error("Live preview generation failed:", response.status);
-            setLivePreviewUrl(image.url); // Fallback to original
+          } catch (error) {
+            console.error("Canvas extension preview error:", error);
+            // Fallback to original image
+            setLivePreviewUrl(image.url);
+          } finally {
+            setIsGeneratingPreview(false);
           }
-        } else if (processingType === "image-matte") {
-          // Make a real matte preview API call
-          const response = await fetch("/api/images/create-matte", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
+        } else if (
+          processingType === "image-matte" &&
+          processing.parameters?.canvasWidth &&
+          processing.parameters?.canvasHeight
+        ) {
+          // Generate API-based matte preview
+          try {
+            setIsGeneratingPreview(true);
+
+            const payload = {
               imageUrl: image.url,
               canvasWidth: parseInt(processing.parameters.canvasWidth) || 1827,
               canvasHeight:
@@ -203,31 +295,70 @@ export function ImageProcessingModal({
                 parseInt(processing.parameters.outputWidth) || 1080,
               requestedHeight:
                 parseInt(processing.parameters.canvasHeight) || 1080,
-            }),
-          });
+            };
 
-          if (response.ok) {
-            const result = await response.json();
-            if (result.imageData) {
-              setLivePreviewUrl(`data:image/jpeg;base64,${result.imageData}`);
+            console.log("🔍 Matte preview payload:", {
+              originalDimensions: processing.originalDimensions,
+              previewPayload: payload,
+              parameters: processing.parameters,
+            });
+
+            const response = await fetch("/api/images/create-matte", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(payload),
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              if (result.processedImageUrl) {
+                console.log("🔍 Matte preview result:", {
+                  hasProcessedImageUrl: !!result.processedImageUrl,
+                  isDataUrl: result.processedImageUrl.startsWith("data:"),
+                  urlStart: result.processedImageUrl.substring(0, 50),
+                  urlLength: result.processedImageUrl.length,
+                });
+
+                // Ensure the data URL is properly formatted
+                let processedUrl = result.processedImageUrl;
+                if (
+                  processedUrl.startsWith("data:image") &&
+                  !processedUrl.includes("base64,")
+                ) {
+                  processedUrl = processedUrl.replace(
+                    "data:image/jpeg;",
+                    "data:image/jpeg;base64,"
+                  );
+                  processedUrl = processedUrl.replace(
+                    "data:image/png;",
+                    "data:image/png;base64,"
+                  );
+                }
+
+                setLivePreviewUrl(processedUrl);
+                setPreviewProcessingTime(Date.now() - startTime);
+              } else {
+                setLivePreviewUrl(image.url);
+              }
+            } else {
+              setLivePreviewUrl(image.url);
             }
-          } else {
-            console.error("Live preview generation failed:", response.status);
-            setLivePreviewUrl(image.url); // Fallback to original
+          } catch (error) {
+            console.error("Matte preview error:", error);
+            setLivePreviewUrl(image.url);
+          } finally {
+            setIsGeneratingPreview(false);
           }
         } else {
-          // Fallback to original image for incomplete parameters
+          // For other processing types or missing parameters, show original image
           setLivePreviewUrl(image.url);
+          setPreviewProcessingTime(Date.now() - startTime);
         }
-
-        setPreviewProcessingTime(Date.now() - startTime);
-      } catch (error) {
-        console.error("Live preview generation failed:", error);
-        setLivePreviewUrl(image.url); // Fallback to original
-      } finally {
-        setIsGeneratingPreview(false);
-      }
-    }, 800); // Increased debounce for real API calls
+      },
+      processingType === "canvas-extension" ? 500 : 100
+    ); // Longer debounce for API calls
   }, [
     livePreviewEnabled,
     image?.url,
@@ -236,10 +367,17 @@ export function ImageProcessingModal({
     processingType,
   ]);
 
-  // Generate live preview when settings change
+  // Generate live preview when settings change or component loads
   useEffect(() => {
     generateLivePreview();
   }, [generateLivePreview]);
+
+  // Initialize live preview when image loads
+  useEffect(() => {
+    if (image?.url && livePreviewEnabled) {
+      generateLivePreview();
+    }
+  }, [image?.url, livePreviewEnabled, generateLivePreview]);
 
   // Draw canvas with overlay based on processing type
   useEffect(() => {
@@ -253,8 +391,8 @@ export function ImageProcessingModal({
     const img = new window.Image();
     img.onload = () => {
       // Calculate canvas dimensions to fit the container
-      const maxWidth = 400;
-      const maxHeight = 300;
+      const maxWidth = 500;
+      const maxHeight = 400;
       const aspectRatio =
         processing.originalDimensions!.width /
         processing.originalDimensions!.height;
@@ -446,7 +584,7 @@ export function ImageProcessingModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-6xl max-h-[85vh] mx-4 overflow-hidden flex flex-col">
+      <DialogContent className="max-w-7xl max-h-[99vh] mx-2 overflow-hidden flex flex-col">
         <ImageProcessingModalHeader
           icon={config.icon}
           title={config.title}
@@ -464,29 +602,33 @@ export function ImageProcessingModal({
               {/* Left: Image Preview with Processing Overlay */}
               <div className="space-y-2">
                 <Label>{config.previewTitle}</Label>
-                <div className="border rounded-lg p-4 bg-muted/50">
+                <div className="border rounded-lg bg-muted/50 relative h-[32rem] lg:h-[36rem] flex flex-col">
                   {image?.url ? (
-                    <div className="space-y-2">
-                      <canvas
-                        ref={canvasRef}
-                        className={`border rounded max-w-full ${
-                          processingType === "image-crop"
-                            ? "cursor-move"
-                            : "cursor-default"
-                        }`}
-                        onMouseDown={handleCanvasMouseDown}
-                        onMouseMove={handleCanvasMouseMove}
-                        onMouseUp={handleCanvasMouseUp}
-                        onMouseLeave={handleCanvasMouseUp}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {config.previewHint}. Original:{" "}
-                        {processing.originalDimensions?.width}×
-                        {processing.originalDimensions?.height}
-                      </p>
-                    </div>
+                    <>
+                      <div className="flex-1 p-4 flex items-center justify-center min-h-0">
+                        <canvas
+                          ref={canvasRef}
+                          className={`border rounded max-w-full max-h-full ${
+                            processingType === "image-crop"
+                              ? "cursor-move"
+                              : "cursor-default"
+                          }`}
+                          onMouseDown={handleCanvasMouseDown}
+                          onMouseMove={handleCanvasMouseMove}
+                          onMouseUp={handleCanvasMouseUp}
+                          onMouseLeave={handleCanvasMouseUp}
+                        />
+                      </div>
+                      <div className="px-4 pb-4">
+                        <p className="text-xs text-muted-foreground">
+                          {config.previewHint}. Original:{" "}
+                          {processing.originalDimensions?.width}×
+                          {processing.originalDimensions?.height}
+                        </p>
+                      </div>
+                    </>
                   ) : (
-                    <div className="h-40 lg:h-48 flex items-center justify-center text-muted-foreground">
+                    <div className="flex-1 flex items-center justify-center text-muted-foreground">
                       No image selected
                     </div>
                   )}
@@ -496,7 +638,7 @@ export function ImageProcessingModal({
               {/* Right: Live Preview */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>Live Preview</Label>
+                  <Label>Preview Mode</Label>
                   <Button
                     variant="outline"
                     size="sm"
@@ -505,13 +647,13 @@ export function ImageProcessingModal({
                   >
                     {livePreviewEnabled ? (
                       <>
-                        <Pause className="mr-1 h-3 w-3" />
-                        Disable
+                        <Eye className="mr-1 h-3 w-3" />
+                        Preview On
                       </>
                     ) : (
                       <>
-                        <Play className="mr-1 h-3 w-3" />
-                        Enable
+                        <Eye className="mr-1 h-3 w-3 opacity-50" />
+                        Preview Off
                       </>
                     )}
                   </Button>
@@ -521,14 +663,13 @@ export function ImageProcessingModal({
                   {livePreviewEnabled &&
                   (processing.processedImageUrl || livePreviewUrl) ? (
                     <div className="space-y-2">
-                      <Image
-                        src={processing.processedImageUrl || livePreviewUrl!}
-                        alt="Live preview"
-                        width={400}
-                        height={400}
-                        className="w-full h-auto max-h-40 lg:max-h-48 object-contain rounded border"
-                        unoptimized={true}
-                      />
+                      <div className="relative w-full flex justify-center">
+                        <img
+                          src={processing.processedImageUrl || livePreviewUrl!}
+                          alt="Live preview"
+                          className="max-w-full max-h-[32rem] lg:max-h-[36rem] object-contain rounded border"
+                        />
+                      </div>
                       <div className="flex items-center justify-between">
                         <p className="text-xs text-muted-foreground">
                           {processing.processedImageUrl
@@ -543,13 +684,18 @@ export function ImageProcessingModal({
                       </div>
                     </div>
                   ) : (
-                    <div className="h-40 lg:h-48 flex items-center justify-center text-muted-foreground">
+                    <div className="h-[32rem] lg:h-[36rem] flex items-center justify-center text-muted-foreground">
                       <div className="text-center space-y-2">
                         <Eye className="h-8 w-8 mx-auto opacity-50" />
                         <p className="text-sm">
                           {livePreviewEnabled
-                            ? "Processing preview..."
-                            : "Live preview disabled"}
+                            ? "Preview ready - adjust settings to see preview"
+                            : "Preview mode disabled"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {livePreviewEnabled
+                            ? "Original image with visual overlays"
+                            : "Enable preview to see visual guides"}
                         </p>
                       </div>
                     </div>

@@ -7,6 +7,9 @@
 // Cache for processed URLs to avoid repeated computation
 const urlCache = new Map<string, string>();
 
+// Clear cache immediately to ensure fixes take effect
+urlCache.clear();
+
 export function fixCloudflareImageUrl(url: string | null | undefined): string {
   // Handle null/undefined/empty
   if (!url || url.trim() === "") {
@@ -21,11 +24,14 @@ export function fixCloudflareImageUrl(url: string | null | undefined): string {
 
   let result: string;
 
-  // If it's a Cloudflare URL and doesn't have a variant, add /public
+  // If it's a Cloudflare URL and doesn't have any variant, add /public
   if (
     url.includes("imagedelivery.net") &&
     !url.includes("/public") &&
-    !url.includes("/thumbnail")
+    !url.includes("/thumbnail") &&
+    !url.includes("/medium") &&
+    !url.includes("/large") &&
+    !url.includes("/highres")
   ) {
     result = `${url}/public`;
   } else {

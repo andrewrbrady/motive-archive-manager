@@ -15,36 +15,58 @@ export function getEnhancedImageUrl(
   width?: string,
   quality?: string
 ): string {
+  // Centralized URL transformation for named variants
+
   // Early return for empty or invalid URLs
   if (!baseUrl || typeof baseUrl !== "string") {
     return baseUrl || "";
   }
 
-  let params = [];
-  // Always check for truthy values and non-empty strings
-  if (width && width.trim() !== "") params.push(`w=${width}`);
-  if (quality && quality.trim() !== "") params.push(`q=${quality}`);
+  // Map requested dimensions to configured named variants
+  const getNamedVariant = (requestedWidth?: string) => {
+    if (!requestedWidth) return "public";
 
-  if (params.length === 0) return baseUrl;
+    const w = parseInt(requestedWidth);
+    // Use actual Cloudflare variants:
+    // thumbnail: 200x150, medium: 600x400, large: 1200x800, highres: 3000x2000
+    if (w <= 200) return "thumbnail";
+    if (w <= 600) return "medium";
+    if (w <= 1200) return "large";
+    return "highres";
+  };
 
-  // Handle different Cloudflare URL formats
-  // Format: https://imagedelivery.net/account/image-id/public
-  // Should become: https://imagedelivery.net/account/image-id/w=1600,q=90
+  // Handle Cloudflare imagedelivery.net URLs
   if (baseUrl.includes("imagedelivery.net")) {
-    // Check if URL already has transformations (contains variant like 'public')
-    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
-      // Replace the last segment (usually 'public') with our parameters
-      const urlParts = baseUrl.split("/");
-      urlParts[urlParts.length - 1] = params.join(",");
-      return urlParts.join("/");
-    } else {
-      // URL doesn't have a variant, append transformations
-      return `${baseUrl}/${params.join(",")}`;
+    const urlParts = baseUrl.split("/");
+    const targetVariant = getNamedVariant(width);
+
+    // FIXED: Strip existing variants (including double variants like /large/public)
+    // Find the cloudflare ID part (format: account/imageId)
+    let cleanUrl = baseUrl;
+    if (urlParts.length >= 5) {
+      // Extract base: https://imagedelivery.net/account/imageId
+      const baseWithId = urlParts.slice(0, 5).join("/");
+      cleanUrl = baseWithId;
     }
+
+    // Always append the target variant to the clean URL
+    const result = `${cleanUrl}/${targetVariant}`;
+
+    return result;
   }
 
-  // Fallback for other URL formats - try to replace /public if it exists
-  return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
+  // Fallback - just return the base URL with /public if it doesn't have a variant
+  if (
+    !baseUrl.includes("/public") &&
+    !baseUrl.includes("/thumbnail") &&
+    !baseUrl.includes("/medium") &&
+    !baseUrl.includes("/large") &&
+    !baseUrl.includes("/highres")
+  ) {
+    return `${baseUrl}/public`;
+  }
+
+  return baseUrl;
 }
 
 /**
@@ -56,37 +78,25 @@ export const memoizedGetEnhancedImageUrl = (
   width?: string,
   quality?: string
 ) => {
-  // Create a stable cache key
-  const cacheKey = `${baseUrl}|${width || ""}|${quality || ""}`;
-
-  // Simple memoization for the same parameters
+  // TEMPORARY: Clear cache to debug double variant issue
   if (typeof window !== "undefined") {
-    // @ts-ignore - Simple cache on window object
-    window.__imageUrlCache = window.__imageUrlCache || new Map();
-    // @ts-ignore
-    if (window.__imageUrlCache.has(cacheKey)) {
-      // @ts-ignore
-      return window.__imageUrlCache.get(cacheKey);
-    }
-
-    const result = getEnhancedImageUrl(baseUrl, width, quality);
-    // @ts-ignore
-    window.__imageUrlCache.set(cacheKey, result);
-    return result;
+    // @ts-ignore - Clear the cache to ensure fresh results
+    window.__imageUrlCache = new Map();
   }
 
+  // Always return fresh result for debugging
   return getEnhancedImageUrl(baseUrl, width, quality);
 };
 
 /**
- * Common image size presets for consistent usage across the app
+ * Common image size presets aligned with Cloudflare named variants
  */
 export const IMAGE_SIZES = {
-  thumbnail: { width: "400", quality: "85" },
-  medium: { width: "800", quality: "90" },
-  large: { width: "1200", quality: "90" },
-  fullsize: { width: "1600", quality: "90" },
-  viewer: { width: "2000", quality: "90" },
+  thumbnail: { width: "200", quality: "85" }, // Maps to thumbnail variant
+  medium: { width: "600", quality: "90" }, // Maps to medium variant
+  large: { width: "1200", quality: "90" }, // Maps to large variant
+  fullsize: { width: "1366", quality: "90" }, // Maps to public variant
+  viewer: { width: "3000", quality: "90" }, // Maps to highres variant
 } as const;
 
 /**

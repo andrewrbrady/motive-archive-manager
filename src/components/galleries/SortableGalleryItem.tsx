@@ -28,56 +28,8 @@ import {
 import { useAPI } from "@/hooks/useAPI";
 import { toast } from "react-hot-toast";
 
-// URL transformation function - copied from ImageThumbnails.tsx lines 84-110
-const getEnhancedImageUrl = (
-  baseUrl: string,
-  width?: string,
-  quality?: string
-) => {
-  let params = [];
-  // Always check for truthy values and non-empty strings
-  if (width && width.trim() !== "") params.push(`w=${width}`);
-  if (quality && quality.trim() !== "") params.push(`q=${quality}`);
-
-  if (params.length === 0) return baseUrl;
-
-  // Handle different Cloudflare URL formats
-  // Format: https://imagedelivery.net/account/image-id/public
-  // Should become: https://imagedelivery.net/account/image-id/w=400,q=85
-  if (baseUrl.includes("imagedelivery.net")) {
-    // Check if URL already has transformations (contains variant like 'public')
-    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
-      // Replace the last segment (usually 'public') with our parameters
-      const urlParts = baseUrl.split("/");
-      urlParts[urlParts.length - 1] = params.join(",");
-      const transformedUrl = urlParts.join("/");
-      console.log("SortableGalleryItem URL transformation:", {
-        baseUrl,
-        transformedUrl,
-        params,
-      });
-      return transformedUrl;
-    } else {
-      // URL doesn't have a variant, append transformations
-      const transformedUrl = `${baseUrl}/${params.join(",")}`;
-      console.log("SortableGalleryItem URL transformation:", {
-        baseUrl,
-        transformedUrl,
-        params,
-      });
-      return transformedUrl;
-    }
-  }
-
-  // Fallback for other URL formats - try to replace /public if it exists
-  const transformedUrl = baseUrl.replace(/\/public$/, `/${params.join(",")}`);
-  console.log("SortableGalleryItem URL transformation (fallback):", {
-    baseUrl,
-    transformedUrl,
-    params,
-  });
-  return transformedUrl;
-};
+// Import centralized URL transformation function
+import { getEnhancedImageUrl } from "@/lib/imageUtils";
 
 interface SortableGalleryItemProps {
   id: string;

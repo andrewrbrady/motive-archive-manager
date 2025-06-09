@@ -43,30 +43,8 @@ import { useAPI } from "@/hooks/useAPI";
 // Increase images per load for better UX
 const IMAGES_PER_LOAD = 40;
 
-// Enhanced image URL with optimizations
-const getEnhancedImageUrl = (
-  baseUrl: string,
-  width?: string,
-  quality?: string
-) => {
-  let params = [];
-  if (width && width.trim() !== "") params.push(`w=${width}`);
-  if (quality && quality.trim() !== "") params.push(`q=${quality}`);
-
-  if (params.length === 0) return baseUrl;
-
-  if (baseUrl.includes("imagedelivery.net")) {
-    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
-      const urlParts = baseUrl.split("/");
-      urlParts[urlParts.length - 1] = params.join(",");
-      return urlParts.join("/");
-    } else {
-      return `${baseUrl}/${params.join(",")}`;
-    }
-  }
-
-  return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
-};
+// Import centralized URL transformation function
+import { getEnhancedImageUrl } from "@/lib/imageUtils";
 
 interface GalleryImageSelectorProps {
   selectedImageIds: string[];
@@ -187,6 +165,14 @@ export function GalleryImageSelector({
   // Refs for intersection observer
   const loadingTriggerRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
+
+  // Use ref to access current allImages value without dependency issues
+  const allImagesRef = useRef<ImageData[]>([]);
+
+  // Update ref when allImages changes
+  useEffect(() => {
+    allImagesRef.current = allImages;
+  }, [allImages]);
 
   // Get current filter values from URL (remove page param as we don't need it)
   const currentSearch = searchParams?.get("search") || undefined;
@@ -322,30 +308,27 @@ export function GalleryImageSelector({
         page: nextPage,
         imagesReceived: nextData?.images?.length || 0,
         totalImages: nextData?.pagination?.total || 0,
-        currentTotal: allImages.length,
+        currentTotal: allImagesRef.current.length,
       });
 
       if (nextData?.images?.length > 0) {
         // Convert newly loaded images to ImageData format
-        const convertedNewImages = nextData.images.map((image: any) =>
-          "id" in image
-            ? {
-                _id: image.id as string,
-                cloudflareId: image.id as string,
-                url: image.url,
-                filename: image.filename,
-                width: 0,
-                height: 0,
-                metadata: image.metadata || {},
-                carId: "",
-                createdAt: image.createdAt,
-                updatedAt: image.updatedAt,
-              }
-            : (image as ImageData)
-        );
+        const convertedNewImages = nextData.images.map((image: any) => ({
+          _id: image._id,
+          cloudflareId: image.cloudflareId || image._id,
+          url: image.url,
+          filename: image.filename,
+          width: 0,
+          height: 0,
+          metadata: image.metadata || {},
+          carId: image.carId || "",
+          createdAt: image.createdAt,
+          updatedAt: image.updatedAt,
+        }));
 
         // Deduplicate images before adding to prevent React key conflicts
-        const existingIds = new Set(allImages.map((img) => img._id));
+        const currentAllImages = allImagesRef.current;
+        const existingIds = new Set(currentAllImages.map((img) => img._id));
         const newUniqueImages = convertedNewImages.filter(
           (img) => !existingIds.has(img._id)
         );
@@ -354,7 +337,7 @@ export function GalleryImageSelector({
         );
 
         if (newUniqueImages.length > 0) {
-          const updatedImages = [...allImages, ...newUniqueImages];
+          const updatedImages = [...currentAllImages, ...newUniqueImages];
           const totalLoaded = updatedImages.length;
           const totalAvailable = nextData.pagination.total;
           const hasMore = totalLoaded < totalAvailable;
@@ -455,23 +438,19 @@ export function GalleryImageSelector({
         totalAvailable: data.pagination.total,
       });
 
-      // Convert Image[] to ImageData[]
-      const convertedImages = data.images.map((image) =>
-        "id" in image
-          ? {
-              _id: image.id as string,
-              cloudflareId: image.id as string,
-              url: image.url,
-              filename: image.filename,
-              width: 0,
-              height: 0,
-              metadata: image.metadata || {},
-              carId: "",
-              createdAt: image.createdAt,
-              updatedAt: image.updatedAt,
-            }
-          : (image as ImageData)
-      );
+      // Convert Image[] to ImageData[] - API returns _id, not id
+      const convertedImages = data.images.map((image: any) => ({
+        _id: image._id,
+        cloudflareId: image.cloudflareId || image._id,
+        url: image.url,
+        filename: image.filename,
+        width: 0,
+        height: 0,
+        metadata: image.metadata || {},
+        carId: image.carId || "",
+        createdAt: image.createdAt,
+        updatedAt: image.updatedAt,
+      }));
 
       // Deduplicate initial images to prevent any key conflicts
       const uniqueImages = convertedImages.filter(
@@ -725,7 +704,24 @@ export function GalleryImageSelector({
                 >
                   <div className="relative flex-1 flex items-center justify-center bg-background">
                     <img
-                      src={getEnhancedImageUrl(image.url, "400", "85")}
+                      src={(() => {
+                        // Use same logic as working ImageCard component
+                        if (!image.url.includes("imagedelivery.net"))
+                          return image.url;
+                        const targetVariant = "medium"; // 600x400 for gallery thumbnails
+                        const urlParts = image.url.split("/");
+                        if (urlParts.length >= 5) {
+                          const lastPart = urlParts[urlParts.length - 1];
+                          if (
+                            lastPart.match(/^[a-zA-Z]+$/) ||
+                            lastPart.includes("=")
+                          ) {
+                            urlParts[urlParts.length - 1] = targetVariant;
+                            return urlParts.join("/");
+                          }
+                        }
+                        return `${image.url}/${targetVariant}`;
+                      })()}
                       alt={image.filename}
                       className="max-w-full max-h-[300px] w-auto h-auto object-contain"
                       loading="lazy"

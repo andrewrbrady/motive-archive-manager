@@ -134,33 +134,57 @@ export function validateImageMatteParams(params: {
   };
 }
 
-// Common Cloudflare URL enhancement function
+// Common Cloudflare URL enhancement function - FIXED to use named variants
 export function getEnhancedCloudflareUrl(
   baseUrl: string,
   width?: string,
   quality?: string
 ): string {
-  const params = [];
-  if (width && width.trim() !== "") params.push(`w=${width}`);
-  if (quality && quality.trim() !== "") params.push(`q=${quality}`);
+  // Map requested dimensions to configured named variants
+  const getNamedVariant = (requestedWidth?: string) => {
+    if (!requestedWidth) return "public";
 
-  if (params.length === 0) return baseUrl;
+    const w = parseInt(requestedWidth);
+    // Use actual Cloudflare variants:
+    // thumbnail: 200x150, medium: 600x400, large: 1200x800, highres: 3000x2000
+    if (w <= 200) return "thumbnail";
+    if (w <= 600) return "medium";
+    if (w <= 1200) return "large";
+    return "highres";
+  };
 
   // Handle Cloudflare imagedelivery.net URLs
   if (baseUrl.includes("imagedelivery.net")) {
-    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
-      // Replace the last segment with our parameters
-      const urlParts = baseUrl.split("/");
-      urlParts[urlParts.length - 1] = params.join(",");
-      return urlParts.join("/");
-    } else {
-      // Append transformations
-      return `${baseUrl}/${params.join(",")}`;
+    const urlParts = baseUrl.split("/");
+    const targetVariant = getNamedVariant(width);
+
+    // If URL already has a variant, replace it
+    if (urlParts.length >= 5) {
+      const lastPart = urlParts[urlParts.length - 1];
+
+      // If it's a named variant or flexible variant, replace it
+      if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+        urlParts[urlParts.length - 1] = targetVariant;
+        return urlParts.join("/");
+      }
     }
+
+    // URL doesn't have a variant, append the named variant
+    return `${baseUrl}/${targetVariant}`;
   }
 
-  // Fallback for other URL formats
-  return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
+  // Fallback - just return the base URL with /public if it doesn't have a variant
+  if (
+    !baseUrl.includes("/public") &&
+    !baseUrl.includes("/thumbnail") &&
+    !baseUrl.includes("/medium") &&
+    !baseUrl.includes("/large") &&
+    !baseUrl.includes("/highres")
+  ) {
+    return `${baseUrl}/public`;
+  }
+
+  return baseUrl;
 }
 
 // Common function to get processing URL (strips Cloudflare transforms)
