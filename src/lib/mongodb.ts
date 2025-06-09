@@ -27,12 +27,11 @@ import { MongoClient, Db, MongoClientOptions } from "mongodb";
 
 // Check if we're in a build environment and should skip database connections
 const isBuildTime =
-  process.env.BUILDING === "true" ||
   process.env.NEXT_PHASE === "phase-production-build" ||
   (process.env.NODE_ENV === "production" &&
-    process.env.VERCEL_ENV === undefined) ||
-  process.env.npm_lifecycle_event === "build" ||
-  process.argv.includes("build");
+    !process.env.VERCEL &&
+    !process.env.DATABASE_URL &&
+    !process.env.MONGODB_URI);
 const isStaticGeneration = process.env.NEXT_PHASE === "phase-production-build";
 
 if (!process.env.MONGODB_URI) {
@@ -432,26 +431,13 @@ export async function connectToDatabase() {
   }
 }
 
-// Initialize Mongoose connection - but only in runtime, never during build
-if (!isBuildTime && !isStaticGeneration && typeof window === "undefined") {
-  // Additional safety check: only connect if we're actually in a server runtime
-  if (process.env.NODE_ENV !== "production" || process.env.VERCEL_ENV) {
-    dbConnect().catch((err) => {
-      console.warn(
-        "Database connection failed during initialization:",
-        err.message
-      );
-    });
-  }
+// Initialize Mongoose connection
+if (!isBuildTime && !isStaticGeneration) {
+  dbConnect().catch(console.error);
 }
 
-// Graceful shutdown handlers - only in actual runtime, not during build
-if (
-  !isBuildTime &&
-  !isStaticGeneration &&
-  typeof window === "undefined" &&
-  process.env.VERCEL_ENV
-) {
+// Graceful shutdown handlers
+if (!isBuildTime && !isStaticGeneration) {
   ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
     process.on(signal, async () => {
       try {
@@ -462,6 +448,7 @@ if (
           const client = await clientPromise;
           await client.close();
         }
+        // [REMOVED] // [REMOVED] console.log("MongoDB connections closed.");
         process.exit(0);
       } catch (err) {
         console.error("Error closing MongoDB connections:", err);

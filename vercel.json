@@ -1,5 +1,74 @@
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
   "framework": "nextjs",
-  "buildCommand": "BUILDING=true npm run build",
-  "outputDirectory": ".next"
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        }
+      ]
+    }
+  ],
+  "functions": {
+    "app/api/images/upload/route.ts": {
+      "maxDuration": 300,
+      "memory": 1536
+    },
+    "app/api/images/extend-canvas/route.ts": {
+      "maxDuration": 60,
+      "memory": 1536
+    },
+    "app/api/images/extend-canvas-js/route.ts": {
+      "maxDuration": 60,
+      "memory": 1536
+    },
+    "app/api/images/extend-canvas-remote/route.ts": {
+      "maxDuration": 60,
+      "memory": 1536
+    },
+    "app/api/cars/*/images/route.ts": {
+      "maxDuration": 60,
+      "memory": 1536
+    },
+    "app/api/cloudflare/images/route.ts": {
+      "maxDuration": 60,
+      "memory": 1536
+    },
+    "app/api/openai/generate-project-caption/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "app/api/openai/generate-caption/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "app/api/system-prompts/*/route.ts": {
+      "maxDuration": 30,
+      "memory": 512
+    },
+    "app/api/system-prompts/active/route.ts": {
+      "maxDuration": 30,
+      "memory": 512
+    },
+    "app/api/length-settings/route.ts": {
+      "maxDuration": 30,
+      "memory": 512
+    },
+    "app/api/projects/*/captions/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  }
 }
