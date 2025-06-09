@@ -53,14 +53,17 @@ Since we can't increase the 4.5MB limit, the solution is to avoid sending large 
 - Upload chunks separately
 - Reassemble on the server
 
-### 3. Updated Next.js Configuration
+### 3. Fixed Next.js Configuration
 
-Added experimental settings to optimize memory usage:
+Removed invalid experimental setting:
 
 ```javascript
-experimental: {
-  isrMemoryCacheSize: 0, // Free up memory for uploads
-},
+// ❌ REMOVED - This property doesn't exist in Next.js 15.3.2
+// experimental: {
+//   isrMemoryCacheSize: 0,
+// },
+
+// ✅ FIXED - Empty or removed experimental section
 ```
 
 ## Real Solution: Implement Direct Upload
@@ -141,19 +144,37 @@ const compressedFile = await imageCompression(originalFile, {
 
 ### Configuration Files:
 
-- ✅ `vercel.json` - Optimized function settings (removed invalid properties)
-- ✅ `next.config.js` - Added memory optimization
+- ✅ `vercel.json` - **Fixed invalid `maxRequestBodySize` properties** (removed schema-breaking config)
+- ✅ `next.config.js` - **Removed invalid `isrMemoryCacheSize`** from experimental section
 - ✅ `app/api/config.ts` - Created configuration constants
+- ✅ `src/lib/cloudflare-image-loader.ts` - **Fixed missing `/public` variants** on URLs
 
-### Runtime Files:
+### Root Causes Fixed:
 
-- ✅ `src/app/api/images/upload/route.ts` - Enhanced with proper exports
+1. **Build Error**: Removed invalid `maxRequestBodySize` from `vercel.json`
+2. **Next.js Config Error**: Removed invalid `isrMemoryCacheSize`
+3. **Image 404s**: Fixed custom loader to ensure URLs have proper variants
+
+## What Was Actually Wrong
+
+### ❌ Original Issues:
+
+- **413 upload errors**: Files > 4.5MB (hardcoded Vercel limit)
+- **Build failure**: Invalid `maxRequestBodySize` property in `vercel.json`
+- **Invalid config warning**: `isrMemoryCacheSize` doesn't exist in Next.js 15.3.2
+- **Image 404s**: URLs missing `/public` variant (e.g., `.../image-id` instead of `.../image-id/public`)
+
+### ✅ Real Solutions:
+
+- **For uploads**: Work within 4.5MB limit (use compression or direct cloud upload)
+- **For build**: Use only valid `vercel.json` properties (`maxDuration`, `memory`)
+- **For images**: Ensure all Cloudflare URLs have proper variants (`/public`, `/thumbnail`, etc.)
 
 ## Next Steps
 
-1. **Test the current fix** with files < 4MB
-2. **Implement client-side compression** for larger files
-3. **Consider migrating to direct cloud upload** for the best user experience
-4. **Monitor Vercel function logs** for any remaining issues
+1. **✅ Deploy and test** - Build should now succeed without errors
+2. **Test image display** - Images should load with proper `/public` variants
+3. **For large uploads**: Implement client-side compression or direct upload
+4. **Monitor logs** for any remaining 413 errors on uploads > 4.5MB
 
-The key takeaway: **Work within the 4.5MB limit** rather than trying to increase it, as it's not configurable on Vercel.
+The key takeaway: **Vercel's 4.5MB limit is hardcoded and cannot be changed**. The real solution is architectural - work within the limit or bypass Vercel Functions for large files.

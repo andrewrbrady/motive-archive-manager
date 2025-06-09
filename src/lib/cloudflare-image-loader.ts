@@ -50,9 +50,18 @@ export function cloudflareImageLoader({
         // URL has existing transformations, replace them
         return `https://imagedelivery.net/${accountHash}/${imageId}/${transformationString}`;
       } else {
-        // URL doesn't have a variant, append transformations
+        // URL doesn't have a variant, append transformations OR add /public as fallback
         return `https://imagedelivery.net/${accountHash}/${imageId}/${transformationString}`;
       }
+    }
+
+    // If URL pattern doesn't match, ensure it has /public variant as fallback
+    if (
+      !src.includes("/public") &&
+      !src.match(/\/w=\d+/) &&
+      !src.match(/\/[a-zA-Z]+$/)
+    ) {
+      return `${src}/public`;
     }
 
     // If URL doesn't match expected pattern, try to append transformations
