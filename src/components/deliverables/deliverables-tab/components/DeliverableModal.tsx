@@ -46,7 +46,9 @@ import EditDeliverableForm from "../../EditDeliverableForm";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { useGalleries } from "@/hooks/use-galleries";
 import { toast } from "@/components/ui/use-toast";
-import { getIconComponent } from "@/components/ui/IconPicker";
+import PlatformDisplay from "./PlatformDisplay";
+import PlatformIcon from "./PlatformIcon";
+import { extractYouTubeVideoId, isYouTubeUrl } from "../utils/youtube";
 
 interface DeliverableModalProps {
   deliverable: Deliverable | null;
@@ -272,92 +274,6 @@ export default function DeliverableModal({
   const handleCancelCaptions = () => {
     setSelectedCaptionIds((deliverable as any)?.caption_ids || []);
     setIsEditingCaptions(false);
-  };
-
-  // YouTube utility functions
-  const extractYouTubeVideoId = (url: string): string | null => {
-    if (!url) return null;
-
-    const patterns = [
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
-      /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
-      /youtube\.com\/v\/([a-zA-Z0-9_-]{11})/,
-    ];
-
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match) return match[1];
-    }
-
-    return null;
-  };
-
-  const isYouTubeUrl = (url: string): boolean => {
-    return extractYouTubeVideoId(url) !== null;
-  };
-
-  // Platform display component with icons
-  const PlatformDisplay = ({
-    platform,
-    platforms,
-  }: {
-    platform?: string;
-    platforms?: string[];
-  }) => {
-    // Handle new platforms array (multiple platforms)
-    if (platforms && platforms.length > 0) {
-      return (
-        <div className="flex items-center gap-1 flex-wrap">
-          {platforms.map((platformId, index) => {
-            const IconComponent = getIconComponent(platformId);
-            return (
-              <div key={platformId} className="flex items-center gap-1">
-                {IconComponent && (
-                  <IconComponent className="h-4 w-4 text-primary" />
-                )}
-                <span className="text-sm">{platformId}</span>
-                {index < platforms.length - 1 && (
-                  <span className="text-muted-foreground">•</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      );
-    }
-
-    // Handle legacy single platform
-    if (!platform)
-      return <span className="text-muted-foreground">Not specified</span>;
-
-    const IconComponent = getIconComponent(platform);
-
-    if (IconComponent) {
-      return (
-        <div className="flex items-center gap-2">
-          <IconComponent className="h-4 w-4 text-primary" />
-          <span>{platform}</span>
-        </div>
-      );
-    }
-
-    // Fallback to text if no icon found
-    return <span>{platform}</span>;
-  };
-
-  // Platform badge component for captions - just icon in upper right
-  const PlatformIcon = ({ platform }: { platform?: string }) => {
-    if (!platform) return null;
-
-    const IconComponent = getIconComponent(platform);
-
-    if (!IconComponent) return null;
-
-    return (
-      <div className="absolute top-2 right-2">
-        <IconComponent className="h-4 w-4 text-primary" />
-      </div>
-    );
   };
 
   if (!deliverable) return null;
