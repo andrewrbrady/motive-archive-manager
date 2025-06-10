@@ -1,5 +1,16 @@
 import { ObjectId } from "mongodb";
 
+// New interface for media type data from API
+export interface MediaType {
+  _id: ObjectId;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // New interface for platform data from API
 export interface DeliverablePlatform {
   _id: string;
@@ -63,7 +74,9 @@ export interface Deliverable {
   description?: string;
   platform: Platform; // Keep for backward compatibility - will be migrated to platforms array
   platforms?: string[]; // New field for multiple platform IDs
-  type: DeliverableType;
+  type: DeliverableType; // Keep for backward compatibility - will be migrated to mediaTypeId
+  mediaTypeId?: ObjectId; // New field for MediaType reference
+  mediaType?: MediaType; // Optional populated MediaType for UI display
 
   // Technical Details
   duration: number;

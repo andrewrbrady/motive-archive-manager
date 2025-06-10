@@ -26,6 +26,7 @@ import {
   Platform,
   DeliverableType,
   DeliverablePlatform,
+  MediaType,
 } from "@/types/deliverable";
 import { format } from "date-fns";
 import UserSelector from "@/components/users/UserSelector";
@@ -35,6 +36,7 @@ import { FirestoreUser } from "@/types/firebase";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { usePlatforms } from "@/contexts/PlatformContext";
 import { useGalleries } from "@/hooks/use-galleries";
+import { useMediaTypes } from "@/hooks/useMediaTypes";
 
 interface EditDeliverableFormProps {
   deliverable: Deliverable;
@@ -46,7 +48,8 @@ interface UpdateDeliverableData {
   title: string;
   platform?: Platform; // Keep for backward compatibility
   platforms?: string[]; // New field for multiple platform IDs
-  type: DeliverableType;
+  type: DeliverableType; // Keep for backward compatibility
+  mediaTypeId?: string; // New field for MediaType ID
   duration: number;
   aspect_ratio: string;
   editor: string;
@@ -77,6 +80,9 @@ export default function EditDeliverableForm({
     { label: string; value: string }[]
   >([]);
   const [type, setType] = useState<DeliverableType>(deliverable.type);
+  const [selectedMediaTypeId, setSelectedMediaTypeId] = useState<string | null>(
+    deliverable.mediaTypeId?.toString() || null
+  );
   const [duration, setDuration] = useState(deliverable.duration);
   const [aspectRatio, setAspectRatio] = useState(deliverable.aspect_ratio);
   const [editorId, setEditorId] = useState<string | null>(null);
@@ -94,6 +100,13 @@ export default function EditDeliverableForm({
 
   const api = useAPI();
   const { data: editors = [] } = useEditors();
+
+  // Fetch MediaTypes
+  const {
+    mediaTypes,
+    isLoading: mediaTypesLoading,
+    error: mediaTypesError,
+  } = useMediaTypes();
 
   // Gallery and caption data
   const { data: galleriesData, isLoading: galleriesLoading } = useGalleries({
@@ -140,6 +153,7 @@ export default function EditDeliverableForm({
   useEffect(() => {
     setTitle(deliverable.title);
     setType(deliverable.type);
+    setSelectedMediaTypeId(deliverable.mediaTypeId?.toString() || null);
     setDuration(deliverable.duration);
     setAspectRatio(deliverable.aspect_ratio);
 
@@ -232,6 +246,7 @@ export default function EditDeliverableForm({
         title: title.trim(),
         platforms: selectedPlatforms.map((p) => p.value),
         type: type,
+        mediaTypeId: selectedMediaTypeId || undefined,
         duration: type === "Photo Gallery" ? 0 : duration || 0,
         aspect_ratio: aspectRatio || "",
         editor: editorName || "",
@@ -356,47 +371,133 @@ export default function EditDeliverableForm({
 
                 <div className="space-y-1.5">
                   <label
-                    htmlFor="type"
+                    htmlFor="mediaType"
                     className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
                   >
-                    Type
+                    Media Type
                   </label>
                   <Select
-                    value={type}
-                    onValueChange={(value) => setType(value as DeliverableType)}
-                    open={openSelects["type"]}
-                    onOpenChange={(open) =>
-                      handleSelectOpenChange("type", open)
-                    }
+                    value={selectedMediaTypeId || "legacy"}
+                    onValueChange={(value) => {
+                      if (value === "legacy") {
+                        setSelectedMediaTypeId(null);
+                        // Also keep legacy type field synced for backward compatibility
+                        setType("other");
+                      } else {
+                        setSelectedMediaTypeId(value);
+                        // Find corresponding MediaType and sync legacy type field
+                        const selectedMediaType = mediaTypes.find(
+                          (mt) => mt._id.toString() === value
+                        );
+                        if (selectedMediaType) {
+                          // Map MediaType names to legacy DeliverableType values for backward compatibility
+                          const legacyTypeMapping: Record<
+                            string,
+                            DeliverableType
+                          > = {
+                            Video: "Video",
+                            "Photo Gallery": "Photo Gallery",
+                            "Mixed Gallery": "Mixed Gallery",
+                            "Video Gallery": "Video Gallery",
+                          };
+                          setType(
+                            legacyTypeMapping[selectedMediaType.name] || "other"
+                          );
+                        }
+                      }
+                    }}
+                    open={openSelects["mediaType"]}
+                    onOpenChange={(open) => {
+                      handleSelectOpenChange("mediaType", open);
+                    }}
                   >
                     <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                      <SelectValue placeholder="Select type" />
+                      <SelectValue placeholder="Select media type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Photo Gallery">
-                        Photo Gallery
+                      {mediaTypesLoading && (
+                        <SelectItem value="loading" disabled>
+                          Loading media types...
+                        </SelectItem>
+                      )}
+                      {!mediaTypesLoading && mediaTypes.length === 0 && (
+                        <SelectItem value="empty" disabled>
+                          No media types available
+                        </SelectItem>
+                      )}
+                      {!mediaTypesLoading &&
+                        mediaTypes.map((mediaType) => (
+                          <SelectItem
+                            key={mediaType._id.toString()}
+                            value={mediaType._id.toString()}
+                          >
+                            {mediaType.name}
+                            {mediaType.description && (
+                              <span className="text-xs text-muted-foreground ml-2">
+                                - {mediaType.description}
+                              </span>
+                            )}
+                          </SelectItem>
+                        ))}
+                      {/* Fallback option for legacy compatibility */}
+                      <SelectItem value="legacy">
+                        <span className="text-muted-foreground">
+                          Other (Legacy Type)
+                        </span>
                       </SelectItem>
-                      <SelectItem value="Video">Video</SelectItem>
-                      <SelectItem value="Mixed Gallery">
-                        Mixed Gallery
-                      </SelectItem>
-                      <SelectItem value="Video Gallery">
-                        Video Gallery
-                      </SelectItem>
-                      <SelectItem value="Still">Still</SelectItem>
-                      <SelectItem value="Graphic">Graphic</SelectItem>
-                      <SelectItem value="feature">Feature</SelectItem>
-                      <SelectItem value="promo">Promo</SelectItem>
-                      <SelectItem value="review">Review</SelectItem>
-                      <SelectItem value="walkthrough">Walkthrough</SelectItem>
-                      <SelectItem value="highlights">Highlights</SelectItem>
-                      <SelectItem value="Marketing Email">
-                        Marketing Email
-                      </SelectItem>
-                      <SelectItem value="Blog">Blog</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
+                  {/* Show legacy type when no MediaType is selected */}
+                  {!selectedMediaTypeId && (
+                    <div className="mt-2">
+                      <label
+                        htmlFor="legacyType"
+                        className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                      >
+                        Legacy Type
+                      </label>
+                      <Select
+                        value={type}
+                        onValueChange={(value) =>
+                          setType(value as DeliverableType)
+                        }
+                        open={openSelects["legacyType"]}
+                        onOpenChange={(open) =>
+                          handleSelectOpenChange("legacyType", open)
+                        }
+                      >
+                        <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
+                          <SelectValue placeholder="Select legacy type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Photo Gallery">
+                            Photo Gallery
+                          </SelectItem>
+                          <SelectItem value="Video">Video</SelectItem>
+                          <SelectItem value="Mixed Gallery">
+                            Mixed Gallery
+                          </SelectItem>
+                          <SelectItem value="Video Gallery">
+                            Video Gallery
+                          </SelectItem>
+                          <SelectItem value="Still">Still</SelectItem>
+                          <SelectItem value="Graphic">Graphic</SelectItem>
+                          <SelectItem value="feature">Feature</SelectItem>
+                          <SelectItem value="promo">Promo</SelectItem>
+                          <SelectItem value="review">Review</SelectItem>
+                          <SelectItem value="walkthrough">
+                            Walkthrough
+                          </SelectItem>
+                          <SelectItem value="highlights">Highlights</SelectItem>
+                          <SelectItem value="Marketing Email">
+                            Marketing Email
+                          </SelectItem>
+                          <SelectItem value="Blog">Blog</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

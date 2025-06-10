@@ -20,7 +20,8 @@ export interface IDeliverable extends Document {
   description?: string;
   platform: Platform; // Keep for backward compatibility
   platforms?: string[]; // New field for multiple platform IDs
-  type: DeliverableType;
+  type: DeliverableType; // Keep for backward compatibility
+  mediaTypeId?: mongoose.Types.ObjectId; // New field for MediaType reference
   duration: number;
   actual_duration?: number;
   aspect_ratio: string;
@@ -94,8 +95,14 @@ const deliverableSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      required: true,
+      required: false, // Make optional for new deliverables that use mediaTypeId
       enum: ["Photo Gallery", "Video", "Mixed Gallery", "Video Gallery"],
+    },
+    mediaTypeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "MediaType",
+      required: false,
+      index: true,
     },
     duration: {
       type: Number,
@@ -185,6 +192,7 @@ const deliverableSchema = new mongoose.Schema(
 deliverableSchema.index({ status: 1 });
 deliverableSchema.index({ platform: 1 });
 deliverableSchema.index({ type: 1 });
+deliverableSchema.index({ mediaTypeId: 1 }); // New index for MediaType reference
 deliverableSchema.index({ firebase_uid: 1, status: 1 });
 deliverableSchema.index({ car_id: 1, status: 1 });
 deliverableSchema.index({ release_date: 1 });

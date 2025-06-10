@@ -181,7 +181,11 @@ export async function PUT(
       updateData.firebase_uid = body.firebase_uid;
     if (body.assignedTo !== undefined)
       updateData.firebase_uid = body.assignedTo;
-    if (body.editor !== undefined) updateData.firebase_uid = body.editor;
+    if (body.editor !== undefined) updateData.editor = body.editor;
+    if (body.target_audience !== undefined)
+      updateData.target_audience = body.target_audience;
+    if (body.music_track !== undefined)
+      updateData.music_track = body.music_track;
     if (body.dropbox_link !== undefined)
       updateData.dropbox_link = body.dropbox_link;
     if (body.social_media_link !== undefined)
