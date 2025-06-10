@@ -179,8 +179,20 @@ export async function PUT(
         updateData.mediaTypeId = new ObjectId(body.mediaTypeId);
       }
     }
+
+    // Handle platform updates - NEW SINGLE PLATFORM APPROACH
+    if (body.platform_id !== undefined) {
+      if (body.platform_id === null || body.platform_id === "") {
+        updateData.platform_id = null;
+      } else {
+        updateData.platform_id = new ObjectId(body.platform_id);
+      }
+    }
+
+    // Keep backward compatibility with legacy platform fields
     if (body.platform) updateData.platform = body.platform;
     if (body.platforms) updateData.platforms = body.platforms;
+
     if (body.duration !== undefined) updateData.duration = body.duration;
     if (body.aspectRatio) updateData.aspect_ratio = body.aspectRatio;
     if (body.aspect_ratio) updateData.aspect_ratio = body.aspect_ratio;

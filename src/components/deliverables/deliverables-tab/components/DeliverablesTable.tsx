@@ -31,6 +31,7 @@ import { PlatformBadges } from "../../PlatformBadges";
 import { useCarDetails } from "@/contexts/CarDetailsContext";
 import { MediaTypeSelector } from "../../MediaTypeSelector";
 import { EditorSelector } from "../../EditorSelector";
+import { PlatformSelector } from "../../PlatformSelector";
 
 interface DeliverablesTableProps {
   deliverables: Deliverable[];
@@ -173,6 +174,18 @@ export default function DeliverablesTable({
           <EditorSelector
             deliverableId={deliverable._id?.toString() || ""}
             initialEditor={deliverable.editor}
+            size="sm"
+          />
+        </div>
+      );
+    }
+
+    if (field === "platform") {
+      return (
+        <div onClick={(e) => e.stopPropagation()}>
+          <PlatformSelector
+            deliverableId={deliverable._id?.toString() || ""}
+            initialPlatformId={deliverable.platform_id?.toString()}
             size="sm"
           />
         </div>
@@ -338,12 +351,7 @@ export default function DeliverablesTable({
                     </TableCell>
                   )}
                   <TableCell className="px-2 py-1.5 text-xs">
-                    <PlatformBadges
-                      platform={deliverable.platform}
-                      platforms={deliverable.platforms}
-                      maxVisible={2}
-                      size="sm"
-                    />
+                    {renderCell(deliverable, "platform")}
                   </TableCell>
                   <TableCell className="px-2 py-1.5 text-xs">
                     {renderCell(deliverable, "mediaType")}

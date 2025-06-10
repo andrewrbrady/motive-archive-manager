@@ -18,8 +18,9 @@ export interface IDeliverable extends Document {
   car_id?: mongoose.Types.ObjectId;
   title: string;
   description?: string;
-  platform: Platform; // Keep for backward compatibility
-  platforms?: string[]; // New field for multiple platform IDs
+  platform_id?: mongoose.Types.ObjectId; // New single platform reference
+  platform?: Platform; // Keep for backward compatibility during migration
+  platforms?: string[]; // Keep for backward compatibility during migration
   type: DeliverableType; // Keep for backward compatibility
   mediaTypeId?: mongoose.Types.ObjectId; // New field for MediaType reference
   duration: number;
@@ -73,9 +74,15 @@ const deliverableSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    platform_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Platform",
+      required: false,
+      index: true,
+    },
     platform: {
       type: String,
-      required: false, // Make optional for new deliverables that use platforms array
+      required: false, // Make optional for new deliverables that use platform_id
       enum: [
         "Instagram Reels",
         "Instagram Post",

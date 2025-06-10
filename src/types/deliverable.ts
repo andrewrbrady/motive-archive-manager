@@ -72,8 +72,9 @@ export interface Deliverable {
   // Basic Information
   title: string;
   description?: string;
-  platform: Platform; // Keep for backward compatibility - will be migrated to platforms array
-  platforms?: string[]; // New field for multiple platform IDs
+  platform_id?: ObjectId; // New single platform reference
+  platform?: Platform; // Keep for backward compatibility during migration
+  platforms?: string[]; // Keep for backward compatibility during migration
   type: DeliverableType; // Keep for backward compatibility - will be migrated to mediaTypeId
   mediaTypeId?: ObjectId; // New field for MediaType reference
   mediaType?: MediaType; // Optional populated MediaType for UI display

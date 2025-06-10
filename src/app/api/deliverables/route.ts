@@ -277,17 +277,30 @@ export async function POST(request: Request) {
     // Remove editor field if present and handle platform migration
     const { editor, ...deliverableData } = data;
 
-    // If platforms array is provided, use it; otherwise fall back to platform for backward compatibility
-    if (deliverableData.platforms && deliverableData.platforms.length > 0) {
-      // For new deliverables with platforms array, remove the old platform field
+    // NEW SINGLE PLATFORM APPROACH
+    if (deliverableData.platform_id) {
+      // New approach: single platform ID
+      // Remove legacy fields if they exist
       delete deliverableData.platform;
+      delete deliverableData.platforms;
+    } else if (
+      deliverableData.platforms &&
+      deliverableData.platforms.length > 0
+    ) {
+      // Legacy support: convert first platform from array to platform_id
+      deliverableData.platform_id = deliverableData.platforms[0];
+      delete deliverableData.platform;
+      delete deliverableData.platforms;
     } else if (deliverableData.platform) {
-      // For backward compatibility, if only platform is provided, keep it
+      // Legacy support: keep platform field for backward compatibility
       delete deliverableData.platforms;
     } else {
-      // Require either platforms array or platform field
+      // Require platform specification
       return NextResponse.json(
-        { error: "Either 'platforms' array or 'platform' field is required" },
+        {
+          error:
+            "Platform selection is required (platform_id, platforms array, or platform field)",
+        },
         { status: 400 }
       );
     }

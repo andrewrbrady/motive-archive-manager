@@ -1,5 +1,5 @@
 import React from "react";
-import { getIconComponent } from "@/components/ui/IconPicker";
+import { PlatformIcon as BasePlatformIcon } from "../../PlatformIcon";
 
 interface PlatformIconProps {
   platform?: string;
@@ -9,13 +9,9 @@ interface PlatformIconProps {
 export default function PlatformIcon({ platform }: PlatformIconProps) {
   if (!platform) return null;
 
-  const IconComponent = getIconComponent(platform);
-
-  if (!IconComponent) return null;
-
   return (
     <div className="absolute top-2 right-2">
-      <IconComponent className="h-4 w-4 text-primary" />
+      <BasePlatformIcon platformName={platform} className="h-4 w-4" />
     </div>
   );
 }

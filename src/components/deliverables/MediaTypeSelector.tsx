@@ -129,11 +129,6 @@ export function MediaTypeSelector({
               className="text-xs"
             >
               {mediaType.name}
-              {mediaType.description && (
-                <span className="text-xs text-muted-foreground ml-2">
-                  - {mediaType.description}
-                </span>
-              )}
             </SelectItem>
           ))}
         </SelectContent>

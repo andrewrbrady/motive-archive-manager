@@ -1,5 +1,5 @@
 import React from "react";
-import { getIconComponent } from "@/components/ui/IconPicker";
+import { PlatformIcon } from "../../PlatformIcon";
 
 interface PlatformDisplayProps {
   platform?: string;
@@ -16,12 +16,9 @@ export default function PlatformDisplay({
     return (
       <div className="flex items-center gap-1 flex-wrap">
         {platforms.map((platformId, index) => {
-          const IconComponent = getIconComponent(platformId);
           return (
             <div key={platformId} className="flex items-center gap-1">
-              {IconComponent && (
-                <IconComponent className="h-4 w-4 text-primary" />
-              )}
+              <PlatformIcon platformId={platformId} className="h-4 w-4" />
               <span className="text-sm">{platformId}</span>
               {index < platforms.length - 1 && (
                 <span className="text-muted-foreground">•</span>
@@ -37,17 +34,10 @@ export default function PlatformDisplay({
   if (!platform)
     return <span className="text-muted-foreground">Not specified</span>;
 
-  const IconComponent = getIconComponent(platform);
-
-  if (IconComponent) {
-    return (
-      <div className="flex items-center gap-2">
-        <IconComponent className="h-4 w-4 text-primary" />
-        <span>{platform}</span>
-      </div>
-    );
-  }
-
-  // Fallback to text if no icon found
-  return <span>{platform}</span>;
+  return (
+    <div className="flex items-center gap-2">
+      <PlatformIcon platformName={platform} className="h-4 w-4" />
+      <span>{platform}</span>
+    </div>
+  );
 }

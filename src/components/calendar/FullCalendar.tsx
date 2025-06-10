@@ -112,7 +112,19 @@ export function FullCalendarComponent({
 
   // Get unique deliverable platforms
   const uniqueDeliverablePlatforms = useMemo(
-    () => [...new Set(deliverables.map((deliverable) => deliverable.platform))],
+    () => [
+      ...new Set(
+        deliverables
+          .map((deliverable) => {
+            // Priority: platform_id > platform (legacy)
+            if (deliverable.platform_id) {
+              return deliverable.platform_id.toString();
+            }
+            return deliverable.platform;
+          })
+          .filter((platform): platform is string => platform !== undefined)
+      ),
+    ],
     [deliverables]
   );
 
@@ -189,14 +201,26 @@ export function FullCalendarComponent({
     // Add filtered deliverable items
     ...(showDeliverables
       ? deliverables
-          .filter(
-            (deliverable) =>
-              (deliverablePlatformFilters.length === 0 ||
-                deliverablePlatformFilters.includes(deliverable.platform)) &&
-              (deliverableTypeFilters.length === 0 ||
-                deliverableTypeFilters.includes(deliverable.type)) &&
-              (!showOnlyScheduled || deliverable.scheduled === true) // Filter by scheduled status
-          )
+          .filter((deliverable) => {
+            // Platform filter logic - handle new platform_id and legacy platform
+            const platformMatch =
+              deliverablePlatformFilters.length === 0 ||
+              (deliverable.platform_id &&
+                deliverablePlatformFilters.includes(
+                  deliverable.platform_id.toString()
+                )) ||
+              (deliverable.platform &&
+                deliverablePlatformFilters.includes(deliverable.platform));
+
+            const typeMatch =
+              deliverableTypeFilters.length === 0 ||
+              deliverableTypeFilters.includes(deliverable.type);
+
+            const scheduledMatch =
+              !showOnlyScheduled || deliverable.scheduled === true;
+
+            return platformMatch && typeMatch && scheduledMatch;
+          })
           .flatMap((deliverable): FullCalendarEvent[] => {
             const items: FullCalendarEvent[] = [];
 
