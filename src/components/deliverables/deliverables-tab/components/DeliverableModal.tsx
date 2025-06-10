@@ -27,6 +27,8 @@ import {
   X,
   Car,
   Database,
+  Edit,
+  Play,
 } from "lucide-react";
 import { useAPI } from "@/hooks/useAPI";
 import { Deliverable } from "@/types/deliverable";
@@ -223,8 +225,31 @@ export default function DeliverableModal({
     setIsEditingReferences(false);
   };
 
+  // YouTube utility functions
+  const extractYouTubeVideoId = (url: string): string | null => {
+    if (!url) return null;
+
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+      /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+      /youtube\.com\/v\/([a-zA-Z0-9_-]{11})/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) return match[1];
+    }
+
+    return null;
+  };
+
+  const isYouTubeUrl = (url: string): boolean => {
+    return extractYouTubeVideoId(url) !== null;
+  };
+
   if (!deliverable) return null;
 
+  // Updated table-like InfoRow component
   const InfoRow = ({
     icon: Icon,
     label,
@@ -236,31 +261,31 @@ export default function DeliverableModal({
     value: string | React.ReactNode;
     href?: string;
   }) => (
-    <div className="flex items-start gap-3 py-2">
-      <Icon className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground">{label}</p>
-        {href ? (
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-blue-600 hover:text-blue-800 break-all"
-          >
-            {value}
-          </a>
-        ) : (
-          <div className="text-sm text-muted-foreground break-words">
-            {value}
-          </div>
-        )}
+    <div className="flex items-center gap-3 py-1.5 border-b border-border/20 last:border-b-0">
+      <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0 w-6" />
+      <div className="text-sm font-medium text-foreground min-w-[120px] flex-shrink-0">
+        {label}
       </div>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-primary hover:text-primary/80 break-all flex-1"
+        >
+          {value}
+        </a>
+      ) : (
+        <div className="text-sm text-muted-foreground break-words flex-1">
+          {value}
+        </div>
+      )}
     </div>
   );
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto bg-background/95 backdrop-blur-sm border-border/50">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold pr-8 flex items-center gap-2">
             {deliverable.title}
@@ -276,12 +301,18 @@ export default function DeliverableModal({
           {/* Left Column - Basic Information & Timeline */}
           <div className="space-y-6">
             {/* Status and Quick Actions */}
-            <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
-              <h3 className="font-medium text-foreground">Status & Actions</h3>
+            <div className="space-y-4 p-4 bg-transparent border border-border/30 rounded-lg">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-foreground">
+                  Status & Actions
+                </h3>
+                <EditDeliverableForm
+                  deliverable={deliverable}
+                  onDeliverableUpdated={actions.onRefresh}
+                  onClose={() => {}}
+                />
+              </div>
               <div className="flex items-center gap-3 flex-wrap">
-                <Badge className={getStatusColor(deliverable.status)}>
-                  {getStatusText(deliverable.status)}
-                </Badge>
                 <StatusSelector
                   deliverableId={deliverable._id?.toString() || ""}
                   initialStatus={deliverable.status}
@@ -297,11 +328,6 @@ export default function DeliverableModal({
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <YouTubeUploadHelper deliverable={deliverable} />
-                  <EditDeliverableForm
-                    deliverable={deliverable}
-                    onDeliverableUpdated={actions.onRefresh}
-                    onClose={() => {}}
-                  />
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -331,136 +357,149 @@ export default function DeliverableModal({
 
             {/* Car Information */}
             {showCarInfo && carInfo && (
-              <div className="p-4 bg-muted/30 rounded-lg">
-                <h3 className="font-medium text-foreground mb-2 flex items-center gap-2">
+              <div className="p-4 bg-transparent border border-border/30 rounded-lg">
+                <h3 className="font-medium text-foreground mb-3 flex items-center gap-2">
                   <Car className="h-4 w-4" />
                   Vehicle
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  {carInfo.year} {carInfo.make} {carInfo.model}
-                </p>
+                <div className="pl-7">
+                  <p className="text-sm text-muted-foreground">
+                    {carInfo.year} {carInfo.make} {carInfo.model}
+                  </p>
+                </div>
               </div>
             )}
 
             {/* Basic Information */}
-            <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+            <div className="space-y-3 p-4 bg-transparent border border-border/30 rounded-lg">
               <h3 className="font-medium text-foreground mb-3 flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Details
               </h3>
 
-              <InfoRow
-                icon={Monitor}
-                label="Platform"
-                value={
-                  <Badge
-                    className={getPillColor("platform", deliverable.platform)}
-                  >
-                    {deliverable.platform || "Not specified"}
-                  </Badge>
-                }
-              />
+              <div className="space-y-0">
+                <InfoRow
+                  icon={Monitor}
+                  label="Platform"
+                  value={deliverable.platform || "Not specified"}
+                />
 
-              <InfoRow icon={Tag} label="Type" value={deliverable.type} />
+                <InfoRow icon={Tag} label="Type" value={deliverable.type} />
 
-              {deliverable.duration > 0 &&
-                (deliverable.type as string) !== "Photo Gallery" && (
+                {deliverable.duration > 0 &&
+                  (deliverable.type as string) !== "Photo Gallery" && (
+                    <InfoRow
+                      icon={Clock}
+                      label="Duration"
+                      value={formatDeliverableDuration(deliverable)}
+                    />
+                  )}
+
+                <InfoRow
+                  icon={Monitor}
+                  label="Aspect Ratio"
+                  value={deliverable.aspect_ratio || "Not specified"}
+                />
+
+                {deliverable.editor && (
                   <InfoRow
-                    icon={Clock}
-                    label="Duration"
-                    value={formatDeliverableDuration(deliverable)}
+                    icon={User}
+                    label="Editor"
+                    value={deliverable.editor}
                   />
                 )}
 
-              <InfoRow
-                icon={Monitor}
-                label="Aspect Ratio"
-                value={deliverable.aspect_ratio || "Not specified"}
-              />
+                {deliverable.target_audience && (
+                  <InfoRow
+                    icon={User}
+                    label="Target Audience"
+                    value={deliverable.target_audience}
+                  />
+                )}
 
-              {deliverable.editor && (
-                <InfoRow
-                  icon={User}
-                  label="Editor"
-                  value={deliverable.editor}
-                />
-              )}
+                {deliverable.music_track && (
+                  <InfoRow
+                    icon={Tag}
+                    label="Music Track"
+                    value={deliverable.music_track}
+                  />
+                )}
 
-              {deliverable.target_audience && (
-                <InfoRow
-                  icon={User}
-                  label="Target Audience"
-                  value={deliverable.target_audience}
-                />
-              )}
-
-              {deliverable.music_track && (
-                <InfoRow
-                  icon={Tag}
-                  label="Music Track"
-                  value={deliverable.music_track}
-                />
-              )}
+                {/* Metadata moved to details */}
+                {deliverable._id && (
+                  <InfoRow
+                    icon={Database}
+                    label="ID"
+                    value={
+                      <code className="text-xs bg-transparent border border-border/20 px-2 py-1 rounded">
+                        {deliverable._id.toString()}
+                      </code>
+                    }
+                  />
+                )}
+              </div>
             </div>
 
             {/* Timeline */}
-            <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+            <div className="space-y-3 p-4 bg-transparent border border-border/30 rounded-lg">
               <h3 className="font-medium text-foreground mb-3 flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 Timeline
               </h3>
 
-              <InfoRow
-                icon={Clock}
-                label="Edit Deadline"
-                value={
-                  deliverable.edit_deadline
-                    ? safeFormat(deliverable.edit_deadline, "MMMM d, yyyy")
-                    : "Not set"
-                }
-              />
+              <div className="space-y-0">
+                <InfoRow
+                  icon={Clock}
+                  label="Edit Deadline"
+                  value={
+                    deliverable.edit_deadline
+                      ? safeFormat(deliverable.edit_deadline, "MMMM d, yyyy")
+                      : "Not set"
+                  }
+                />
 
-              <InfoRow
-                icon={Calendar}
-                label="Release Date"
-                value={
-                  deliverable.release_date
-                    ? safeFormat(deliverable.release_date, "MMMM d, yyyy")
-                    : "Not set"
-                }
-              />
+                <InfoRow
+                  icon={Calendar}
+                  label="Release Date"
+                  value={
+                    deliverable.release_date
+                      ? safeFormat(deliverable.release_date, "MMMM d, yyyy")
+                      : "Not set"
+                  }
+                />
 
-              <InfoRow
-                icon={Calendar}
-                label="Created"
-                value={
-                  deliverable.created_at
-                    ? safeFormat(
-                        deliverable.created_at,
-                        "MMMM d, yyyy 'at' h:mm a"
-                      )
-                    : "Unknown"
-                }
-              />
+                <InfoRow
+                  icon={Calendar}
+                  label="Created"
+                  value={
+                    deliverable.created_at
+                      ? safeFormat(
+                          deliverable.created_at,
+                          "MMMM d, yyyy 'at' h:mm a"
+                        )
+                      : "Unknown"
+                  }
+                />
 
-              <InfoRow
-                icon={Calendar}
-                label="Last Updated"
-                value={
-                  deliverable.updated_at
-                    ? safeFormat(
-                        deliverable.updated_at,
-                        "MMMM d, yyyy 'at' h:mm a"
-                      )
-                    : "Unknown"
-                }
-              />
+                <InfoRow
+                  icon={Calendar}
+                  label="Last Updated"
+                  value={
+                    deliverable.updated_at
+                      ? safeFormat(
+                          deliverable.updated_at,
+                          "MMMM d, yyyy 'at' h:mm a"
+                        )
+                      : "Unknown"
+                  }
+                />
+              </div>
             </div>
           </div>
 
           {/* Center Column - Content References */}
           <div className="space-y-6">
-            <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
+            <div className="space-y-4 p-4 bg-transparent border border-border/30 rounded-lg">
               <div className="flex items-center justify-between">
                 <h3 className="font-medium text-foreground flex items-center gap-2">
                   <FileText className="h-4 w-4" />
@@ -555,7 +594,7 @@ export default function DeliverableModal({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 pt-3 border-t">
+                  <div className="flex items-center gap-2 pt-3 border-t border-border/30">
                     <Button
                       onClick={handleSaveReferences}
                       disabled={isSaving}
@@ -578,7 +617,7 @@ export default function DeliverableModal({
                 <div className="space-y-4">
                   {/* Linked Galleries */}
                   {(linkedGalleries.length > 0 || loadingGalleries) && (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
                         <ImageIcon className="h-4 w-4" />
                         Galleries{" "}
@@ -594,15 +633,15 @@ export default function DeliverableModal({
                           No galleries linked
                         </div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {linkedGalleries.map((gallery, index) => (
                             <div
                               key={gallery._id || index}
-                              className="p-3 bg-white/50 dark:bg-gray-800/50 rounded-lg border"
+                              className="p-3 bg-transparent border border-border/20 rounded-lg"
                             >
-                              <div className="flex items-start justify-between">
+                              <div className="flex items-start justify-between mb-3">
                                 <div className="flex-1">
-                                  <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center justify-between">
                                     <p className="text-sm font-medium text-foreground">
                                       {gallery.name || `Gallery ${index + 1}`}
                                     </p>
@@ -611,7 +650,6 @@ export default function DeliverableModal({
                                         variant="outline"
                                         size="sm"
                                         asChild
-                                        className="ml-2"
                                       >
                                         <a
                                           href={`/galleries/${gallery._id}`}
@@ -642,46 +680,38 @@ export default function DeliverableModal({
                                         : ""}
                                     </p>
                                   )}
-
-                                  {/* Image Thumbnails */}
-                                  {gallery.images &&
-                                    gallery.images.length > 0 && (
-                                      <div className="flex gap-1 mt-2 overflow-x-auto">
-                                        {gallery.images
-                                          .slice(0, 4)
-                                          .map(
-                                            (
-                                              image: any,
-                                              imageIndex: number
-                                            ) => (
-                                              <div
-                                                key={image._id || imageIndex}
-                                                className="flex-shrink-0 relative group"
-                                              >
-                                                <img
-                                                  src={image.url}
-                                                  alt={`Gallery ${gallery.name} - Image ${imageIndex + 1}`}
-                                                  className="w-12 h-12 object-cover rounded border bg-gray-100 dark:bg-gray-800"
-                                                  loading="lazy"
-                                                />
-                                                {/* Show +N indicator if there are more images */}
-                                                {imageIndex === 3 &&
-                                                  gallery.images.length > 4 && (
-                                                    <div className="absolute inset-0 bg-black/60 rounded flex items-center justify-center">
-                                                      <span className="text-white text-xs font-medium">
-                                                        +
-                                                        {gallery.images.length -
-                                                          4}
-                                                      </span>
-                                                    </div>
-                                                  )}
-                                              </div>
-                                            )
-                                          )}
-                                      </div>
-                                    )}
                                 </div>
                               </div>
+
+                              {/* 6x2 Image Thumbnails Grid */}
+                              {gallery.images && gallery.images.length > 0 && (
+                                <div className="grid grid-cols-6 gap-1">
+                                  {gallery.images
+                                    .slice(0, 12)
+                                    .map((image: any, imageIndex: number) => (
+                                      <div
+                                        key={image._id || imageIndex}
+                                        className="aspect-square relative group"
+                                      >
+                                        <img
+                                          src={image.url}
+                                          alt={`Gallery ${gallery.name} - Image ${imageIndex + 1}`}
+                                          className="w-full h-full object-cover rounded border bg-muted/20"
+                                          loading="lazy"
+                                        />
+                                        {/* Show +N indicator on the 12th image if there are more */}
+                                        {imageIndex === 11 &&
+                                          gallery.images.length > 12 && (
+                                            <div className="absolute inset-0 bg-black/70 rounded flex items-center justify-center">
+                                              <span className="text-white text-xs font-medium">
+                                                +{gallery.images.length - 12}
+                                              </span>
+                                            </div>
+                                          )}
+                                      </div>
+                                    ))}
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -691,7 +721,7 @@ export default function DeliverableModal({
 
                   {/* Linked Captions */}
                   {(linkedCaptions.length > 0 || loadingCaptions) && (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
                         <MessageSquare className="h-4 w-4" />
                         Captions{" "}
@@ -707,44 +737,37 @@ export default function DeliverableModal({
                           No captions linked
                         </div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {linkedCaptions.map((caption, index) => (
                             <div
                               key={caption._id || index}
-                              className="p-3 bg-white/50 dark:bg-gray-800/50 rounded-lg border"
+                              className="p-4 bg-transparent border border-border/20 rounded-lg"
                             >
-                              <div className="flex items-start justify-between">
+                              <div className="flex items-start justify-between mb-3">
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
+                                  <div className="flex items-center gap-2 mb-2">
                                     <Badge
-                                      variant="secondary"
-                                      className="text-xs"
+                                      variant="outline"
+                                      className="text-xs bg-transparent"
                                     >
                                       {caption.platform || "Unknown Platform"}
                                     </Badge>
                                   </div>
-                                  <p className="text-sm text-foreground line-clamp-3">
+                                  {/* Fuller caption text with rich text support */}
+                                  <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
                                     {caption.caption_text || "No caption text"}
-                                  </p>
+                                  </div>
                                   {caption.hashtags &&
                                     caption.hashtags.length > 0 && (
-                                      <p className="text-xs text-blue-600 mt-1">
+                                      <p className="text-xs text-primary mt-2">
                                         {caption.hashtags
-                                          .slice(0, 3)
                                           .map((tag: string) => `#${tag}`)
                                           .join(" ")}
-                                        {caption.hashtags.length > 3 &&
-                                          ` +${caption.hashtags.length - 3} more`}
                                       </p>
                                     )}
                                 </div>
                                 {caption._id && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    asChild
-                                    className="ml-2"
-                                  >
+                                  <Button variant="outline" size="sm" asChild>
                                     <a
                                       href={`/captions/${caption._id}`}
                                       target="_blank"
@@ -776,81 +799,113 @@ export default function DeliverableModal({
             </div>
           </div>
 
-          {/* Right Column - Links, Description, and Metadata */}
+          {/* Right Column - Links and Description */}
           <div className="space-y-6">
+            {/* YouTube Video Embed */}
+            {deliverable.social_media_link &&
+              isYouTubeUrl(deliverable.social_media_link) && (
+                <div className="space-y-3 p-4 bg-transparent border border-border/30 rounded-lg">
+                  <h3 className="font-medium text-foreground mb-3 flex items-center gap-2">
+                    <Play className="h-4 w-4" />
+                    {deliverable.aspect_ratio === "9:16"
+                      ? "YouTube Shorts Preview"
+                      : "Video Preview"}
+                  </h3>
+                  <div
+                    className={`relative w-full bg-black rounded-lg overflow-hidden ${
+                      deliverable.aspect_ratio === "9:16"
+                        ? "aspect-[9/16] max-w-[300px] mx-auto"
+                        : "aspect-video"
+                    }`}
+                  >
+                    <iframe
+                      src={`https://www.youtube.com/embed/${extractYouTubeVideoId(deliverable.social_media_link)}${
+                        deliverable.aspect_ratio === "9:16"
+                          ? "?autoplay=0&mute=1"
+                          : ""
+                      }`}
+                      title={
+                        deliverable.aspect_ratio === "9:16"
+                          ? "YouTube Shorts player"
+                          : "YouTube video player"
+                      }
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                      className="absolute inset-0 w-full h-full"
+                    ></iframe>
+                  </div>
+                  {deliverable.aspect_ratio === "9:16" && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Optimized for YouTube Shorts (9:16 aspect ratio)
+                    </p>
+                  )}
+                </div>
+              )}
+
             {/* Links */}
             {(deliverable.dropbox_link ||
               deliverable.social_media_link ||
               deliverable.publishing_url) && (
-              <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+              <div className="space-y-3 p-4 bg-transparent border border-border/30 rounded-lg">
                 <h3 className="font-medium text-foreground mb-3 flex items-center gap-2">
                   <Link className="h-4 w-4" />
                   Links
                 </h3>
 
-                {deliverable.dropbox_link && (
-                  <InfoRow
-                    icon={Cloud}
-                    label="Dropbox"
-                    value="View in Dropbox"
-                    href={deliverable.dropbox_link}
-                  />
-                )}
+                <div className="space-y-0">
+                  {deliverable.dropbox_link && (
+                    <InfoRow
+                      icon={Cloud}
+                      label="Dropbox"
+                      value="View in Dropbox"
+                      href={deliverable.dropbox_link}
+                    />
+                  )}
 
-                {deliverable.social_media_link && (
-                  <InfoRow
-                    icon={Share2}
-                    label="Social Media"
-                    value="View Post"
-                    href={deliverable.social_media_link}
-                  />
-                )}
+                  {deliverable.social_media_link && (
+                    <InfoRow
+                      icon={Share2}
+                      label={
+                        isYouTubeUrl(deliverable.social_media_link)
+                          ? "YouTube"
+                          : "Social Media"
+                      }
+                      value={
+                        isYouTubeUrl(deliverable.social_media_link)
+                          ? "Watch on YouTube"
+                          : "View Post"
+                      }
+                      href={deliverable.social_media_link}
+                    />
+                  )}
 
-                {deliverable.publishing_url && (
-                  <InfoRow
-                    icon={Link}
-                    label="Publishing URL"
-                    value="View Published Content"
-                    href={deliverable.publishing_url}
-                  />
-                )}
+                  {deliverable.publishing_url && (
+                    <InfoRow
+                      icon={Link}
+                      label="Publishing URL"
+                      value="View Published Content"
+                      href={deliverable.publishing_url}
+                    />
+                  )}
+                </div>
               </div>
             )}
 
             {/* Description */}
             {deliverable.description && (
-              <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+              <div className="space-y-3 p-4 bg-transparent border border-border/30 rounded-lg">
                 <h3 className="font-medium text-foreground mb-3 flex items-center gap-2">
                   <FileText className="h-4 w-4" />
                   Description
                 </h3>
-                <div className="p-3 bg-white/50 dark:bg-gray-800/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                <div className="p-3 bg-transparent border border-border/20 rounded-lg">
+                  <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
                     {deliverable.description}
-                  </p>
+                  </div>
                 </div>
               </div>
             )}
-
-            {/* Metadata */}
-            <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
-              <h3 className="font-medium text-foreground mb-3 flex items-center gap-2">
-                <Database className="h-4 w-4" />
-                Metadata
-              </h3>
-
-              {deliverable._id && (
-                <InfoRow
-                  icon={FileText}
-                  label="ID"
-                  value={
-                    <code className="text-xs bg-muted px-2 py-1 rounded">
-                      {deliverable._id.toString()}
-                    </code>
-                  }
-                />
-              )}
-            </div>
           </div>
         </div>
       </DialogContent>
