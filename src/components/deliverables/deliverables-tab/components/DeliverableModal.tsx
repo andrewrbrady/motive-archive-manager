@@ -21,7 +21,7 @@ import { DeliverableActions } from "../types";
 import { getStatusColor, getStatusText, getPillColor } from "../utils";
 import { StatusSelector } from "../../StatusSelector";
 import YouTubeUploadHelper from "../../YouTubeUploadHelper";
-import EditDeliverableForm from "../../EditDeliverableForm";
+
 import PlatformDisplay from "./PlatformDisplay";
 import PlatformIcon from "./PlatformIcon";
 import GalleryManagement from "./GalleryManagement";

@@ -13,9 +13,9 @@ import { DeliverableActions } from "../types";
 import { safeFormat, formatDeliverableDuration } from "../utils";
 import { StatusSelector } from "../../StatusSelector";
 import YouTubeUploadHelper from "../../YouTubeUploadHelper";
-import EditDeliverableForm from "../../EditDeliverableForm";
 import { PlatformBadges } from "../../PlatformBadges";
 import { useCarDetails } from "@/contexts/CarDetailsContext";
+import { useMediaTypes } from "@/hooks/useMediaTypes";
 
 interface DeliverableCardProps {
   deliverable: Deliverable;
@@ -31,12 +31,24 @@ export default function DeliverableCard({
   showCarInfo = false,
 }: DeliverableCardProps) {
   const { getCarDetails } = useCarDetails();
+  const { mediaTypes } = useMediaTypes();
 
   // Get car details from context if needed
   const carInfo =
     showCarInfo && deliverable.car_id
       ? getCarDetails(deliverable.car_id.toString())
       : null;
+
+  // Get the proper media type name
+  const getMediaTypeName = () => {
+    if (deliverable.mediaTypeId) {
+      const mediaType = mediaTypes.find(
+        (mt) => mt._id.toString() === deliverable.mediaTypeId?.toString()
+      );
+      return mediaType ? mediaType.name : deliverable.type;
+    }
+    return deliverable.type;
+  };
 
   return (
     <div
@@ -52,13 +64,14 @@ export default function DeliverableCard({
           </div>
           <div className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] flex items-center gap-2">
             <PlatformBadges
+              platform_id={deliverable.platform_id?.toString()}
               platform={deliverable.platform}
               platforms={deliverable.platforms}
               maxVisible={2}
               size="sm"
             />
             <span>•</span>
-            <span>{deliverable.type}</span>
+            <span>{getMediaTypeName()}</span>
           </div>
           {showCarInfo && carInfo && (
             <p className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mt-1">
@@ -154,11 +167,6 @@ export default function DeliverableCard({
 
       {/* Action buttons for mobile - hidden by default, shown on tap/hover */}
       <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <EditDeliverableForm
-          deliverable={deliverable}
-          onDeliverableUpdated={actions.onRefresh}
-          onClose={() => {}}
-        />
         <Button
           variant="ghost"
           size="sm"

@@ -125,6 +125,24 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
   useEffect(() => {
     if (!api) return;
 
+    // Listen for popup messages
+    const handleMessage = (event: MessageEvent) => {
+      // Verify origin for security
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data.type === "youtube-auth-success") {
+        // Authentication successful via popup
+        checkAuthStatus();
+        toast.success("YouTube authentication successful!");
+      } else if (event.data.type === "youtube-auth-error") {
+        // Authentication failed via popup
+        toast.error(`Authentication failed: ${event.data.error}`);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    // Handle redirect-based authentication
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("youtube_auth_success") === "true") {
       const storedDeliverableId = sessionStorage.getItem(
@@ -148,14 +166,24 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
         sessionStorage.removeItem("youtube_upload_description");
         sessionStorage.removeItem("youtube_upload_tags");
 
-        // Automatically open the upload dialog
-        setIsOpen(true);
+        // Check if modal should be reopened
+        const shouldOpenModal = urlParams.get("youtube_modal_open") === "true";
+        if (shouldOpenModal) {
+          setIsOpen(true);
+        }
 
-        // Clear the URL parameter
+        // Clear the URL parameters
         const newUrl = window.location.pathname;
         window.history.replaceState({}, document.title, newUrl);
+
+        toast.success("YouTube authentication successful!");
       }
     }
+
+    // Cleanup
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
   }, [deliverable._id, api]);
 
   // Authentication check - don't render if not authenticated
@@ -212,31 +240,60 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
       sessionStorage.setItem("youtube_upload_description", description);
       sessionStorage.setItem("youtube_upload_tags", tags);
 
-      // Show detailed user guidance before redirect
-      toast(
-        "🎯 IMPORTANT: To upload to the MotiveArchiveMedia channel:\n\n" +
-          "1. On the next screen, you'll see 'Choose an account'\n" +
-          "2. Look for the MotiveArchiveMedia Google account (NOT your personal account)\n" +
-          "3. If you don't see it, click 'Use another account' and sign in with the brand account credentials\n" +
-          "4. Make sure you're authenticating AS the brand account, not your personal account",
-        {
-          duration: 12000,
-          style: {
-            backgroundColor: "#dc2626",
-            color: "white",
-            fontSize: "14px",
-            lineHeight: "1.4",
-            whiteSpace: "pre-line",
-            maxWidth: "500px",
-          },
-        }
-      );
-
       // Get auth URL from API
       const data = await api.get<YouTubeAuthResponse>("youtube/auth/start");
 
       if (data.auth_url) {
-        // Longer delay to let user read the detailed guidance
+        // Try popup authentication first
+        try {
+          toast("Opening authentication popup...", { icon: "ℹ️" });
+          const authResult = await authenticateWithPopup(data.auth_url);
+          if (authResult.success) {
+            // Re-check auth status and continue with upload
+            await checkAuthStatus();
+            toast.success("YouTube authentication successful!");
+            return;
+          }
+        } catch (popupError: any) {
+          console.warn(
+            "Popup authentication failed, falling back to redirect:",
+            popupError
+          );
+          if (popupError?.message?.includes("blocked")) {
+            toast.error(
+              "Popup was blocked by browser. Falling back to redirect method..."
+            );
+          } else {
+            toast.error(
+              "Popup authentication failed. Trying redirect method..."
+            );
+          }
+        }
+
+        // Fallback to redirect method if popup fails
+        toast(
+          "🎯 IMPORTANT: To upload to the MotiveArchiveMedia channel:\n\n" +
+            "1. On the next screen, you'll see 'Choose an account'\n" +
+            "2. Look for the MotiveArchiveMedia Google account (NOT your personal account)\n" +
+            "3. If you don't see it, click 'Use another account' and sign in with the brand account credentials\n" +
+            "4. Make sure you're authenticating AS the brand account, not your personal account",
+          {
+            duration: 12000,
+            style: {
+              backgroundColor: "#dc2626",
+              color: "white",
+              fontSize: "14px",
+              lineHeight: "1.4",
+              whiteSpace: "pre-line",
+              maxWidth: "500px",
+            },
+          }
+        );
+
+        // Store current page state for better redirect using cookies
+        document.cookie = `youtube_auth_return_url=${encodeURIComponent(window.location.href)}; path=/; max-age=3600`;
+        document.cookie = `youtube_auth_modal_open=true; path=/; max-age=3600`;
+
         setTimeout(() => {
           window.location.href = data.auth_url!;
         }, 3000);
@@ -247,6 +304,66 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
       console.error("Authentication error:", error);
       toast.error("Failed to start authentication");
     }
+  };
+
+  // Popup authentication method
+  const authenticateWithPopup = (
+    authUrl: string
+  ): Promise<{ success: boolean }> => {
+    return new Promise((resolve, reject) => {
+      // Add popup parameter to auth URL for better detection
+      const popupAuthUrl = authUrl.includes("?")
+        ? `${authUrl}&popup=true`
+        : `${authUrl}?popup=true`;
+
+      // Open popup window
+      const popup = window.open(
+        popupAuthUrl,
+        "youtube-auth",
+        "width=500,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no"
+      );
+
+      if (!popup) {
+        reject(new Error("Popup blocked by browser"));
+        return;
+      }
+
+      // Listen for messages from popup
+      const handleMessage = (event: MessageEvent) => {
+        // Verify origin for security
+        if (event.origin !== window.location.origin) return;
+
+        if (event.data.type === "youtube-auth-success") {
+          window.removeEventListener("message", handleMessage);
+          resolve({ success: true });
+        } else if (event.data.type === "youtube-auth-error") {
+          window.removeEventListener("message", handleMessage);
+          reject(new Error(`Authentication failed: ${event.data.error}`));
+        }
+      };
+
+      window.addEventListener("message", handleMessage);
+
+      // Poll for popup closure
+      const pollTimer = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(pollTimer);
+          window.removeEventListener("message", handleMessage);
+          reject(new Error("Authentication cancelled - popup was closed"));
+          return;
+        }
+      }, 1000);
+
+      // Timeout after 5 minutes
+      setTimeout(() => {
+        clearInterval(pollTimer);
+        window.removeEventListener("message", handleMessage);
+        if (!popup.closed) {
+          popup.close();
+        }
+        reject(new Error("Authentication timeout"));
+      }, 300000);
+    });
   };
 
   const handleUpload = async () => {

@@ -26,7 +26,7 @@ import { DeliverableActions, BatchModeState } from "../types";
 import { safeFormat, formatDeliverableDuration } from "../utils";
 import { StatusSelector } from "../../StatusSelector";
 import YouTubeUploadHelper from "../../YouTubeUploadHelper";
-import EditDeliverableForm from "../../EditDeliverableForm";
+
 import { PlatformBadges } from "../../PlatformBadges";
 import { useCarDetails } from "@/contexts/CarDetailsContext";
 import { MediaTypeSelector } from "../../MediaTypeSelector";

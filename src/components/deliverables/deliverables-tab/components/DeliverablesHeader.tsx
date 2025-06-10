@@ -1,16 +1,17 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { BatchModeState } from "../types";
 import NewDeliverableForm from "../../NewDeliverableForm";
-import BatchDeliverableForm from "../../BatchDeliverableForm";
-import { FileJson } from "lucide-react";
+
+import BatchSelectorModal from "../../BatchSelectorModal";
+import { FileJson, Package } from "lucide-react";
 
 interface DeliverablesHeaderProps {
   title?: string;
   carId?: string;
   batchMode: BatchModeState;
   showNewDeliverable?: boolean;
-  showBatchDeliverable?: boolean;
+
   onRefresh?: () => void;
   onShowJsonUpload?: () => void;
   children?: React.ReactNode;
@@ -21,11 +22,13 @@ export default function DeliverablesHeader({
   carId,
   batchMode,
   showNewDeliverable = true,
-  showBatchDeliverable = true,
+
   onRefresh,
   onShowJsonUpload,
   children,
 }: DeliverablesHeaderProps) {
+  const [showBatchSelector, setShowBatchSelector] = useState(false);
+
   const {
     isBatchMode,
     selectedDeliverables,
@@ -60,17 +63,20 @@ export default function DeliverablesHeader({
               <Button variant="outline" onClick={toggleBatchMode}>
                 Batch Delete
               </Button>
+              {carId && (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowBatchSelector(true)}
+                >
+                  <Package className="w-4 h-4 mr-2" />
+                  Add Batch
+                </Button>
+              )}
               {onShowJsonUpload && (
                 <Button variant="outline" onClick={onShowJsonUpload}>
                   <FileJson className="w-4 h-4 mr-2" />
                   Batch JSON
                 </Button>
-              )}
-              {showBatchDeliverable && carId && (
-                <BatchDeliverableForm
-                  carId={carId}
-                  onDeliverableCreated={onRefresh || (() => {})}
-                />
               )}
               {showNewDeliverable && carId && (
                 <NewDeliverableForm
@@ -109,17 +115,21 @@ export default function DeliverablesHeader({
               <Button variant="outline" onClick={toggleBatchMode} size="sm">
                 Batch Delete
               </Button>
+              {carId && (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowBatchSelector(true)}
+                  size="sm"
+                >
+                  <Package className="w-4 h-4 mr-1" />
+                  Add Batch
+                </Button>
+              )}
               {onShowJsonUpload && (
                 <Button variant="outline" onClick={onShowJsonUpload} size="sm">
                   <FileJson className="w-4 h-4 mr-1" />
                   JSON
                 </Button>
-              )}
-              {showBatchDeliverable && carId && (
-                <BatchDeliverableForm
-                  carId={carId}
-                  onDeliverableCreated={onRefresh || (() => {})}
-                />
               )}
               {showNewDeliverable && carId && (
                 <NewDeliverableForm
@@ -131,6 +141,19 @@ export default function DeliverablesHeader({
           )}
         </div>
       </div>
+
+      {/* Batch Selector Modal */}
+      {carId && (
+        <BatchSelectorModal
+          isOpen={showBatchSelector}
+          onClose={() => setShowBatchSelector(false)}
+          carId={carId}
+          onBatchApplied={() => {
+            setShowBatchSelector(false);
+            onRefresh?.();
+          }}
+        />
+      )}
     </>
   );
 }

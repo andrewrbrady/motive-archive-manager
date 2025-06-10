@@ -30,6 +30,7 @@ import PlatformSettingsContent from "./PlatformSettingsContent";
 import EventTypeSettingsContent from "./EventTypeSettingsContent";
 import ImageAnalysisPromptsContent from "./ImageAnalysisPromptsContent";
 import { ModelsConfigurator } from "@/components/admin/ModelsConfigurator";
+import DeliverableBatchManagement from "@/components/admin/DeliverableBatchManagement";
 import { useAPI } from "@/hooks/useAPI";
 
 // TypeScript interfaces for API responses
@@ -353,6 +354,11 @@ export default function AdminTabs() {
       value: "image-analysis-prompts",
       label: "Image Analysis Prompts",
       content: <ImageAnalysisPromptsContent />,
+    },
+    {
+      value: "deliverable-batches",
+      label: "Deliverable Batches",
+      content: <DeliverableBatchManagement />,
     },
   ];
 
