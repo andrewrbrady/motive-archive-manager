@@ -43,11 +43,17 @@ interface DeliverableTemplate {
   type?: string; // Legacy field
   duration?: number;
   aspect_ratio: string;
+  daysUntilDeadline: number;
+  daysUntilRelease?: number;
 }
 
 interface BatchTemplate {
   name: string;
   templates: DeliverableTemplate[];
+}
+
+interface BatchTemplatesResponse {
+  templates: Record<string, BatchTemplate>;
 }
 
 export default function BatchDeliverableForm({
