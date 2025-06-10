@@ -1,6 +1,23 @@
-import { BatchTemplate, PREDEFINED_BATCHES } from "@/types/deliverable";
 import fs from "fs";
 import path from "path";
+
+// Define batch interfaces locally
+interface DeliverableTemplate {
+  title: string;
+  platform_id?: string;
+  platform?: string; // Legacy field
+  mediaTypeId?: string;
+  type?: string; // Legacy field
+  duration?: number;
+  aspect_ratio: string;
+  daysUntilDeadline?: number;
+  daysUntilRelease?: number;
+}
+
+interface BatchTemplate {
+  name: string;
+  templates: DeliverableTemplate[];
+}
 
 const STORAGE_FILE = path.join(process.cwd(), "data", "batch-templates.json");
 
@@ -12,7 +29,7 @@ function ensureDataDir() {
   }
 }
 
-// Read from file, fallback to predefined batches
+// Read from file
 function readFromFile(): Record<string, BatchTemplate> {
   try {
     ensureDataDir();
@@ -24,8 +41,8 @@ function readFromFile(): Record<string, BatchTemplate> {
     console.warn("Failed to read batch templates from file:", error);
   }
 
-  // Fallback to predefined batches
-  return { ...PREDEFINED_BATCHES };
+  // Return empty object if no file exists
+  return {};
 }
 
 // Write to file
