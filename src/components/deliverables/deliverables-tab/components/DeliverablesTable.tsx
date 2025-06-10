@@ -20,6 +20,7 @@ import {
   ChevronDown,
   ChevronsUpDown,
 } from "lucide-react";
+
 import { Deliverable } from "@/types/deliverable";
 import { DeliverableActions, BatchModeState } from "../types";
 import { safeFormat, formatDeliverableDuration } from "../utils";
@@ -28,6 +29,8 @@ import YouTubeUploadHelper from "../../YouTubeUploadHelper";
 import EditDeliverableForm from "../../EditDeliverableForm";
 import { PlatformBadges } from "../../PlatformBadges";
 import { useCarDetails } from "@/contexts/CarDetailsContext";
+import { MediaTypeSelector } from "../../MediaTypeSelector";
+import { EditorSelector } from "../../EditorSelector";
 
 interface DeliverablesTableProps {
   deliverables: Deliverable[];
@@ -152,11 +155,35 @@ export default function DeliverablesTable({
       );
     }
 
+    if (field === "mediaType") {
+      return (
+        <div onClick={(e) => e.stopPropagation()}>
+          <MediaTypeSelector
+            deliverableId={deliverable._id?.toString() || ""}
+            initialMediaTypeId={deliverable.mediaTypeId?.toString()}
+            size="sm"
+          />
+        </div>
+      );
+    }
+
+    if (field === "editor") {
+      return (
+        <div onClick={(e) => e.stopPropagation()}>
+          <EditorSelector
+            deliverableId={deliverable._id?.toString() || ""}
+            initialEditor={deliverable.editor}
+            size="sm"
+          />
+        </div>
+      );
+    }
+
     return <div className="cursor-pointer">{value?.toString() || ""}</div>;
   };
 
   const getColumnCount = () => {
-    let count = 9; // Base columns including Scheduled column
+    let count = 10; // Base columns including Media Type and Scheduled columns
     if (isBatchMode) count += 1; // Checkbox column
     if (showCarColumn) count += 1; // Car column
     return count;
@@ -186,33 +213,38 @@ export default function DeliverablesTable({
             {renderSortableHeader(
               "title",
               "Title",
-              "w-[12%] px-2 py-1.5 text-xs font-medium"
+              "w-[11%] px-2 py-1.5 text-xs font-medium"
             )}
             {showCarColumn &&
               renderSortableHeader(
                 "car",
                 "Car",
-                "w-[13%] px-2 py-1.5 text-xs font-medium"
+                "w-[12%] px-2 py-1.5 text-xs font-medium"
               )}
             {renderSortableHeader(
               "platform",
               "Platform",
-              "w-[12%] px-2 py-1.5 text-xs font-medium"
+              "w-[10%] px-2 py-1.5 text-xs font-medium"
+            )}
+            {renderSortableHeader(
+              "mediaType",
+              "Media Type",
+              "w-[11%] px-2 py-1.5 text-xs font-medium"
             )}
             {renderSortableHeader(
               "status",
               "Status",
-              "w-[10%] px-2 py-1.5 text-xs font-medium"
+              "w-[9%] px-2 py-1.5 text-xs font-medium"
             )}
             {renderSortableHeader(
               "duration",
               "Duration",
-              "w-[8%] px-2 py-1.5 text-xs font-medium"
+              "w-[7%] px-2 py-1.5 text-xs font-medium"
             )}
             {renderSortableHeader(
               "editor",
               "Editor",
-              "w-[11%] px-2 py-1.5 text-xs font-medium"
+              "w-[10%] px-2 py-1.5 text-xs font-medium"
             )}
             {renderSortableHeader(
               "edit_deadline",
@@ -229,7 +261,7 @@ export default function DeliverablesTable({
               "Scheduled",
               "w-[3%] px-2 py-1.5 text-xs font-medium text-center"
             )}
-            <TableHead className="w-[6%] text-right px-2 py-1.5 text-xs font-medium">
+            <TableHead className="w-[5%] text-right px-2 py-1.5 text-xs font-medium">
               Actions
             </TableHead>
           </TableRow>
@@ -312,6 +344,9 @@ export default function DeliverablesTable({
                       maxVisible={2}
                       size="sm"
                     />
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-xs">
+                    {renderCell(deliverable, "mediaType")}
                   </TableCell>
                   <TableCell className="px-2 py-1.5 text-xs">
                     {renderCell(deliverable, "status")}

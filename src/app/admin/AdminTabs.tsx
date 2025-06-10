@@ -31,6 +31,7 @@ import EventTypeSettingsContent from "./EventTypeSettingsContent";
 import ImageAnalysisPromptsContent from "./ImageAnalysisPromptsContent";
 import { ModelsConfigurator } from "@/components/admin/ModelsConfigurator";
 import { useAPI } from "@/hooks/useAPI";
+import MigrateMediaTypesButton from "@/components/admin/deliverables/MigrateMediaTypesButton";
 
 // TypeScript interfaces for API responses
 interface OAuthDebugResponse {
@@ -353,6 +354,11 @@ export default function AdminTabs() {
       value: "image-analysis-prompts",
       label: "Image Analysis Prompts",
       content: <ImageAnalysisPromptsContent />,
+    },
+    {
+      value: "migrate-media-types",
+      label: "Migrate Media Types",
+      content: <MigrateMediaTypesButton />,
     },
   ];
 

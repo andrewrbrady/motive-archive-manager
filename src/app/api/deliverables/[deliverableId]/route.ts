@@ -171,6 +171,14 @@ export async function PUT(
       updateData.description = body.description?.trim();
     if (body.status) updateData.status = body.status;
     if (body.type) updateData.type = body.type;
+    if (body.mediaTypeId !== undefined) {
+      // Handle mediaTypeId updates (ObjectId conversion)
+      if (body.mediaTypeId === null || body.mediaTypeId === "") {
+        updateData.mediaTypeId = null;
+      } else {
+        updateData.mediaTypeId = new ObjectId(body.mediaTypeId);
+      }
+    }
     if (body.platform) updateData.platform = body.platform;
     if (body.platforms) updateData.platforms = body.platforms;
     if (body.duration !== undefined) updateData.duration = body.duration;
