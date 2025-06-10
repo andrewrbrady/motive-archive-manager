@@ -6,10 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Command, CommandGroup, CommandItem } from "@/components/ui/command";
 import { Command as CommandPrimitive } from "cmdk";
 import { cn } from "@/lib/utils";
+import { getIconComponent } from "@/components/ui/IconPicker";
 
 interface Option {
   label: string;
   value: string;
+  icon?: string;
 }
 
 interface MultiSelectProps {
@@ -55,6 +57,15 @@ export function MultiSelect({
   const selectables = options.filter(
     (option) => !value.some((v) => v.value === option.value)
   );
+
+  // Filter options based on search input
+  const filteredOptions = options.filter((option) => {
+    const matchesSearch =
+      inputValue === "" ||
+      option.label.toLowerCase().includes(inputValue.toLowerCase()) ||
+      option.value.toLowerCase().includes(inputValue.toLowerCase());
+    return matchesSearch;
+  });
 
   const isSelected = (option: Option) => {
     return value.some((v) => v.value === option.value);
@@ -144,26 +155,38 @@ export function MultiSelect({
           >
             <div className="max-h-[200px] overflow-auto p-1">
               <div className="space-y-0.5">
-                {options.map((option) => {
-                  const selected = isSelected(option);
-                  return (
-                    <div
-                      key={option.value}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        handleSelect(option);
-                      }}
-                      className={cn(
-                        "cursor-pointer rounded-md px-3 py-2 transition-colors text-left text-sm w-full",
-                        selected
-                          ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
-                          : "hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
-                      )}
-                    >
-                      <span className="truncate">{option.label}</span>
-                    </div>
-                  );
-                })}
+                {filteredOptions.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-[hsl(var(--foreground-muted))] text-center">
+                    {inputValue ? "No results found" : "No options available"}
+                  </div>
+                ) : (
+                  filteredOptions.map((option) => {
+                    const selected = isSelected(option);
+                    const IconComponent = option.icon
+                      ? getIconComponent(option.icon)
+                      : null;
+                    return (
+                      <div
+                        key={option.value}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelect(option);
+                        }}
+                        className={cn(
+                          "cursor-pointer rounded-md px-3 py-2 transition-colors text-left text-sm w-full flex items-center gap-2",
+                          selected
+                            ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]"
+                            : "hover:bg-[hsl(var(--background-subtle))] hover:text-[hsl(var(--foreground))]"
+                        )}
+                      >
+                        {IconComponent && (
+                          <IconComponent className="h-4 w-4 text-primary flex-shrink-0" />
+                        )}
+                        <span className="truncate">{option.label}</span>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
