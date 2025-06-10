@@ -405,14 +405,15 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
   return (
     <>
       <Button
-        variant="ghost"
+        variant="outline"
         size="sm"
         onClick={handleClick}
         disabled={isCheckingAuth}
-        className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-950"
+        className="text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-950 border-red-200 dark:border-red-800 flex-1"
         title="Upload to YouTube"
       >
-        <Play className="h-4 w-4" />
+        <Play className="h-4 w-4 mr-2" />
+        Upload to YouTube
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>

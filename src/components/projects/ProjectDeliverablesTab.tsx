@@ -2153,45 +2153,44 @@ export function ProjectDeliverablesTab({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-4">
-        {/* Mobile View - Cards */}
-        <div className="block md:hidden space-y-3">
-          {!isLoadingDeliverables && sortedDeliverables.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium mb-2">No deliverables yet</p>
-              <p className="text-sm">
-                Add deliverables to track project outputs and milestones
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {sortedDeliverables.map((deliverable) => (
-                <DeliverableCard
-                  key={deliverable._id?.toString()}
-                  deliverable={deliverable}
-                  actions={deliverableActions}
-                  onOpenModal={handleOpenDeliverableModal}
-                  showCarInfo={true}
-                />
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* Desktop View - Table */}
-        <DeliverablesTable
-          deliverables={sortedDeliverables}
-          isLoading={isLoadingDeliverables}
-          actions={deliverableActions}
-          batchMode={mockBatchMode}
-          showCarColumn={true}
-          onOpenModal={handleOpenDeliverableModal}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSort={handleSort}
-        />
-      </CardContent>
+      {/* Mobile View - Cards */}
+      <div className="block md:hidden space-y-3 px-6 pb-6">
+        {!isLoadingDeliverables && sortedDeliverables.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="text-lg font-medium mb-2">No deliverables yet</p>
+            <p className="text-sm">
+              Add deliverables to track project outputs and milestones
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {sortedDeliverables.map((deliverable) => (
+              <DeliverableCard
+                key={deliverable._id?.toString()}
+                deliverable={deliverable}
+                actions={deliverableActions}
+                onOpenModal={handleOpenDeliverableModal}
+                showCarInfo={true}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop View - Table - Full width */}
+      <DeliverablesTable
+        deliverables={sortedDeliverables}
+        isLoading={isLoadingDeliverables}
+        actions={deliverableActions}
+        batchMode={mockBatchMode}
+        showCarColumn={true}
+        onOpenModal={handleOpenDeliverableModal}
+        sortField={sortField}
+        sortDirection={sortDirection}
+        onSort={handleSort}
+      />
 
       {/* Deliverable Detail Modal */}
       <DeliverableModal

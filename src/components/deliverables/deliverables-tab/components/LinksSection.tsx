@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, Share2, Cloud } from "lucide-react";
+import { Link, Share2, Cloud, Play, Download } from "lucide-react";
 import { Deliverable } from "@/types/deliverable";
 import { isYouTubeUrl } from "../utils/youtube";
 
@@ -61,7 +61,7 @@ export default function LinksSection({ deliverable }: LinksSectionProps) {
       <div className="space-y-0">
         {deliverable.dropbox_link && (
           <InfoRow
-            icon={Cloud}
+            icon={Download}
             label="Dropbox"
             value="View in Dropbox"
             href={deliverable.dropbox_link}
@@ -70,7 +70,7 @@ export default function LinksSection({ deliverable }: LinksSectionProps) {
 
         {deliverable.social_media_link && (
           <InfoRow
-            icon={Share2}
+            icon={isYouTubeUrl(deliverable.social_media_link) ? Play : Share2}
             label={
               isYouTubeUrl(deliverable.social_media_link)
                 ? "YouTube"

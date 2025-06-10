@@ -108,11 +108,6 @@ export default function DeliverablesTable({
           <span className="truncate">
             {value ? safeFormat(value, "MMM d, yyyy") : "Not set"}
           </span>
-          {field === "release_date" && deliverable.scheduled && (
-            <div title="Scheduled">
-              <CheckCircle className="h-3 w-3 text-green-600 flex-shrink-0" />
-            </div>
-          )}
         </div>
       );
     }
@@ -143,18 +138,32 @@ export default function DeliverablesTable({
       );
     }
 
+    if (field === "scheduled") {
+      return (
+        <div className="cursor-pointer flex justify-center">
+          {deliverable.scheduled ? (
+            <div title="Scheduled">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </div>
+          ) : (
+            <div className="h-4 w-4" />
+          )}
+        </div>
+      );
+    }
+
     return <div className="cursor-pointer">{value?.toString() || ""}</div>;
   };
 
   const getColumnCount = () => {
-    let count = 8; // Base columns (reduced from 9 due to Type column removal)
+    let count = 9; // Base columns including Scheduled column
     if (isBatchMode) count += 1; // Checkbox column
     if (showCarColumn) count += 1; // Car column
     return count;
   };
 
   return (
-    <div className="hidden md:block rounded-md border w-full overflow-x-auto">
+    <div className="hidden md:block rounded-b-md border border-t-0 w-full overflow-x-auto">
       <Table className="w-full table-fixed">
         <TableHeader>
           <TableRow>
@@ -177,18 +186,18 @@ export default function DeliverablesTable({
             {renderSortableHeader(
               "title",
               "Title",
-              "w-[15%] px-2 py-1.5 text-xs font-medium"
+              "w-[12%] px-2 py-1.5 text-xs font-medium"
             )}
             {showCarColumn &&
               renderSortableHeader(
                 "car",
                 "Car",
-                "w-[12%] px-2 py-1.5 text-xs font-medium"
+                "w-[13%] px-2 py-1.5 text-xs font-medium"
               )}
             {renderSortableHeader(
               "platform",
               "Platform",
-              "w-[24%] px-2 py-1.5 text-xs font-medium"
+              "w-[12%] px-2 py-1.5 text-xs font-medium"
             )}
             {renderSortableHeader(
               "status",
@@ -203,19 +212,24 @@ export default function DeliverablesTable({
             {renderSortableHeader(
               "editor",
               "Editor",
-              "w-[13%] px-2 py-1.5 text-xs font-medium"
+              "w-[11%] px-2 py-1.5 text-xs font-medium"
             )}
             {renderSortableHeader(
               "edit_deadline",
               "Deadline",
-              "w-[13%] px-2 py-1.5 text-xs font-medium"
+              "w-[7%] px-2 py-1.5 text-xs font-medium"
             )}
             {renderSortableHeader(
               "release_date",
               "Release Date",
-              "w-[13%] px-2 py-1.5 text-xs font-medium"
+              "w-[7%] px-2 py-1.5 text-xs font-medium"
             )}
-            <TableHead className="w-[12%] text-right px-2 py-1.5 text-xs font-medium">
+            {renderSortableHeader(
+              "scheduled",
+              "Scheduled",
+              "w-[3%] px-2 py-1.5 text-xs font-medium text-center"
+            )}
+            <TableHead className="w-[6%] text-right px-2 py-1.5 text-xs font-medium">
               Actions
             </TableHead>
           </TableRow>
@@ -314,6 +328,9 @@ export default function DeliverablesTable({
                   <TableCell className="px-2 py-1.5 text-xs">
                     {renderCell(deliverable, "release_date")}
                   </TableCell>
+                  <TableCell className="px-2 py-1.5 text-xs">
+                    {renderCell(deliverable, "scheduled")}
+                  </TableCell>
                   <TableCell className="px-2 py-1.5">
                     <div
                       className="flex justify-end items-center gap-1"
@@ -321,47 +338,6 @@ export default function DeliverablesTable({
                     >
                       {!isBatchMode && (
                         <>
-                          {/* Dropbox Link Icon */}
-                          {deliverable.dropbox_link ? (
-                            <a
-                              href={deliverable.dropbox_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1 text-blue-600 hover:text-blue-800"
-                              title="Open Dropbox"
-                            >
-                              <Cloud className="h-4 w-4" />
-                            </a>
-                          ) : (
-                            <div
-                              className="p-1 text-gray-400"
-                              title="No Dropbox link"
-                            >
-                              <Cloud className="h-4 w-4" />
-                            </div>
-                          )}
-
-                          {/* Social Media Link Icon */}
-                          {deliverable.social_media_link && (
-                            <a
-                              href={deliverable.social_media_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1 text-blue-600 hover:text-blue-800"
-                              title="Open Social Media"
-                            >
-                              <Share2 className="h-4 w-4" />
-                            </a>
-                          )}
-
-                          {/* YouTube Upload Button */}
-                          <YouTubeUploadHelper deliverable={deliverable} />
-
-                          <EditDeliverableForm
-                            deliverable={deliverable}
-                            onDeliverableUpdated={actions.onRefresh}
-                            onClose={() => {}}
-                          />
                           <Button
                             variant="ghost"
                             size="sm"

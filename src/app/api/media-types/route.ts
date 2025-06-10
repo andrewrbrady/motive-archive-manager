@@ -13,6 +13,9 @@ export async function GET(request: NextRequest) {
       return authResult;
     }
 
+    const { searchParams } = new URL(request.url);
+    const includeInactive = searchParams.get("includeInactive") === "true";
+
     const db = await getDatabase();
     if (!db) {
       console.error("Failed to get database instance");
@@ -22,10 +25,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get active media types sorted by sortOrder
+    // Build query filter
+    const filter = includeInactive ? {} : { isActive: true };
+
+    // Get media types sorted by sortOrder
     const mediaTypes = await db
-      .collection<IMediaType>("media_types")
-      .find({ isActive: true })
+      .collection("media_types")
+      .find(filter)
       .sort({ sortOrder: 1, name: 1 })
       .toArray();
 

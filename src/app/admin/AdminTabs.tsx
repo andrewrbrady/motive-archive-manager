@@ -7,6 +7,7 @@ import LocationsClient from "../locations/LocationsClient";
 import ClientsContent from "@/app/admin/ClientsContent";
 import ContactsContent from "@/app/admin/ContactsContent";
 import MakesContent from "@/app/admin/MakesContent";
+import MediaTypesContent from "@/app/admin/media-types/MediaTypesContent";
 import CreativeRolesManagement from "@/components/users/CreativeRolesManagement";
 import { Loader2 } from "lucide-react";
 import {
@@ -312,6 +313,11 @@ export default function AdminTabs() {
       value: "makes",
       label: "Makes",
       content: <MakesContent />,
+    },
+    {
+      value: "media-types",
+      label: "Media Types",
+      content: <MediaTypesContent />,
     },
     {
       value: "caption-prompts",

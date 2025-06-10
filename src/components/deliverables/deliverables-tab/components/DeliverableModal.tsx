@@ -7,7 +7,14 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Trash2, CheckCircle, Car, FileText } from "lucide-react";
+import {
+  Copy,
+  Trash2,
+  CheckCircle,
+  Car,
+  FileText,
+  Youtube,
+} from "lucide-react";
 import { useAPI } from "@/hooks/useAPI";
 import { Deliverable } from "@/types/deliverable";
 import { DeliverableActions } from "../types";
@@ -143,12 +150,31 @@ export default function DeliverableModal({
     }
   };
 
+  // Determine what to show based on media type
+  const getMediaTypeDisplayName = () => {
+    if (deliverable.mediaTypeId) {
+      // TODO: You might want to fetch media type names here
+      return deliverable.type; // Fallback to legacy type for now
+    }
+    return deliverable.type;
+  };
+
+  const shouldShowYouTubePreview = () => {
+    const mediaType = getMediaTypeDisplayName()?.toLowerCase();
+    return mediaType === "video" || mediaType === "mixed gallery";
+  };
+
+  const shouldShowGalleries = () => {
+    const mediaType = getMediaTypeDisplayName()?.toLowerCase();
+    return mediaType === "photo gallery" || mediaType === "mixed gallery";
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-y-auto bg-background/95 backdrop-blur-sm border-border/50">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold pr-8 flex items-center gap-2">
-            {deliverable.title}
+            Deliverable Details
             {deliverable.scheduled && (
               <div title="Scheduled">
                 <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
@@ -166,11 +192,6 @@ export default function DeliverableModal({
                 <h3 className="font-medium text-foreground">
                   Status & Actions
                 </h3>
-                <EditDeliverableForm
-                  deliverable={deliverable}
-                  onDeliverableUpdated={actions.onRefresh}
-                  onClose={() => {}}
-                />
               </div>
               <div className="flex items-center gap-3 flex-wrap">
                 <StatusSelector
@@ -251,23 +272,27 @@ export default function DeliverableModal({
             />
           </div>
 
-          {/* Right Column - Galleries, YouTube, Links and Description */}
+          {/* Right Column - Conditional content based on media type */}
           <div className="space-y-6">
-            {/* Galleries Section */}
-            <GalleryManagement
-              deliverable={deliverable}
-              linkedGalleries={linkedGalleries}
-              loadingGalleries={loadingGalleries}
-              onRefresh={actions.onRefresh}
-              api={api}
-            />
+            {/* Galleries Section - only show for photo gallery or mixed gallery */}
+            {shouldShowGalleries() && (
+              <GalleryManagement
+                deliverable={deliverable}
+                linkedGalleries={linkedGalleries}
+                loadingGalleries={loadingGalleries}
+                onRefresh={actions.onRefresh}
+                api={api}
+              />
+            )}
 
-            {/* YouTube Video Embed */}
-            <VideoPreview
-              socialMediaLink={deliverable.social_media_link || ""}
-              aspectRatio={deliverable.aspect_ratio}
-              title={deliverable.title}
-            />
+            {/* YouTube Video Embed - only show for video or mixed gallery */}
+            {shouldShowYouTubePreview() && (
+              <VideoPreview
+                socialMediaLink={deliverable.social_media_link || ""}
+                aspectRatio={deliverable.aspect_ratio}
+                title={deliverable.title}
+              />
+            )}
 
             {/* Description */}
             {deliverable.description && (
