@@ -210,6 +210,10 @@ export async function PUT(
       updateData.dropbox_link = body.dropbox_link;
     if (body.social_media_link !== undefined)
       updateData.social_media_link = body.social_media_link;
+    if (body.primaryImageId !== undefined)
+      updateData.primaryImageId = body.primaryImageId;
+    if (body.thumbnailUrl !== undefined)
+      updateData.thumbnailUrl = body.thumbnailUrl;
 
     // Handle content references (galleries and captions)
     if (body.gallery_ids !== undefined)

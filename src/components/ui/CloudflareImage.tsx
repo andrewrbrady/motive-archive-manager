@@ -25,7 +25,7 @@ interface CloudflareImageProps extends Omit<ImageProps, "src" | "loader"> {
 
 export function CloudflareImage({
   src,
-  variant = "medium",
+  variant = "public",
   fallback,
   alt,
   className,
@@ -46,11 +46,15 @@ export function CloudflareImage({
   // Phase 2: Fix missing Cloudflare variants - ensure URL has proper variant
   const optimizedSrc = useMemo(() => {
     if (src.includes("imagedelivery.net")) {
-      // Check if URL already has a variant (ends with /public, /thumbnail, etc. or has transform params)
-      const hasVariant = src.match(
-        /\/(public|thumbnail|medium|large|w=\d+)(?:,.*)?$/
-      );
-      if (!hasVariant) {
+      // Check if URL already has a variant or transform params
+      const hasVariant = src.match(/\/[^\/]+(?:,.*)?$/);
+
+      if (hasVariant) {
+        // URL has a variant - replace it with the correct one
+        const cloudflareVariant = CLOUDFLARE_VARIANTS[variant] || "public";
+        const baseUrl = src.replace(/\/[^\/]+(?:,.*)?$/, "");
+        return `${baseUrl}/${cloudflareVariant}`;
+      } else {
         // Missing variant - append the correct one based on variant prop
         const cloudflareVariant = CLOUDFLARE_VARIANTS[variant] || "public";
         return `${src}/${cloudflareVariant}`;

@@ -29,6 +29,7 @@ import CaptionManagement from "./CaptionManagement";
 import VideoPreview from "./VideoPreview";
 import DetailsTimeline from "./DetailsTimeline";
 import LinksSection from "./LinksSection";
+import ThumbnailSelector from "./ThumbnailSelector";
 
 interface DeliverableModalProps {
   deliverable: Deliverable | null;
@@ -120,6 +121,19 @@ export default function DeliverableModal({
     }
   }, [deliverable, api]);
 
+  // Local refresh function that only updates modal content without closing
+  const handleLocalRefresh = React.useCallback(() => {
+    // Re-fetch the linked content to update the UI
+    fetchLinkedContent();
+  }, [fetchLinkedContent]);
+
+  // Handle modal close and trigger parent refresh
+  const handleModalClose = React.useCallback(() => {
+    // Trigger parent refresh when modal closes to ensure calendar is updated
+    actions.onRefresh();
+    onClose();
+  }, [actions, onClose]);
+
   // Fetch linked galleries and captions when deliverable changes
   useEffect(() => {
     fetchLinkedContent();
@@ -142,8 +156,9 @@ export default function DeliverableModal({
         Object.assign(deliverable, (response as any).deliverable);
       }
 
-      // Also trigger refresh for consistency with other components
-      actions.onRefresh();
+      // Use local refresh to avoid closing the modal
+      // Parent will be refreshed when modal closes
+      handleLocalRefresh();
     } catch (error) {
       console.error("Failed to update deliverable:", error);
       throw error;
@@ -170,7 +185,7 @@ export default function DeliverableModal({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleModalClose}>
       <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-y-auto bg-background/95 backdrop-blur-sm border-border/50">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold pr-8 flex items-center gap-2">
@@ -225,7 +240,7 @@ export default function DeliverableModal({
                     size="sm"
                     onClick={() => {
                       actions.onDelete(deliverable._id?.toString() || "");
-                      onClose();
+                      handleModalClose();
                     }}
                     className="flex-1"
                   >
@@ -258,16 +273,25 @@ export default function DeliverableModal({
             />
 
             {/* Links */}
-            <LinksSection deliverable={deliverable} />
+            <LinksSection
+              deliverable={deliverable}
+              onUpdate={handleDeliverableUpdate}
+            />
           </div>
 
-          {/* Center Column - Captions */}
+          {/* Center Column - Thumbnail & Captions */}
           <div className="space-y-6">
+            <ThumbnailSelector
+              deliverable={deliverable}
+              linkedGalleries={linkedGalleries}
+              onUpdate={handleDeliverableUpdate}
+            />
+
             <CaptionManagement
               deliverable={deliverable}
               linkedCaptions={linkedCaptions}
               loadingCaptions={loadingCaptions}
-              onRefresh={actions.onRefresh}
+              onRefresh={handleLocalRefresh}
               api={api}
             />
           </div>
@@ -280,7 +304,7 @@ export default function DeliverableModal({
                 deliverable={deliverable}
                 linkedGalleries={linkedGalleries}
                 loadingGalleries={loadingGalleries}
-                onRefresh={actions.onRefresh}
+                onRefresh={handleLocalRefresh}
                 api={api}
               />
             )}

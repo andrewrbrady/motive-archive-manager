@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { MessageSquare, Plus, ExternalLink } from "lucide-react";
 import { Deliverable } from "@/types/deliverable";
 import { MultiSelect } from "@/components/ui/multi-select";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import PlatformIcon from "./PlatformIcon";
 
 interface CaptionManagementProps {
@@ -75,17 +75,10 @@ export default function CaptionManagement({
       onRefresh();
       setIsEditingCaptions(false);
 
-      toast({
-        title: "Success",
-        description: "Captions updated successfully",
-      });
+      toast.success("Captions updated successfully");
     } catch (error) {
       console.error("Error updating captions:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update captions",
-        variant: "destructive",
-      });
+      toast.error("Failed to update captions");
     } finally {
       setIsSaving(false);
     }

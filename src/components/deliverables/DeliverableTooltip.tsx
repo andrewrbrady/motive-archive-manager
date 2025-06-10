@@ -7,12 +7,15 @@ import {
 } from "@/components/ui/hover-card";
 import { CalendarIcon, Clock, MonitorPlay, User, Pencil } from "lucide-react";
 import { format } from "date-fns";
-import { Deliverable } from "@/types/deliverable";
+import { Deliverable, DeliverableStatus } from "@/types/deliverable";
 import { Button } from "@/components/ui/button";
-import EditDeliverableForm from "./EditDeliverableForm";
 import { useState, useRef } from "react";
 import { getCarThumbnailUrl } from "@/lib/cloudflare";
 import Image from "next/image";
+import DeliverableModal from "./deliverables-tab/components/DeliverableModal";
+import { DeliverableActions } from "./deliverables-tab/types";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "sonner";
 
 interface DeliverableTooltipProps {
   children: React.ReactNode;
@@ -37,7 +40,9 @@ export default function DeliverableTooltip({
   onDeliverableUpdated,
 }: DeliverableTooltipProps) {
   const [isHoverOpen, setIsHoverOpen] = useState(false);
-  const editButtonRef = useRef<HTMLButtonElement>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const api = useAPI();
+
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
@@ -60,6 +65,61 @@ export default function DeliverableTooltip({
   const carThumbnailUrl = deliverable.car
     ? getCarThumbnailUrl(deliverable.car)
     : "";
+
+  // Create actions for the DeliverableModal
+  const actions: DeliverableActions = {
+    onEdit: (deliverable: Deliverable) => {
+      // This is handled by the modal itself
+    },
+    onDelete: async (deliverableId: string) => {
+      if (!api) return;
+
+      try {
+        await api.delete(`deliverables/${deliverableId}`);
+        toast.success("Deliverable deleted successfully");
+        onDeliverableUpdated?.();
+      } catch (error) {
+        console.error("Failed to delete deliverable:", error);
+        toast.error("Failed to delete deliverable");
+      }
+    },
+    onDuplicate: async (deliverable: Deliverable) => {
+      if (!api) return;
+
+      try {
+        const duplicateData = {
+          ...deliverable,
+          title: `${deliverable.title} (Copy)`,
+        };
+        delete duplicateData._id;
+
+        await api.post("deliverables", duplicateData);
+        toast.success("Deliverable duplicated successfully");
+        onDeliverableUpdated?.();
+      } catch (error) {
+        console.error("Failed to duplicate deliverable:", error);
+        toast.error("Failed to duplicate deliverable");
+      }
+    },
+    onStatusChange: async (
+      deliverableId: string,
+      newStatus: DeliverableStatus
+    ) => {
+      if (!api) return;
+
+      try {
+        await api.put(`deliverables/${deliverableId}`, { status: newStatus });
+        toast.success("Status updated successfully");
+        onDeliverableUpdated?.();
+      } catch (error) {
+        console.error("Failed to update status:", error);
+        toast.error("Failed to update status");
+      }
+    },
+    onRefresh: () => {
+      onDeliverableUpdated?.();
+    },
+  };
 
   return (
     <>
@@ -179,13 +239,7 @@ export default function DeliverableTooltip({
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsHoverOpen(false);
-                  // Delay to ensure hover card closes first, then find and click the hidden edit button
-                  setTimeout(() => {
-                    const hiddenEditButton = document.querySelector(
-                      '[data-deliverable-id="' + deliverable._id + '"] button'
-                    ) as HTMLButtonElement;
-                    hiddenEditButton?.click();
-                  }, 100);
+                  setIsModalOpen(true);
                 }}
                 className="h-6 px-2 text-xs"
               >
@@ -197,19 +251,15 @@ export default function DeliverableTooltip({
         </HoverCardContent>
       </HoverCard>
 
-      {/* EditDeliverableForm outside hover card to prevent unmounting */}
-      <div
-        style={{ display: "none" }}
-        data-deliverable-id={deliverable._id?.toString()}
-      >
-        <EditDeliverableForm
-          deliverable={deliverable}
-          onDeliverableUpdated={() => {
-            onDeliverableUpdated?.();
-          }}
-          onClose={() => {}}
-        />
-      </div>
+      {/* DeliverableModal for editing */}
+      <DeliverableModal
+        deliverable={deliverable}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        actions={actions}
+        showCarInfo={!!deliverable.car}
+        carInfo={deliverable.car}
+      />
     </>
   );
 }

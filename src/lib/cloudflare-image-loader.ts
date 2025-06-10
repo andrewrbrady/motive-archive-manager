@@ -112,7 +112,7 @@ export const CLOUDFLARE_VARIANTS = {
 
 export function getCloudflareImageUrl(
   imageId: string,
-  variant: keyof typeof CLOUDFLARE_VARIANTS = "medium"
+  variant: keyof typeof CLOUDFLARE_VARIANTS = "public"
 ): string {
   const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
   if (!accountId) {

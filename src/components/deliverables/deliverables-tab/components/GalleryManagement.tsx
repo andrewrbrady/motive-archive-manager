@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ExternalLink, Plus, ImageIcon } from "lucide-react";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { useGalleries } from "@/hooks/use-galleries";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { Deliverable } from "@/types/deliverable";
 
 interface GalleryManagementProps {
@@ -59,17 +59,10 @@ export default function GalleryManagement({
       onRefresh();
       setIsEditingGalleries(false);
 
-      toast({
-        title: "Success",
-        description: "Galleries updated successfully",
-      });
+      toast.success("Galleries updated successfully");
     } catch (error) {
       console.error("Error updating galleries:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update galleries",
-        variant: "destructive",
-      });
+      toast.error("Failed to update galleries");
     } finally {
       setIsSaving(false);
     }

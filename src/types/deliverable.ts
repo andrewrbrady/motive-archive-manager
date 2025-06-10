@@ -97,6 +97,8 @@ export interface Deliverable {
   target_audience?: string;
   music_track?: string;
   thumbnail_url?: string;
+  primaryImageId?: string; // Cloudflare Images ID for primary/thumbnail image
+  thumbnailUrl?: string; // Computed/cached thumbnail URL from Cloudflare
   tags: string[];
   publishing_url?: string;
   dropbox_link?: string; // Link to Dropbox files/folder
