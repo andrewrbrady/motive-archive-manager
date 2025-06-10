@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { BatchTemplate } from "@/types/deliverable";
+import { useAPI } from "@/hooks/useAPI";
 import { addDays, format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
@@ -27,7 +27,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { useAPI } from "@/hooks/useAPI";
 import "react-day-picker/dist/style.css";
 
 interface BatchDeliverableFormProps {
@@ -35,8 +34,20 @@ interface BatchDeliverableFormProps {
   onDeliverableCreated?: () => void;
 }
 
-interface BatchTemplatesResponse {
-  templates: Record<string, BatchTemplate>;
+// Define batch interface locally
+interface DeliverableTemplate {
+  title: string;
+  platform_id?: string;
+  platform?: string; // Legacy field
+  mediaTypeId?: string;
+  type?: string; // Legacy field
+  duration?: number;
+  aspect_ratio: string;
+}
+
+interface BatchTemplate {
+  name: string;
+  templates: DeliverableTemplate[];
 }
 
 export default function BatchDeliverableForm({

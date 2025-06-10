@@ -34,9 +34,25 @@ import {
   GripVertical,
 } from "lucide-react";
 import { toast } from "sonner";
-import { BatchTemplate, DeliverableTemplate } from "@/types/deliverable";
+
 import DeliverableTemplateGantt from "./DeliverableTemplateGantt";
 import { useAPI } from "@/hooks/useAPI";
+
+// Define batch interfaces locally
+interface DeliverableTemplate {
+  title: string;
+  platform_id?: string;
+  platform?: string; // Legacy field
+  mediaTypeId?: string;
+  type?: string; // Legacy field
+  duration?: number;
+  aspect_ratio: string;
+}
+
+interface BatchTemplate {
+  name: string;
+  templates: DeliverableTemplate[];
+}
 
 export default function BatchTemplateManager() {
   const [isOpen, setIsOpen] = useState(false);

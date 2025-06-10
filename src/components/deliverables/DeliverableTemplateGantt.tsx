@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { DeliverableTemplate, BatchTemplate } from "@/types/deliverable";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -12,6 +11,22 @@ import { cn } from "@/lib/utils";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { GripVertical, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+// Define batch interfaces locally
+interface DeliverableTemplate {
+  title: string;
+  platform_id?: string;
+  platform?: string; // Legacy field
+  mediaTypeId?: string;
+  type?: string; // Legacy field
+  duration?: number;
+  aspect_ratio: string;
+}
+
+interface BatchTemplate {
+  name: string;
+  templates: DeliverableTemplate[];
+}
 
 const PLATFORM_COLORS: Record<string, string> = {
   "Instagram Reels": "var(--accent-hover)",
@@ -225,10 +240,10 @@ export default function DeliverableTemplateGantt({
                       i === 0
                         ? "border-primary/50"
                         : i % 7 === 0
-                        ? "border-muted-foreground/30"
-                        : zoomLevel >= 1.5
-                        ? "border-muted-foreground/20"
-                        : "border-transparent"
+                          ? "border-muted-foreground/30"
+                          : zoomLevel >= 1.5
+                            ? "border-muted-foreground/20"
+                            : "border-transparent"
                     )}
                     style={{ left: `${i * dayWidth + dayWidth / 2}px` }}
                   >
@@ -236,10 +251,10 @@ export default function DeliverableTemplateGantt({
                       {i === 0
                         ? "Start"
                         : zoomLevel >= 0.75
-                        ? `Day ${i}`
-                        : i % 7 === 0
-                        ? `Day ${i}`
-                        : ""}
+                          ? `Day ${i}`
+                          : i % 7 === 0
+                            ? `Day ${i}`
+                            : ""}
                     </div>
                   </div>
                 ))}

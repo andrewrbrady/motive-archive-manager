@@ -1,7 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { BatchTemplate, PREDEFINED_BATCHES } from "@/types/deliverable";
+
+// Define interfaces locally for batch management
+interface DeliverableTemplate {
+  title: string;
+  platform_id?: string;
+  platform?: string; // Legacy field
+  mediaTypeId?: string;
+  type?: string; // Legacy field
+  duration?: number;
+  aspect_ratio: string;
+}
+
+interface BatchTemplate {
+  name: string;
+  templates: DeliverableTemplate[];
+}
 
 export async function GET() {
   try {
@@ -25,19 +40,10 @@ export async function GET() {
     console.log("Raw batches from MongoDB:", JSON.stringify(batches, null, 2));
     console.log("Number of batches found:", batches.length);
 
-    // If no batches in DB, return predefined ones but don't save them
-    if (batches.length === 0) {
-      console.log("No batches in DB, returning predefined batches");
-      const predefinedBatches = Object.values(PREDEFINED_BATCHES);
-      return NextResponse.json({
-        success: true,
-        batches: predefinedBatches,
-      });
-    }
-
+    // Return empty array if no batches in DB
     const response = {
       success: true,
-      batches,
+      batches: batches || [],
     };
 
     console.log(

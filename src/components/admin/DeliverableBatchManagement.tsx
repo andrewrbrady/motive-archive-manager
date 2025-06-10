@@ -26,17 +26,30 @@ import {
 import { Plus, Edit, Trash2, Copy, Package } from "lucide-react";
 import { toast } from "sonner";
 import {
-  BatchTemplate,
-  DeliverableTemplate,
   Platform,
   DeliverableType,
-  PREDEFINED_BATCHES,
   DeliverablePlatform,
   MediaType,
 } from "@/types/deliverable";
 import { useAPI } from "@/hooks/useAPI";
 import { usePlatforms } from "@/contexts/PlatformContext";
 import { useMediaTypes } from "@/hooks/useMediaTypes";
+
+// Define batch interfaces locally
+interface DeliverableTemplate {
+  title: string;
+  platform_id?: string;
+  platform?: string; // Legacy field
+  mediaTypeId?: string;
+  type?: string; // Legacy field
+  duration?: number;
+  aspect_ratio: string;
+}
+
+interface BatchTemplate {
+  name: string;
+  templates: DeliverableTemplate[];
+}
 
 interface DeliverableBatchManagementProps {}
 
@@ -116,8 +129,8 @@ export default function DeliverableBatchManagement({}: DeliverableBatchManagemen
 
   const fetchBatches = async () => {
     if (!api) {
-      console.log("API client not available, using predefined batches");
-      setBatches(Object.values(PREDEFINED_BATCHES));
+      console.log("API client not available");
+      setBatches([]);
       setIsLoading(false);
       return;
     }
@@ -141,13 +154,8 @@ export default function DeliverableBatchManagement({}: DeliverableBatchManagemen
       setBatches(response.batches || []);
     } catch (error) {
       console.error("Error fetching batches:", error);
-      toast.error(
-        "Failed to load deliverable batches from server, using predefined batches"
-      );
-
-      // Fallback to predefined batches
-      console.log("Using fallback predefined batches:", PREDEFINED_BATCHES);
-      setBatches(Object.values(PREDEFINED_BATCHES));
+      toast.error("Failed to load deliverable batches from server");
+      setBatches([]);
     } finally {
       setIsLoading(false);
     }
