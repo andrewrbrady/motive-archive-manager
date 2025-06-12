@@ -2,7 +2,15 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Type, Heading, Minus, PlusCircle, ChevronDown } from "lucide-react";
+import {
+  Type,
+  Heading,
+  Minus,
+  PlusCircle,
+  ChevronDown,
+  ImageIcon,
+} from "lucide-react";
+import { ImageGalleryPopup } from "./ImageGalleryPopup";
 
 interface ContentInsertionToolbarProps {
   activeBlockId: string | null;
@@ -11,12 +19,19 @@ interface ContentInsertionToolbarProps {
   onAddTextBlock: () => void;
   onAddHeadingBlock: (level: 1 | 2 | 3) => void;
   onAddDividerBlock: () => void;
+  // Image gallery props
+  finalImages?: any[];
+  loadingImages?: boolean;
+  projectId?: string;
+  onRefreshImages?: () => void;
+  onAddImage?: (imageUrl: string, altText?: string) => void;
 }
 
 /**
  * ContentInsertionToolbar - Fixed bottom toolbar for adding content blocks
  * Extracted from BlockComposer for better maintainability and performance
  * Maintains all existing functionality and active block positioning logic
+ * Enhanced with ImageGalleryPopup integration
  */
 export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
   function ContentInsertionToolbar({
@@ -26,7 +41,16 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
     onAddTextBlock,
     onAddHeadingBlock,
     onAddDividerBlock,
+    finalImages = [],
+    loadingImages = false,
+    projectId,
+    onRefreshImages,
+    onAddImage,
   }) {
+    // Show image gallery button only if we have the necessary props and images
+    const showImageGallery =
+      finalImages.length > 0 && onRefreshImages && onAddImage;
+
     return (
       <>
         {/* Fixed Bottom Content Insertion Toolbar */}
@@ -54,6 +78,26 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
 
                 {/* Quick Insert - Most Common Actions */}
                 <div className="flex items-center gap-2">
+                  {/* Image Gallery Popup Button */}
+                  {showImageGallery && (
+                    <ImageGalleryPopup
+                      finalImages={finalImages}
+                      loadingImages={loadingImages}
+                      projectId={projectId}
+                      activeBlockId={activeBlockId}
+                      onRefreshImages={onRefreshImages}
+                      onAddImage={onAddImage}
+                    >
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="hover:bg-muted/20"
+                        title="Add Images"
+                      >
+                        <ImageIcon className="h-4 w-4" />
+                      </Button>
+                    </ImageGalleryPopup>
+                  )}
                   <Button
                     onClick={onAddTextBlock}
                     variant="ghost"
@@ -101,6 +145,27 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
 
                 {/* All Insert Options */}
                 <div className="flex items-center justify-center gap-2 flex-wrap">
+                  {/* Image Gallery Button */}
+                  {showImageGallery && (
+                    <ImageGalleryPopup
+                      finalImages={finalImages}
+                      loadingImages={loadingImages}
+                      projectId={projectId}
+                      activeBlockId={activeBlockId}
+                      onRefreshImages={onRefreshImages}
+                      onAddImage={onAddImage}
+                    >
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+                      >
+                        <ImageIcon className="h-4 w-4 mr-2" />
+                        Add Images
+                      </Button>
+                    </ImageGalleryPopup>
+                  )}
+
                   {/* Text Block Button */}
                   <Button
                     onClick={onAddTextBlock}

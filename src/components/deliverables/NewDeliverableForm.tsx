@@ -29,6 +29,7 @@ import { FirestoreUser } from "@/types/firebase";
 import { useAPI } from "@/hooks/useAPI";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { usePlatforms } from "@/contexts/PlatformContext";
+import { useMediaTypes } from "@/hooks/useMediaTypes";
 
 interface Car {
   _id: string;
@@ -54,6 +55,7 @@ export default function NewDeliverableForm({
     { label: string; value: string }[]
   >([]);
   const [type, setType] = useState<DeliverableType>();
+  const [mediaTypeId, setMediaTypeId] = useState<string>("");
   const [duration, setDuration] = useState(0);
   const [aspectRatio, setAspectRatio] = useState("");
   const [editor, setEditor] = useState("");
@@ -67,6 +69,16 @@ export default function NewDeliverableForm({
   const [openSelects, setOpenSelects] = useState<Record<string, boolean>>({});
 
   const { platforms: availablePlatforms } = usePlatforms();
+  const { mediaTypes, isLoading: mediaTypesLoading } = useMediaTypes();
+
+  // Helper function to get media type name for display (following established pattern)
+  const getMediaTypeName = (mediaTypeId: string) => {
+    if (!mediaTypeId) return null;
+    const mediaType = mediaTypes.find(
+      (mt) => mt._id.toString() === mediaTypeId
+    );
+    return mediaType ? mediaType.name : null;
+  };
 
   const handleSelectOpenChange = (selectId: string, open: boolean) => {
     setOpenSelects((prev) => ({ ...prev, [selectId]: open }));
@@ -136,6 +148,7 @@ export default function NewDeliverableForm({
     setTitle("");
     setSelectedPlatforms([]);
     setType(undefined);
+    setMediaTypeId("");
     setDuration(0);
     setAspectRatio("");
     setEditor("");
@@ -200,6 +213,25 @@ export default function NewDeliverableForm({
         aspect_ratio: aspectRatio || undefined,
         status: "not_started",
       };
+
+      // Add MediaType support with backward compatibility
+      if (mediaTypeId) {
+        requestBody.mediaTypeId = mediaTypeId;
+        // Also update legacy type field for backward compatibility
+        const selectedMediaType = mediaTypes.find(
+          (mt) => mt._id.toString() === mediaTypeId
+        );
+        if (selectedMediaType) {
+          const legacyTypeMapping: Record<string, DeliverableType> = {
+            Video: "Video",
+            "Photo Gallery": "Photo Gallery",
+            "Mixed Gallery": "Mixed Gallery",
+            "Video Gallery": "Video Gallery",
+          };
+          requestBody.type =
+            legacyTypeMapping[selectedMediaType.name] || "other";
+        }
+      }
 
       if (selectedUser) {
         requestBody.editor = selectedUser.name;
@@ -352,44 +384,126 @@ export default function NewDeliverableForm({
                     >
                       Type
                     </label>
-                    <Select
-                      value={type || ""}
-                      onValueChange={(value) =>
-                        setType(value as DeliverableType)
-                      }
-                      open={openSelects["type"]}
-                      onOpenChange={(open) =>
-                        handleSelectOpenChange("type", open)
-                      }
-                    >
-                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Photo Gallery">
-                          Photo Gallery
-                        </SelectItem>
-                        <SelectItem value="Video">Video</SelectItem>
-                        <SelectItem value="Mixed Gallery">
-                          Mixed Gallery
-                        </SelectItem>
-                        <SelectItem value="Video Gallery">
-                          Video Gallery
-                        </SelectItem>
-                        <SelectItem value="Still">Still</SelectItem>
-                        <SelectItem value="Graphic">Graphic</SelectItem>
-                        <SelectItem value="feature">Feature</SelectItem>
-                        <SelectItem value="promo">Promo</SelectItem>
-                        <SelectItem value="review">Review</SelectItem>
-                        <SelectItem value="walkthrough">Walkthrough</SelectItem>
-                        <SelectItem value="highlights">Highlights</SelectItem>
-                        <SelectItem value="Marketing Email">
-                          Marketing Email
-                        </SelectItem>
-                        <SelectItem value="Blog">Blog</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Select
+                        value={mediaTypeId || "legacy"}
+                        onValueChange={(value) => {
+                          if (value === "legacy") {
+                            // No MediaType selected, keep legacy type
+                            setMediaTypeId("");
+                          } else {
+                            // MediaType selected, sync legacy type field
+                            const selectedMediaType = mediaTypes.find(
+                              (mt) => mt._id.toString() === value
+                            );
+                            if (selectedMediaType) {
+                              const legacyTypeMapping: Record<
+                                string,
+                                DeliverableType
+                              > = {
+                                Video: "Video",
+                                "Photo Gallery": "Photo Gallery",
+                                "Mixed Gallery": "Mixed Gallery",
+                                "Video Gallery": "Video Gallery",
+                              };
+                              setMediaTypeId(value);
+                              setType(
+                                legacyTypeMapping[selectedMediaType.name] ||
+                                  "other"
+                              );
+                            } else {
+                              setMediaTypeId(value);
+                            }
+                          }
+                        }}
+                        open={openSelects["type"]}
+                        onOpenChange={(open) =>
+                          handleSelectOpenChange("type", open)
+                        }
+                      >
+                        <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
+                          <SelectValue placeholder="Select media type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {mediaTypesLoading && (
+                            <SelectItem value="loading" disabled>
+                              Loading media types...
+                            </SelectItem>
+                          )}
+                          {!mediaTypesLoading && mediaTypes.length === 0 && (
+                            <SelectItem value="empty" disabled>
+                              No media types available
+                            </SelectItem>
+                          )}
+                          {!mediaTypesLoading &&
+                            mediaTypes.map((mediaType) => (
+                              <SelectItem
+                                key={mediaType._id.toString()}
+                                value={mediaType._id.toString()}
+                              >
+                                {mediaType.name}
+                                {mediaType.description && (
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    - {mediaType.description}
+                                  </span>
+                                )}
+                              </SelectItem>
+                            ))}
+                          {/* Fallback option for legacy compatibility */}
+                          <SelectItem value="legacy">
+                            <span className="text-muted-foreground">
+                              Other (Legacy Type)
+                            </span>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      {/* Show legacy type dropdown when no MediaType is selected */}
+                      {!mediaTypeId && (
+                        <Select
+                          value={type || ""}
+                          onValueChange={(value) =>
+                            setType(value as DeliverableType)
+                          }
+                          open={openSelects["legacyType"]}
+                          onOpenChange={(open) =>
+                            handleSelectOpenChange("legacyType", open)
+                          }
+                        >
+                          <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
+                            <SelectValue placeholder="Select legacy type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Photo Gallery">
+                              Photo Gallery
+                            </SelectItem>
+                            <SelectItem value="Video">Video</SelectItem>
+                            <SelectItem value="Mixed Gallery">
+                              Mixed Gallery
+                            </SelectItem>
+                            <SelectItem value="Video Gallery">
+                              Video Gallery
+                            </SelectItem>
+                            <SelectItem value="Still">Still</SelectItem>
+                            <SelectItem value="Graphic">Graphic</SelectItem>
+                            <SelectItem value="feature">Feature</SelectItem>
+                            <SelectItem value="promo">Promo</SelectItem>
+                            <SelectItem value="review">Review</SelectItem>
+                            <SelectItem value="walkthrough">
+                              Walkthrough
+                            </SelectItem>
+                            <SelectItem value="highlights">
+                              Highlights
+                            </SelectItem>
+                            <SelectItem value="Marketing Email">
+                              Marketing Email
+                            </SelectItem>
+                            <SelectItem value="Blog">Blog</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
                   </div>
                 </div>
 

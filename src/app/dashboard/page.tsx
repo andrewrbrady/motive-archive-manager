@@ -27,6 +27,7 @@ import { Calendar, Clock } from "lucide-react";
 import { ExternalLink } from "lucide-react";
 import { PlatformBadges } from "@/components/deliverables/PlatformBadges";
 import { useAPI } from "@/hooks/useAPI";
+import { useMediaTypes } from "@/hooks/useMediaTypes";
 
 interface DeliverableResponse {
   deliverables: (Deliverable & { car?: Car })[];
@@ -70,6 +71,7 @@ function DashboardContent() {
 function DashboardInner() {
   const { data: session } = useSession();
   const api = useAPI();
+  const { mediaTypes } = useMediaTypes();
   const [deliverables, setDeliverables] = useState<
     (Deliverable & { car?: Car })[]
   >([]);
@@ -260,6 +262,17 @@ function DashboardInner() {
     }, {} as GroupedDeliverables);
   };
 
+  // Helper function to get the proper media type name for display
+  const getMediaTypeName = (deliverable: Deliverable) => {
+    if (deliverable.mediaTypeId) {
+      const mediaType = mediaTypes.find(
+        (mt) => mt._id.toString() === deliverable.mediaTypeId?.toString()
+      );
+      return mediaType ? mediaType.name : deliverable.type;
+    }
+    return deliverable.type;
+  };
+
   if (!session?.user) {
     return null;
   }
@@ -328,402 +341,448 @@ function DashboardInner() {
         </Card>
 
         {/* Deliverables Section */}
-        <div className="lg:col-span-3">
-          <Tabs defaultValue="active" className="w-full">
-            <TabsList className="w-full justify-start border-b rounded-none h-8 mb-0 bg-transparent p-0">
-              <TabsTrigger
-                value="active"
-                className="text-xs px-3 data-[state=active]:bg-transparent"
-              >
-                Active
-              </TabsTrigger>
-              <TabsTrigger
-                value="completed"
-                className="text-xs px-3 data-[state=active]:bg-transparent"
-              >
-                Completed
-              </TabsTrigger>
-            </TabsList>
+        <Card className="lg:col-span-3 border-0 shadow-none bg-transparent">
+          <CardHeader className="px-0 pb-2">
+            <CardTitle className="text-base">Your Deliverables</CardTitle>
+          </CardHeader>
+          <CardContent className="px-0">
+            <Tabs defaultValue="active" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 text-xs h-8">
+                <TabsTrigger value="active" className="text-xs">
+                  Active (
+                  {deliverables.filter((d) => d.status !== "done").length})
+                </TabsTrigger>
+                <TabsTrigger value="completed" className="text-xs">
+                  Completed (
+                  {deliverables.filter((d) => d.status === "done").length})
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="active" className="mt-2">
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="text-center">
-                    <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-2"></div>
+              <TabsContent value="active" className="mt-2">
+                {isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="text-center">
+                      <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-2"></div>
+                      <p className="text-xs text-muted-foreground">
+                        Loading your deliverables...
+                      </p>
+                    </div>
+                  </div>
+                ) : Object.keys(groupedActiveDeliverables).length === 0 ? (
+                  <div className="text-center py-8">
                     <p className="text-xs text-muted-foreground">
-                      Loading your deliverables...
+                      No active deliverables assigned to you.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Check back later or contact your project manager.
                     </p>
                   </div>
-                </div>
-              ) : Object.keys(groupedActiveDeliverables).length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-xs text-muted-foreground">
-                    No active deliverables assigned to you.
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Check back later or contact your project manager.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {Object.entries(groupedActiveDeliverables).map(
-                    ([carId, { car, deliverables }]) => (
-                      <div
-                        key={carId}
-                        className="rounded-md border border-border overflow-hidden"
-                      >
-                        {/* Car Header */}
-                        <div className="py-2 px-3 border-b border-border">
-                          <div className="flex items-center gap-2">
-                            <Link href={`/cars/${car._id?.toString()}`}>
-                              <CarAvatar
-                                primaryImageId={car.primaryImageId}
-                                entityName={`${car.year} ${car.make} ${car.model}`}
-                                size="sm"
-                              />
-                            </Link>
-                            <div>
-                              <p className="text-xs font-medium">
-                                {car.year} {car.make} {car.model}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {deliverables.length} active deliverable
-                                {deliverables.length !== 1 ? "s" : ""}
-                              </p>
+                ) : (
+                  <div className="space-y-4">
+                    {Object.entries(groupedActiveDeliverables).map(
+                      ([carId, { car, deliverables }]) => (
+                        <div
+                          key={carId}
+                          className="rounded-md border border-border overflow-hidden"
+                        >
+                          {/* Car Header */}
+                          <div className="py-2 px-3 border-b border-border">
+                            <div className="flex items-center gap-2">
+                              <Link href={`/cars/${car._id?.toString()}`}>
+                                <CarAvatar
+                                  primaryImageId={car.primaryImageId}
+                                  entityName={`${car.year} ${car.make} ${car.model}`}
+                                  size="sm"
+                                />
+                              </Link>
+                              <div>
+                                <p className="text-xs font-medium">
+                                  {car.year} {car.make} {car.model}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {deliverables.length} active deliverable
+                                  {deliverables.length !== 1 ? "s" : ""}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        {/* Desktop Table View */}
-                        <div className="hidden md:block">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="hover:bg-transparent">
-                                <TableHead className="w-[35%] py-1.5 pl-6 pr-2 text-xs font-medium">
-                                  Title
-                                </TableHead>
-                                <TableHead className="w-[30%] py-1.5 px-2 text-xs font-medium">
-                                  Platform
-                                </TableHead>
-                                <TableHead className="w-[20%] py-1.5 px-2 text-xs font-medium whitespace-nowrap">
-                                  Deadline
-                                </TableHead>
-                                <TableHead className="w-[15%] py-1.5 pl-2 pr-3 text-right text-xs font-medium">
-                                  Status
-                                </TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {deliverables.map((deliverable) => (
-                                <TableRow
-                                  key={deliverable._id?.toString()}
-                                  className="hover:bg-muted/50"
-                                >
-                                  <TableCell className="w-[35%] py-1.5 pl-6 pr-2 text-xs font-medium">
-                                    {deliverable.title}
-                                  </TableCell>
-                                  <TableCell className="w-[30%] py-1.5 px-2 text-xs">
-                                    <PlatformBadges
-                                      platform={deliverable.platform}
-                                      platforms={deliverable.platforms}
-                                      maxVisible={2}
-                                      size="sm"
-                                    />
-                                  </TableCell>
-                                  <TableCell className="w-[20%] py-1.5 px-2 text-xs whitespace-nowrap">
-                                    {new Date(
-                                      deliverable.edit_deadline
-                                    ).toLocaleDateString()}
-                                  </TableCell>
-                                  <TableCell className="w-[15%] py-1.5 pl-2 pr-3 text-right">
-                                    <StatusSelector
-                                      deliverableId={
-                                        deliverable._id?.toString() || ""
-                                      }
-                                      initialStatus={deliverable.status}
-                                      size="sm"
-                                      onStatusChange={(newStatus) =>
-                                        handleStatusChange(
-                                          deliverable._id?.toString() || "",
-                                          newStatus
-                                        )
-                                      }
-                                    />
-                                  </TableCell>
+                          {/* Desktop Table View */}
+                          <div className="hidden md:block">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="border-b border-border/50">
+                                  <TableHead className="text-xs py-2 pl-6 pr-2 w-[35%]">
+                                    Title
+                                  </TableHead>
+                                  <TableHead className="text-xs py-2 px-2 w-[30%]">
+                                    Platform & Type
+                                  </TableHead>
+                                  <TableHead className="text-xs py-2 px-2 w-[20%]">
+                                    Deadline
+                                  </TableHead>
+                                  <TableHead className="text-xs py-2 px-2 w-[15%]">
+                                    Status
+                                  </TableHead>
                                 </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
+                              </TableHeader>
 
-                        {/* Mobile Card View */}
-                        <div className="md:hidden space-y-2 p-3">
-                          {deliverables.map((deliverable) => (
-                            <div
-                              key={deliverable._id?.toString()}
-                              className="bg-muted/20 rounded-lg p-3 space-y-2"
-                            >
-                              <div className="flex justify-between items-start gap-2">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-medium truncate">
-                                    {deliverable.title}
-                                  </p>
-                                  <div className="text-xs text-muted-foreground">
-                                    <PlatformBadges
-                                      platform={deliverable.platform}
-                                      platforms={deliverable.platforms}
-                                      maxVisible={2}
-                                      size="sm"
-                                    />
-                                    <span className="ml-2">
-                                      • {deliverable.type}
-                                    </span>
+                              <TableBody>
+                                {deliverables.map((deliverable) => (
+                                  <TableRow
+                                    key={deliverable._id?.toString()}
+                                    className="hover:bg-muted/50"
+                                  >
+                                    <TableCell className="w-[35%] py-1.5 pl-6 pr-2 text-xs font-medium">
+                                      {deliverable.title}
+                                    </TableCell>
+                                    <TableCell className="w-[30%] py-1.5 px-2 text-xs">
+                                      <div className="space-y-1">
+                                        <PlatformBadges
+                                          platform_id={deliverable.platform_id?.toString()}
+                                          platform={deliverable.platform}
+                                          platforms={deliverable.platforms}
+                                          maxVisible={2}
+                                          size="sm"
+                                        />
+                                        <div className="text-xs text-muted-foreground">
+                                          {getMediaTypeName(deliverable)}
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="w-[20%] py-1.5 px-2 text-xs whitespace-nowrap">
+                                      {new Date(
+                                        deliverable.edit_deadline
+                                      ).toLocaleDateString()}
+                                    </TableCell>
+                                    <TableCell
+                                      className="w-[15%] py-1.5 px-2"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <StatusSelector
+                                        deliverableId={
+                                          deliverable._id?.toString() || ""
+                                        }
+                                        initialStatus={deliverable.status}
+                                        size="sm"
+                                        onStatusChange={async (newStatus) => {
+                                          try {
+                                            await api.put(
+                                              `/api/deliverables/${deliverable._id}`,
+                                              { status: newStatus }
+                                            );
+                                            // Refresh deliverables data
+                                            fetchUserDeliverables();
+                                            toast.success("Status updated");
+                                          } catch (error) {
+                                            console.error(
+                                              "Failed to update status:",
+                                              error
+                                            );
+                                            toast.error(
+                                              "Failed to update status"
+                                            );
+                                          }
+                                        }}
+                                      />
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+
+                          {/* Mobile Card View */}
+                          <div className="md:hidden space-y-2 p-3">
+                            {deliverables.map((deliverable) => (
+                              <div
+                                key={deliverable._id?.toString()}
+                                className="bg-muted/20 rounded-lg p-3 space-y-2"
+                              >
+                                <div className="flex justify-between items-start gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium truncate">
+                                      {deliverable.title}
+                                    </p>
+                                    <div className="text-xs text-muted-foreground space-y-1">
+                                      <div>
+                                        <PlatformBadges
+                                          platform_id={deliverable.platform_id?.toString()}
+                                          platform={deliverable.platform}
+                                          platforms={deliverable.platforms}
+                                          maxVisible={2}
+                                          size="sm"
+                                        />
+                                      </div>
+                                      <span>
+                                        • {getMediaTypeName(deliverable)}
+                                      </span>
+                                    </div>
                                   </div>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  {deliverable.dropbox_link && (
-                                    <a
-                                      href={deliverable.dropbox_link}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="p-1 text-muted-foreground hover:text-foreground"
-                                      title="Dropbox"
-                                    >
-                                      <ExternalLink className="h-3 w-3" />
-                                    </a>
-                                  )}
-                                  {deliverable.social_media_link && (
-                                    <a
-                                      href={deliverable.social_media_link}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="p-1 text-muted-foreground hover:text-foreground"
-                                      title="Social Media"
-                                    >
-                                      <ExternalLink className="h-3 w-3" />
-                                    </a>
-                                  )}
                                   <StatusSelector
                                     deliverableId={
                                       deliverable._id?.toString() || ""
                                     }
                                     initialStatus={deliverable.status}
                                     size="sm"
-                                    onStatusChange={(newStatus) =>
-                                      handleStatusChange(
-                                        deliverable._id?.toString() || "",
-                                        newStatus
-                                      )
-                                    }
+                                    onStatusChange={async (newStatus) => {
+                                      try {
+                                        await api.put(
+                                          `/api/deliverables/${deliverable._id}`,
+                                          { status: newStatus }
+                                        );
+                                        // Refresh deliverables data
+                                        fetchUserDeliverables();
+                                        toast.success("Status updated");
+                                      } catch (error) {
+                                        console.error(
+                                          "Failed to update status:",
+                                          error
+                                        );
+                                        toast.error("Failed to update status");
+                                      }
+                                    }}
                                   />
                                 </div>
-                              </div>
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Calendar className="h-3 w-3" />
-                                {new Date(
-                                  deliverable.edit_deadline
-                                ).toLocaleDateString()}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  )}
-                </div>
-              )}
-            </TabsContent>
 
-            <TabsContent value="completed" className="mt-2">
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="text-center">
-                    <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-2"></div>
-                    <p className="text-xs text-muted-foreground">
-                      Loading your deliverables...
-                    </p>
-                  </div>
-                </div>
-              ) : Object.keys(groupedCompletedDeliverables).length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-xs text-muted-foreground">
-                    No completed deliverables.
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Completed work will appear here.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {Object.entries(groupedCompletedDeliverables).map(
-                    ([carId, { car, deliverables }]) => (
-                      <div
-                        key={carId}
-                        className="rounded-md border border-border overflow-hidden"
-                      >
-                        {/* Car Header */}
-                        <div className="py-2 px-3 border-b border-border">
-                          <div className="flex items-center gap-2">
-                            <Link href={`/cars/${car._id?.toString()}`}>
-                              <CarAvatar
-                                primaryImageId={car.primaryImageId}
-                                entityName={`${car.year} ${car.make} ${car.model}`}
-                                size="sm"
-                              />
-                            </Link>
-                            <div>
-                              <p className="text-xs font-medium">
-                                {car.year} {car.make} {car.model}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {deliverables.length} completed deliverable
-                                {deliverables.length !== 1 ? "s" : ""}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Desktop Table View */}
-                        <div className="hidden md:block">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="hover:bg-transparent">
-                                <TableHead className="w-[35%] py-1.5 pl-6 pr-2 text-xs font-medium">
-                                  Title
-                                </TableHead>
-                                <TableHead className="w-[30%] py-1.5 px-2 text-xs font-medium">
-                                  Platform
-                                </TableHead>
-                                <TableHead className="w-[20%] py-1.5 px-2 text-xs font-medium whitespace-nowrap">
-                                  Deadline
-                                </TableHead>
-                                <TableHead className="w-[15%] py-1.5 pl-2 pr-3 text-right text-xs font-medium">
-                                  Status
-                                </TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {deliverables.map((deliverable) => (
-                                <TableRow
-                                  key={deliverable._id?.toString()}
-                                  className="hover:bg-muted/50"
-                                >
-                                  <TableCell className="w-[35%] py-1.5 pl-6 pr-2 text-xs font-medium">
-                                    {deliverable.title}
-                                  </TableCell>
-                                  <TableCell className="w-[30%] py-1.5 px-2 text-xs">
-                                    <PlatformBadges
-                                      platform={deliverable.platform}
-                                      platforms={deliverable.platforms}
-                                      maxVisible={2}
-                                      size="sm"
-                                    />
-                                  </TableCell>
-                                  <TableCell className="w-[20%] py-1.5 px-2 text-xs whitespace-nowrap">
-                                    {new Date(
-                                      deliverable.edit_deadline
-                                    ).toLocaleDateString()}
-                                  </TableCell>
-                                  <TableCell className="w-[15%] py-1.5 pl-2 pr-3 text-right">
-                                    <StatusSelector
-                                      deliverableId={
-                                        deliverable._id?.toString() || ""
-                                      }
-                                      initialStatus={deliverable.status}
-                                      size="sm"
-                                      onStatusChange={(newStatus) =>
-                                        handleStatusChange(
-                                          deliverable._id?.toString() || "",
-                                          newStatus
-                                        )
-                                      }
-                                    />
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-
-                        {/* Mobile Card View */}
-                        <div className="md:hidden space-y-2 p-3">
-                          {deliverables.map((deliverable) => (
-                            <div
-                              key={deliverable._id?.toString()}
-                              className="bg-muted/20 rounded-lg p-3 space-y-2"
-                            >
-                              <div className="flex justify-between items-start gap-2">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-medium truncate">
-                                    {deliverable.title}
-                                  </p>
-                                  <div className="text-xs text-muted-foreground">
-                                    <PlatformBadges
-                                      platform={deliverable.platform}
-                                      platforms={deliverable.platforms}
-                                      maxVisible={2}
-                                      size="sm"
-                                    />
-                                    <span className="ml-2">
-                                      • {deliverable.type}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>
+                                      {new Date(
+                                        deliverable.edit_deadline
+                                      ).toLocaleDateString()}
                                     </span>
                                   </div>
-                                </div>
-                                <div className="flex items-center gap-1">
                                   {deliverable.dropbox_link && (
                                     <a
                                       href={deliverable.dropbox_link}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="p-1 text-muted-foreground hover:text-foreground"
-                                      title="Dropbox"
+                                      className="text-xs text-primary hover:underline flex items-center gap-1"
                                     >
                                       <ExternalLink className="h-3 w-3" />
+                                      Files
                                     </a>
                                   )}
-                                  {deliverable.social_media_link && (
-                                    <a
-                                      href={deliverable.social_media_link}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="p-1 text-muted-foreground hover:text-foreground"
-                                      title="Social Media"
-                                    >
-                                      <ExternalLink className="h-3 w-3" />
-                                    </a>
-                                  )}
-                                  <StatusSelector
-                                    deliverableId={
-                                      deliverable._id?.toString() || ""
-                                    }
-                                    initialStatus={deliverable.status}
-                                    size="sm"
-                                    onStatusChange={(newStatus) =>
-                                      handleStatusChange(
-                                        deliverable._id?.toString() || "",
-                                        newStatus
-                                      )
-                                    }
-                                  />
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Calendar className="h-3 w-3" />
-                                {new Date(
-                                  deliverable.edit_deadline
-                                ).toLocaleDateString()}
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="completed" className="mt-2">
+                {isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="text-center">
+                      <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-2"></div>
+                      <p className="text-xs text-muted-foreground">
+                        Loading your deliverables...
+                      </p>
+                    </div>
+                  </div>
+                ) : Object.keys(groupedCompletedDeliverables).length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-xs text-muted-foreground">
+                      No completed deliverables.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Completed work will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {Object.entries(groupedCompletedDeliverables).map(
+                      ([carId, { car, deliverables }]) => (
+                        <div
+                          key={carId}
+                          className="rounded-md border border-border overflow-hidden"
+                        >
+                          {/* Car Header */}
+                          <div className="py-2 px-3 border-b border-border">
+                            <div className="flex items-center gap-2">
+                              <Link href={`/cars/${car._id?.toString()}`}>
+                                <CarAvatar
+                                  primaryImageId={car.primaryImageId}
+                                  entityName={`${car.year} ${car.make} ${car.model}`}
+                                  size="sm"
+                                />
+                              </Link>
+                              <div>
+                                <p className="text-xs font-medium">
+                                  {car.year} {car.make} {car.model}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {deliverables.length} completed deliverable
+                                  {deliverables.length !== 1 ? "s" : ""}
+                                </p>
                               </div>
                             </div>
-                          ))}
+                          </div>
+
+                          {/* Desktop Table View */}
+                          <div className="hidden md:block">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="border-b border-border/50">
+                                  <TableHead className="text-xs py-2 pl-6 pr-2 w-[35%]">
+                                    Title
+                                  </TableHead>
+                                  <TableHead className="text-xs py-2 px-2 w-[30%]">
+                                    Platform & Type
+                                  </TableHead>
+                                  <TableHead className="text-xs py-2 px-2 w-[20%]">
+                                    Release Date
+                                  </TableHead>
+                                  <TableHead className="text-xs py-2 px-2 w-[15%]">
+                                    Links
+                                  </TableHead>
+                                </TableRow>
+                              </TableHeader>
+
+                              <TableBody>
+                                {deliverables.map((deliverable) => (
+                                  <TableRow
+                                    key={deliverable._id?.toString()}
+                                    className="hover:bg-muted/50"
+                                  >
+                                    <TableCell className="w-[35%] py-1.5 pl-6 pr-2 text-xs font-medium">
+                                      {deliverable.title}
+                                    </TableCell>
+                                    <TableCell className="w-[30%] py-1.5 px-2 text-xs">
+                                      <div className="space-y-1">
+                                        <PlatformBadges
+                                          platform_id={deliverable.platform_id?.toString()}
+                                          platform={deliverable.platform}
+                                          platforms={deliverable.platforms}
+                                          maxVisible={2}
+                                          size="sm"
+                                        />
+                                        <div className="text-xs text-muted-foreground">
+                                          {getMediaTypeName(deliverable)}
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="w-[20%] py-1.5 px-2 text-xs whitespace-nowrap">
+                                      {deliverable.release_date
+                                        ? new Date(
+                                            deliverable.release_date
+                                          ).toLocaleDateString()
+                                        : "Not set"}
+                                    </TableCell>
+                                    <TableCell className="w-[15%] py-1.5 px-2">
+                                      <div className="flex items-center gap-1">
+                                        {deliverable.social_media_link && (
+                                          <a
+                                            href={deliverable.social_media_link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-primary hover:underline"
+                                            title="View Published Content"
+                                          >
+                                            <ExternalLink className="h-3 w-3" />
+                                          </a>
+                                        )}
+                                        {deliverable.dropbox_link && (
+                                          <a
+                                            href={deliverable.dropbox_link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-primary hover:underline"
+                                            title="View Files"
+                                          >
+                                            <ExternalLink className="h-3 w-3" />
+                                          </a>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+
+                          {/* Mobile Card View */}
+                          <div className="md:hidden space-y-2 p-3">
+                            {deliverables.map((deliverable) => (
+                              <div
+                                key={deliverable._id?.toString()}
+                                className="bg-muted/20 rounded-lg p-3 space-y-2"
+                              >
+                                <div className="flex justify-between items-start gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium truncate">
+                                      {deliverable.title}
+                                    </p>
+                                    <div className="text-xs text-muted-foreground space-y-1">
+                                      <div>
+                                        <PlatformBadges
+                                          platform_id={deliverable.platform_id?.toString()}
+                                          platform={deliverable.platform}
+                                          platforms={deliverable.platforms}
+                                          maxVisible={2}
+                                          size="sm"
+                                        />
+                                      </div>
+                                      <span>
+                                        • {getMediaTypeName(deliverable)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    {deliverable.social_media_link && (
+                                      <a
+                                        href={deliverable.social_media_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-primary hover:underline"
+                                        title="View Published Content"
+                                      >
+                                        <ExternalLink className="h-3 w-3" />
+                                      </a>
+                                    )}
+                                    {deliverable.dropbox_link && (
+                                      <a
+                                        href={deliverable.dropbox_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-primary hover:underline"
+                                        title="View Files"
+                                      >
+                                        <ExternalLink className="h-3 w-3" />
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Calendar className="h-3 w-3" />
+                                  <span>
+                                    Release:{" "}
+                                    {deliverable.release_date
+                                      ? new Date(
+                                          deliverable.release_date
+                                        ).toLocaleDateString()
+                                      : "Not set"}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )
-                  )}
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
+                      )
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

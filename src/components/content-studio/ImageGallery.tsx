@@ -215,7 +215,7 @@ export const ImageGallery = React.memo<ImageGalleryProps>(
                 <div className="grid grid-cols-3 gap-2">
                   {finalImages.map((image: any, index: number) => (
                     <GalleryImage
-                      key={image.id || index}
+                      key={`gallery-image-${image.id || "no-id"}-${index}`}
                       image={image}
                       index={index}
                       onAddImage={onAddImage}

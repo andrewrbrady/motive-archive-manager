@@ -39,6 +39,8 @@ import { LoadingSpinner } from "@/components/ui/loading";
 import BatchAssignmentModal from "./BatchAssignmentModal";
 import FirestoreUserSelector from "@/components/users/FirestoreUserSelector";
 import { useAPI } from "@/hooks/useAPI";
+import { useMediaTypes } from "@/hooks/useMediaTypes";
+import { PlatformBadges } from "./PlatformBadges";
 
 interface Car {
   _id: string;
@@ -54,7 +56,12 @@ interface DeliverableWithCar extends Deliverable {
 }
 
 const formatDuration = (deliverable: Deliverable) => {
-  if (deliverable.type === "Photo Gallery") {
+  // Check if this is a photo gallery type using either new or legacy system
+  const isPhotoGallery = deliverable.mediaTypeId
+    ? false // We'll check this below using media types
+    : deliverable.type === "Photo Gallery";
+
+  if (isPhotoGallery) {
     return "N/A";
   }
   const minutes = Math.floor(deliverable.duration / 60);
@@ -64,6 +71,7 @@ const formatDuration = (deliverable: Deliverable) => {
 
 export default function DeliverablesList() {
   const api = useAPI();
+  const { mediaTypes } = useMediaTypes();
   const [deliverables, setDeliverables] = useState<DeliverableWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -81,6 +89,31 @@ export default function DeliverablesList() {
   const [cars, setCars] = useState<Car[]>([]);
   const [selectedCar, setSelectedCar] = useState("");
   const [creativeRole, setCreativeRole] = useState("all");
+
+  // Helper function to get the proper media type name for display
+  const getMediaTypeName = (deliverable: Deliverable) => {
+    if (deliverable.mediaTypeId) {
+      const mediaType = mediaTypes.find(
+        (mt) => mt._id.toString() === deliverable.mediaTypeId?.toString()
+      );
+      return mediaType ? mediaType.name : deliverable.type;
+    }
+    return deliverable.type;
+  };
+
+  // Updated formatDuration to use media type info
+  const formatDeliverableDuration = (deliverable: Deliverable) => {
+    const mediaTypeName = getMediaTypeName(deliverable);
+
+    // Check if this is a photo gallery type
+    if (mediaTypeName === "Photo Gallery") {
+      return "N/A";
+    }
+
+    const minutes = Math.floor(deliverable.duration / 60);
+    const seconds = deliverable.duration % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  };
 
   const CREATIVE_ROLES = [
     "video_editor",
@@ -545,9 +578,19 @@ export default function DeliverablesList() {
                         {deliverable.car?.year} {deliverable.car?.make}{" "}
                         {deliverable.car?.model}
                       </TableCell>
-                      <TableCell>{deliverable.platform}</TableCell>
-                      <TableCell>{deliverable.type}</TableCell>
-                      <TableCell>{formatDuration(deliverable)}</TableCell>
+                      <TableCell>
+                        <PlatformBadges
+                          platform_id={deliverable.platform_id?.toString()}
+                          platform={deliverable.platform}
+                          platforms={deliverable.platforms}
+                          maxVisible={1}
+                          size="sm"
+                        />
+                      </TableCell>
+                      <TableCell>{getMediaTypeName(deliverable)}</TableCell>
+                      <TableCell>
+                        {formatDeliverableDuration(deliverable)}
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant={

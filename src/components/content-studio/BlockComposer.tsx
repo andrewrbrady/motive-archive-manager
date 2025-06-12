@@ -22,11 +22,9 @@ import {
   Copy,
 } from "lucide-react";
 
-import { PreviewColumn } from "./PreviewColumn";
-import { BlockEditor } from "./BlockEditor";
 import { EmailHeaderConfig, type EmailHeaderState } from "./EmailHeaderConfig";
-import { ImageGallery } from "./ImageGallery";
 import { ContentInsertionToolbar } from "./ContentInsertionToolbar";
+import { IntegratedPreviewEditor } from "./IntegratedPreviewEditor";
 import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { api } from "@/lib/api-client";
@@ -72,7 +70,6 @@ export function BlockComposer({
   const [compositionName, setCompositionName] = useState("");
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
   const [draggedOverIndex, setDraggedOverIndex] = useState<number | null>(null);
-  const [isGalleryCollapsed, setIsGalleryCollapsed] = useState(false);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [isInsertToolbarExpanded, setIsInsertToolbarExpanded] = useState(false);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(true);
@@ -655,20 +652,6 @@ export function BlockComposer({
   }, [blocks, onBlocksChange, toast, activeBlockId]);
 
   // Get blocks with drag state consideration
-  const getDisplayBlocks = () => {
-    if (!draggedBlockId || draggedOverIndex === null) return blocks;
-
-    const draggedIndex = blocks.findIndex(
-      (block) => block.id === draggedBlockId
-    );
-    if (draggedIndex === -1) return blocks;
-
-    const reorderedBlocks = [...blocks];
-    const [draggedBlock] = reorderedBlocks.splice(draggedIndex, 1);
-    reorderedBlocks.splice(draggedOverIndex, 0, draggedBlock);
-
-    return reorderedBlocks;
-  };
 
   // Export to HTML
   const exportToHTML = useCallback(async () => {
@@ -759,6 +742,7 @@ export function BlockComposer({
     try {
       const compositionData = {
         name: compositionName,
+        type: "content-composition",
         blocks,
         template: template || null,
         metadata: {
@@ -809,10 +793,6 @@ export function BlockComposer({
   ]);
 
   // Callback functions for extracted components
-  const handleToggleGalleryCollapse = useCallback(() => {
-    setIsGalleryCollapsed(!isGalleryCollapsed);
-  }, [isGalleryCollapsed]);
-
   const handleToggleInsertToolbar = useCallback(() => {
     setIsInsertToolbarExpanded(!isInsertToolbarExpanded);
   }, [isInsertToolbarExpanded]);
@@ -908,78 +888,22 @@ export function BlockComposer({
         )}
       </Card>
 
-      <div className="flex gap-6">
-        {/* Left Column - Preview */}
-        <div className="flex-1 min-w-0">
-          <PreviewColumn
-            blocks={blocks}
-            emailHeader={emailHeader.enabled ? emailHeader : undefined}
-          />
-        </div>
-
-        {/* Right Column - Content Editor */}
-        <div className="flex-1 min-w-0 space-y-6">
-          {/* Available Images Gallery */}
-          {finalImages.length > 0 && (
-            <ImageGallery
-              finalImages={finalImages}
-              loadingImages={loadingImages}
-              projectId={projectId}
-              activeBlockId={activeBlockId}
-              isGalleryCollapsed={isGalleryCollapsed}
-              onToggleCollapse={handleToggleGalleryCollapse}
-              onRefreshImages={refetchImages}
-              onAddImage={addImageFromGallery}
-            />
-          )}
-
-          {/* Block List */}
-          {blocks.length > 0 && (
-            <div className="space-y-4">
-              {getDisplayBlocks().map((block, index) => (
-                <BlockEditor
-                  key={block.id}
-                  block={block}
-                  blocks={blocks}
-                  index={index}
-                  total={blocks.length}
-                  isDragging={draggedBlockId === block.id}
-                  isActive={activeBlockId === block.id}
-                  onUpdate={(updates) => updateBlock(block.id, updates)}
-                  onRemove={() => removeBlock(block.id)}
-                  onMove={(direction) => moveBlock(block.id, direction)}
-                  onDragStart={() => handleDragStart(block.id)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={() => handleDragOver(index)}
-                  onSetActive={() => setActiveBlockId(block.id)}
-                  onBlocksChange={onBlocksChange}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Empty State */}
-          {blocks.length === 0 && (
-            <Card className="bg-transparent border border-border/40">
-              <CardContent>
-                <div className="text-center space-y-4">
-                  <div className="w-16 h-16 mx-auto bg-muted/20 rounded-full flex items-center justify-center">
-                    <FileText className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Select Copy to Get Started</h3>
-                    <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                      Go to the Copy Selection tab to choose copy from your
-                      project or car. Selected copy will automatically be split
-                      into paragraph blocks here.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+      {/* Single Column Content Editor */}
+      <IntegratedPreviewEditor
+        blocks={blocks}
+        emailHeader={emailHeader.enabled ? emailHeader : undefined}
+        activeBlockId={activeBlockId}
+        draggedBlockId={draggedBlockId}
+        draggedOverIndex={draggedOverIndex}
+        onSetActive={setActiveBlockId}
+        onUpdateBlock={updateBlock}
+        onRemoveBlock={removeBlock}
+        onMoveBlock={moveBlock}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragOver={handleDragOver}
+        onBlocksChange={onBlocksChange}
+      />
 
       {/* Content Insertion Toolbar */}
       <ContentInsertionToolbar
@@ -989,6 +913,11 @@ export function BlockComposer({
         onAddTextBlock={addTextBlock}
         onAddHeadingBlock={addHeadingBlock}
         onAddDividerBlock={addDividerBlock}
+        finalImages={finalImages}
+        loadingImages={loadingImages}
+        projectId={projectId}
+        onRefreshImages={refetchImages}
+        onAddImage={addImageFromGallery}
       />
     </div>
   );
