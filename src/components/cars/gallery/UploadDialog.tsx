@@ -59,13 +59,9 @@ export function UploadDialog({
               Upload Images
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Upload Images</DialogTitle>
-              <DialogDescription>
-                Upload images for this car. They will be automatically assigned
-                to {vehicleInfo?.year} {vehicleInfo?.make} {vehicleInfo?.model}.
-              </DialogDescription>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto py-4">
               {uploadError && (
@@ -79,6 +75,7 @@ export function UploadDialog({
                 vehicleInfo={vehicleInfo}
                 onComplete={onComplete}
                 onError={handleUploadError}
+                onCancel={() => handleDialogOpenChange(false)}
               />
             </div>
             <DialogFooter className="flex-shrink-0">
@@ -105,13 +102,9 @@ export function UploadDialog({
             Upload Images
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Upload Images</DialogTitle>
-            <DialogDescription>
-              Upload images for this car. They will be automatically assigned to{" "}
-              {vehicleInfo?.year} {vehicleInfo?.make} {vehicleInfo?.model}.
-            </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto py-4">
             {uploadError && (
@@ -123,18 +116,14 @@ export function UploadDialog({
             <CarImageUpload
               carId={carId}
               vehicleInfo={vehicleInfo}
-              onComplete={onComplete}
+              onComplete={() => {
+                onComplete();
+                handleDialogOpenChange(false);
+              }}
               onError={handleUploadError}
+              onCancel={() => handleDialogOpenChange(false)}
             />
           </div>
-          <DialogFooter className="flex-shrink-0">
-            <Button
-              variant="outline"
-              onClick={() => handleDialogOpenChange(false)}
-            >
-              Cancel
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     );
@@ -143,13 +132,9 @@ export function UploadDialog({
   // Regular dialog (controlled externally)
   return (
     <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Upload Images</DialogTitle>
-          <DialogDescription>
-            Upload images for this car. They will be automatically assigned to{" "}
-            {vehicleInfo?.year} {vehicleInfo?.make} {vehicleInfo?.model}.
-          </DialogDescription>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto py-4">
           {uploadError && (
@@ -161,18 +146,14 @@ export function UploadDialog({
           <CarImageUpload
             carId={carId}
             vehicleInfo={vehicleInfo}
-            onComplete={onComplete}
+            onComplete={() => {
+              onComplete();
+              handleDialogOpenChange(false);
+            }}
             onError={handleUploadError}
+            onCancel={() => handleDialogOpenChange(false)}
           />
         </div>
-        <DialogFooter className="flex-shrink-0">
-          <Button
-            variant="outline"
-            onClick={() => handleDialogOpenChange(false)}
-          >
-            Cancel
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

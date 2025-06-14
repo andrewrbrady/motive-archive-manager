@@ -47,7 +47,7 @@ interface Image {
   url: string;
   filename: string;
   metadata: any;
-  carId: ObjectId;
+  carId: ObjectId | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -80,10 +80,11 @@ interface Collections {
 
 // Batch size for MongoDB operations
 const BATCH_SIZE = 50;
-// Parallel upload configuration
-const CLOUDFLARE_UPLOAD_CONCURRENCY = 4;
+// Parallel upload configuration - OPTIMIZED for better performance
+const CLOUDFLARE_UPLOAD_CONCURRENCY = 10; // Increased from 4 to 10
 const ANALYSIS_RETRY_COUNT = 2;
-const ANALYSIS_CONCURRENCY = 4;
+const ANALYSIS_CONCURRENCY = 8; // Increased from 4 to 8
+const ANALYSIS_TIMEOUT = 30000; // Reduced from 60s to 30s for faster processing
 
 // File size limits and validation
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB per file to avoid Vercel limits
@@ -211,22 +212,43 @@ export async function POST(request: NextRequest) {
     collections: Collections,
     now: string,
     selectedPromptId?: string,
-    selectedModelId?: string
+    selectedModelId?: string,
+    isCarMode: boolean = true
   ) => {
     const fileId = `${i}-${file.name}`;
     try {
       await sendProgress({
+        type: "progress",
+        fileIndex: i,
         fileId,
         fileName: file.name,
         status: "uploading",
         progress: 0,
-        currentStep: "Starting upload to Cloudflare",
+        message: "Starting upload to Cloudflare",
       });
 
       // Log file information for debugging
       console.log(
         `Uploading file: ${file.name}, Size: ${(file.size / 1024 / 1024).toFixed(2)}MB, Type: ${file.type}`
       );
+
+      // Update progress for Cloudflare upload with enhanced progress tracking
+      await sendProgress({
+        type: "progress",
+        fileIndex: i,
+        fileId,
+        fileName: file.name,
+        status: "uploading",
+        progress: 25,
+        message: "Uploading to Cloudflare...",
+        stepProgress: {
+          cloudflare: {
+            status: "uploading",
+            progress: 50,
+            message: "Uploading file to Cloudflare Images",
+          },
+        },
+      });
 
       // Upload to Cloudflare with enhanced error handling
       const uploadFormData = new FormData();
@@ -299,13 +321,45 @@ export async function POST(request: NextRequest) {
         throw new Error(`Invalid Cloudflare image URL format: ${imageUrl}`);
       }
 
-      // Update progress for analysis phase
+      // Update progress after successful Cloudflare upload with enhanced tracking
       await sendProgress({
+        type: "progress",
+        fileIndex: i,
+        fileId,
+        fileName: file.name,
+        status: "uploading",
+        progress: 50,
+        message: "Cloudflare upload complete",
+        stepProgress: {
+          cloudflare: {
+            status: "complete",
+            progress: 100,
+            message: "Successfully uploaded to Cloudflare Images",
+          },
+        },
+      });
+
+      // Update progress for analysis phase with enhanced tracking
+      await sendProgress({
+        type: "progress",
+        fileIndex: i,
         fileId,
         fileName: file.name,
         status: "analyzing",
         progress: 75,
-        currentStep: "Analyzing image with AI",
+        message: "Analyzing image with AI",
+        stepProgress: {
+          cloudflare: {
+            status: "complete",
+            progress: 100,
+            message: "Upload complete",
+          },
+          openai: {
+            status: "analyzing",
+            progress: 25,
+            message: "Starting AI image analysis",
+          },
+        },
       });
 
       // Try to analyze the image with retries
@@ -316,11 +370,25 @@ export async function POST(request: NextRequest) {
         try {
           if (attempt > 0) {
             await sendProgress({
+              type: "progress",
+              fileIndex: i,
               fileId,
               fileName: file.name,
               status: "analyzing",
               progress: 75,
-              currentStep: `Retry #${attempt}: Analyzing image with AI`,
+              message: `Retry #${attempt}: Analyzing image with AI`,
+              stepProgress: {
+                cloudflare: {
+                  status: "complete",
+                  progress: 100,
+                  message: "Upload complete",
+                },
+                openai: {
+                  status: "retrying",
+                  progress: 50,
+                  message: `Retry attempt ${attempt} - analyzing image`,
+                },
+              },
             });
           }
 
@@ -338,7 +406,7 @@ export async function POST(request: NextRequest) {
                 modelId: selectedModelId,
               }),
               // Adding a longer timeout for the analysis request
-              signal: AbortSignal.timeout(60000), // 60 seconds timeout
+              signal: AbortSignal.timeout(ANALYSIS_TIMEOUT), // 30 seconds timeout
             }
           );
 
@@ -375,7 +443,7 @@ export async function POST(request: NextRequest) {
         url: imageUrl,
         filename: file.name,
         metadata: {
-          category: "exterior",
+          category: isCarMode ? "exterior" : "unclassified",
           isPrimary: false,
           vehicleInfo,
           ...(imageAnalysis || {}),
@@ -387,28 +455,46 @@ export async function POST(request: NextRequest) {
               : String(analysisError)
             : null,
         },
-        carId: new ObjectId(carId),
+        carId: isCarMode && carId ? new ObjectId(carId) : null,
         createdAt: now,
         updatedAt: now,
       };
 
-      // Send complete progress
+      // Send complete progress with enhanced step tracking
       await sendProgress({
+        type: "complete",
+        fileIndex: i,
         fileId,
         fileName: file.name,
         status: "complete",
         progress: 100,
-        currentStep: imageAnalysis
+        message: imageAnalysis
           ? "Upload and analysis complete"
           : "Upload complete, analysis failed",
         imageUrl,
         metadata: imageDoc.metadata,
+        stepProgress: {
+          cloudflare: {
+            status: "complete",
+            progress: 100,
+            message: "Successfully uploaded to Cloudflare Images",
+          },
+          openai: {
+            status: imageAnalysis ? "complete" : "failed",
+            progress: imageAnalysis ? 100 : 0,
+            message: imageAnalysis
+              ? "AI analysis completed successfully"
+              : "AI analysis failed - will retry",
+          },
+        },
       });
 
       return imageDoc;
     } catch (error) {
       console.error(`Error processing file ${file.name}:`, error);
       await sendProgress({
+        type: "error",
+        fileIndex: i,
         fileId,
         fileName: file.name,
         status: "error",
@@ -428,29 +514,58 @@ export async function POST(request: NextRequest) {
     collections: Collections,
     now: string,
     selectedPromptId?: string,
-    selectedModelId?: string
+    selectedModelId?: string,
+    isCarMode: boolean = true
   ) => {
     try {
       console.log(
         `Processing batch of ${batch.length} images (starting at index ${startIndex})`
       );
 
-      // Process each file in the batch concurrently
-      const imageDocPromises = batch.map((file, i) =>
-        processFile(
-          file,
-          startIndex + i,
-          carId,
-          vehicleInfo,
-          collections,
-          now,
-          selectedPromptId,
-          selectedModelId
-        )
+      // Process files with true parallel processing - using Promise.all for faster processing
+      console.log(
+        `Processing ${batch.length} files with concurrency limit: ${CLOUDFLARE_UPLOAD_CONCURRENCY}`
       );
 
-      // Await all promises, handle errors individually
-      const results = await Promise.allSettled(imageDocPromises);
+      // Create chunks based on concurrency limit for better resource management
+      const processChunks: File[][] = [];
+      for (let i = 0; i < batch.length; i += CLOUDFLARE_UPLOAD_CONCURRENCY) {
+        processChunks.push(batch.slice(i, i + CLOUDFLARE_UPLOAD_CONCURRENCY));
+      }
+
+      const results: Array<PromiseSettledResult<any>> = [];
+
+      // Process chunks in parallel for maximum throughput
+      for (
+        let chunkIndex = 0;
+        chunkIndex < processChunks.length;
+        chunkIndex++
+      ) {
+        const chunk = processChunks[chunkIndex];
+        const chunkOffset = chunkIndex * CLOUDFLARE_UPLOAD_CONCURRENCY;
+
+        console.log(
+          `Processing chunk ${chunkIndex + 1}/${processChunks.length} with ${chunk.length} files`
+        );
+
+        // Use Promise.all for faster failure handling within each chunk
+        const chunkPromises = chunk.map((file, i) =>
+          processFile(
+            file,
+            startIndex + chunkOffset + i,
+            carId,
+            vehicleInfo,
+            collections,
+            now,
+            selectedPromptId,
+            selectedModelId,
+            isCarMode
+          )
+        );
+
+        const chunkResults = await Promise.allSettled(chunkPromises);
+        results.push(...chunkResults);
+      }
 
       // Extract successful results
       const successfulDocs = results
@@ -473,29 +588,35 @@ export async function POST(request: NextRequest) {
           throw new Error("Failed to insert images into database");
         }
 
-        // Update car document with image IDs
-        const imageIds = successfulDocs.map((doc) => doc._id);
-        const updateResult = await collections.cars.updateOne(
-          { _id: new ObjectId(carId) },
-          {
-            $push: { imageIds: { $each: imageIds } },
-            $set: { updatedAt: now },
-          }
-        );
-
-        if (!updateResult.acknowledged) {
-          // If car update fails, try to rollback image insertions
-          console.error(
-            "Car update failed, attempting to rollback image insertions"
+        // Update car document with image IDs (only for car mode)
+        if (isCarMode && carId) {
+          const imageIds = successfulDocs.map((doc) => doc._id);
+          const updateResult = await collections.cars.updateOne(
+            { _id: new ObjectId(carId) },
+            {
+              $push: { imageIds: { $each: imageIds } },
+              $set: { updatedAt: now },
+            }
           );
-          try {
-            await collections.images.deleteMany({
-              _id: { $in: imageIds },
-            });
-          } catch (rollbackError) {
-            console.error("Rollback failed:", rollbackError);
+
+          if (!updateResult.acknowledged) {
+            // If car update fails, try to rollback image insertions
+            console.error(
+              "Car update failed, attempting to rollback image insertions"
+            );
+            try {
+              await collections.images.deleteMany({
+                _id: { $in: imageIds },
+              });
+            } catch (rollbackError) {
+              console.error("Rollback failed:", rollbackError);
+            }
+            throw new Error("Failed to update car with new images");
           }
-          throw new Error("Failed to update car with new images");
+        } else {
+          console.log(
+            `General mode upload: ${successfulDocs.length} images inserted without car association`
+          );
         }
 
         return successfulDocs;
@@ -567,15 +688,23 @@ export async function POST(request: NextRequest) {
       const fileCount = parseInt(formData.get("fileCount") as string);
       const selectedPromptId = formData.get("selectedPromptId") as string;
       const selectedModelId = formData.get("selectedModelId") as string;
+      const metadata = formData.get("metadata") as string;
+
+      // Determine upload mode based on carId presence
+      const isCarMode = carId && carId !== "undefined" && carId !== "null";
+      const isGeneralMode = !isCarMode;
 
       console.log("=== EXTRACTED PARAMETERS ===");
       console.log("Car ID:", carId);
       console.log("File Count:", fileCount);
       console.log("Selected Prompt ID:", selectedPromptId);
       console.log("Selected Model ID:", selectedModelId);
+      console.log("Metadata:", metadata);
+      console.log("Upload Mode:", isCarMode ? "car" : "general");
 
-      if (!carId) {
-        await sendProgress({ error: "No car ID provided" });
+      // For car mode, carId is required. For general mode, it's optional
+      if (isCarMode && !carId) {
+        await sendProgress({ error: "No car ID provided for car mode upload" });
         return;
       }
 
@@ -679,22 +808,46 @@ export async function POST(request: NextRequest) {
       // Initialize MongoDB connection with retry logic
       const collections = await initMongoConnection();
 
-      // Fetch car information first
-      const car = await collections.cars.findOne({ _id: new ObjectId(carId) });
-      if (!car) {
-        throw new Error("Car not found");
-      }
+      // Fetch car information for car mode uploads
+      let car = null;
+      let vehicleInfo = null;
 
-      // Extract vehicle info for analysis
-      const vehicleInfo = {
-        make: car.make,
-        model: car.model,
-        year: car.year,
-        color: car.color,
-        engine: car.engine,
-        condition: car.condition,
-        additionalContext: car.description,
-      };
+      if (isCarMode) {
+        car = await collections.cars.findOne({ _id: new ObjectId(carId) });
+        if (!car) {
+          throw new Error("Car not found");
+        }
+
+        // Extract vehicle info for analysis
+        vehicleInfo = {
+          make: car.make,
+          model: car.model,
+          year: car.year,
+          color: car.color,
+          engine: car.engine,
+          condition: car.condition,
+          additionalContext: car.description,
+        };
+      } else {
+        // For general mode, use provided metadata or defaults
+        let parsedMetadata = {};
+        try {
+          parsedMetadata = metadata ? JSON.parse(metadata) : {};
+        } catch (error) {
+          console.warn("Failed to parse metadata, using defaults:", error);
+        }
+
+        vehicleInfo = {
+          make: "Unknown",
+          model: "General Upload",
+          year: new Date().getFullYear(),
+          color: "Unknown",
+          engine: "Unknown",
+          condition: "Unknown",
+          additionalContext: "General gallery upload",
+          ...parsedMetadata,
+        };
+      }
 
       // Use the already collected and validated files from above
       // (files array was already created in the validation section)
@@ -709,12 +862,13 @@ export async function POST(request: NextRequest) {
           const batchResults = await processBatch(
             batch,
             i,
-            carId,
+            carId || "",
             vehicleInfo,
             collections,
             now,
             selectedPromptId,
-            selectedModelId
+            selectedModelId,
+            Boolean(isCarMode)
           );
           results.push(...batchResults);
         } catch (error) {

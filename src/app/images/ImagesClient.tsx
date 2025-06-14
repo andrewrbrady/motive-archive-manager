@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import ImageUploadWithProgress from "@/components/ui/ImageUploadWithProgress";
+import ImageUploader from "@/components/ui/ImageUploader";
 import Pagination from "@/components/ui/pagination";
 import {
   Plus,
@@ -397,17 +397,35 @@ export default function ImagesClient() {
                       Select images to upload to the gallery.
                     </DialogDescription>
                   </DialogHeader>
-                  <ImageUploadWithProgress
+                  <ImageUploader
+                    mode="general"
+                    carId={
+                      carFilter && carFilter !== "all" ? carFilter : undefined
+                    }
+                    metadata={{
+                      category: "unclassified",
+                      angle: "unknown",
+                      movement: "unknown",
+                      tod: "unknown",
+                      view: "unknown",
+                    }}
                     onComplete={() => {
+                      console.log(
+                        "🔄 ImagesClient: onComplete callback triggered"
+                      );
                       toast({
                         title: "Upload successful",
                         description: "Images uploaded successfully",
                       });
                       // Refresh the images list
+                      console.log(
+                        "🔄 ImagesClient: Calling mutate() to refresh images"
+                      );
                       mutate();
+                      console.log("🔄 ImagesClient: Closing upload dialog");
                       setIsUploadDialogOpen(false);
                     }}
-                    onError={(error) => {
+                    onError={(error: string) => {
                       toast({
                         title: "Upload failed",
                         description:
