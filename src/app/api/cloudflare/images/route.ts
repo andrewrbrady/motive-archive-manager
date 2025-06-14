@@ -143,15 +143,27 @@ export async function POST(request: NextRequest) {
   let retryCount = 0;
   const MAX_RETRIES = 3;
 
-  // Log request details for debugging Vercel 413 issues
+  // Enhanced logging for debugging Vercel 413 issues
   const requestHeaders = Object.fromEntries([...request.headers.entries()]);
-  console.log("=== CLOUDFLARE IMAGES UPLOAD REQUEST ===");
+  const requestStartTime = Date.now();
+
+  console.log("=== CLOUDFLARE IMAGES UPLOAD REQUEST START ===");
+  console.log("Timestamp:", new Date().toISOString());
   console.log("Request URL:", request.url);
+  console.log("Method:", request.method);
   console.log("Content-Type:", requestHeaders["content-type"]);
   console.log("Content-Length:", requestHeaders["content-length"] || "unknown");
   console.log("User-Agent:", requestHeaders["user-agent"]);
   console.log("Environment:", process.env.NODE_ENV);
   console.log("Vercel Environment:", process.env.VERCEL_ENV || "unknown");
+  console.log("All Request Headers:", JSON.stringify(requestHeaders, null, 2));
+
+  // Log Vercel limits for reference
+  console.log("=== VERCEL LIMITS ===");
+  console.log("Vercel Body Size Limit: 4.5MB (4,718,592 bytes)");
+  console.log("Our MAX_TOTAL_SIZE config:", MAX_TOTAL_SIZE, "bytes");
+  console.log("Our MAX_FILE_SIZE config:", MAX_FILE_SIZE, "bytes");
+  console.log("Our VERCEL_CHUNK_SIZE config:", VERCEL_CHUNK_SIZE, "bytes");
 
   const sendProgress = async (data: any) => {
     await writer.write(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
@@ -526,11 +538,41 @@ export async function POST(request: NextRequest) {
   const processImages = async () => {
     let mongoClient;
     try {
+      console.log("=== PARSING FORM DATA ===");
+      const formDataParseStart = Date.now();
+
       const formData = await request.formData();
+      const formDataParseTime = Date.now() - formDataParseStart;
+
+      console.log("FormData parsing time:", formDataParseTime, "ms");
+
+      // Log FormData structure for debugging
+      console.log("FormData entries:");
+      for (const [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(`  ${key}: File {`);
+          console.log(`    name: "${value.name}"`);
+          console.log(
+            `    size: ${value.size} bytes (${(value.size / 1024 / 1024).toFixed(2)}MB)`
+          );
+          console.log(`    type: "${value.type}"`);
+          console.log(`    lastModified: ${value.lastModified}`);
+          console.log(`  }`);
+        } else {
+          console.log(`  ${key}: "${value}"`);
+        }
+      }
+
       const carId = formData.get("carId") as string;
       const fileCount = parseInt(formData.get("fileCount") as string);
       const selectedPromptId = formData.get("selectedPromptId") as string;
       const selectedModelId = formData.get("selectedModelId") as string;
+
+      console.log("=== EXTRACTED PARAMETERS ===");
+      console.log("Car ID:", carId);
+      console.log("File Count:", fileCount);
+      console.log("Selected Prompt ID:", selectedPromptId);
+      console.log("Selected Model ID:", selectedModelId);
 
       if (!carId) {
         await sendProgress({ error: "No car ID provided" });
@@ -540,6 +582,8 @@ export async function POST(request: NextRequest) {
       // Collect all files and validate them first
       const files: File[] = [];
       let totalSize = 0;
+
+      console.log("=== COLLECTING FILES ===");
 
       for (let i = 0; i < fileCount; i++) {
         const file = formData.get(`file${i}`) as File;
@@ -553,8 +597,65 @@ export async function POST(request: NextRequest) {
 
           files.push(file);
           totalSize += file.size;
+          console.log(
+            `  File ${i}: ${file.name} - ${file.size} bytes (${(file.size / 1024 / 1024).toFixed(2)}MB)`
+          );
         } else {
-          console.log(`File ${i} not found in FormData`);
+          console.log(`  File ${i} not found in FormData`);
+        }
+      }
+
+      // Calculate and log payload size overhead
+      const requestContentLength = requestHeaders["content-length"]
+        ? parseInt(requestHeaders["content-length"])
+        : null;
+
+      console.log("=== PAYLOAD SIZE ANALYSIS ===");
+      console.log(
+        "Raw files total size:",
+        totalSize,
+        "bytes",
+        `(${(totalSize / 1024 / 1024).toFixed(2)}MB)`
+      );
+      console.log(
+        "Request Content-Length header:",
+        requestContentLength,
+        "bytes",
+        requestContentLength
+          ? `(${(requestContentLength / 1024 / 1024).toFixed(2)}MB)`
+          : "(unknown)"
+      );
+
+      if (requestContentLength && totalSize > 0) {
+        const overhead = requestContentLength - totalSize;
+        const overheadPercent = ((overhead / totalSize) * 100).toFixed(1);
+        console.log(
+          "Multipart form overhead:",
+          overhead,
+          "bytes",
+          `(${(overhead / 1024 / 1024).toFixed(2)}MB)`
+        );
+        console.log("Overhead percentage:", overheadPercent + "%");
+
+        // Log proximity to Vercel limit
+        const vercelLimit = 4718592; // 4.5MB in bytes
+        const proximityToLimit = (
+          (requestContentLength / vercelLimit) *
+          100
+        ).toFixed(1);
+        console.log("Proximity to Vercel 4.5MB limit:", proximityToLimit + "%");
+
+        if (requestContentLength > vercelLimit) {
+          console.error("🚨 REQUEST EXCEEDS VERCEL LIMIT!");
+          console.error("Request size:", requestContentLength, "bytes");
+          console.error("Vercel limit:", vercelLimit, "bytes");
+          console.error(
+            "Overage:",
+            requestContentLength - vercelLimit,
+            "bytes"
+          );
+        } else if (requestContentLength > vercelLimit * 0.9) {
+          console.warn("⚠️ Request approaching Vercel limit (>90%)");
         }
       }
 
@@ -626,6 +727,15 @@ export async function POST(request: NextRequest) {
       }
 
       // Final status update
+      const requestEndTime = Date.now();
+      const totalProcessingTime = requestEndTime - requestStartTime;
+
+      console.log("=== REQUEST COMPLETION ===");
+      console.log("Total processing time:", totalProcessingTime, "ms");
+      console.log("Successful uploads:", results.length);
+      console.log("Failed uploads:", fileCount - results.length);
+      console.log("Request completed successfully");
+
       await sendProgress({
         type: "complete",
         success: true,
@@ -634,13 +744,53 @@ export async function POST(request: NextRequest) {
         failedUploads: fileCount - results.length,
       });
     } catch (error) {
-      console.error("Error processing images:", error);
+      const requestEndTime = Date.now();
+      const totalProcessingTime = requestEndTime - requestStartTime;
+
+      console.error("=== REQUEST ERROR ===");
+      console.error("Processing time before error:", totalProcessingTime, "ms");
+      console.error("Error type:", error?.constructor?.name || "Unknown");
+      console.error(
+        "Error message:",
+        error instanceof Error ? error.message : "Failed to process images"
+      );
+      console.error(
+        "Error stack:",
+        error instanceof Error ? error.stack : "No stack trace"
+      );
+
+      // Special handling for common 413-related errors
+      if (error instanceof Error) {
+        if (
+          error.message.includes("413") ||
+          error.message.includes("Content Too Large")
+        ) {
+          console.error(
+            "🚨 DETECTED 413 ERROR - VERCEL BODY SIZE LIMIT EXCEEDED!"
+          );
+          console.error("This confirms the request payload exceeded 4.5MB");
+        }
+        if (
+          error.message.includes("PayloadTooLargeError") ||
+          error.message.includes("request entity too large")
+        ) {
+          console.error(
+            "🚨 PAYLOAD TOO LARGE ERROR - MULTIPART FORM EXCEEDED LIMITS!"
+          );
+        }
+      }
+
       await sendProgress({
         type: "error",
         error:
           error instanceof Error ? error.message : "Failed to process images",
       });
     } finally {
+      const requestEndTime = Date.now();
+      const totalRequestTime = requestEndTime - requestStartTime;
+      console.log("=== REQUEST CLEANUP ===");
+      console.log("Total request duration:", totalRequestTime, "ms");
+      console.log("Closing writer stream");
       await writer.close();
     }
   };

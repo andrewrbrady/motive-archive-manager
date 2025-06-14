@@ -180,23 +180,68 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
 
   // Create chunks of files for upload
   const createUploadChunks = (files: File[]): File[][] => {
+    console.log("=== CHUNK CREATION START ===");
+    console.log("Input files:", files.length);
+    console.log(
+      "Files details:",
+      files.map((f) => ({
+        name: f.name,
+        size: f.size,
+        sizeMB: (f.size / 1024 / 1024).toFixed(2) + "MB",
+        type: f.type,
+      }))
+    );
+
     const chunks: File[][] = [];
     let currentChunk: File[] = [];
     let currentChunkSize = 0;
     const maxChunkSize = 6 * 1024 * 1024; // 6MB per chunk - safely under 8MB backend limit
     const maxFilesPerChunk = 5; // Max 5 files per chunk
 
-    for (const file of files) {
+    console.log("Chunk limits:", {
+      maxChunkSize:
+        maxChunkSize +
+        " bytes (" +
+        (maxChunkSize / 1024 / 1024).toFixed(1) +
+        "MB)",
+      maxFilesPerChunk: maxFilesPerChunk,
+    });
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
       // If adding this file would exceed limits, start a new chunk
       if (
         (currentChunkSize + file.size > maxChunkSize &&
           currentChunk.length > 0) ||
         currentChunk.length >= maxFilesPerChunk
       ) {
+        console.log(`Chunk ${chunks.length} complete:`, {
+          files: currentChunk.length,
+          totalSize:
+            currentChunkSize +
+            " bytes (" +
+            (currentChunkSize / 1024 / 1024).toFixed(2) +
+            "MB)",
+          fileNames: currentChunk.map((f) => f.name),
+        });
+
         chunks.push([...currentChunk]);
         currentChunk = [];
         currentChunkSize = 0;
       }
+
+      console.log(`Adding file ${i} to chunk ${chunks.length}:`, {
+        fileName: file.name,
+        fileSize:
+          file.size + " bytes (" + (file.size / 1024 / 1024).toFixed(2) + "MB)",
+        chunkSizeAfter:
+          currentChunkSize +
+          file.size +
+          " bytes (" +
+          ((currentChunkSize + file.size) / 1024 / 1024).toFixed(2) +
+          "MB)",
+      });
 
       currentChunk.push(file);
       currentChunkSize += file.size;
@@ -204,8 +249,29 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
 
     // Add the last chunk if it has files
     if (currentChunk.length > 0) {
+      console.log(`Final chunk ${chunks.length} complete:`, {
+        files: currentChunk.length,
+        totalSize:
+          currentChunkSize +
+          " bytes (" +
+          (currentChunkSize / 1024 / 1024).toFixed(2) +
+          "MB)",
+        fileNames: currentChunk.map((f) => f.name),
+      });
       chunks.push(currentChunk);
     }
+
+    console.log("=== CHUNK CREATION SUMMARY ===");
+    console.log("Total chunks created:", chunks.length);
+    chunks.forEach((chunk, index) => {
+      const chunkSize = chunk.reduce((sum, file) => sum + file.size, 0);
+      console.log(`Chunk ${index}:`, {
+        files: chunk.length,
+        totalSize:
+          chunkSize + " bytes (" + (chunkSize / 1024 / 1024).toFixed(2) + "MB)",
+        fileNames: chunk.map((f) => f.name),
+      });
+    });
 
     return chunks;
   };
@@ -213,6 +279,29 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
   // Start upload with chunked processing
   const startUpload = async () => {
     if (pendingFiles.length === 0) return;
+
+    console.log("=== UPLOAD START ===");
+    console.log("Timestamp:", new Date().toISOString());
+    console.log("Total files to upload:", pendingFiles.length);
+
+    const totalUploadSize = pendingFiles.reduce(
+      (sum, file) => sum + file.size,
+      0
+    );
+    console.log(
+      "Total upload size:",
+      totalUploadSize +
+        " bytes (" +
+        (totalUploadSize / 1024 / 1024).toFixed(2) +
+        "MB)"
+    );
+
+    console.log("File breakdown:");
+    pendingFiles.forEach((file, index) => {
+      console.log(
+        `  ${index}: ${file.name} - ${file.size} bytes (${(file.size / 1024 / 1024).toFixed(2)}MB) - ${file.type}`
+      );
+    });
 
     setIsUploading(true);
     setUploadSuccess(false);
@@ -303,6 +392,32 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
     globalOffset: number,
     totalFiles: number
   ) => {
+    console.log(
+      `=== PROCESSING CHUNK ${chunkIndex + 1}/${Math.ceil(totalFiles / 5)} ===`
+    );
+    console.log("Chunk details:", {
+      chunkIndex,
+      globalOffset,
+      totalFiles: totalFiles,
+      filesInChunk: chunk.length,
+      files: chunk.map((f, i) => ({
+        localIndex: i,
+        globalIndex: globalOffset + i,
+        name: f.name,
+        size: f.size + " bytes (" + (f.size / 1024 / 1024).toFixed(2) + "MB)",
+        type: f.type,
+      })),
+    });
+
+    const chunkTotalSize = chunk.reduce((sum, file) => sum + file.size, 0);
+    console.log(
+      "Chunk total file size:",
+      chunkTotalSize +
+        " bytes (" +
+        (chunkTotalSize / 1024 / 1024).toFixed(2) +
+        "MB)"
+    );
+
     // Update chunk files to "uploading" status
     chunk.forEach((file, localIndex) => {
       const globalIndex = globalOffset + localIndex;
@@ -321,12 +436,28 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
       );
     });
 
+    // Declare variables outside try block for error handling access
+    let estimatedFormDataSize = 0;
+    let formData: FormData;
+
     try {
+      console.log("=== CREATING FORM DATA ===");
+      const formDataStart = performance.now();
+
       // Create FormData with format expected by /api/cloudflare/images
-      const formData = new FormData();
+      formData = new FormData();
 
       // Add files with numbered naming (file0, file1, etc.)
       chunk.forEach((file, index) => {
+        console.log(`Adding file${index}:`, {
+          name: file.name,
+          size:
+            file.size +
+            " bytes (" +
+            (file.size / 1024 / 1024).toFixed(2) +
+            "MB)",
+          type: file.type,
+        });
         formData.append(`file${index}`, file);
       });
 
@@ -341,8 +472,91 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
         formData.append("selectedModelId", selectedModelId);
       }
 
+      const formDataTime = performance.now() - formDataStart;
+      console.log("FormData creation time:", formDataTime.toFixed(2) + "ms");
+
+      // Log FormData structure
+      console.log("FormData entries being sent:");
+      for (const [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(
+            `  ${key}: File "${value.name}" (${value.size} bytes, ${value.type})`
+          );
+        } else {
+          console.log(`  ${key}: "${value}"`);
+        }
+      }
+
+      // Try to estimate FormData size (this is approximate)
+      estimatedFormDataSize = 0;
+      for (const [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          // FormData overhead includes boundaries, headers, filename, etc.
+          // Rough estimation: ~200-300 bytes per field + file content
+          estimatedFormDataSize += value.size + 300;
+        } else {
+          estimatedFormDataSize += key.length + value.toString().length + 100;
+        }
+      }
+
+      console.log("=== PAYLOAD SIZE ESTIMATION ===");
+      console.log(
+        "Raw files size:",
+        chunkTotalSize +
+          " bytes (" +
+          (chunkTotalSize / 1024 / 1024).toFixed(2) +
+          "MB)"
+      );
+      console.log(
+        "Estimated FormData size:",
+        estimatedFormDataSize +
+          " bytes (" +
+          (estimatedFormDataSize / 1024 / 1024).toFixed(2) +
+          "MB)"
+      );
+      console.log(
+        "Estimated overhead:",
+        estimatedFormDataSize -
+          chunkTotalSize +
+          " bytes (" +
+          ((estimatedFormDataSize - chunkTotalSize) / 1024 / 1024).toFixed(2) +
+          "MB)"
+      );
+      console.log(
+        "Estimated overhead percentage:",
+        (
+          ((estimatedFormDataSize - chunkTotalSize) / chunkTotalSize) *
+          100
+        ).toFixed(1) + "%"
+      );
+
+      // Check proximity to Vercel limit
+      const vercelLimit = 4.5 * 1024 * 1024; // 4.5MB
+      console.log(
+        "Proximity to Vercel 4.5MB limit:",
+        ((estimatedFormDataSize / vercelLimit) * 100).toFixed(1) + "%"
+      );
+
+      if (estimatedFormDataSize > vercelLimit) {
+        console.error("🚨 ESTIMATED PAYLOAD EXCEEDS VERCEL LIMIT!");
+        console.error("Estimated size:", estimatedFormDataSize + " bytes");
+        console.error("Vercel limit:", vercelLimit + " bytes");
+        console.error("This chunk will likely cause a 413 error");
+      } else if (estimatedFormDataSize > vercelLimit * 0.9) {
+        console.warn("⚠️ Payload approaching Vercel limit (>90%)");
+      }
+
       // Get auth token
+      console.log("=== STARTING UPLOAD REQUEST ===");
       const token = await getValidToken();
+      const uploadStart = performance.now();
+
+      console.log("Making fetch request to /api/cloudflare/images");
+      console.log("Request headers:", {
+        method: "POST",
+        Authorization: "Bearer [TOKEN]",
+        // Note: Content-Type will be set automatically by FormData
+      });
 
       // Start the streaming upload
       const response = await fetch("/api/cloudflare/images", {
@@ -353,9 +567,53 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
         body: formData,
       });
 
+      const uploadTime = performance.now() - uploadStart;
+      console.log(
+        "Initial response received in:",
+        uploadTime.toFixed(2) + "ms"
+      );
+      console.log("Response status:", response.status);
+      console.log("Response statusText:", response.statusText);
+      console.log(
+        "Response headers:",
+        Object.fromEntries([...response.headers.entries()])
+      );
+
       if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
+        console.error("=== UPLOAD REQUEST FAILED ===");
+        console.error("Status:", response.status);
+        console.error("Status text:", response.statusText);
+
+        // Special handling for 413 errors
+        if (response.status === 413) {
+          console.error("🚨 413 CONTENT TOO LARGE ERROR DETECTED!");
+          console.error(
+            "This confirms the FormData payload exceeded Vercel's 4.5MB limit"
+          );
+          console.error(
+            "Estimated payload size was:",
+            estimatedFormDataSize + " bytes"
+          );
+          console.error("Raw files size was:", chunkTotalSize + " bytes");
+          console.error(
+            "This indicates multipart form overhead caused the limit breach"
+          );
+        }
+
+        // Try to get error response body
+        try {
+          const errorText = await response.text();
+          console.error("Error response body:", errorText);
+        } catch (e) {
+          console.error("Could not read error response body:", e);
+        }
+
+        throw new Error(
+          `Upload failed: ${response.status} ${response.statusText}`
+        );
       }
+
+      console.log("=== STARTING STREAM PROCESSING ===");
 
       // Handle Server-Sent Events stream
       const reader = response.body?.getReader();
@@ -472,7 +730,54 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
         }
       }
     } catch (error) {
-      console.error(`Chunk ${chunkIndex + 1} upload error:`, error);
+      console.error(`=== CHUNK ${chunkIndex + 1} UPLOAD ERROR ===`);
+      console.error("Error type:", error?.constructor?.name || "Unknown");
+      console.error(
+        "Error message:",
+        error instanceof Error ? error.message : "Chunk upload failed"
+      );
+      console.error(
+        "Error stack:",
+        error instanceof Error ? error.stack : "No stack trace"
+      );
+
+      // Log chunk details for debugging
+      console.error("Failed chunk details:", {
+        chunkIndex: chunkIndex + 1,
+        filesInChunk: chunk.length,
+        chunkSize:
+          chunkTotalSize +
+          " bytes (" +
+          (chunkTotalSize / 1024 / 1024).toFixed(2) +
+          "MB)",
+        estimatedFormDataSize:
+          estimatedFormDataSize +
+          " bytes (" +
+          (estimatedFormDataSize / 1024 / 1024).toFixed(2) +
+          "MB)",
+        files: chunk.map((f) => ({ name: f.name, size: f.size })),
+      });
+
+      // Special handling for 413 errors
+      if (
+        error instanceof Error &&
+        (error.message.includes("413") ||
+          error.message.includes("Content Too Large"))
+      ) {
+        console.error("🚨 413 ERROR CONFIRMED IN FRONTEND!");
+        console.error("The server returned a 413 Content Too Large error");
+        console.error("This chunk exceeded Vercel's 4.5MB body size limit");
+        console.error("Raw file size:", chunkTotalSize + " bytes");
+        console.error(
+          "Estimated FormData size:",
+          estimatedFormDataSize + " bytes"
+        );
+        console.error(
+          "Multipart overhead:",
+          estimatedFormDataSize - chunkTotalSize + " bytes"
+        );
+      }
+
       const errorMessage =
         error instanceof Error ? error.message : "Chunk upload failed";
 
