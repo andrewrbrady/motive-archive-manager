@@ -46,6 +46,10 @@
       "maxDuration": 300,
       "memory": 3008
     },
+    "app/api/cloudflare/direct-upload/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
     "app/api/openai/generate-project-caption/route.ts": {
       "maxDuration": 60,
       "memory": 1024

@@ -4,7 +4,7 @@
 
 **Problem**: Image uploads were failing on Vercel production with 413 (Request Entity Too Large) errors, while working locally.
 
-**Root Cause**: Vercel's default body size limits were insufficient for high-quality image uploads from a media firm.
+**Root Cause**: Vercel has a HARD 4.5MB limit for serverless functions that cannot be configured away - even on Pro accounts. Recent Next.js 15 updates have stricter enforcement. Your 9.2MB batch uploads exceed this infrastructure limit.
 
 ## IMPLEMENTED SOLUTION
 
