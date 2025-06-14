@@ -385,7 +385,7 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
     }
   };
 
-  // Process a single chunk of files
+  // Process a single chunk of files using individual uploads (avoids 413 errors)
   const processChunk = async (
     chunk: File[],
     chunkIndex: number,
@@ -393,7 +393,7 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
     totalFiles: number
   ) => {
     console.log(
-      `=== PROCESSING CHUNK ${chunkIndex + 1}/${Math.ceil(totalFiles / 5)} ===`
+      `=== PROCESSING CHUNK ${chunkIndex + 1}/${Math.ceil(totalFiles / 5)} [INDIVIDUAL UPLOADS] ===`
     );
     console.log("Chunk details:", {
       chunkIndex,
@@ -429,308 +429,244 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
             ? {
                 ...p,
                 status: "uploading",
-                currentStep: `Chunk ${chunkIndex + 1}: Uploading...`,
+                currentStep: `Chunk ${chunkIndex + 1}: Preparing individual upload...`,
+                stepProgress: {
+                  cloudflare: {
+                    status: "pending",
+                    progress: 0,
+                    message: "Preparing individual upload...",
+                  },
+                  openai: {
+                    status: "pending",
+                    progress: 0,
+                    message: "Waiting for upload",
+                  },
+                },
               }
             : p
         )
       );
     });
 
-    // Declare variables outside try block for error handling access
-    let estimatedFormDataSize = 0;
-    let formData: FormData;
-
     try {
-      console.log("=== CREATING FORM DATA ===");
-      const formDataStart = performance.now();
+      console.log("=== UPLOADING FILES INDIVIDUALLY TO AVOID 413 ERRORS ===");
 
-      // Create FormData with format expected by /api/cloudflare/images
-      formData = new FormData();
-
-      // Add files with numbered naming (file0, file1, etc.)
-      chunk.forEach((file, index) => {
-        console.log(`Adding file${index}:`, {
-          name: file.name,
-          size:
-            file.size +
-            " bytes (" +
-            (file.size / 1024 / 1024).toFixed(2) +
-            "MB)",
-          type: file.type,
-        });
-        formData.append(`file${index}`, file);
-      });
-
-      formData.append("carId", carId);
-      formData.append("fileCount", chunk.length.toString());
-
-      // Add selected prompt and model
-      if (selectedPromptId) {
-        formData.append("selectedPromptId", selectedPromptId);
-      }
-      if (selectedModelId) {
-        formData.append("selectedModelId", selectedModelId);
-      }
-
-      const formDataTime = performance.now() - formDataStart;
-      console.log("FormData creation time:", formDataTime.toFixed(2) + "ms");
-
-      // Log FormData structure
-      console.log("FormData entries being sent:");
-      for (const [key, value] of formData.entries()) {
-        if (value instanceof File) {
-          console.log(
-            `  ${key}: File "${value.name}" (${value.size} bytes, ${value.type})`
-          );
-        } else {
-          console.log(`  ${key}: "${value}"`);
-        }
-      }
-
-      // Try to estimate FormData size (this is approximate)
-      estimatedFormDataSize = 0;
-      for (const [key, value] of formData.entries()) {
-        if (value instanceof File) {
-          // FormData overhead includes boundaries, headers, filename, etc.
-          // Rough estimation: ~200-300 bytes per field + file content
-          estimatedFormDataSize += value.size + 300;
-        } else {
-          estimatedFormDataSize += key.length + value.toString().length + 100;
-        }
-      }
-
-      console.log("=== PAYLOAD SIZE ESTIMATION ===");
-      console.log(
-        "Raw files size:",
-        chunkTotalSize +
-          " bytes (" +
-          (chunkTotalSize / 1024 / 1024).toFixed(2) +
-          "MB)"
-      );
-      console.log(
-        "Estimated FormData size:",
-        estimatedFormDataSize +
-          " bytes (" +
-          (estimatedFormDataSize / 1024 / 1024).toFixed(2) +
-          "MB)"
-      );
-      console.log(
-        "Estimated overhead:",
-        estimatedFormDataSize -
-          chunkTotalSize +
-          " bytes (" +
-          ((estimatedFormDataSize - chunkTotalSize) / 1024 / 1024).toFixed(2) +
-          "MB)"
-      );
-      console.log(
-        "Estimated overhead percentage:",
-        (
-          ((estimatedFormDataSize - chunkTotalSize) / chunkTotalSize) *
-          100
-        ).toFixed(1) + "%"
-      );
-
-      // Check proximity to Vercel limit
-      const vercelLimit = 4.5 * 1024 * 1024; // 4.5MB
-      console.log(
-        "Proximity to Vercel 4.5MB limit:",
-        ((estimatedFormDataSize / vercelLimit) * 100).toFixed(1) + "%"
-      );
-
-      if (estimatedFormDataSize > vercelLimit) {
-        console.error("🚨 ESTIMATED PAYLOAD EXCEEDS VERCEL LIMIT!");
-        console.error("Estimated size:", estimatedFormDataSize + " bytes");
-        console.error("Vercel limit:", vercelLimit + " bytes");
-        console.error("This chunk will likely cause a 413 error");
-      } else if (estimatedFormDataSize > vercelLimit * 0.9) {
-        console.warn("⚠️ Payload approaching Vercel limit (>90%)");
-      }
-
-      // Get auth token
-      console.log("=== STARTING UPLOAD REQUEST ===");
+      // Get auth token once for all uploads
       const token = await getValidToken();
-      const uploadStart = performance.now();
 
-      console.log("Making fetch request to /api/cloudflare/images");
-      console.log("Request headers:", {
-        method: "POST",
-        Authorization: "Bearer [TOKEN]",
-        // Note: Content-Type will be set automatically by FormData
-      });
+      // Upload each file individually to our existing API endpoint
+      const uploadPromises = chunk.map(async (file, localIndex) => {
+        const globalIndex = globalOffset + localIndex;
+        const fileId = `${globalIndex}-${file.name}`;
 
-      // Start the streaming upload
-      const response = await fetch("/api/cloudflare/images", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
+        console.log(`Starting individual upload for ${file.name}...`);
 
-      const uploadTime = performance.now() - uploadStart;
-      console.log(
-        "Initial response received in:",
-        uploadTime.toFixed(2) + "ms"
-      );
-      console.log("Response status:", response.status);
-      console.log("Response statusText:", response.statusText);
-      console.log(
-        "Response headers:",
-        Object.fromEntries([...response.headers.entries()])
-      );
-
-      if (!response.ok) {
-        console.error("=== UPLOAD REQUEST FAILED ===");
-        console.error("Status:", response.status);
-        console.error("Status text:", response.statusText);
-
-        // Special handling for 413 errors
-        if (response.status === 413) {
-          console.error("🚨 413 CONTENT TOO LARGE ERROR DETECTED!");
-          console.error(
-            "This confirms the FormData payload exceeded Vercel's 4.5MB limit"
-          );
-          console.error(
-            "Estimated payload size was:",
-            estimatedFormDataSize + " bytes"
-          );
-          console.error("Raw files size was:", chunkTotalSize + " bytes");
-          console.error(
-            "This indicates multipart form overhead caused the limit breach"
-          );
-        }
-
-        // Try to get error response body
-        try {
-          const errorText = await response.text();
-          console.error("Error response body:", errorText);
-        } catch (e) {
-          console.error("Could not read error response body:", e);
-        }
-
-        throw new Error(
-          `Upload failed: ${response.status} ${response.statusText}`
+        // Update progress to show individual upload starting
+        setProgress((prev) =>
+          prev.map((p) =>
+            p.fileId === fileId
+              ? {
+                  ...p,
+                  progress: 10,
+                  currentStep: "Uploading to Cloudflare...",
+                  stepProgress: {
+                    cloudflare: {
+                      status: "uploading",
+                      progress: 10,
+                      message: "Uploading to Cloudflare...",
+                    },
+                    openai: {
+                      status: "pending",
+                      progress: 0,
+                      message: "Waiting for upload",
+                    },
+                  },
+                }
+              : p
+          )
         );
-      }
 
-      console.log("=== STARTING STREAM PROCESSING ===");
+        // Create FormData for single file upload
+        const formData = new FormData();
+        formData.append("file0", file); // Use the expected format
+        formData.append("carId", carId);
+        formData.append("fileCount", "1"); // Single file
 
-      // Handle Server-Sent Events stream
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+        // Add selected prompt and model
+        if (selectedPromptId) {
+          formData.append("selectedPromptId", selectedPromptId);
+        }
+        if (selectedModelId) {
+          formData.append("selectedModelId", selectedModelId);
+        }
 
-      if (!reader) {
-        throw new Error("Failed to get response reader");
-      }
+        const uploadStart = performance.now();
 
-      let buffer = "";
+        // Upload to our existing API endpoint that already works
+        const response = await fetch("/api/cloudflare/images", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
 
-      while (true) {
-        const { done, value } = await reader.read();
+        const uploadTime = performance.now() - uploadStart;
+        console.log(
+          `Individual upload of ${file.name} request completed in ${uploadTime.toFixed(2)}ms`
+        );
 
-        if (done) break;
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Individual upload failed for ${file.name}:`, {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText,
+          });
+          throw new Error(
+            `Upload failed for ${file.name}: ${response.status} ${response.statusText}`
+          );
+        }
 
-        buffer += decoder.decode(value, { stream: true });
+        // Handle streaming response for this individual file
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
 
-        // Process complete messages
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || ""; // Keep incomplete line in buffer
+        if (!reader) {
+          throw new Error(`Failed to get response reader for ${file.name}`);
+        }
 
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
+        let buffer = "";
 
-              // Handle individual file progress updates
-              if (data.fileId && data.fileName) {
-                // Map the chunk-local fileId to global fileId
-                const chunkFileIndex = parseInt(data.fileId.split("-")[0]);
-                const globalFileIndex = globalOffset + chunkFileIndex;
-                const globalFileId = `${globalFileIndex}-${data.fileName}`;
+        while (true) {
+          const { done, value } = await reader.read();
 
-                setProgress((prev) =>
-                  prev.map((p) =>
-                    p.fileId === globalFileId
-                      ? {
-                          ...p,
-                          progress: data.progress || p.progress,
-                          status: data.status || p.status,
-                          currentStep:
-                            data.currentStep ||
-                            `Chunk ${chunkIndex + 1}: ${data.status}`,
-                          error: data.error,
-                          imageUrl: data.imageUrl || p.imageUrl,
-                          metadata: data.metadata || p.metadata,
-                          stepProgress: {
-                            cloudflare: {
-                              status:
-                                data.status === "uploading"
-                                  ? "uploading"
-                                  : data.status === "analyzing"
-                                    ? "complete"
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete messages
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                // Handle individual file progress updates
+                if (
+                  data.fileId &&
+                  data.fileName &&
+                  data.fileName === file.name
+                ) {
+                  setProgress((prev) =>
+                    prev.map((p) =>
+                      p.fileId === fileId
+                        ? {
+                            ...p,
+                            progress: data.progress || p.progress,
+                            status: data.status || p.status,
+                            currentStep: data.currentStep || p.currentStep,
+                            error: data.error,
+                            imageUrl: data.imageUrl || p.imageUrl,
+                            metadata: data.metadata || p.metadata,
+                            stepProgress: {
+                              cloudflare: {
+                                status:
+                                  data.status === "uploading"
+                                    ? "uploading"
+                                    : data.status === "analyzing"
+                                      ? "complete"
+                                      : data.status === "complete"
+                                        ? "complete"
+                                        : "pending",
+                                progress:
+                                  data.status === "uploading"
+                                    ? data.progress
+                                    : data.status === "analyzing"
+                                      ? 100
+                                      : data.status === "complete"
+                                        ? 100
+                                        : 0,
+                                message:
+                                  data.status === "uploading"
+                                    ? "Uploading to Cloudflare..."
+                                    : data.status === "analyzing"
+                                      ? "Upload complete"
+                                      : data.status === "complete"
+                                        ? "Upload complete"
+                                        : "Pending",
+                              },
+                              openai: {
+                                status:
+                                  data.status === "analyzing"
+                                    ? "analyzing"
                                     : data.status === "complete"
                                       ? "complete"
                                       : "pending",
-                              progress:
-                                data.status === "uploading"
-                                  ? data.progress
-                                  : data.status === "analyzing"
-                                    ? 100
+                                progress:
+                                  data.status === "analyzing"
+                                    ? 50
                                     : data.status === "complete"
                                       ? 100
                                       : 0,
-                              message:
-                                data.status === "uploading"
-                                  ? "Uploading to Cloudflare..."
-                                  : data.status === "analyzing"
-                                    ? "Upload complete"
+                                message:
+                                  data.status === "analyzing"
+                                    ? "Analyzing with AI..."
                                     : data.status === "complete"
-                                      ? "Upload complete"
-                                      : "Waiting",
+                                      ? "Analysis complete"
+                                      : "Waiting for upload",
+                              },
                             },
-                            openai: {
-                              status:
-                                data.status === "analyzing"
-                                  ? "analyzing"
-                                  : data.status === "complete"
-                                    ? "complete"
-                                    : "pending",
-                              progress:
-                                data.status === "analyzing"
-                                  ? 50
-                                  : data.status === "complete"
-                                    ? 100
-                                    : 0,
-                              message:
-                                data.status === "analyzing"
-                                  ? "Analyzing with AI..."
-                                  : data.status === "complete"
-                                    ? "Analysis complete"
-                                    : "Waiting for upload",
-                            },
-                          },
-                        }
-                      : p
-                  )
-                );
-              }
+                          }
+                        : p
+                    )
+                  );
+                }
 
-              // Handle chunk completion
-              if (data.type === "complete") {
-                console.log(`Chunk ${chunkIndex + 1} completed:`, data);
-                // Don't set uploadSuccess here - wait for all chunks
-              } else if (data.type === "error" || data.error) {
-                console.error(`Chunk ${chunkIndex + 1} error:`, data.error);
-                throw new Error(data.error || "Chunk upload failed");
+                // Handle file completion
+                if (
+                  data.type === "complete" ||
+                  (data.status === "complete" && data.fileName === file.name)
+                ) {
+                  console.log(
+                    `Individual upload completed for ${file.name}:`,
+                    data
+                  );
+                  break; // This file is done
+                } else if (data.type === "error" || data.error) {
+                  console.error(
+                    `Individual upload error for ${file.name}:`,
+                    data.error
+                  );
+                  throw new Error(
+                    data.error || `Upload failed for ${file.name}`
+                  );
+                }
+              } catch (parseError) {
+                console.error("Error parsing SSE data:", parseError, line);
               }
-            } catch (parseError) {
-              console.error("Error parsing SSE data:", parseError, line);
             }
           }
         }
-      }
+
+        console.log(
+          `Successfully completed individual upload for ${file.name}`
+        );
+        return { success: true, fileName: file.name };
+      });
+
+      // Wait for all individual uploads to complete
+      console.log(
+        `Waiting for ${chunk.length} individual uploads to complete...`
+      );
+      const results = await Promise.all(uploadPromises);
+      console.log(
+        `All ${results.length} individual uploads in chunk ${chunkIndex + 1} completed successfully`
+      );
     } catch (error) {
-      console.error(`=== CHUNK ${chunkIndex + 1} UPLOAD ERROR ===`);
+      console.error(`=== CHUNK ${chunkIndex + 1} INDIVIDUAL UPLOAD ERROR ===`);
       console.error("Error type:", error?.constructor?.name || "Unknown");
       console.error(
         "Error message:",
@@ -750,33 +686,8 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
           " bytes (" +
           (chunkTotalSize / 1024 / 1024).toFixed(2) +
           "MB)",
-        estimatedFormDataSize:
-          estimatedFormDataSize +
-          " bytes (" +
-          (estimatedFormDataSize / 1024 / 1024).toFixed(2) +
-          "MB)",
         files: chunk.map((f) => ({ name: f.name, size: f.size })),
       });
-
-      // Special handling for 413 errors
-      if (
-        error instanceof Error &&
-        (error.message.includes("413") ||
-          error.message.includes("Content Too Large"))
-      ) {
-        console.error("🚨 413 ERROR CONFIRMED IN FRONTEND!");
-        console.error("The server returned a 413 Content Too Large error");
-        console.error("This chunk exceeded Vercel's 4.5MB body size limit");
-        console.error("Raw file size:", chunkTotalSize + " bytes");
-        console.error(
-          "Estimated FormData size:",
-          estimatedFormDataSize + " bytes"
-        );
-        console.error(
-          "Multipart overhead:",
-          estimatedFormDataSize - chunkTotalSize + " bytes"
-        );
-      }
 
       const errorMessage =
         error instanceof Error ? error.message : "Chunk upload failed";
