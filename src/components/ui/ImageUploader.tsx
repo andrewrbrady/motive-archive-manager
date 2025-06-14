@@ -390,6 +390,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         );
 
         try {
+          console.log(
+            `🚀 Starting upload for file ${localIndex + 1}/${chunk.length}: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`
+          );
+
           // Update progress to show upload starting
           setProgress((prev) => {
             const updated = [...prev];
@@ -417,14 +421,27 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
           if (!cloudflareResponse.ok) {
             const errorText = await cloudflareResponse.text();
+            console.error(`❌ Cloudflare upload failed for ${file.name}:`, {
+              status: cloudflareResponse.status,
+              statusText: cloudflareResponse.statusText,
+              errorText: errorText,
+            });
             throw new Error(
-              `Cloudflare upload failed: ${cloudflareResponse.status} ${errorText}`
+              `Cloudflare upload failed: ${cloudflareResponse.status} ${cloudflareResponse.statusText} - ${errorText}`
             );
           }
 
           const cloudflareResult = await cloudflareResponse.json();
+          console.log(`✅ Cloudflare upload successful for ${file.name}:`, {
+            imageId: cloudflareResult.imageId,
+            imageUrl: cloudflareResult.imageUrl,
+          });
 
           if (!cloudflareResult.success) {
+            console.error(
+              `❌ Cloudflare API error for ${file.name}:`,
+              cloudflareResult.error
+            );
             throw new Error(
               `Cloudflare API error: ${cloudflareResult.error || "Unknown error"}`
             );
@@ -469,38 +486,81 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           }
 
           // Call our backend for AI analysis and database storage
-          const analysisResponse = await fetch(
-            "/api/cloudflare/images/analyze",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-              body: analysisFormData,
-            }
-          );
-
-          if (!analysisResponse.ok) {
-            console.warn(
-              "AI analysis failed, but image was uploaded successfully"
+          let analysisSuccess = false;
+          try {
+            const analysisResponse = await fetch(
+              "/api/cloudflare/images/analyze",
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+                body: analysisFormData,
+              }
             );
-            // Continue with basic completion even if analysis fails
+
+            if (analysisResponse.ok) {
+              const analysisResult = await analysisResponse.json();
+              if (analysisResult.success) {
+                analysisSuccess = true;
+                console.log(`✅ AI analysis completed for ${file.name}`);
+
+                // Update progress with analysis results
+                setProgress((prev) => {
+                  const updated = [...prev];
+                  if (updated[fileIndex]) {
+                    updated[fileIndex] = {
+                      ...updated[fileIndex],
+                      status: "complete",
+                      currentStep: "Complete with AI analysis",
+                      progress: 100,
+                      imageUrl: imageUrl,
+                      metadata: analysisResult.metadata,
+                    };
+                  }
+                  return updated;
+                });
+              } else {
+                console.warn(
+                  `⚠️ AI analysis API returned error for ${file.name}:`,
+                  analysisResult.error
+                );
+              }
+            } else {
+              console.warn(
+                `⚠️ AI analysis HTTP error for ${file.name}: ${analysisResponse.status}`
+              );
+            }
+          } catch (analysisError) {
+            console.warn(
+              `⚠️ AI analysis exception for ${file.name}:`,
+              analysisError
+            );
           }
 
-          // Update progress for completion
-          setProgress((prev) => {
-            const updated = [...prev];
-            if (updated[fileIndex]) {
-              updated[fileIndex] = {
-                ...updated[fileIndex],
-                status: "complete",
-                currentStep: "Complete",
-                progress: 100,
-                imageUrl: imageUrl,
-              };
-            }
-            return updated;
-          });
+          // If analysis failed, still mark as complete since the image was uploaded successfully
+          if (!analysisSuccess) {
+            console.log(
+              `✅ Image uploaded successfully (without AI analysis): ${file.name}`
+            );
+          }
+
+          // Update progress for completion (only if analysis didn't already do it)
+          if (!analysisSuccess) {
+            setProgress((prev) => {
+              const updated = [...prev];
+              if (updated[fileIndex]) {
+                updated[fileIndex] = {
+                  ...updated[fileIndex],
+                  status: "complete",
+                  currentStep: "Complete (upload only)",
+                  progress: 100,
+                  imageUrl: imageUrl,
+                };
+              }
+              return updated;
+            });
+          }
 
           console.log(`✅ File ${file.name} processed successfully`);
         } catch (error) {
