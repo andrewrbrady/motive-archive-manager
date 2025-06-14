@@ -4,7 +4,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { FilterState, ExtendedImageType } from "@/types/gallery";
 import { useFastRouter } from "@/lib/navigation/simple-cache";
-import { useAPI } from "@/hooks/useAPI";
+import { useAPI, useAPIStatus } from "@/hooks/useAPI";
 import { useDebounce } from "@/hooks/useDebounce"; // Import useDebounce for search input
 
 // Enhanced caching utilities for image gallery
@@ -242,6 +242,9 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   const lastNavigationRef = useRef<number>(0);
   const api = useAPI();
 
+  // Add ref to prevent infinite URL update loops
+  const isUpdatingUrlRef = useRef(false);
+
   // URL-based state
   const isEditMode = searchParams?.get("mode") === "edit";
   const urlPage = searchParams?.get("page");
@@ -271,9 +274,13 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   );
   const loadMoreTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Local state
+  // Local state - Initialize currentPage from URL properly
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(() => {
+    // Initialize from URL page parameter, convert from 1-based to 0-based
+    const pageFromUrl = urlPage ? parseInt(urlPage, 10) - 1 : 0;
+    return Math.max(0, pageFromUrl); // Ensure it's not negative
+  });
   const [filters, setFilters] = useState<FilterState>({
     sortBy: "filename",
     sortDirection: "asc",
@@ -348,7 +355,16 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
       // Add search query - use debounced version to prevent excessive API calls
       if (debouncedSearchQuery) params.append("search", debouncedSearchQuery);
 
-      return params.toString();
+      const queryString = params.toString();
+      console.log("🔧 buildApiQuery called:", {
+        limit,
+        skip,
+        filters: Object.keys(filters).length > 0 ? filters : "none",
+        searchQuery: debouncedSearchQuery || "none",
+        result: queryString,
+      });
+
+      return queryString;
     },
     [filters, debouncedSearchQuery]
   );
@@ -356,6 +372,9 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   // API Query for initial data fetching with enhanced caching
   const apiLimit = 50;
   const apiQueryString = buildApiQuery(apiLimit);
+
+  console.log("🔄 useAPIQuery hook with query:", apiQueryString);
+
   const {
     data,
     error,
@@ -370,13 +389,75 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
     };
   }>(`/api/cars/${carId}/images?${apiQueryString}`, {
     staleTime: 60 * 1000, // 1 minute
+    enabled: !!carId && !!api, // Only run when we have a valid carId AND api client
+    refetchOnWindowFocus: false, // Prevent refetch on window focus
+    refetchOnReconnect: false, // Prevent refetch on reconnect
+    retry: false, // Disable automatic retries that could cause loops
     // Disable cached data for now to prevent issues
     // initialData: cachedData,
   });
 
+  // Log authentication status for debugging
+  console.log("🔒 Auth Status:", {
+    hasApi: !!api,
+    isLoading,
+    hasError: !!error,
+    errorMessage: error?.message,
+    carId,
+    queryEnabled: !!carId && !!api,
+  });
+
+  // Better error handling for authentication issues
+  const { isAuthenticated, isLoading: authLoading } = useAPIStatus();
+
+  useEffect(() => {
+    if (error?.message === "Authentication required") {
+      console.log("🔐 Authentication required - checking auth status...", {
+        isAuthenticated,
+        authLoading,
+        hasApi: !!api,
+      });
+
+      // Check if user is actually signed out vs auth still loading
+      const timeoutId = setTimeout(() => {
+        console.log("🔐 Auth timeout check:", {
+          isAuthenticated,
+          authLoading,
+          hasApi: !!api,
+        });
+
+        if (!authLoading && !isAuthenticated) {
+          // User is definitely not signed in
+          toast({
+            title: "Sign In Required",
+            description: "Please sign in to view car images",
+            variant: "destructive",
+          });
+          // Redirect to sign in
+          window.location.href = "/auth/signin";
+        } else if (!api && isAuthenticated) {
+          // User is signed in but API client isn't ready
+          toast({
+            title: "Loading...",
+            description: "Preparing image gallery...",
+          });
+        }
+      }, 2000); // Wait 2 seconds before checking
+
+      return () => clearTimeout(timeoutId);
+    }
+
+    // Return empty cleanup function for other cases
+    return () => {};
+  }, [error, api, toast, isAuthenticated, authLoading]);
+
   // Sync debounced search query to URL to enable sharing and prevent page refresh
   useEffect(() => {
+    // Prevent infinite loops
+    if (isUpdatingUrlRef.current) return;
+
     if (searchParams && debouncedSearchQuery !== urlSearchQuery) {
+      isUpdatingUrlRef.current = true;
       const params = new URLSearchParams(searchParams.toString());
 
       if (debouncedSearchQuery.trim()) {
@@ -390,6 +471,11 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
 
       // Use router.replace to update URL without adding to history
       router.replace(`?${params.toString()}`, { scroll: false });
+
+      // Reset the flag after a brief delay
+      setTimeout(() => {
+        isUpdatingUrlRef.current = false;
+      }, 100);
     }
   }, [debouncedSearchQuery, urlSearchQuery, searchParams, router]);
 
@@ -698,20 +784,29 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
   const handlePageChange = useCallback(
     (newPage: number) => {
       try {
+        // Prevent infinite loops
+        if (isUpdatingUrlRef.current) return;
+
         console.log("Manual page change to:", newPage + 1);
         setIsNavigating(true); // Block early loading during manual navigation
         setCurrentPage(newPage);
+
+        isUpdatingUrlRef.current = true;
         const params = new URLSearchParams(searchParams?.toString() || "");
         params.set("page", (newPage + 1).toString());
         router.replace(`?${params.toString()}`, { scroll: false });
 
-        // Reset navigation flag after a brief delay
-        setTimeout(() => setIsNavigating(false), 500);
+        // Reset flags after a brief delay
+        setTimeout(() => {
+          setIsNavigating(false);
+          isUpdatingUrlRef.current = false;
+        }, 500);
       } catch (error) {
         console.error("Error changing page:", error);
         // Fallback: just update local state
         setCurrentPage(newPage);
         setIsNavigating(false);
+        isUpdatingUrlRef.current = false;
       }
     },
     [searchParams, router]
@@ -871,26 +966,47 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
 
     // Debounce the actual loading with shorter delay for better UX
     loadMoreTimeoutRef.current = setTimeout(async () => {
+      // Get current values to avoid stale closure
+      const currentImagesLength = images.length;
+      const currentTotalAvailable = totalImagesAvailable;
+
       if (
         isLoadingMore ||
         isNavigating || // Don't load during manual navigation
-        !totalImagesAvailable ||
-        images.length >= totalImagesAvailable ||
+        !currentTotalAvailable ||
+        currentImagesLength >= currentTotalAvailable ||
         !api
       ) {
+        console.log("🚫 LoadMore blocked:", {
+          isLoadingMore,
+          isNavigating,
+          currentTotalAvailable,
+          currentImagesLength,
+          hasApi: !!api,
+        });
         return;
       }
+
+      console.log("🚀 LoadMore starting:", {
+        currentImagesLength,
+        currentTotalAvailable,
+        remaining: currentTotalAvailable - currentImagesLength,
+      });
 
       setIsLoadingMore(true);
       try {
         // PERFORMANCE OPTIMIZATION: Load fewer images per batch but more frequently
         // This reduces the memory footprint and improves response time
         const batchSize = 25; // Reduced from 50 to 25 for faster loading
-        const newLimit = images.length + batchSize;
 
         // Use skip parameter instead of relying on client-side deduplication
-        const skip = images.length;
+        const skip = currentImagesLength;
         const apiQueryString = buildApiQuery(batchSize, skip);
+
+        console.log(
+          "📡 API call:",
+          `/api/cars/${carId}/images?${apiQueryString}`
+        );
 
         const additionalData = await api.get<{
           images: ExtendedImageType[];
@@ -900,6 +1016,11 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
             currentPage?: number;
           };
         }>(`/api/cars/${carId}/images?${apiQueryString}`);
+
+        console.log("📥 API response:", {
+          imagesReceived: additionalData?.images?.length || 0,
+          totalImages: additionalData?.pagination?.totalImages,
+        });
 
         if (additionalData?.images && additionalData.images.length > 0) {
           // PERFORMANCE FIX: Use functional update to avoid stale closures
@@ -914,10 +1035,14 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
               (img) => !existingIds.has(img.id || img._id)
             );
 
+            console.log("✅ Adding new images:", {
+              newImagesCount: newImages.length,
+              previousCount: prev.length,
+              totalAfter: prev.length + newImages.length,
+            });
+
             return [...prev, ...newImages];
           });
-
-          setCurrentLimit(newLimit);
 
           // Update total available count if provided
           if (additionalData.pagination?.totalImages !== undefined) {
@@ -930,17 +1055,15 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
       } finally {
         setIsLoadingMore(false);
       }
-    }, 150); // Reduced debounce time from 300ms to 150ms for more responsive loading
+    }, 300); // Increased debounce time to prevent rapid fire calls
   }, [
+    // CRITICAL FIX: Remove images.length and other changing dependencies to prevent infinite loops
     buildApiQuery,
     isLoadingMore,
     isNavigating,
-    totalImagesAvailable,
-    images.length,
-    currentLimit,
     api,
     carId,
-    data?.images, // Add data.images to dependency for better deduplication
+    // Removed: totalImagesAvailable, images.length, currentLimit, data?.images
   ]);
 
   const handleUploadComplete = useCallback(async () => {
@@ -1154,9 +1277,13 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
 
   // Initialize currentImageId if not present in URL
   useEffect(() => {
+    // Prevent infinite loops and only initialize once
+    if (isUpdatingUrlRef.current || isInitialLoad === false) return;
+
     if (!currentImageId && filteredImages.length > 0 && searchParams) {
       const firstImage = filteredImages[0];
       if (firstImage) {
+        isUpdatingUrlRef.current = true;
         const params = new URLSearchParams(searchParams.toString());
         params.set("image", firstImage.id || firstImage._id);
         if (!params.get("page")) {
@@ -1165,23 +1292,40 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
         const newUrl = `?${params.toString()}`;
         // Initialize with the first image when none is selected
         fastReplace(newUrl, { scroll: false });
+
+        // Reset the flag after a brief delay
+        setTimeout(() => {
+          isUpdatingUrlRef.current = false;
+        }, 100);
       }
     }
-  }, [currentImageId, filteredImages, searchParams, fastReplace]);
+  }, [
+    currentImageId,
+    filteredImages,
+    searchParams,
+    fastReplace,
+    isInitialLoad,
+  ]);
 
-  // Cleanup timeout on unmount
+  // Cleanup timeout on unmount and reset URL update flag
   useEffect(() => {
     return () => {
       if (loadMoreTimeoutRef.current) {
         clearTimeout(loadMoreTimeoutRef.current);
       }
+      // Reset URL update flag on unmount to prevent stale state
+      isUpdatingUrlRef.current = false;
     };
   }, []);
 
   // Reset pagination and adjust current image when filters change
   useEffect(() => {
+    // Prevent infinite loops
+    if (isUpdatingUrlRef.current) return;
+
     // Only reset if we have filtered results and we're not on page 1
     if (filteredImages.length > 0 && currentPage > 0) {
+      isUpdatingUrlRef.current = true;
       setCurrentPage(0);
 
       // Update URL to reflect page reset
@@ -1200,23 +1344,37 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
 
       // Use router replace to update URL without adding to history
       router.replace(`?${params.toString()}`, { scroll: false });
+
+      // Reset the flag after a brief delay
+      setTimeout(() => {
+        isUpdatingUrlRef.current = false;
+      }, 100);
     }
   }, [filters, debouncedSearchQuery, filteredImages.length]); // Use debouncedSearchQuery to prevent reset on every keystroke
 
   // Separate effect to handle when currentPage exceeds available pages
   useEffect(() => {
+    // Prevent infinite loops
+    if (isUpdatingUrlRef.current) return;
+
     const maxPage = Math.max(
       0,
       Math.ceil(filteredImages.length / itemsPerPage) - 1
     );
 
     if (currentPage > maxPage && filteredImages.length > 0) {
+      isUpdatingUrlRef.current = true;
       setCurrentPage(maxPage);
 
       // Update URL
       const params = new URLSearchParams(searchParams?.toString() || "");
       params.set("page", (maxPage + 1).toString());
       router.replace(`?${params.toString()}`, { scroll: false });
+
+      // Reset the flag after a brief delay
+      setTimeout(() => {
+        isUpdatingUrlRef.current = false;
+      }, 100);
     }
   }, [filteredImages.length, currentPage, itemsPerPage, router, searchParams]);
 
@@ -1254,10 +1412,24 @@ export function useImageGallery(carId: string, vehicleInfo?: any) {
 
   // Handle pagination when filteredImages count changes
   useEffect(() => {
+    // Prevent infinite loops
+    if (isUpdatingUrlRef.current) return;
+
     if (totalPages > 0 && currentPage >= totalPages) {
+      isUpdatingUrlRef.current = true;
       setCurrentPage(totalPages - 1);
+
+      // Update URL to reflect the corrected page
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("page", totalPages.toString());
+      router.replace(`?${params.toString()}`, { scroll: false });
+
+      // Reset the flag after a brief delay
+      setTimeout(() => {
+        isUpdatingUrlRef.current = false;
+      }, 100);
     }
-  }, [filteredImages.length, currentPage, totalPages]);
+  }, [filteredImages.length, currentPage, totalPages, searchParams, router]);
 
   return {
     // Data

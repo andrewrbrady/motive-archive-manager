@@ -211,7 +211,36 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const imageUrl = result.result.variants[0].replace(/\/public$/, "");
+      // Improved URL construction with validation
+      if (!result.result?.variants || result.result.variants.length === 0) {
+        throw new Error("No image variants returned from Cloudflare");
+      }
+
+      const originalVariantUrl = result.result.variants[0];
+      console.log("Original Cloudflare variant URL:", originalVariantUrl);
+
+      // Extract base URL by removing ANY variant suffix (not just /public)
+      // This handles cases where Cloudflare returns URLs with different variants
+      const baseUrlMatch = originalVariantUrl.match(
+        /^(https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+)/
+      );
+      if (!baseUrlMatch) {
+        throw new Error(
+          `Could not extract base URL from Cloudflare variant: ${originalVariantUrl}`
+        );
+      }
+
+      const imageUrl = baseUrlMatch[1]; // This is the clean base URL without any variant
+      console.log("Constructed base image URL (no variant):", imageUrl);
+
+      // Validate the base URL format
+      if (
+        !imageUrl.includes("imagedelivery.net") ||
+        !imageUrl.match(/^https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+$/)
+      ) {
+        console.error("Invalid Cloudflare base URL format:", imageUrl);
+        throw new Error(`Invalid Cloudflare image URL format: ${imageUrl}`);
+      }
 
       // Update progress for analysis phase
       await sendProgress({

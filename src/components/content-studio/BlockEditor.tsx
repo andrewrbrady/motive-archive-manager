@@ -53,8 +53,6 @@ function BlockEditor({
       case "image":
         // eslint-disable-next-line jsx-a11y/alt-text
         return <Image className="h-4 w-4" />;
-      case "heading":
-        return <Heading className="h-4 w-4" />;
       case "divider":
         return <Minus className="h-4 w-4" />;
       default:

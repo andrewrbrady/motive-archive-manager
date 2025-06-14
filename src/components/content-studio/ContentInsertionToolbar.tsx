@@ -9,6 +9,8 @@ import {
   PlusCircle,
   ChevronDown,
   ImageIcon,
+  Save,
+  Loader2,
 } from "lucide-react";
 import { ImageGalleryPopup } from "./ImageGalleryPopup";
 
@@ -17,7 +19,6 @@ interface ContentInsertionToolbarProps {
   isInsertToolbarExpanded: boolean;
   onToggleExpanded: () => void;
   onAddTextBlock: () => void;
-  onAddHeadingBlock: (level: 1 | 2 | 3) => void;
   onAddDividerBlock: () => void;
   // Image gallery props
   finalImages?: any[];
@@ -25,6 +26,11 @@ interface ContentInsertionToolbarProps {
   projectId?: string;
   onRefreshImages?: () => void;
   onAddImage?: (imageUrl: string, altText?: string) => void;
+  // Save functionality
+  onSave?: () => void;
+  isSaving?: boolean;
+  canSave?: boolean;
+  isUpdate?: boolean;
 }
 
 /**
@@ -39,13 +45,16 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
     isInsertToolbarExpanded,
     onToggleExpanded,
     onAddTextBlock,
-    onAddHeadingBlock,
     onAddDividerBlock,
     finalImages = [],
     loadingImages = false,
     projectId,
     onRefreshImages,
     onAddImage,
+    onSave,
+    isSaving = false,
+    canSave = false,
+    isUpdate = false,
   }) {
     // Show image gallery button only if we have the necessary props and images
     const showImageGallery =
@@ -60,6 +69,22 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
             {!isInsertToolbarExpanded ? (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
+                  {onSave && (
+                    <Button
+                      onClick={onSave}
+                      disabled={isSaving || !canSave}
+                      variant="default"
+                      size="sm"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
+                      {isSaving ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-2" />
+                      )}
+                      {isUpdate ? "Update" : "Save"}
+                    </Button>
+                  )}
                   <Button
                     onClick={() => onToggleExpanded()}
                     variant="outline"
@@ -107,15 +132,7 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                   >
                     <Type className="h-4 w-4" />
                   </Button>
-                  <Button
-                    onClick={() => onAddHeadingBlock(2)}
-                    variant="ghost"
-                    size="sm"
-                    className="hover:bg-muted/20"
-                    title="Add H2 Heading"
-                  >
-                    <Heading className="h-4 w-4" />
-                  </Button>
+
                   <Button
                     onClick={onAddDividerBlock}
                     variant="ghost"
@@ -145,6 +162,24 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
 
                 {/* All Insert Options */}
                 <div className="flex items-center justify-center gap-2 flex-wrap">
+                  {/* Save Button */}
+                  {onSave && (
+                    <Button
+                      onClick={onSave}
+                      disabled={isSaving || !canSave}
+                      variant="default"
+                      size="sm"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
+                      {isSaving ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-2" />
+                      )}
+                      {isUpdate ? "Update" : "Save"}
+                    </Button>
+                  )}
+
                   {/* Image Gallery Button */}
                   {showImageGallery && (
                     <ImageGalleryPopup
@@ -175,37 +210,6 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                   >
                     <Type className="h-4 w-4 mr-2" />
                     Text Block
-                  </Button>
-
-                  {/* Heading Buttons */}
-                  <Button
-                    onClick={() => onAddHeadingBlock(1)}
-                    variant="outline"
-                    size="sm"
-                    className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
-                  >
-                    <Heading className="h-4 w-4 mr-2" />
-                    H1 Heading
-                  </Button>
-
-                  <Button
-                    onClick={() => onAddHeadingBlock(2)}
-                    variant="outline"
-                    size="sm"
-                    className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
-                  >
-                    <Heading className="h-4 w-4 mr-2" />
-                    H2 Heading
-                  </Button>
-
-                  <Button
-                    onClick={() => onAddHeadingBlock(3)}
-                    variant="outline"
-                    size="sm"
-                    className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
-                  >
-                    <Heading className="h-4 w-4 mr-2" />
-                    H3 Heading
                   </Button>
 
                   {/* Horizontal Rule / Divider Button */}

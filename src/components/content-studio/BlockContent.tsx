@@ -67,12 +67,9 @@ const areBlockContentPropsEqual = (
   }
 
   // Check content property only for blocks that have it
-  if (
-    (prevBlock.type === "text" || prevBlock.type === "heading") &&
-    (nextBlock.type === "text" || nextBlock.type === "heading")
-  ) {
-    const prevContentBlock = prevBlock as TextBlock | HeadingBlock;
-    const nextContentBlock = nextBlock as TextBlock | HeadingBlock;
+  if (prevBlock.type === "text" && nextBlock.type === "text") {
+    const prevContentBlock = prevBlock as TextBlock;
+    const nextContentBlock = nextBlock as TextBlock;
     if (prevContentBlock.content !== nextContentBlock.content) {
       return false;
     }
@@ -80,21 +77,13 @@ const areBlockContentPropsEqual = (
 
   // Compare type-specific properties efficiently
   switch (prevBlock.type) {
-    case "heading": {
-      const prevHeading = prevBlock as HeadingBlock;
-      const nextHeading = nextBlock as HeadingBlock;
-      return (
-        prevHeading.level === nextHeading.level &&
-        JSON.stringify(prevHeading.richFormatting) ===
-          JSON.stringify(nextHeading.richFormatting)
-      );
-    }
     case "text": {
       const prevText = prevBlock as TextBlock;
       const nextText = nextBlock as TextBlock;
       return (
+        prevText.element === nextText.element &&
         JSON.stringify(prevText.richFormatting) ===
-        JSON.stringify(nextText.richFormatting)
+          JSON.stringify(nextText.richFormatting)
       );
     }
     case "image": {
@@ -143,15 +132,6 @@ const BlockContent = React.memo<BlockContentProps>(function BlockContent({
     case "image":
       return (
         <ImageBlockContent block={block as ImageBlock} onUpdate={onUpdate} />
-      );
-    case "heading":
-      return (
-        <HeadingBlockContent
-          block={block as HeadingBlock}
-          blocks={blocks}
-          onUpdate={onUpdate}
-          onBlocksChange={onBlocksChange}
-        />
       );
     case "divider":
       return (
@@ -285,21 +265,21 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
             .split(/\n|\r\n/)
             .map((line) => line.trim())
             .filter((line) => line.length > 0);
-          const newBlocks: (TextBlock | HeadingBlock)[] = [];
+          const newBlocks: TextBlock[] = [];
           let blockIndex = blocks.length;
 
           lines.forEach((line) => {
             const headerMatch = line.match(/^##\s+(.+)$/);
 
             if (headerMatch) {
-              // Create heading block for ## headers
+              // Create text block with h2 element for ## headers
               const headingContent = headerMatch[1].trim();
               newBlocks.push({
-                id: `heading-paste-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                type: "heading" as const,
+                id: `text-paste-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                type: "text" as const,
                 order: blockIndex,
                 content: headingContent,
-                level: 2,
+                element: "h2",
                 styles: {},
                 metadata: {
                   sourceType: "paste",
@@ -314,6 +294,7 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
                 type: "text" as const,
                 order: blockIndex,
                 content: line,
+                element: "p",
                 styles: {},
                 metadata: {
                   sourceType: "paste",
@@ -464,6 +445,28 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
 
     return (
       <div className="space-y-3">
+        {/* Element Type Selector */}
+        <div className="flex items-center space-x-2">
+          <Label className="text-sm font-medium text-muted-foreground">
+            Element:
+          </Label>
+          <select
+            value={block.element || "p"}
+            onChange={(e) =>
+              onUpdate({ element: e.target.value as TextBlock["element"] })
+            }
+            className="px-3 py-1 border border-border/40 rounded-md bg-transparent focus:border-border/60 focus:ring-1 focus:ring-ring transition-colors text-sm"
+          >
+            <option value="p">Paragraph</option>
+            <option value="h1">Heading 1</option>
+            <option value="h2">Heading 2</option>
+            <option value="h3">Heading 3</option>
+            <option value="h4">Heading 4</option>
+            <option value="h5">Heading 5</option>
+            <option value="h6">Heading 6</option>
+          </select>
+        </div>
+
         {/* Text Content Input with Formatting Controls */}
         <div className="flex items-start space-x-2">
           <textarea
@@ -717,279 +720,6 @@ const ImageBlockContent = React.memo<ImageBlockContentProps>(
             </div>
           </div>
         )}
-      </div>
-    );
-  }
-);
-
-/**
- * HeadingBlockContent - Memoized heading block editor
- * Phase 2A Performance: Optimized heading preview rendering and paste handling
- */
-interface HeadingBlockContentProps {
-  block: HeadingBlock;
-  blocks: ContentBlock[];
-  onUpdate: (updates: Partial<ContentBlock>) => void;
-  onBlocksChange: (blocks: ContentBlock[]) => void;
-}
-
-const HeadingBlockContent = React.memo<HeadingBlockContentProps>(
-  function HeadingBlockContent({ block, blocks, onUpdate, onBlocksChange }) {
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    // Performance optimization: Memoize heading preview class calculation
-    const headingPreviewClass = useMemo(() => {
-      const levelClassMap = {
-        1: "text-3xl",
-        2: "text-2xl",
-        3: "text-xl",
-        4: "text-lg",
-        5: "text-base",
-        6: "text-sm",
-      };
-      return `${levelClassMap[block.level] || "text-xl"} font-bold text-foreground`;
-    }, [block.level]);
-
-    // Get the content to display - always use rich formatted content if available
-    const displayContent = useMemo(() => {
-      if (block.richFormatting?.formattedContent) {
-        return block.richFormatting.formattedContent;
-      }
-      return block.content || "";
-    }, [block.content, block.richFormatting?.formattedContent]);
-
-    // Auto-resize input based on content
-    const autoResizeInput = useMemo(() => {
-      return () => {
-        const input = inputRef.current;
-        if (!input) return;
-
-        // Create a temporary element to measure text width
-        const temp = document.createElement("span");
-        temp.style.visibility = "hidden";
-        temp.style.position = "absolute";
-        temp.style.whiteSpace = "nowrap";
-        temp.style.font = window.getComputedStyle(input).font;
-        temp.textContent = input.value || input.placeholder;
-
-        document.body.appendChild(temp);
-        const textWidth = temp.offsetWidth;
-        document.body.removeChild(temp);
-
-        // Set width with some padding, min and max limits
-        const minWidth = 200; // Minimum width in pixels
-        const maxWidth = 600; // Maximum width in pixels
-        const padding = 24; // Extra padding for comfortable editing
-        const newWidth = Math.min(
-          Math.max(textWidth + padding, minWidth),
-          maxWidth
-        );
-
-        input.style.width = `${newWidth}px`;
-      };
-    }, []);
-
-    // Auto-resize on content change
-    React.useEffect(() => {
-      autoResizeInput();
-    }, [displayContent, autoResizeInput]);
-
-    // Auto-resize on initial mount
-    React.useEffect(() => {
-      autoResizeInput();
-    }, [autoResizeInput]);
-
-    // Ensure rich formatting is always enabled for headings
-    React.useEffect(() => {
-      if (!block.richFormatting?.enabled) {
-        onUpdate({
-          richFormatting: {
-            ...block.richFormatting,
-            enabled: true,
-            formattedContent: block.content || "",
-          },
-        } as Partial<HeadingBlock>);
-      }
-    }, [block.richFormatting?.enabled, block.content, onUpdate]);
-
-    // Performance optimization: Memoize rich content formatting for preview
-    const formattedPreviewContent = useMemo(() => {
-      if (!displayContent) {
-        return "Heading content...";
-      }
-
-      let html = displayContent;
-
-      // Convert **bold** to <strong>bold</strong>
-      html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-
-      // Convert [text](url) to <a href="url">text</a>
-      html = html.replace(
-        /\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline">$1</a>'
-      );
-
-      return html;
-    }, [displayContent]);
-
-    // Update the formatted content (always in rich mode)
-    const updateFormattedContent = (newContent: string) => {
-      const hasLinks = /\[([^\]]+)\]\(([^)]+)\)/.test(newContent);
-      const hasBold = /\*\*([^*]+)\*\*/.test(newContent);
-
-      onUpdate({
-        content: newContent, // Always update plain content too
-        richFormatting: {
-          ...block.richFormatting,
-          enabled: true, // Always enabled
-          formattedContent: newContent,
-          hasLinks,
-          hasBold,
-        },
-      } as Partial<HeadingBlock>);
-    };
-
-    // Performance optimization: Memoize heading paste handler
-    const handleHeadingPaste = useMemo(
-      () => (e: React.ClipboardEvent<HTMLInputElement>) => {
-        const pastedText = e.clipboardData.getData("text");
-
-        // Check if the pasted text contains ## headers
-        const hasHeaders = /^##\s+.+$/gm.test(pastedText);
-
-        if (hasHeaders) {
-          e.preventDefault(); // Prevent normal paste
-
-          // Split the pasted text by lines and process headers
-          const lines = pastedText
-            .split(/\n|\r\n/)
-            .map((line) => line.trim())
-            .filter((line) => line.length > 0);
-          const newBlocks: (TextBlock | HeadingBlock)[] = [];
-          let blockIndex = blocks.length;
-
-          // First, update the current heading with the first header content
-          const firstHeaderMatch = lines[0]?.match(/^##\s+(.+)$/);
-          if (firstHeaderMatch) {
-            const content = firstHeaderMatch[1].trim();
-            updateFormattedContent(content);
-            lines.shift(); // Remove the first line as it's been used
-          }
-
-          // Process remaining lines
-          lines.forEach((line) => {
-            const headerMatch = line.match(/^##\s+(.+)$/);
-
-            if (headerMatch) {
-              // Create heading block for ## headers
-              const headingContent = headerMatch[1].trim();
-              newBlocks.push({
-                id: `heading-paste-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                type: "heading" as const,
-                order: blockIndex,
-                content: headingContent,
-                level: 2,
-                styles: {},
-                metadata: {
-                  sourceType: "paste",
-                  importedAt: new Date().toISOString(),
-                  originalMarkdown: line,
-                },
-              });
-            } else if (line.length > 10) {
-              // Create text block for regular content
-              newBlocks.push({
-                id: `text-paste-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                type: "text" as const,
-                order: blockIndex,
-                content: line,
-                styles: {},
-                metadata: {
-                  sourceType: "paste",
-                  importedAt: new Date().toISOString(),
-                },
-              });
-            }
-            blockIndex++;
-          });
-
-          if (newBlocks.length > 0) {
-            // Insert new blocks after the current block
-            const currentBlockIndex = blocks.findIndex(
-              (b: ContentBlock) => b.id === block.id
-            );
-            const updatedBlocks = [
-              ...blocks.slice(0, currentBlockIndex + 1),
-              ...newBlocks,
-              ...blocks.slice(currentBlockIndex + 1),
-            ].map((b: ContentBlock, index: number) => ({ ...b, order: index }));
-
-            onBlocksChange(updatedBlocks);
-          }
-        }
-      },
-      [blocks, block.id, onBlocksChange, updateFormattedContent]
-    );
-
-    // Performance optimization: Memoize input change handlers
-    const handleContentChange = useMemo(
-      () => (e: React.ChangeEvent<HTMLInputElement>) => {
-        updateFormattedContent(e.target.value);
-        // Trigger auto-resize after content change
-        setTimeout(autoResizeInput, 0);
-      },
-      [updateFormattedContent, autoResizeInput]
-    );
-
-    const handleLevelChange = useMemo(
-      () => (e: React.ChangeEvent<HTMLSelectElement>) => {
-        onUpdate({
-          level: parseInt(e.target.value) as 1 | 2 | 3 | 4 | 5 | 6,
-        } as Partial<HeadingBlock>);
-      },
-      [onUpdate]
-    );
-
-    const hasFormattedContent =
-      displayContent && formattedPreviewContent !== displayContent;
-
-    return (
-      <div className="space-y-3">
-        {/* Heading Content Input with Level Selector */}
-        <div className="flex items-center space-x-2">
-          <Input
-            id={`heading-${block.id}`}
-            placeholder="Enter heading text..."
-            value={displayContent}
-            onChange={handleContentChange}
-            onPaste={handleHeadingPaste}
-            className="bg-transparent border-border/40 focus:border-border/60 min-w-0"
-            ref={inputRef}
-            style={{ width: "200px" }} // Initial width, will be overridden by auto-resize
-          />
-          <select
-            id={`heading-level-${block.id}`}
-            value={block.level}
-            onChange={handleLevelChange}
-            className="px-3 py-2 border border-border/40 rounded-md bg-transparent focus:border-border/60 focus:ring-1 focus:ring-ring transition-colors text-sm min-w-16"
-          >
-            <option value={1}>H1</option>
-            <option value={2}>H2</option>
-            <option value={3}>H3</option>
-            <option value={4}>H4</option>
-            <option value={5}>H5</option>
-            <option value={6}>H6</option>
-          </select>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 hover:bg-muted/20"
-            title="Use **bold** for bold text and [link text](url) for links"
-          >
-            <Info className="h-4 w-4 text-muted-foreground" />
-          </Button>
-        </div>
       </div>
     );
   }

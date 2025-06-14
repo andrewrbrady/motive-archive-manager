@@ -193,9 +193,12 @@ const PreviewBlock = React.memo<PreviewBlockProps>(function PreviewBlock({
 }) {
   switch (block.type) {
     case "text":
-      return <TextBlockPreview block={block as TextBlock} />;
-    case "heading":
-      return <HeadingBlockPreview block={block as HeadingBlock} />;
+      // Check if this is a heading text block
+      const textBlock = block as TextBlock;
+      if (textBlock.element && textBlock.element.startsWith("h")) {
+        return <HeadingBlockPreview block={textBlock} />;
+      }
+      return <TextBlockPreview block={textBlock} />;
     case "image":
       return <ImageBlockPreview block={block as ImageBlock} />;
     case "button":
@@ -288,10 +291,13 @@ const TextBlockPreview = React.memo<{ block: TextBlock }>(
  * Phase 2A Performance: Added React.memo and memoized heading style calculations
  * Rich Text Enhancement: Added support for bold and link rendering in headings (always enabled)
  */
-const HeadingBlockPreview = React.memo<{ block: HeadingBlock }>(
+const HeadingBlockPreview = React.memo<{ block: TextBlock }>(
   function HeadingBlockPreview({ block }) {
     const content = block.content || "Your heading will appear here...";
     const formatting = block.formatting || {};
+
+    // Extract level from element (h1 -> 1, h2 -> 2, etc.)
+    const level = block.element ? parseInt(block.element.substring(1)) : 2;
 
     // Performance optimization: Memoize expensive heading style calculations
     const headingStyles = useMemo(() => {
@@ -299,12 +305,11 @@ const HeadingBlockPreview = React.memo<{ block: HeadingBlock }>(
         fontWeight: formatting.fontWeight || "bold",
         color: formatting.color || "currentColor",
         textAlign: formatting.textAlign || "left",
-        marginTop: formatting.marginTop || (block.level <= 2 ? "24px" : "20px"),
-        marginBottom:
-          formatting.marginBottom || (block.level <= 2 ? "16px" : "12px"),
+        marginTop: formatting.marginTop || (level <= 2 ? "24px" : "20px"),
+        marginBottom: formatting.marginBottom || (level <= 2 ? "16px" : "12px"),
       };
 
-      switch (block.level) {
+      switch (level) {
         case 1:
           return {
             ...baseStyles,
@@ -349,7 +354,7 @@ const HeadingBlockPreview = React.memo<{ block: HeadingBlock }>(
           };
       }
     }, [
-      block.level,
+      level,
       formatting.fontWeight,
       formatting.color,
       formatting.textAlign,
@@ -409,7 +414,7 @@ const HeadingBlockPreview = React.memo<{ block: HeadingBlock }>(
     return (
       <div className="px-6" style={containerStyles}>
         {React.createElement(
-          `h${block.level}`,
+          block.element || "h2",
           {
             style: elementStyles,
             className: !block.content

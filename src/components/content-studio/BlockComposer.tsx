@@ -20,14 +20,18 @@ import {
   Heading,
   Download,
   Copy,
+  Columns2,
+  Columns,
 } from "lucide-react";
 
-import { EmailHeaderConfig, type EmailHeaderState } from "./EmailHeaderConfig";
 import { ContentInsertionToolbar } from "./ContentInsertionToolbar";
 import { IntegratedPreviewEditor } from "./IntegratedPreviewEditor";
+import { StylesheetSelector } from "../BlockComposer/StylesheetSelector";
+
 import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { api } from "@/lib/api-client";
+import { classToInlineStyles } from "@/lib/css-parser";
 import {
   BlockComposerProps,
   ContentBlock,
@@ -73,44 +77,46 @@ export function BlockComposer({
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [isInsertToolbarExpanded, setIsInsertToolbarExpanded] = useState(false);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
 
-  // Email header configuration
-  const [emailHeader, setEmailHeader] = useState<EmailHeaderState>({
-    enabled: false,
-    headerImageUrl: "",
-    headerImageAlt: "Email Header",
-    headerImageHeight: "100",
-    stripes: {
-      enabled: false,
-      topColor: "#BC1F1F",
-      bottomColor: "#0E2D4E",
-      height: "4px",
-    },
-  });
+  // Stylesheet management
+  const [selectedStylesheetId, setSelectedStylesheetId] = useState<
+    string | null
+  >(null);
 
   // Initialize composition name when loading existing composition
   React.useEffect(() => {
     if (loadedComposition) {
       setCompositionName(loadedComposition.name || "");
 
-      // Load header settings if they exist in metadata
-      if (loadedComposition.metadata?.emailHeader) {
-        setEmailHeader((prev) => ({
-          ...prev,
-          // Spread the loaded header data, but ensure all fields have defaults
-          ...loadedComposition.metadata.emailHeader,
-          // Ensure new fields have defaults if they don't exist in saved data
-          headerImageUrl:
-            loadedComposition.metadata.emailHeader.headerImageUrl ?? "",
-          headerImageAlt:
-            loadedComposition.metadata.emailHeader.headerImageAlt ??
-            "Email Header",
-          headerImageHeight:
-            loadedComposition.metadata.emailHeader.headerImageHeight ?? "100",
-        }));
+      // Load stylesheet selection if it exists in metadata
+      if (loadedComposition.metadata?.selectedStylesheetId) {
+        setSelectedStylesheetId(
+          loadedComposition.metadata.selectedStylesheetId
+        );
       }
     }
   }, [loadedComposition]);
+
+  // Migration effect: ensure all text blocks have an element property
+  React.useEffect(() => {
+    const needsMigration = blocks.some(
+      (block) => block.type === "text" && !(block as TextBlock).element
+    );
+
+    if (needsMigration) {
+      const migratedBlocks = blocks.map((block) => {
+        if (block.type === "text" && !(block as TextBlock).element) {
+          return {
+            ...block,
+            element: "p", // Default to paragraph for existing text blocks
+          } as TextBlock;
+        }
+        return block;
+      });
+      onBlocksChange(migratedBlocks);
+    }
+  }, [blocks, onBlocksChange]);
 
   // Determine context for image gallery
   const carId = selectedCopies[0]?.carId;
@@ -238,7 +244,7 @@ export function BlockComposer({
   // Automatically import selected copy into blocks (split by paragraphs with ## header detection)
   useEffect(() => {
     if (selectedCopies.length > 0 && blocks.length === 0) {
-      const textBlocks: (TextBlock | HeadingBlock)[] = [];
+      const textBlocks: TextBlock[] = [];
       let blockIndex = 0;
 
       selectedCopies.forEach((copy) => {
@@ -263,13 +269,13 @@ export function BlockComposer({
         }
 
         paragraphs.forEach((paragraph) => {
-          // Helper function to create heading blocks
+          // Helper function to create heading blocks (now unified with text blocks)
           const createHeadingBlock = (content: string, level: 1 | 2 | 3) => ({
-            id: `heading-${Date.now()}-${blockIndex}`,
-            type: "heading" as const,
+            id: `text-${Date.now()}-${blockIndex}`,
+            type: "text" as const,
             order: blockIndex,
             content: content.trim(),
-            level,
+            element: `h${level}` as "h1" | "h2" | "h3",
             styles: {},
             metadata: {
               source: "copy-import",
@@ -293,6 +299,7 @@ export function BlockComposer({
               type: "text",
               order: blockIndex,
               content: paragraph,
+              element: "p",
               styles: {},
               metadata: {
                 source: "copy-import",
@@ -540,6 +547,7 @@ export function BlockComposer({
       type: "text",
       order: 0, // Will be set by insertBlock
       content: "Enter your text here...",
+      element: "p",
       styles: {},
       metadata: { source: "manual", createdAt: new Date().toISOString() },
     };
@@ -585,12 +593,12 @@ export function BlockComposer({
         });
       };
 
-      const newBlock: HeadingBlock = {
-        id: `heading-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        type: "heading",
+      const newBlock: TextBlock = {
+        id: `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: "text",
         order: 0, // Will be set by insertBlock
         content: "Enter your heading here...",
-        level,
+        element: `h${level}` as "h1" | "h2" | "h3",
         styles: {},
         metadata: { source: "manual", createdAt: new Date().toISOString() },
       };
@@ -659,7 +667,6 @@ export function BlockComposer({
       const response = (await api.post("/api/content-studio/export-html", {
         blocks,
         template: template || null,
-        emailHeader: emailHeader.enabled ? emailHeader : null,
         metadata: {
           name: compositionName || "Untitled Composition",
           exportedAt: new Date().toISOString(),
@@ -693,7 +700,7 @@ export function BlockComposer({
         variant: "destructive",
       });
     }
-  }, [blocks, template, emailHeader, compositionName, projectId, carId, toast]);
+  }, [blocks, template, compositionName, projectId, carId, toast]);
 
   // Copy HTML to clipboard
   const copyHTMLToClipboard = useCallback(async () => {
@@ -701,7 +708,6 @@ export function BlockComposer({
       const response = (await api.post("/api/content-studio/export-html", {
         blocks,
         template: template || null,
-        emailHeader: emailHeader.enabled ? emailHeader : null,
         metadata: {
           name: compositionName || "Untitled Composition",
           exportedAt: new Date().toISOString(),
@@ -725,7 +731,7 @@ export function BlockComposer({
         variant: "destructive",
       });
     }
-  }, [blocks, template, emailHeader, compositionName, projectId, carId, toast]);
+  }, [blocks, template, compositionName, projectId, carId, toast]);
 
   // Save composition
   const saveComposition = useCallback(async () => {
@@ -746,7 +752,7 @@ export function BlockComposer({
         blocks,
         template: template || null,
         metadata: {
-          emailHeader: emailHeader.enabled ? emailHeader : null,
+          selectedStylesheetId,
           projectId,
           carId,
           selectedCopies,
@@ -784,7 +790,6 @@ export function BlockComposer({
     compositionName,
     blocks,
     template,
-    emailHeader,
     projectId,
     carId,
     selectedCopies,
@@ -808,6 +813,42 @@ export function BlockComposer({
               Content Composition
             </CardTitle>
             <div className="flex items-center gap-2">
+              <Button
+                onClick={saveComposition}
+                disabled={isSaving || !compositionName.trim()}
+                variant="default"
+                size="sm"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {isSaving ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                {loadedComposition ? "Update" : "Save"}
+              </Button>
+
+              {/* Stylesheet Selector */}
+              <StylesheetSelector
+                selectedStylesheetId={selectedStylesheetId || undefined}
+                onStylesheetChange={setSelectedStylesheetId}
+                className="w-auto"
+              />
+
+              <Button
+                onClick={() => setShowPreview(!showPreview)}
+                variant={showPreview ? "default" : "outline"}
+                size="sm"
+                className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+                title={showPreview ? "Hide preview" : "Show preview"}
+              >
+                {showPreview ? (
+                  <Columns className="h-4 w-4 mr-2" />
+                ) : (
+                  <Columns2 className="h-4 w-4 mr-2" />
+                )}
+                {showPreview ? "Single View" : "Preview"}
+              </Button>
               <Button
                 onClick={exportToHTML}
                 variant="outline"
@@ -858,28 +899,8 @@ export function BlockComposer({
               />
             </div>
 
-            {/* Email Header Configuration */}
-            <EmailHeaderConfig
-              emailHeader={emailHeader}
-              onEmailHeaderChange={setEmailHeader}
-            />
-
-            {/* Save Button */}
+            {/* Block Count Badge */}
             <div className="flex items-center gap-2">
-              <Button
-                onClick={saveComposition}
-                disabled={isSaving || !compositionName.trim()}
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                {isSaving ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4 mr-2" />
-                )}
-                {loadedComposition ? "Update" : "Save"} Composition
-              </Button>
-
-              {/* Block Count Badge */}
               <Badge variant="outline" className="bg-transparent">
                 {blocks.length} block{blocks.length !== 1 ? "s" : ""}
               </Badge>
@@ -888,22 +909,53 @@ export function BlockComposer({
         )}
       </Card>
 
-      {/* Single Column Content Editor */}
-      <IntegratedPreviewEditor
-        blocks={blocks}
-        emailHeader={emailHeader.enabled ? emailHeader : undefined}
-        activeBlockId={activeBlockId}
-        draggedBlockId={draggedBlockId}
-        draggedOverIndex={draggedOverIndex}
-        onSetActive={setActiveBlockId}
-        onUpdateBlock={updateBlock}
-        onRemoveBlock={removeBlock}
-        onMoveBlock={moveBlock}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragOver={handleDragOver}
-        onBlocksChange={onBlocksChange}
-      />
+      {/* Content Editor - Single or Two Column Layout */}
+      {showPreview ? (
+        <div className="grid grid-cols-2 gap-6 h-[calc(100vh-300px)]">
+          {/* Clean Preview Column - Left */}
+          <div className="overflow-y-auto border border-border/40 rounded-lg bg-background">
+            <CleanPreview
+              blocks={blocks}
+              selectedStylesheetId={selectedStylesheetId}
+            />
+          </div>
+
+          {/* Editor Column - Right */}
+          <div className="overflow-y-auto">
+            <IntegratedPreviewEditor
+              blocks={blocks}
+              selectedStylesheetId={selectedStylesheetId}
+              activeBlockId={activeBlockId}
+              draggedBlockId={draggedBlockId}
+              draggedOverIndex={draggedOverIndex}
+              onSetActive={setActiveBlockId}
+              onUpdateBlock={updateBlock}
+              onRemoveBlock={removeBlock}
+              onMoveBlock={moveBlock}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragOver={handleDragOver}
+              onBlocksChange={onBlocksChange}
+            />
+          </div>
+        </div>
+      ) : (
+        <IntegratedPreviewEditor
+          blocks={blocks}
+          selectedStylesheetId={selectedStylesheetId}
+          activeBlockId={activeBlockId}
+          draggedBlockId={draggedBlockId}
+          draggedOverIndex={draggedOverIndex}
+          onSetActive={setActiveBlockId}
+          onUpdateBlock={updateBlock}
+          onRemoveBlock={removeBlock}
+          onMoveBlock={moveBlock}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragOver={handleDragOver}
+          onBlocksChange={onBlocksChange}
+        />
+      )}
 
       {/* Content Insertion Toolbar */}
       <ContentInsertionToolbar
@@ -911,14 +963,180 @@ export function BlockComposer({
         isInsertToolbarExpanded={isInsertToolbarExpanded}
         onToggleExpanded={handleToggleInsertToolbar}
         onAddTextBlock={addTextBlock}
-        onAddHeadingBlock={addHeadingBlock}
         onAddDividerBlock={addDividerBlock}
         finalImages={finalImages}
         loadingImages={loadingImages}
         projectId={projectId}
         onRefreshImages={refetchImages}
         onAddImage={addImageFromGallery}
+        onSave={saveComposition}
+        isSaving={isSaving}
+        canSave={!!compositionName.trim()}
+        isUpdate={!!loadedComposition}
       />
     </div>
   );
 }
+
+/**
+ * CleanPreview - Clean preview component that renders blocks without editing controls
+ */
+interface CleanPreviewProps {
+  blocks: ContentBlock[];
+  selectedStylesheetId?: string | null;
+}
+
+const CleanPreview = React.memo<CleanPreviewProps>(function CleanPreview({
+  blocks,
+  selectedStylesheetId,
+}) {
+  return (
+    <div className="p-6 space-y-4">
+      {/* Content Blocks */}
+      {blocks.map((block) => (
+        <CleanPreviewBlock key={block.id} block={block} />
+      ))}
+    </div>
+  );
+});
+
+/**
+ * CleanPreviewBlock - Renders individual blocks in clean preview mode
+ */
+interface CleanPreviewBlockProps {
+  block: ContentBlock;
+}
+
+const CleanPreviewBlock = React.memo<CleanPreviewBlockProps>(
+  function CleanPreviewBlock({ block }) {
+    const customStyles = useMemo(() => {
+      if (block.cssClass) {
+        return classToInlineStyles(block.cssClass);
+      }
+      return {};
+    }, [block.cssClass]);
+
+    switch (block.type) {
+      case "text": {
+        const textBlock = block as TextBlock;
+        const content = textBlock.content || "Your text will appear here...";
+
+        const formattedContent = useMemo(() => {
+          if (!textBlock.richFormatting?.formattedContent) {
+            return content;
+          }
+
+          let html = textBlock.richFormatting.formattedContent;
+          html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+          html = html.replace(
+            /\[([^\]]+)\]\(([^)]+)\)/g,
+            '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline">$1</a>'
+          );
+          html = html.replace(/\n/g, "<br>");
+          return html;
+        }, [textBlock.richFormatting?.formattedContent, content]);
+
+        const hasRichContent = textBlock.richFormatting?.formattedContent;
+        const textClass = !textBlock.content
+          ? "text-muted-foreground italic"
+          : "text-foreground";
+
+        // Get default classes based on element type
+        const getElementClasses = (element: string) => {
+          switch (element) {
+            case "h1":
+              return "text-3xl font-bold mb-4 mt-6";
+            case "h2":
+              return "text-2xl font-bold mb-3 mt-5";
+            case "h3":
+              return "text-xl font-bold mb-2 mt-4";
+            case "h4":
+              return "text-lg font-bold mb-2 mt-3";
+            case "h5":
+              return "text-base font-bold mb-1 mt-2";
+            case "h6":
+              return "text-sm font-bold mb-1 mt-2";
+            case "p":
+            default:
+              return "mb-4 leading-relaxed";
+          }
+        };
+
+        const elementType = textBlock.element || "p"; // Fallback to "p" if element is undefined
+        const defaultClasses = getElementClasses(elementType);
+        const finalClassName = textBlock.cssClassName
+          ? `${textBlock.cssClassName} ${textClass}`
+          : `${defaultClasses} ${textClass}`;
+
+        // For headings, don't add line breaks; for paragraphs, add them
+        const processedContent =
+          elementType === "p"
+            ? formattedContent
+            : formattedContent.replace(/<br>/g, " ");
+
+        return React.createElement(
+          textBlock.element || "p", // Fallback to "p" if element is undefined
+          {
+            className: finalClassName,
+            style: customStyles,
+            ...(hasRichContent
+              ? { dangerouslySetInnerHTML: { __html: processedContent } }
+              : {}),
+          },
+          hasRichContent ? undefined : content
+        );
+      }
+
+      case "image": {
+        const imageBlock = block as ImageBlock;
+        if (!imageBlock.imageUrl) {
+          return (
+            <div className="flex items-center justify-center h-48 bg-muted rounded border-2 border-dashed border-muted-foreground/25">
+              <div className="text-center text-muted-foreground">
+                <ImageIcon className="h-12 w-12 mx-auto mb-2" />
+                <p className="text-sm">No image selected</p>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div
+            className={
+              imageBlock.cssClassName ? imageBlock.cssClassName : "mb-4"
+            }
+          >
+            <img
+              src={imageBlock.imageUrl}
+              alt={imageBlock.altText || "Content image"}
+              style={customStyles}
+              className="w-full h-auto rounded"
+            />
+            {imageBlock.caption && (
+              <p className="text-sm text-muted-foreground mt-2 text-center italic">
+                {imageBlock.caption}
+              </p>
+            )}
+          </div>
+        );
+      }
+
+      case "divider": {
+        const dividerBlock = block as DividerBlock;
+        return (
+          <div
+            className={
+              dividerBlock.cssClassName
+                ? dividerBlock.cssClassName
+                : "my-8 border-t border-border"
+            }
+            style={customStyles}
+          />
+        );
+      }
+
+      default:
+        return null;
+    }
+  }
+);

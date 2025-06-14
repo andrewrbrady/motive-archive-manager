@@ -357,13 +357,21 @@ export function CarImageGallery({
   // Show loading when:
   // 1. Explicitly loading (isLoading) AND initial load is not complete yet
   // 2. Initial load not complete AND we don't have error state
+  // 3. Authentication error - show loading instead of error until auth is ready
   // The key fix: Don't rely on vehicleInfo.imageIds as it might be stale
-  if ((isLoading && isInitialLoad) || (isInitialLoad && !error)) {
+  const isAuthError = error?.message === "Authentication required";
+  if (
+    (isLoading && isInitialLoad) ||
+    (isInitialLoad && !error) ||
+    isAuthError
+  ) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading gallery...</p>
+          <p className="text-sm text-muted-foreground">
+            {isAuthError ? "Authenticating..." : "Loading gallery..."}
+          </p>
         </div>
       </div>
     );

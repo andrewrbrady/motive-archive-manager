@@ -8,6 +8,33 @@ import { fixCloudflareImageUrl } from "@/lib/image-utils";
 // ✅ PERFORMANCE FIX: Images change less frequently
 export const revalidate = 600; // 10 minutes
 
+// Rate limiting to prevent infinite loops
+const requestCounts = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW = 10000; // 10 seconds
+const MAX_REQUESTS_PER_WINDOW = 20; // Max 20 requests per 10 seconds per car
+
+function checkRateLimit(carId: string): boolean {
+  const now = Date.now();
+  const key = `car-${carId}`;
+  const current = requestCounts.get(key);
+
+  if (!current || now > current.resetTime) {
+    // Reset window
+    requestCounts.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+
+  if (current.count >= MAX_REQUESTS_PER_WINDOW) {
+    console.warn(
+      `🚨 Rate limit exceeded for car ${carId}: ${current.count} requests in ${RATE_LIMIT_WINDOW}ms`
+    );
+    return false;
+  }
+
+  current.count++;
+  return true;
+}
+
 interface ImageData {
   imageUrl: string;
   imageId: string;
@@ -52,11 +79,72 @@ export async function GET(request: Request) {
   const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/images
 
   try {
+    // Rate limiting check first
+    if (!checkRateLimit(id)) {
+      return NextResponse.json(
+        {
+          error: "Rate limit exceeded. Too many requests in a short time.",
+          rateLimited: true,
+          retryAfter: 10,
+        },
+        { status: 429 }
+      );
+    }
+
     // Parse query parameters
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || "50");
     const skip =
       parseInt(url.searchParams.get("skip") || "0") || (page - 1) * limit;
+
+    // Add logging for debugging infinite loop issues
+    console.log(
+      `🔍 Image API Request - CarId: ${id}, Page: ${page}, Limit: ${limit}, Skip: ${skip}`
+    );
+
+    // Validate pagination parameters to prevent infinite loops
+    if (page < 1) {
+      return NextResponse.json(
+        { error: "Invalid page number. Page must be 1 or greater." },
+        { status: 400 }
+      );
+    }
+
+    if (limit < 1 || limit > 200) {
+      return NextResponse.json(
+        { error: "Invalid limit. Limit must be between 1 and 200." },
+        { status: 400 }
+      );
+    }
+
+    if (skip < 0) {
+      return NextResponse.json(
+        { error: "Invalid skip value. Skip must be 0 or greater." },
+        { status: 400 }
+      );
+    }
+
+    // Safeguard against potentially infinite loops - if skip is extremely high, likely a bug
+    if (skip > 10000) {
+      console.warn(
+        `⚠️ Extremely high skip value detected: ${skip} for car ${id}. Possible infinite loop.`
+      );
+      return NextResponse.json(
+        {
+          error: "Skip value too high. This might indicate a pagination issue.",
+          pagination: {
+            totalImages: 0,
+            totalPages: 0,
+            currentPage: 1,
+            itemsPerPage: limit,
+            startIndex: 1,
+            endIndex: 0,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
     const category = url.searchParams.get("category");
     const search = url.searchParams.get("search");
     const angle = url.searchParams.get("angle");

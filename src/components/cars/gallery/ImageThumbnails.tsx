@@ -411,95 +411,27 @@ export function ImageThumbnails({
 
   // Removed shouldTriggerEarlyLoad callback - logic moved inline to prevent infinite loops
 
-  // Effect to trigger early loading with debouncing - FIXED infinite loop
+  // Effect to trigger early loading with debouncing - DISABLED to prevent infinite loops
+  // COMMENTED OUT: This effect was causing infinite loops by continuously triggering onLoadMore
+  // The intersection observer and manual load more buttons provide sufficient loading mechanisms
+  /*
   useEffect(() => {
-    // Extract the logic from shouldTriggerEarlyLoad to avoid callback dependency
-    if (!totalImagesAvailable || !onLoadMore || isLoadingMore || isNavigating) {
-      return;
-    }
+    // DISABLED: This was causing infinite API calls
+    // Manual loading and intersection observer are sufficient
+  }, []);
+  */
 
-    // Check for active filters (inline to avoid dependency)
-    const hasActiveFilters = Boolean(
-      (filters && Object.keys(filters).length > 0) ||
-        (searchQuery && searchQuery.trim())
-    );
-
-    if (hasActiveFilters) {
-      return;
-    }
-
-    const hasMoreImages = images.length < totalImagesAvailable;
-    if (!hasMoreImages) {
-      return; // No more images to load from server
-    }
-
-    // OPTIMIZED: Only trigger when user is on the last page AND near the end of all loaded content
-    const isOnLastAvailablePage =
-      currentPage >= Math.ceil(images.length / ITEMS_PER_PAGE) - 1;
-
-    if (!isOnLastAvailablePage) {
-      return; // User is not on the last page of loaded content yet
-    }
-
-    // Only trigger when we're truly running low on total content (less than 1 page remaining)
-    const imagesRemaining = totalImagesAvailable - images.length;
-    const shouldLoad = imagesRemaining > 0 && imagesRemaining <= ITEMS_PER_PAGE;
-
-    if (shouldLoad) {
-      // Add a small delay to prevent triggering during rapid page changes
-      const timer = setTimeout(() => {
-        // Double-check conditions haven't changed during timeout
-        if (
-          !isLoadingMore &&
-          !isNavigating &&
-          images.length < totalImagesAvailable
-        ) {
-          onLoadMore();
-        }
-      }, 300);
-
-      return () => clearTimeout(timer);
-    }
-    // Return undefined when no cleanup is needed
-    return undefined;
-  }, [
-    totalImagesAvailable,
-    isLoadingMore,
-    isNavigating,
-    images.length,
-    currentPage,
-    filters,
-    searchQuery,
-    onLoadMore,
-  ]); // Fixed: Use stable dependencies instead of callback dependency
-
-  // Intersection Observer for infinite scroll - FIXED to prevent auto-pagination
+  // Intersection Observer for infinite scroll - DISABLED to prevent auto-loading loops
   const handleIntersection = useCallback(
     (entries: IntersectionObserverEntry[]) => {
-      const [entry] = entries;
-      if (entry.isIntersecting && !isLoadingMore && !isNavigating) {
-        // Check if we're at the last page and there might be more images to load from server
-        const hasMoreImages = totalImagesAvailable
-          ? images.length < totalImagesAvailable
-          : false;
-
-        // IMPORTANT FIX: Only load more images, never auto-change pages
-        // Let the user manually control pagination through UI controls
-        if (hasMoreImages && onLoadMore) {
-          // Load more images if available from server
-          onLoadMore();
-        }
-        // REMOVED: automatic page changing that was causing the runaway pagination
-        // Users should control page navigation manually via pagination controls
-      }
+      // DISABLED: Intersection observer was causing infinite loops
+      // Users can manually load more images using the "Load More" button
+      console.log(
+        "📍 Intersection observer triggered but disabled to prevent loops"
+      );
     },
     [
-      onLoadMore,
-      isLoadingMore,
-      isNavigating,
-      totalImagesAvailable,
-      images.length,
-      // Removed currentPage, totalPages, onPageChange to prevent auto-pagination
+      // Minimal dependencies to prevent callback recreation
     ]
   );
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Select,
   SelectContent,
@@ -212,25 +212,26 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
     fetchCarDetails();
   }, [carId, api]);
 
+  // Function to fetch captions (extracted for reuse)
+  const fetchCaptions = useCallback(async () => {
+    try {
+      const captions = (await api.get(`captions?carId=${carId}`)) as Array<{
+        _id: string;
+        platform: string;
+        context: string;
+        caption: string;
+        createdAt: string;
+      }>;
+      setSavedCaptions(captions);
+    } catch (err) {
+      console.error("Error fetching captions:", err);
+    }
+  }, [api, carId]);
+
   // Fetch existing captions when component mounts
   useEffect(() => {
-    const fetchCaptions = async () => {
-      try {
-        const captions = (await api.get(`captions?carId=${carId}`)) as Array<{
-          _id: string;
-          platform: string;
-          context: string;
-          caption: string;
-          createdAt: string;
-        }>;
-        setSavedCaptions(captions);
-      } catch (err) {
-        console.error("Error fetching captions:", err);
-      }
-    };
-
     fetchCaptions();
-  }, [carId, api]);
+  }, [fetchCaptions]);
 
   // Fetch prompts when component mounts (was previously on modal open)
   useEffect(() => {
@@ -497,8 +498,11 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
 
   const handleDelete = async (captionId: string) => {
     try {
-      await api.delete(`captions?id=${captionId}`);
-      setSavedCaptions((prev) => prev.filter((c) => c._id !== captionId));
+      await api.delete(`captions/${captionId}`);
+      toast.success("Caption deleted successfully");
+
+      // Refresh saved captions
+      await fetchCaptions();
     } catch (err) {
       console.error("Error deleting caption:", err);
       toast.error("Failed to delete caption");
@@ -512,24 +516,15 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
         throw new Error("Caption not found");
       }
 
-      // Update the caption directly
-      await api.patch(`captions?id=${captionId}`, {
+      // Update the caption directly using the new endpoint format
+      await api.patch(`captions/${captionId}`, {
         caption: currentCaption,
         platform: captionToEdit.platform,
         context: captionToEdit.context || "",
       });
 
-      // Update the caption in the local state
-      setSavedCaptions((prev) =>
-        prev.map((caption) =>
-          caption._id === captionId
-            ? {
-                ...caption,
-                caption: currentCaption,
-              }
-            : caption
-        )
-      );
+      // Refresh saved captions to get the updated data
+      await fetchCaptions();
     } catch (err) {
       console.error("Error editing caption:", err);
       setError(err instanceof Error ? err.message : "An error occurred");

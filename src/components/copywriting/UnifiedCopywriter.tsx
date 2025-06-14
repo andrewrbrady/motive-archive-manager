@@ -610,7 +610,7 @@ export function UnifiedCopywriter({
         if (mode === "project") {
           await api.delete(`projects/${projectId}/captions/${captionId}`);
         } else {
-          await api.delete(`captions?id=${captionId}&carId=${entityId}`);
+          await api.delete(`captions/${captionId}?carId=${entityId}`);
         }
 
         toast({

@@ -7,7 +7,6 @@
 // Content block types that can be added to templates
 export type ContentBlockType =
   | "text"
-  | "heading"
   | "image"
   | "divider"
   | "button"
@@ -21,18 +20,31 @@ export interface BaseContentBlock {
   order: number;
   styles?: Record<string, any>;
   metadata?: Record<string, any>;
+  // CSS styling support
+  cssClassName?: string;
+  cssClass?: {
+    name: string;
+    selector: string;
+    properties: { [key: string]: string };
+    description?: string;
+    category?: string;
+  };
 }
 
 // Specific block types
 export interface TextBlock extends BaseContentBlock {
   type: "text";
   content: string;
+  // Element type - can be paragraph or any heading level
+  element: "p" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
   formatting?: {
     fontSize?: string;
     fontWeight?: string;
     color?: string;
     textAlign?: "left" | "center" | "right";
     lineHeight?: string;
+    marginTop?: string;
+    marginBottom?: string;
   };
   // Rich text formatting support for bold and links
   richFormatting?: {
@@ -40,27 +52,6 @@ export interface TextBlock extends BaseContentBlock {
     // Store rich content as HTML or markdown-like format
     formattedContent?: string;
     // Track formatting rules applied
-    hasLinks?: boolean;
-    hasBold?: boolean;
-  };
-}
-
-export interface HeadingBlock extends BaseContentBlock {
-  type: "heading";
-  content: string;
-  level: 1 | 2 | 3 | 4 | 5 | 6;
-  formatting?: {
-    fontSize?: string;
-    fontWeight?: string;
-    color?: string;
-    textAlign?: "left" | "center" | "right";
-    marginTop?: string;
-    marginBottom?: string;
-  };
-  // Rich text formatting support for bold and links (optional for headings)
-  richFormatting?: {
-    enabled?: boolean;
-    formattedContent?: string;
     hasLinks?: boolean;
     hasBold?: boolean;
   };
@@ -105,10 +96,14 @@ export interface ColumnsBlock extends BaseContentBlock {
   gap?: string;
 }
 
+// Backward compatibility - HeadingBlock is now just a TextBlock with heading element
+export type HeadingBlock = TextBlock & {
+  element: "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+};
+
 // Union type for all content blocks
 export type ContentBlock =
   | TextBlock
-  | HeadingBlock
   | ImageBlock
   | DividerBlock
   | ButtonBlock

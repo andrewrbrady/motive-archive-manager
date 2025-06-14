@@ -548,15 +548,25 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     if (!api) return;
 
     try {
-      await api.delete(`captions?id=${contentId}&carId=${carDetails?._id}`);
+      await api.delete(`captions/${contentId}?carId=${carDetails?._id}`);
 
       toast({
         title: "Success",
         description: "Caption deleted successfully",
       });
 
-      // Refresh saved captions
-      await fetchSavedCaptions();
+      // Refresh saved captions by fetching them again
+      try {
+        const refreshedCaptions = (await api.get(
+          `captions?carId=${carId}&limit=${captionsLimit}&sort=-createdAt`
+        )) as CarSavedCaption[];
+        setSavedCaptions(
+          Array.isArray(refreshedCaptions) ? refreshedCaptions : []
+        );
+        setCaptionsHasMore((refreshedCaptions || []).length === captionsLimit);
+      } catch (refreshError) {
+        console.error("Error refreshing captions:", refreshError);
+      }
     } catch (error) {
       console.error("Error deleting caption:", error);
       toast({
@@ -576,7 +586,7 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
         throw new Error("Caption not found");
       }
 
-      await api.patch(`captions?id=${contentId}`, {
+      await api.patch(`captions/${contentId}`, {
         caption: editingText,
         platform: captionToEdit.platform,
         context: captionToEdit.context || "",
@@ -587,8 +597,18 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
         description: "Caption updated successfully",
       });
 
-      // Refresh saved captions
-      await fetchSavedCaptions();
+      // Refresh saved captions by fetching them again
+      try {
+        const refreshedCaptions = (await api.get(
+          `captions?carId=${carId}&limit=${captionsLimit}&sort=-createdAt`
+        )) as CarSavedCaption[];
+        setSavedCaptions(
+          Array.isArray(refreshedCaptions) ? refreshedCaptions : []
+        );
+        setCaptionsHasMore((refreshedCaptions || []).length === captionsLimit);
+      } catch (refreshError) {
+        console.error("Error refreshing captions:", refreshError);
+      }
       handleCancelEdit();
     } catch (error) {
       console.error("Error updating caption:", error);

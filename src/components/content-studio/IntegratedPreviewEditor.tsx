@@ -17,10 +17,13 @@ import {
 } from "./types";
 import { EmailHeaderState } from "./EmailHeaderConfig";
 import { BlockContent } from "./BlockContent";
+import { CSSClassSelector } from "../BlockComposer/CSSClassSelector";
+import { CSSClass, classToInlineStyles } from "@/lib/css-parser";
 
 interface IntegratedPreviewEditorProps {
   blocks: ContentBlock[];
   emailHeader?: EmailHeaderState;
+  selectedStylesheetId?: string | null;
   // Editing functionality
   activeBlockId: string | null;
   draggedBlockId: string | null;
@@ -46,6 +49,7 @@ export const IntegratedPreviewEditor = React.memo<IntegratedPreviewEditorProps>(
   function IntegratedPreviewEditor({
     blocks,
     emailHeader,
+    selectedStylesheetId,
     activeBlockId,
     draggedBlockId,
     draggedOverIndex,
@@ -218,6 +222,7 @@ export const IntegratedPreviewEditor = React.memo<IntegratedPreviewEditorProps>(
                         total={blocks.length}
                         isActive={activeBlockId === block.id}
                         isDragging={draggedBlockId === block.id}
+                        selectedStylesheetId={selectedStylesheetId}
                         onSetActive={onSetActive}
                         onUpdate={(updates) => onUpdateBlock(block.id, updates)}
                         onRemove={() => onRemoveBlock(block.id)}
@@ -249,6 +254,7 @@ interface EditablePreviewBlockProps {
   total: number;
   isActive: boolean;
   isDragging: boolean;
+  selectedStylesheetId?: string | null;
   onSetActive: (blockId: string | null) => void;
   onUpdate: (updates: Partial<ContentBlock>) => void;
   onRemove: () => void;
@@ -267,6 +273,7 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
     total,
     isActive,
     isDragging,
+    selectedStylesheetId,
     onSetActive,
     onUpdate,
     onRemove,
@@ -282,10 +289,14 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
           return <Type className="h-3 w-3" />;
         case "image":
           return <ImageIcon className="h-3 w-3" />;
-        case "heading":
-          return <Heading className="h-3 w-3" />;
         case "divider":
           return <Minus className="h-3 w-3" />;
+        case "button":
+          return <Type className="h-3 w-3" />;
+        case "spacer":
+          return <Minus className="h-3 w-3" />;
+        case "columns":
+          return <Type className="h-3 w-3" />;
         default:
           return <Type className="h-3 w-3" />;
       }
@@ -402,21 +413,42 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
                 className="p-4 bg-background/50 border border-border/40 rounded-lg m-2"
                 onClick={(e) => e.stopPropagation()} // Prevent clicks from bubbling up
               >
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                    Editing {block.type} block
+                <div className="mb-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                      Editing {block.type} block
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSetActive(null);
+                      }}
+                      className="h-6 text-xs"
+                    >
+                      Done
+                    </Button>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSetActive(null);
-                    }}
-                    className="h-6 text-xs"
-                  >
-                    Done
-                  </Button>
+
+                  {/* CSS Class Selector */}
+                  {selectedStylesheetId && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        Style:
+                      </span>
+                      <CSSClassSelector
+                        stylesheetId={selectedStylesheetId}
+                        selectedClassName={(block as any).cssClassName}
+                        onClassSelect={(cssClass) => {
+                          onUpdate({
+                            cssClassName: cssClass?.name || undefined,
+                            cssClass: cssClass || undefined,
+                          });
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
                 <BlockContent
                   block={block}
@@ -456,13 +488,24 @@ const PreviewBlock = React.memo<PreviewBlockProps>(function PreviewBlock({
 }) {
   switch (block.type) {
     case "text":
-      return <TextBlockPreview block={block as TextBlock} />;
-    case "heading":
-      return <HeadingBlockPreview block={block as HeadingBlock} />;
+      // Check if this is a heading text block
+      const textBlock = block as TextBlock;
+      if (textBlock.element && textBlock.element.startsWith("h")) {
+        return <HeadingBlockPreview block={textBlock} />;
+      }
+      return <TextBlockPreview block={textBlock} />;
     case "image":
       return <ImageBlockPreview block={block as ImageBlock} />;
     case "divider":
       return <DividerBlockPreview block={block as DividerBlock} />;
+    case "button":
+    case "spacer":
+    case "columns":
+      return (
+        <div className="p-6 text-center text-muted-foreground">
+          {block.type} block (preview not implemented)
+        </div>
+      );
     default:
       return null;
   }
@@ -490,16 +533,41 @@ const TextBlockPreview = React.memo<{ block: TextBlock }>(
 
     const hasRichContent = block.richFormatting?.formattedContent;
 
+    // Apply CSS class styles if available
+    const customStyles = useMemo(() => {
+      if (block.cssClass) {
+        return classToInlineStyles(block.cssClass);
+      }
+      return {};
+    }, [block.cssClass]);
+
+    const containerClass = block.cssClassName
+      ? block.cssClassName
+      : "p-6 text-base leading-relaxed";
+    const textClass = !block.content
+      ? "text-muted-foreground italic"
+      : "text-foreground";
+
     return (
-      <div className="p-6 text-base leading-relaxed">
+      <div className={block.cssClassName ? "" : "p-6"}>
         {hasRichContent ? (
           <div
-            className={`whitespace-pre-wrap ${!block.content ? "text-muted-foreground italic" : "text-foreground"}`}
+            className={
+              block.cssClassName
+                ? `${block.cssClassName} whitespace-pre-wrap ${textClass}`
+                : `whitespace-pre-wrap ${textClass}`
+            }
+            style={customStyles}
             dangerouslySetInnerHTML={{ __html: formattedContent }}
           />
         ) : (
           <div
-            className={`whitespace-pre-wrap ${!block.content ? "text-muted-foreground italic" : "text-foreground"}`}
+            className={
+              block.cssClassName
+                ? `${block.cssClassName} whitespace-pre-wrap ${textClass}`
+                : `whitespace-pre-wrap ${textClass}`
+            }
+            style={customStyles}
           >
             {content}
           </div>
@@ -509,7 +577,7 @@ const TextBlockPreview = React.memo<{ block: TextBlock }>(
   }
 );
 
-const HeadingBlockPreview = React.memo<{ block: HeadingBlock }>(
+const HeadingBlockPreview = React.memo<{ block: TextBlock }>(
   function HeadingBlockPreview({ block }) {
     const content = block.content || "Your heading will appear here...";
 
@@ -529,31 +597,48 @@ const HeadingBlockPreview = React.memo<{ block: HeadingBlock }>(
 
     const hasRichContent = block.richFormatting?.formattedContent;
 
-    const getHeadingClasses = (level: number) => {
-      switch (level) {
-        case 1:
+    const getHeadingClasses = (element: string) => {
+      switch (element) {
+        case "h1":
           return "text-3xl font-bold mb-4 mt-6";
-        case 2:
+        case "h2":
           return "text-2xl font-bold mb-3 mt-5";
-        case 3:
+        case "h3":
           return "text-xl font-bold mb-2 mt-4";
-        case 4:
+        case "h4":
           return "text-lg font-bold mb-2 mt-3";
-        case 5:
+        case "h5":
           return "text-base font-bold mb-1 mt-2";
-        case 6:
+        case "h6":
           return "text-sm font-bold mb-1 mt-2";
         default:
           return "text-xl font-bold mb-2 mt-4";
       }
     };
 
+    // Apply CSS class styles if available
+    const customStyles = useMemo(() => {
+      if (block.cssClass) {
+        return classToInlineStyles(block.cssClass);
+      }
+      return {};
+    }, [block.cssClass]);
+
+    const defaultClasses = getHeadingClasses(block.element || "h2");
+    const textClass = !block.content
+      ? "text-muted-foreground italic"
+      : "text-foreground";
+    const finalClassName = block.cssClassName
+      ? `${block.cssClassName} ${textClass}`
+      : `${defaultClasses} ${textClass}`;
+
     return (
-      <div className="px-6">
+      <div className={block.cssClassName ? "" : "px-6"}>
         {React.createElement(
-          `h${block.level}`,
+          block.element || "h2",
           {
-            className: `${getHeadingClasses(block.level)} ${!block.content ? "text-muted-foreground italic" : "text-foreground"}`,
+            className: finalClassName,
+            style: customStyles,
             ...(hasRichContent
               ? { dangerouslySetInnerHTML: { __html: formattedContent } }
               : {}),

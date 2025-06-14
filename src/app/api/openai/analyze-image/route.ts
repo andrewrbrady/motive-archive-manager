@@ -220,14 +220,59 @@ async function retryOpenAICall<T>(
       return await fn();
     } catch (error) {
       lastError = error;
+
+      // Enhanced error logging with more details
+      const errorDetails = {
+        attempt: attempt + 1,
+        maxAttempts: maxRetries + 1,
+        errorType:
+          error instanceof Error ? error.constructor.name : typeof error,
+        message: error instanceof Error ? error.message : String(error),
+        // Include additional OpenAI-specific error details if available
+        ...(error && typeof error === "object" && "status" in error
+          ? {
+              status: (error as any).status,
+              code: (error as any).code,
+              type: (error as any).type,
+              param: (error as any).param,
+            }
+          : {}),
+      };
+
       console.error(
         `OpenAI API call failed (attempt ${attempt + 1}/${maxRetries + 1}):`,
-        error
+        errorDetails
       );
+
+      // If this is an invalid_image_url error, provide more specific guidance
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        (error as any).code === "invalid_image_url"
+      ) {
+        console.error("Image URL validation failed. This usually means:");
+        console.error("1. The image URL is not publicly accessible");
+        console.error("2. The URL does not point directly to an image file");
+        console.error("3. The image host is blocking OpenAI's requests");
+        console.error("4. The URL format is incorrect or malformed");
+      }
     }
   }
 
-  throw lastError || new Error("All retry attempts failed");
+  // Provide a more detailed error message when all retries fail
+  const finalError = new Error(
+    `OpenAI API call failed after ${maxRetries + 1} attempts. Last error: ${
+      lastError instanceof Error ? lastError.message : String(lastError)
+    }`
+  );
+
+  // Preserve the original error details
+  if (lastError && typeof lastError === "object") {
+    Object.assign(finalError, lastError);
+  }
+
+  throw finalError;
 }
 
 // Validation function to check if analysis results are acceptable
@@ -271,7 +316,7 @@ function validateAnalysisResults(analysis: ImageAnalysis): {
 
 // Enhanced analysis function with validation and retry
 async function analyzeImageWithValidation(
-  publicImageUrl: string,
+  analysisImageUrl: string,
   prompt: string,
   model: string,
   maxValidationRetries = 2
@@ -329,7 +374,7 @@ async function analyzeImageWithValidation(
               {
                 type: "image_url",
                 image_url: {
-                  url: publicImageUrl,
+                  url: analysisImageUrl,
                 },
               },
             ],
@@ -418,8 +463,100 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure the URL is publicly accessible
-    const publicImageUrl = `${imageUrl}/public`;
+    // Properly construct the image URL for analysis
+    let analysisImageUrl = imageUrl;
+
+    // Handle Cloudflare Images URLs
+    if (imageUrl.includes("imagedelivery.net")) {
+      // Extract the base URL (account hash + image ID) and use an appropriate variant for analysis
+      const cloudflareMatch = imageUrl.match(
+        /https:\/\/imagedelivery\.net\/([^\/]+)\/([^\/]+)/
+      );
+
+      if (cloudflareMatch) {
+        const [, accountHash, imageId] = cloudflareMatch;
+        // Use a medium-sized variant for analysis (not highres to save bandwidth and costs)
+        // OpenAI doesn't need massive images for analysis - medium quality is sufficient
+        analysisImageUrl = `https://imagedelivery.net/${accountHash}/${imageId}/w=1200,q=85`;
+        console.log(
+          "Constructed analysis image URL (optimized size):",
+          analysisImageUrl
+        );
+      } else {
+        console.warn("Could not parse Cloudflare URL format:", imageUrl);
+        // Fallback: if URL doesn't match expected format, try to add a reasonable variant
+        if (
+          !imageUrl.includes("/public") &&
+          !imageUrl.match(/\/[a-zA-Z]+$/) &&
+          !imageUrl.includes("w=")
+        ) {
+          analysisImageUrl = `${imageUrl}/w=1200,q=85`;
+        }
+      }
+    } else {
+      // For non-Cloudflare URLs, use as-is
+      analysisImageUrl = imageUrl;
+    }
+
+    // Validate that the constructed URL is accessible
+    console.log("Final image URL for analysis:", analysisImageUrl);
+
+    // Basic URL validation
+    try {
+      new URL(analysisImageUrl);
+    } catch (error) {
+      console.error("Invalid URL constructed:", analysisImageUrl);
+      return NextResponse.json(
+        {
+          error: "Invalid image URL",
+          details: `Constructed URL is malformed: ${analysisImageUrl}`,
+          originalUrl: imageUrl,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Optional: Quick accessibility check for Cloudflare URLs
+    if (analysisImageUrl.includes("imagedelivery.net")) {
+      try {
+        console.log(
+          "Performing quick accessibility check for Cloudflare image..."
+        );
+        const headResponse = await fetch(analysisImageUrl, {
+          method: "HEAD",
+          signal: AbortSignal.timeout(5000), // 5 second timeout
+        });
+
+        if (!headResponse.ok) {
+          console.warn(
+            `Image accessibility check failed: ${headResponse.status} ${headResponse.statusText}`
+          );
+          console.warn(`URL: ${analysisImageUrl}`);
+
+          if (headResponse.status === 404) {
+            return NextResponse.json(
+              {
+                error: "Image not found",
+                details: `The image at ${analysisImageUrl} returned 404 Not Found. The image may have been deleted or the URL is incorrect.`,
+                originalUrl: imageUrl,
+                status: headResponse.status,
+              },
+              { status: 404 }
+            );
+          }
+        } else {
+          console.log("Image accessibility check passed");
+        }
+      } catch (accessibilityError) {
+        console.warn(
+          "Could not perform accessibility check:",
+          accessibilityError instanceof Error
+            ? accessibilityError.message
+            : String(accessibilityError)
+        );
+        // Don't fail the request if accessibility check fails - continue with OpenAI analysis
+      }
+    }
 
     // Build context-aware prompt
     let prompt = IMAGE_ANALYSIS_CONFIG.basePrompt;
@@ -511,7 +648,7 @@ export async function POST(request: NextRequest) {
 
     // Use the enhanced analysis function with validation and retry
     const normalizedAnalysis = await analyzeImageWithValidation(
-      publicImageUrl,
+      analysisImageUrl,
       prompt,
       selectedModel,
       2 // maxValidationRetries

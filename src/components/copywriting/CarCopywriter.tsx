@@ -323,8 +323,8 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
           description: "Saving caption changes...",
         });
 
-        // Wait for the update to complete
-        await api.patch(`captions?id=${captionId}`, {
+        // Wait for the update to complete - using the new endpoint format
+        await api.patch(`captions/${captionId}`, {
           caption: newText,
         });
 
