@@ -217,8 +217,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     const chunks: File[][] = [];
     let currentChunk: File[] = [];
     let currentChunkSize = 0;
-    const maxChunkSize = 6 * 1024 * 1024; // 6MB per chunk - safely under 8MB backend limit
-    const maxFilesPerChunk = 3; // OPTIMIZED: Reduced from 5 to 3 files per chunk for faster processing
+    const maxChunkSize = 2 * 1024 * 1024; // 2MB per chunk - very conservative to avoid payload limits
+    const maxFilesPerChunk = 1; // Process one file at a time to avoid any payload issues
 
     for (const file of files) {
       // Check if adding this file would exceed either limit
@@ -308,8 +308,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
       let globalFileIndex = 0;
 
-      // OPTIMIZED: Process chunks in parallel for maximum throughput
-      const maxParallelChunks = Math.min(chunks.length, 3); // Limit to 3 parallel chunks to balance speed vs resource usage
+      // Process chunks sequentially to avoid overwhelming the endpoints
+      const maxParallelChunks = 1; // Process one chunk at a time to avoid any issues
       console.log(
         `Processing ${chunks.length} chunks with up to ${maxParallelChunks} parallel chunks`
       );
@@ -380,207 +380,149 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         throw new Error("Authentication required");
       }
 
-      // Create FormData for this chunk
-      const formData = new FormData();
-
-      // Add files to FormData with the expected naming convention
-      chunk.forEach((file, index) => {
-        formData.append(`file${index}`, file);
-        console.log(
-          `Added file ${index + 1}: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`
-        );
-      });
-
-      // Add file count
-      formData.append("fileCount", chunk.length.toString());
-
-      // Add metadata
-      formData.append("selectedPromptId", selectedPromptId);
-      formData.append("selectedModelId", selectedModelId);
-
-      if (mode === "car" && carId) {
-        formData.append("carId", carId);
-        if (vehicleInfo) {
-          formData.append("vehicleInfo", JSON.stringify(vehicleInfo));
-        }
-      } else {
-        // General mode metadata
-        formData.append("metadata", JSON.stringify(metadata));
-      }
-
-      console.log("FormData prepared, starting fetch...");
-      console.log("FormData contents:", {
-        selectedPromptId,
-        selectedModelId,
-        carId: mode === "car" ? carId : "N/A",
-        fileCount: chunk.length,
-      });
-
-      // Update progress to show upload starting
-      chunk.forEach((file, localIndex) => {
+      // Process each file in the chunk individually with direct Cloudflare uploads
+      for (let localIndex = 0; localIndex < chunk.length; localIndex++) {
+        const file = chunk[localIndex];
         const fileIndex = globalOffset + localIndex;
-        setProgress((prev) => {
-          const updated = [...prev];
-          if (updated[fileIndex]) {
-            updated[fileIndex] = {
-              ...updated[fileIndex],
-              status: "uploading",
-              currentStep: "Starting upload...",
-            };
-          }
-          return updated;
-        });
-      });
 
-      // Make the request with streaming response
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-
-      try {
-        const response = await fetch("/api/cloudflare/images", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-
-        console.log("Response received:", {
-          status: response.status,
-          statusText: response.statusText,
-          ok: response.ok,
-          headers: Object.fromEntries(response.headers.entries()),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("Upload request failed:", {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorText,
-          });
-          throw new Error(
-            `Upload failed: ${response.status} ${response.statusText} - ${errorText}`
-          );
-        }
-
-        if (!response.body) {
-          throw new Error("No response body received");
-        }
-
-        console.log("✅ Upload request successful, processing stream...");
-
-        // Process the streaming response
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
+        console.log(
+          `Processing file ${localIndex + 1}/${chunk.length}: ${file.name}`
+        );
 
         try {
-          while (true) {
-            const { done, value } = await reader.read();
-
-            if (done) {
-              console.log("✅ Stream processing complete");
-              break;
+          // Update progress to show upload starting
+          setProgress((prev) => {
+            const updated = [...prev];
+            if (updated[fileIndex]) {
+              updated[fileIndex] = {
+                ...updated[fileIndex],
+                status: "uploading",
+                currentStep: "Uploading to Cloudflare...",
+                progress: 10,
+              };
             }
+            return updated;
+          });
 
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split("\n");
+          // Upload directly to Cloudflare via our proxy endpoint (avoids payload limits)
+          const formData = new FormData();
+          formData.append("file", file);
 
-            for (const line of lines) {
-              if (line.trim() === "") continue;
+          console.log(`Direct Cloudflare upload for: ${file.name}`);
 
-              try {
-                // Handle Server-Sent Events format
-                let jsonData;
-                if (line.startsWith("data: ")) {
-                  const jsonString = line.substring(6); // Remove "data: " prefix
-                  jsonData = JSON.parse(jsonString);
-                } else {
-                  jsonData = JSON.parse(line);
-                }
+          const cloudflareResponse = await fetch("/api/cloudflare/thumbnails", {
+            method: "POST",
+            body: formData,
+          });
 
-                console.log("📦 Received stream data:", jsonData);
-                const data = jsonData;
-
-                if (data.type === "progress") {
-                  // Update progress for the specific file
-                  const fileIndex = globalOffset + data.fileIndex;
-                  setProgress((prev) => {
-                    const updated = [...prev];
-                    if (updated[fileIndex]) {
-                      updated[fileIndex] = {
-                        ...updated[fileIndex],
-                        progress: data.progress,
-                        status: data.status,
-                        currentStep: data.message || data.currentStep,
-                        stepProgress: data.stepProgress,
-                      };
-                    }
-                    return updated;
-                  });
-
-                  // Update page title with overall progress
-                  const overallProgress = Math.round(
-                    ((fileIndex + data.progress / 100) / totalFiles) * 100
-                  );
-                  document.title = `${overallProgress}% - Uploading Images`;
-                } else if (data.type === "complete") {
-                  // Mark file as complete
-                  const fileIndex = globalOffset + data.fileIndex;
-                  setProgress((prev) => {
-                    const updated = [...prev];
-                    if (updated[fileIndex]) {
-                      updated[fileIndex] = {
-                        ...updated[fileIndex],
-                        progress: 100,
-                        status: "complete",
-                        currentStep: "Complete",
-                        imageUrl: data.imageUrl,
-                        metadata: data.metadata,
-                      };
-                    }
-                    return updated;
-                  });
-                } else if (data.type === "error") {
-                  // Mark file as error
-                  const fileIndex = globalOffset + data.fileIndex;
-                  setProgress((prev) => {
-                    const updated = [...prev];
-                    if (updated[fileIndex]) {
-                      updated[fileIndex] = {
-                        ...updated[fileIndex],
-                        status: "error",
-                        error: data.error,
-                        currentStep: "Error",
-                      };
-                    }
-                    return updated;
-                  });
-                } else if (data.error) {
-                  // Handle general errors (like "No valid files to process")
-                  console.error("❌ API Error:", data.error);
-                  throw new Error(data.error);
-                }
-              } catch (parseError) {
-                console.warn("Failed to parse stream data:", line, parseError);
-              }
-            }
+          if (!cloudflareResponse.ok) {
+            const errorText = await cloudflareResponse.text();
+            throw new Error(
+              `Cloudflare upload failed: ${cloudflareResponse.status} ${errorText}`
+            );
           }
-        } finally {
-          reader.releaseLock();
-        }
 
-        console.log(`✅ Chunk ${chunkIndex + 1} processed successfully`);
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        console.error(
-          `❌ Fetch error for chunk ${chunkIndex + 1}:`,
-          fetchError
-        );
-        throw fetchError;
+          const cloudflareResult = await cloudflareResponse.json();
+
+          if (!cloudflareResult.success) {
+            throw new Error(
+              `Cloudflare API error: ${cloudflareResult.error || "Unknown error"}`
+            );
+          }
+
+          // Update progress for successful Cloudflare upload
+          setProgress((prev) => {
+            const updated = [...prev];
+            if (updated[fileIndex]) {
+              updated[fileIndex] = {
+                ...updated[fileIndex],
+                status: "analyzing",
+                currentStep: "Processing with AI...",
+                progress: 40,
+              };
+            }
+            return updated;
+          });
+
+          // Extract image URL
+          const imageUrl = cloudflareResult.imageUrl;
+          const cloudflareId = cloudflareResult.imageId;
+
+          // Now process the image through our backend for AI analysis and database storage
+          const analysisFormData = new FormData();
+          analysisFormData.append("cloudflareId", cloudflareId);
+          analysisFormData.append("imageUrl", imageUrl);
+          analysisFormData.append("fileName", file.name);
+          analysisFormData.append("selectedPromptId", selectedPromptId);
+          analysisFormData.append("selectedModelId", selectedModelId);
+
+          if (mode === "car" && carId) {
+            analysisFormData.append("carId", carId);
+            if (vehicleInfo) {
+              analysisFormData.append(
+                "vehicleInfo",
+                JSON.stringify(vehicleInfo)
+              );
+            }
+          } else {
+            analysisFormData.append("metadata", JSON.stringify(metadata));
+          }
+
+          // Call our backend for AI analysis and database storage
+          const analysisResponse = await fetch(
+            "/api/cloudflare/images/analyze",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+              body: analysisFormData,
+            }
+          );
+
+          if (!analysisResponse.ok) {
+            console.warn(
+              "AI analysis failed, but image was uploaded successfully"
+            );
+            // Continue with basic completion even if analysis fails
+          }
+
+          // Update progress for completion
+          setProgress((prev) => {
+            const updated = [...prev];
+            if (updated[fileIndex]) {
+              updated[fileIndex] = {
+                ...updated[fileIndex],
+                status: "complete",
+                currentStep: "Complete",
+                progress: 100,
+                imageUrl: imageUrl,
+              };
+            }
+            return updated;
+          });
+
+          console.log(`✅ File ${file.name} processed successfully`);
+        } catch (error) {
+          console.error(`❌ Error processing file ${file.name}:`, error);
+
+          // Mark file as error
+          setProgress((prev) => {
+            const updated = [...prev];
+            if (updated[fileIndex]) {
+              updated[fileIndex] = {
+                ...updated[fileIndex],
+                status: "error",
+                error: error instanceof Error ? error.message : "Upload failed",
+                currentStep: "Error",
+              };
+            }
+            return updated;
+          });
+        }
       }
+
+      console.log(`✅ Chunk ${chunkIndex + 1} processed successfully`);
     } catch (error) {
       console.error(`❌ Chunk ${chunkIndex + 1} processing failed:`, error);
 
