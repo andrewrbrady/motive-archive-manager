@@ -3,12 +3,16 @@ import { MongoClient, ObjectId, Collection } from "mongodb";
 import { getDatabase } from "@/lib/mongodb";
 import { analyzeImage } from "@/lib/imageAnalyzer";
 
-// Set maximum execution time to 300 seconds (5 minutes)
+// Set maximum execution time to 300 seconds (5 minutes) - matches vercel.json
 export const maxDuration = 300;
 export const runtime = "nodejs";
 
 // Force dynamic rendering for uploads
 export const dynamic = "force-dynamic";
+
+// Configure for large file uploads (Vercel Pro)
+export const preferredRegion = "auto";
+export const revalidate = false;
 
 // Ensure environment variables are set
 if (
@@ -81,6 +85,21 @@ const CLOUDFLARE_UPLOAD_CONCURRENCY = 4;
 const ANALYSIS_RETRY_COUNT = 2;
 const ANALYSIS_CONCURRENCY = 4;
 
+// File size limits and validation
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB (Cloudflare Images limit)
+const MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB total request size for Vercel Pro
+const VERCEL_CHUNK_SIZE = 4 * 1024 * 1024; // 4MB chunks to stay under Vercel body limits
+const SUPPORTED_MIME_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/bmp",
+  "image/tiff",
+  "image/svg+xml",
+];
+
 export async function GET() {
   try {
     const response = await fetch(
@@ -123,6 +142,16 @@ export async function POST(request: NextRequest) {
   let mongoClient: MongoClient | undefined;
   let retryCount = 0;
   const MAX_RETRIES = 3;
+
+  // Log request details for debugging Vercel 413 issues
+  const requestHeaders = Object.fromEntries([...request.headers.entries()]);
+  console.log("=== CLOUDFLARE IMAGES UPLOAD REQUEST ===");
+  console.log("Request URL:", request.url);
+  console.log("Content-Type:", requestHeaders["content-type"]);
+  console.log("Content-Length:", requestHeaders["content-length"] || "unknown");
+  console.log("User-Agent:", requestHeaders["user-agent"]);
+  console.log("Environment:", process.env.NODE_ENV);
+  console.log("Vercel Environment:", process.env.VERCEL_ENV || "unknown");
 
   const sendProgress = async (data: any) => {
     await writer.write(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
@@ -182,7 +211,12 @@ export async function POST(request: NextRequest) {
         currentStep: "Starting upload to Cloudflare",
       });
 
-      // Upload to Cloudflare
+      // Log file information for debugging
+      console.log(
+        `Uploading file: ${file.name}, Size: ${(file.size / 1024 / 1024).toFixed(2)}MB, Type: ${file.type}`
+      );
+
+      // Upload to Cloudflare with enhanced error handling
       const uploadFormData = new FormData();
       uploadFormData.append("file", file);
       uploadFormData.append("requireSignedURLs", "false");
@@ -199,9 +233,20 @@ export async function POST(request: NextRequest) {
       );
 
       if (!response.ok) {
-        throw new Error(
-          `Failed to upload to Cloudflare: ${response.statusText}`
-        );
+        if (response.status === 413) {
+          throw new Error(
+            `File ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB) is too large for upload. Maximum file size is ${MAX_FILE_SIZE / 1024 / 1024}MB. This suggests a Vercel body size limit issue - check your Vercel configuration.`
+          );
+        } else if (response.status === 400) {
+          const errorText = await response.text();
+          throw new Error(
+            `Cloudflare rejected file ${file.name}: ${response.statusText}. Details: ${errorText}`
+          );
+        } else {
+          throw new Error(
+            `Failed to upload ${file.name} to Cloudflare: ${response.status} ${response.statusText}`
+          );
+        }
       }
 
       const result = await response.json();
@@ -454,6 +499,30 @@ export async function POST(request: NextRequest) {
     }
   };
 
+  // Helper function to validate file size and type
+  const validateFile = (
+    file: File,
+    index: number
+  ): { valid: boolean; error?: string } => {
+    // Check file type
+    if (!SUPPORTED_MIME_TYPES.includes(file.type)) {
+      return {
+        valid: false,
+        error: `File ${index + 1} (${file.name}): Unsupported file type "${file.type}". Supported types: ${SUPPORTED_MIME_TYPES.join(", ")}`,
+      };
+    }
+
+    // Check individual file size
+    if (file.size > MAX_FILE_SIZE) {
+      return {
+        valid: false,
+        error: `File ${index + 1} (${file.name}): File size ${(file.size / 1024 / 1024).toFixed(2)}MB exceeds maximum allowed size of ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+      };
+    }
+
+    return { valid: true };
+  };
+
   const processImages = async () => {
     let mongoClient;
     try {
@@ -465,6 +534,44 @@ export async function POST(request: NextRequest) {
 
       if (!carId) {
         await sendProgress({ error: "No car ID provided" });
+        return;
+      }
+
+      // Collect all files and validate them first
+      const files: File[] = [];
+      let totalSize = 0;
+
+      for (let i = 0; i < fileCount; i++) {
+        const file = formData.get(`file${i}`) as File;
+        if (file) {
+          // Validate individual file
+          const validation = validateFile(file, i);
+          if (!validation.valid) {
+            await sendProgress({ error: validation.error });
+            return;
+          }
+
+          files.push(file);
+          totalSize += file.size;
+        } else {
+          console.log(`File ${i} not found in FormData`);
+        }
+      }
+
+      // Validate total request size
+      if (totalSize > MAX_TOTAL_SIZE) {
+        await sendProgress({
+          error: `Total file size ${(totalSize / 1024 / 1024).toFixed(2)}MB exceeds maximum allowed total size of ${MAX_TOTAL_SIZE / 1024 / 1024}MB for batch upload. Please upload fewer or smaller files.`,
+        });
+        return;
+      }
+
+      console.log(
+        `Validated ${files.length} files with total size: ${(totalSize / 1024 / 1024).toFixed(2)}MB`
+      );
+
+      if (files.length === 0) {
+        await sendProgress({ error: "No valid files to process" });
         return;
       }
 
@@ -488,16 +595,8 @@ export async function POST(request: NextRequest) {
         additionalContext: car.description,
       };
 
-      // Collect all files into an array for better processing
-      const files: File[] = [];
-      for (let i = 0; i < fileCount; i++) {
-        const file = formData.get(`file${i}`) as File;
-        if (file) {
-          files.push(file);
-        } else {
-          // [REMOVED] // [REMOVED] console.log(`File ${i} not found in FormData`);
-        }
-      }
+      // Use the already collected and validated files from above
+      // (files array was already created in the validation section)
 
       const now = new Date().toISOString();
       const results = [];

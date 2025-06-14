@@ -2,6 +2,13 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
+  "functions": {
+    "app/api/cloudflare/images/route.ts": {
+      "maxDuration": 300,
+      "memory": 3008,
+      "maxRequestBodySize": "50mb"
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",
@@ -21,7 +28,7 @@
       ]
     }
   ],
-  "functions": {
+  "additionalFunctions": {
     "app/api/images/upload/route.ts": {
       "maxDuration": 300,
       "memory": 1536
@@ -39,10 +46,6 @@
       "memory": 1536
     },
     "app/api/cars/*/images/route.ts": {
-      "maxDuration": 60,
-      "memory": 1536
-    },
-    "app/api/cloudflare/images/route.ts": {
       "maxDuration": 60,
       "memory": 1536
     },
