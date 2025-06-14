@@ -44,8 +44,7 @@
     },
     "app/api/cloudflare/images/route.ts": {
       "maxDuration": 300,
-      "memory": 3008,
-      "maxRequestBodySize": "50mb"
+      "memory": 3008
     },
     "app/api/openai/generate-project-caption/route.ts": {
       "maxDuration": 60,
