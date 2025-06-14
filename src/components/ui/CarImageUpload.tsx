@@ -154,9 +154,9 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
       return;
     }
 
-    // Check individual file sizes (25MB limit per file for direct upload)
+    // Check individual file sizes (8MB limit per file)
     const oversizedFiles = fileArray.filter(
-      (file) => file.size > 25 * 1024 * 1024
+      (file) => file.size > 8 * 1024 * 1024
     );
 
     console.log("Oversized files:", oversizedFiles.length);
@@ -164,20 +164,53 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
     if (oversizedFiles.length > 0) {
       console.log("Calling onError for oversized files");
       onError?.(
-        `The following files are too large (over 25MB): ${oversizedFiles.map((f) => f.name).join(", ")}. Please compress them before uploading.`
+        `The following files are too large (over 8MB): ${oversizedFiles.map((f) => f.name).join(", ")}. Please compress them before uploading.`
       );
       return;
     }
 
+    // For large batches, we'll process them in chunks automatically
     const totalSize = fileArray.reduce((acc, file) => acc + file.size, 0);
     console.log("Total size:", (totalSize / 1024 / 1024).toFixed(1), "MB");
-    console.log("Will process", fileArray.length, "files with direct upload");
+    console.log("Will process", fileArray.length, "files in chunks if needed");
 
     setPendingFiles(fileArray);
     setProgress([]); // Reset progress if new files are selected
   };
 
-  // Start upload with direct upload processing
+  // Create chunks of files for upload
+  const createUploadChunks = (files: File[]): File[][] => {
+    const chunks: File[][] = [];
+    let currentChunk: File[] = [];
+    let currentChunkSize = 0;
+    const maxChunkSize = 6 * 1024 * 1024; // 6MB per chunk - safely under 8MB backend limit
+    const maxFilesPerChunk = 5; // Max 5 files per chunk
+
+    for (const file of files) {
+      // If adding this file would exceed limits, start a new chunk
+      if (
+        (currentChunkSize + file.size > maxChunkSize &&
+          currentChunk.length > 0) ||
+        currentChunk.length >= maxFilesPerChunk
+      ) {
+        chunks.push([...currentChunk]);
+        currentChunk = [];
+        currentChunkSize = 0;
+      }
+
+      currentChunk.push(file);
+      currentChunkSize += file.size;
+    }
+
+    // Add the last chunk if it has files
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks;
+  };
+
+  // Start upload with chunked processing
   const startUpload = async () => {
     if (pendingFiles.length === 0) return;
 
@@ -209,19 +242,27 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
     setProgress(initialProgress);
 
     try {
-      console.log(`Processing ${pendingFiles.length} files with direct upload`);
+      // Create chunks for processing
+      const chunks = createUploadChunks(pendingFiles);
+      console.log(
+        `Processing ${pendingFiles.length} files in ${chunks.length} chunks`
+      );
 
-      // Process each file individually with direct upload
-      for (let fileIndex = 0; fileIndex < pendingFiles.length; fileIndex++) {
-        const file = pendingFiles[fileIndex];
+      let completedFiles = 0;
+      const totalFiles = pendingFiles.length;
+
+      // Process each chunk sequentially
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+        const chunk = chunks[chunkIndex];
         console.log(
-          `Processing file ${fileIndex + 1}/${pendingFiles.length}: ${file.name}`
+          `Processing chunk ${chunkIndex + 1}/${chunks.length} with ${chunk.length} files`
         );
 
-        await processDirectUpload(file, fileIndex, pendingFiles.length);
+        await processChunk(chunk, chunkIndex, completedFiles, totalFiles);
+        completedFiles += chunk.length;
       }
 
-      console.log("All files processed successfully");
+      console.log("All chunks processed successfully");
       setUploadSuccess(true);
 
       // Clear pending files
@@ -255,195 +296,201 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
     }
   };
 
-  // Process a single file with direct upload
-  const processDirectUpload = async (
-    file: File,
-    fileIndex: number,
+  // Process a single chunk of files
+  const processChunk = async (
+    chunk: File[],
+    chunkIndex: number,
+    globalOffset: number,
     totalFiles: number
   ) => {
-    const fileId = `${fileIndex}-${file.name}`;
+    // Update chunk files to "uploading" status
+    chunk.forEach((file, localIndex) => {
+      const globalIndex = globalOffset + localIndex;
+      const fileId = `${globalIndex}-${file.name}`;
 
-    try {
-      // Step 1: Get direct upload URL
       setProgress((prev) =>
         prev.map((p) =>
           p.fileId === fileId
             ? {
                 ...p,
                 status: "uploading",
-                currentStep: "Getting upload URL...",
-                progress: 10,
-                stepProgress: {
-                  ...p.stepProgress,
-                  cloudflare: {
-                    status: "uploading",
-                    progress: 10,
-                    message: "Getting upload URL...",
-                  },
-                },
+                currentStep: `Chunk ${chunkIndex + 1}: Uploading...`,
               }
             : p
         )
       );
+    });
 
-      const uploadUrlResponse = await fetch("/api/cloudflare/direct-upload", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: file.type,
-          carId,
-        }),
+    try {
+      // Create FormData with format expected by /api/cloudflare/images
+      const formData = new FormData();
+
+      // Add files with numbered naming (file0, file1, etc.)
+      chunk.forEach((file, index) => {
+        formData.append(`file${index}`, file);
       });
 
-      if (!uploadUrlResponse.ok) {
-        const errorData = await uploadUrlResponse.json();
-        throw new Error(errorData.error || "Failed to get upload URL");
+      formData.append("carId", carId);
+      formData.append("fileCount", chunk.length.toString());
+
+      // Add selected prompt and model
+      if (selectedPromptId) {
+        formData.append("selectedPromptId", selectedPromptId);
+      }
+      if (selectedModelId) {
+        formData.append("selectedModelId", selectedModelId);
       }
 
-      const { uploadURL } = await uploadUrlResponse.json();
+      // Get auth token
+      const token = await getValidToken();
 
-      // Step 2: Upload file directly to Cloudflare
-      setProgress((prev) =>
-        prev.map((p) =>
-          p.fileId === fileId
-            ? {
-                ...p,
-                currentStep: "Uploading to Cloudflare...",
-                progress: 30,
-                stepProgress: {
-                  ...p.stepProgress,
-                  cloudflare: {
-                    status: "uploading",
-                    progress: 30,
-                    message: "Uploading to Cloudflare...",
-                  },
-                },
-              }
-            : p
-        )
-      );
-
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const directUploadResponse = await fetch(uploadURL, {
+      // Start the streaming upload
+      const response = await fetch("/api/cloudflare/images", {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: formData,
       });
 
-      if (!directUploadResponse.ok) {
-        throw new Error("Direct upload to Cloudflare failed");
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
       }
 
-      const uploadResult = await directUploadResponse.json();
+      // Handle Server-Sent Events stream
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-      if (!uploadResult.success) {
-        throw new Error("Cloudflare upload failed");
+      if (!reader) {
+        throw new Error("Failed to get response reader");
       }
 
-      // Step 3: Notify completion
-      setProgress((prev) =>
-        prev.map((p) =>
-          p.fileId === fileId
-            ? {
-                ...p,
-                currentStep: "Processing completion...",
-                progress: 80,
-                stepProgress: {
-                  cloudflare: {
-                    status: "complete",
-                    progress: 100,
-                    message: "Upload complete",
-                  },
-                  openai: {
-                    status: "analyzing",
-                    progress: 50,
-                    message: "Processing...",
-                  },
-                },
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete messages
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              // Handle individual file progress updates
+              if (data.fileId && data.fileName) {
+                // Map the chunk-local fileId to global fileId
+                const chunkFileIndex = parseInt(data.fileId.split("-")[0]);
+                const globalFileIndex = globalOffset + chunkFileIndex;
+                const globalFileId = `${globalFileIndex}-${data.fileName}`;
+
+                setProgress((prev) =>
+                  prev.map((p) =>
+                    p.fileId === globalFileId
+                      ? {
+                          ...p,
+                          progress: data.progress || p.progress,
+                          status: data.status || p.status,
+                          currentStep:
+                            data.currentStep ||
+                            `Chunk ${chunkIndex + 1}: ${data.status}`,
+                          error: data.error,
+                          imageUrl: data.imageUrl || p.imageUrl,
+                          metadata: data.metadata || p.metadata,
+                          stepProgress: {
+                            cloudflare: {
+                              status:
+                                data.status === "uploading"
+                                  ? "uploading"
+                                  : data.status === "analyzing"
+                                    ? "complete"
+                                    : data.status === "complete"
+                                      ? "complete"
+                                      : "pending",
+                              progress:
+                                data.status === "uploading"
+                                  ? data.progress
+                                  : data.status === "analyzing"
+                                    ? 100
+                                    : data.status === "complete"
+                                      ? 100
+                                      : 0,
+                              message:
+                                data.status === "uploading"
+                                  ? "Uploading to Cloudflare..."
+                                  : data.status === "analyzing"
+                                    ? "Upload complete"
+                                    : data.status === "complete"
+                                      ? "Upload complete"
+                                      : "Waiting",
+                            },
+                            openai: {
+                              status:
+                                data.status === "analyzing"
+                                  ? "analyzing"
+                                  : data.status === "complete"
+                                    ? "complete"
+                                    : "pending",
+                              progress:
+                                data.status === "analyzing"
+                                  ? 50
+                                  : data.status === "complete"
+                                    ? 100
+                                    : 0,
+                              message:
+                                data.status === "analyzing"
+                                  ? "Analyzing with AI..."
+                                  : data.status === "complete"
+                                    ? "Analysis complete"
+                                    : "Waiting for upload",
+                            },
+                          },
+                        }
+                      : p
+                  )
+                );
               }
-            : p
-        )
-      );
 
-      const token = await getValidToken();
-      const completionResponse = await fetch(
-        "/api/cloudflare/images/complete",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            imageId: uploadResult.result.id,
-            carId,
-            imageUrl:
-              uploadResult.result.variants?.[0] || uploadResult.result.filename,
-            fileName: file.name,
-            fileSize: file.size,
-            selectedPromptId,
-            selectedModelId,
-          }),
+              // Handle chunk completion
+              if (data.type === "complete") {
+                console.log(`Chunk ${chunkIndex + 1} completed:`, data);
+                // Don't set uploadSuccess here - wait for all chunks
+              } else if (data.type === "error" || data.error) {
+                console.error(`Chunk ${chunkIndex + 1} error:`, data.error);
+                throw new Error(data.error || "Chunk upload failed");
+              }
+            } catch (parseError) {
+              console.error("Error parsing SSE data:", parseError, line);
+            }
+          }
         }
-      );
-
-      if (!completionResponse.ok) {
-        const errorData = await completionResponse.json();
-        throw new Error(errorData.error || "Failed to complete upload");
       }
-
-      // Final success update
-      setProgress((prev) =>
-        prev.map((p) =>
-          p.fileId === fileId
-            ? {
-                ...p,
-                status: "complete",
-                currentStep: "Upload complete",
-                progress: 100,
-                imageUrl:
-                  uploadResult.result.variants?.[0] ||
-                  uploadResult.result.filename,
-                stepProgress: {
-                  cloudflare: {
-                    status: "complete",
-                    progress: 100,
-                    message: "Upload complete",
-                  },
-                  openai: {
-                    status: "complete",
-                    progress: 100,
-                    message: "Analysis complete",
-                  },
-                },
-              }
-            : p
-        )
-      );
     } catch (error) {
-      console.error(`Direct upload error for ${file.name}:`, error);
+      console.error(`Chunk ${chunkIndex + 1} upload error:`, error);
       const errorMessage =
-        error instanceof Error ? error.message : "Upload failed";
+        error instanceof Error ? error.message : "Chunk upload failed";
 
-      setProgress((prev) =>
-        prev.map((p) =>
-          p.fileId === fileId
-            ? {
-                ...p,
-                status: "error",
-                error: errorMessage,
-                currentStep: `Error: ${errorMessage}`,
-              }
-            : p
-        )
-      );
+      // Update chunk files to error status
+      chunk.forEach((file, localIndex) => {
+        const globalIndex = globalOffset + localIndex;
+        const fileId = `${globalIndex}-${file.name}`;
 
-      throw error;
+        setProgress((prev) =>
+          prev.map((p) =>
+            p.fileId === fileId
+              ? { ...p, status: "error", error: errorMessage }
+              : p
+          )
+        );
+      });
+
+      throw error; // Re-throw to stop processing subsequent chunks
     }
   };
 
@@ -495,276 +542,270 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
       if (activeUploads > 0) {
         // Show progress while uploading
         document.title = `(${completedUploads}/${totalUploads}) Uploading ${overallPercent}% - ${originalTitle}`;
-      } else if (allComplete) {
+      } else if (completedUploads === totalUploads && uploadSuccess) {
         // Show completion
         document.title = `✅ Upload Complete - ${originalTitle}`;
       }
-    } else if (originalTitle) {
-      // Restore original title
-      document.title = originalTitle;
-    }
 
-    // Add event listener
-    window.addEventListener("beforeunload", handleBeforeUnload);
+      // Add beforeunload listener during upload
+      window.addEventListener("beforeunload", handleBeforeUnload);
+
+      return () => {
+        window.removeEventListener("beforeunload", handleBeforeUnload);
+      };
+    } else {
+      // Restore original title when not uploading
+      if (originalTitle && document.title !== originalTitle) {
+        document.title = originalTitle;
+      }
+    }
 
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [isUploading, progress, overallPercent, allComplete, originalTitle]);
+  }, [isUploading, progress, overallPercent, uploadSuccess, originalTitle]);
 
+  // Remove a file from pending list
   const removePendingFile = (index: number) => {
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  if (!api) return <div>Loading...</div>;
+
   return (
-    <div className="space-y-6">
-      {/* Model and Prompt Selection */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Model Selection */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">AI Model</label>
-          <Select value={selectedModelId} onValueChange={setSelectedModelId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select AI model" />
-            </SelectTrigger>
-            <SelectContent>
-              {IMAGE_ANALYSIS_CONFIG.availableModels.map((model) => (
-                <SelectItem key={model.id} value={model.id}>
-                  <div className="flex flex-col">
-                    <span className="font-medium">{model.name}</span>
-                    <span className="text-xs text-gray-500">
-                      {model.description}
-                    </span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Prompt Selection */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">
-            Analysis Prompt
-          </label>
-          <Select
-            value={selectedPromptId}
-            onValueChange={setSelectedPromptId}
-            disabled={isLoadingPrompts}
-          >
-            <SelectTrigger>
-              <SelectValue
-                placeholder={
-                  isLoadingPrompts
-                    ? "Loading prompts..."
-                    : "Select analysis prompt"
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {availablePrompts.map((prompt) => (
-                <SelectItem key={prompt._id} value={prompt._id}>
-                  <div className="flex flex-col">
-                    <span className="font-medium">{prompt.name}</span>
-                    {prompt.description && (
-                      <span className="text-xs text-gray-500">
-                        {prompt.description}
-                      </span>
-                    )}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Upload Area */}
-      <div
-        className={cn(
-          "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
-          isUploading
-            ? "border-gray-300 bg-gray-50"
-            : "border-gray-300 hover:border-gray-400 hover:bg-gray-50 cursor-pointer"
-        )}
-        onDrop={handleDrop}
-        onDragOver={(e) => e.preventDefault()}
-        onClick={handleClick}
-      >
-        <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-lg font-medium text-gray-700 mb-2">
-          {isUploading ? "Uploading..." : "Drop images here or click to select"}
-        </p>
-        <p className="text-sm text-gray-500">
-          {multiple
-            ? "Select multiple images (up to 25MB each)"
-            : "Select an image (up to 25MB)"}
-        </p>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          multiple={multiple}
-          onChange={handleInputChange}
-          className="hidden"
-          disabled={isUploading}
-        />
-      </div>
-
-      {/* Pending Files */}
-      {pendingFiles.length > 0 && !isUploading && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium text-gray-700">
-            Ready to upload ({pendingFiles.length} files)
-          </h3>
+    <div>
+      {/* Analysis Options - only show if not uploading and no progress yet */}
+      {progress.length === 0 && !isUploading && (
+        <div className="space-y-4 mb-4">
+          {/* Prompt Selection */}
           <div className="space-y-2">
-            {pendingFiles.map((file, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {file.name}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {(file.size / 1024 / 1024).toFixed(2)} MB
-                  </p>
-                </div>
-                <button
-                  onClick={() => removePendingFile(index)}
-                  className="ml-4 p-1 text-gray-400 hover:text-red-500"
-                >
-                  <XIcon className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+            <label className="text-sm font-medium">Analysis Prompt</label>
+            <Select
+              value={selectedPromptId}
+              onValueChange={setSelectedPromptId}
+              disabled={isLoadingPrompts}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    isLoadingPrompts
+                      ? "Loading prompts..."
+                      : "Select analysis prompt"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {availablePrompts.map((prompt) => (
+                  <SelectItem key={prompt._id} value={prompt._id}>
+                    <div className="flex flex-col">
+                      <span>{prompt.name}</span>
+                      {prompt.description && (
+                        <span className="text-xs text-muted-foreground">
+                          {prompt.description}
+                        </span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <Button
-            onClick={startUpload}
-            disabled={!selectedPromptId || !selectedModelId}
-            className="w-full"
-          >
-            Upload {pendingFiles.length}{" "}
-            {pendingFiles.length === 1 ? "Image" : "Images"}
+
+          {/* Model Selection */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">AI Model</label>
+            <Select value={selectedModelId} onValueChange={setSelectedModelId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select AI model" />
+              </SelectTrigger>
+              <SelectContent>
+                {IMAGE_ANALYSIS_CONFIG.availableModels.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    <div className="flex flex-col">
+                      <span>{model.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {model.description}
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
+      {/* File select/drop UI, only if not uploading and no progress yet */}
+      {progress.length === 0 && !isUploading && (
+        <div
+          className={cn(
+            "border border-dashed border-border rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer transition-colors bg-background"
+          )}
+          tabIndex={0}
+          role="button"
+          aria-disabled={isUploading}
+          onClick={handleClick}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleFiles(e.dataTransfer.files);
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          aria-label="Upload images"
+        >
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            multiple={multiple}
+            className="hidden"
+            onChange={handleInputChange}
+            disabled={isUploading}
+          />
+          <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+          <div className="text-sm font-medium">
+            Click to select or drag and drop images
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            Images up to 8MB each (25MB total per batch)
+          </div>
+        </div>
+      )}
+
+      {/* Pending files list and confirm button */}
+      {pendingFiles.length > 0 && progress.length === 0 && !isUploading && (
+        <div className="mt-4 w-full">
+          <div className="mb-2 font-medium">Files to upload:</div>
+          <ul className="w-full max-w-[350px] overflow-hidden mb-4 divide-y divide-border rounded border border-border bg-background max-h-48 overflow-y-auto">
+            {pendingFiles.map((file, i) => (
+              <li
+                key={i}
+                className="flex items-center w-full max-w-full min-w-0 px-3 py-2 text-sm overflow-hidden"
+              >
+                <span className="truncate flex-1 min-w-0 max-w-full block whitespace-nowrap">
+                  {file.name}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removePendingFile(i)}
+                  className="ml-2 h-6 w-6 p-0"
+                >
+                  <XIcon className="h-3 w-3" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+          <Button onClick={startUpload} className="w-full">
+            Upload {pendingFiles.length} file
+            {pendingFiles.length > 1 ? "s" : ""}
           </Button>
         </div>
       )}
 
-      {/* Upload Progress */}
+      {/* Simplified progress display */}
       {progress.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-gray-700">
-              Upload Progress
-            </h3>
-            <span className="text-sm text-gray-500">
-              {progress.filter((p) => p.status === "complete").length}/
-              {progress.length} completed
-            </span>
+        <div className="mt-4 w-full space-y-3">
+          <div className="text-sm font-medium">
+            Uploading {progress.length} file{progress.length > 1 ? "s" : ""}...
           </div>
 
-          {/* Overall Progress */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Overall Progress</span>
-              <span className="text-sm text-gray-600">{overallPercent}%</span>
-            </div>
-            <Progress value={overallPercent} className="w-full" />
-          </div>
-
-          {/* Individual File Progress */}
-          <div className="space-y-3">
-            {progress.map((item) => (
-              <div key={item.fileId} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    {item.status === "complete" && (
-                      <Check className="w-4 h-4 text-green-500" />
+          {/* Individual file progress */}
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {progress.map((fileProgress, i) => (
+              <div key={fileProgress.fileId} className="space-y-1">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {fileProgress.status === "uploading" && (
+                      <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
                     )}
-                    {item.status === "error" && (
-                      <XIcon className="w-4 h-4 text-red-500" />
+                    {fileProgress.status === "analyzing" && (
+                      <Loader2 className="h-3 w-3 animate-spin flex-shrink-0 text-purple-500" />
                     )}
-                    {item.status === "uploading" && (
-                      <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                    {fileProgress.status === "complete" && (
+                      <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
                     )}
-                    <span className="text-sm font-medium text-gray-900 truncate">
-                      {item.fileName}
+                    {fileProgress.status === "error" && (
+                      <XIcon className="h-3 w-3 text-red-500 flex-shrink-0" />
+                    )}
+                    <span className="truncate text-muted-foreground">
+                      {fileProgress.fileName}
                     </span>
                   </div>
-                  <span className="text-sm text-gray-500">
-                    {item.progress}%
+                  <span className="text-xs font-medium ml-2 flex-shrink-0">
+                    {fileProgress.progress}%
                   </span>
                 </div>
-
                 <Progress
-                  value={item.progress}
+                  value={fileProgress.progress}
                   className={cn(
-                    "w-full h-2",
-                    item.status === "error" && "bg-red-100",
-                    item.status === "complete" && "bg-green-100"
+                    "h-1.5",
+                    fileProgress.status === "error" && "bg-red-100"
                   )}
                 />
-
-                {item.currentStep && (
-                  <p className="text-xs text-gray-500">{item.currentStep}</p>
-                )}
-
-                {item.error && (
-                  <p className="text-xs text-red-600">{item.error}</p>
-                )}
-
-                {/* Step Progress Details */}
-                {item.stepProgress && (
-                  <div className="grid grid-cols-2 gap-4 text-xs">
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span>Cloudflare Upload</span>
-                        <span>
-                          {item.stepProgress.cloudflare?.progress || 0}%
-                        </span>
-                      </div>
-                      <Progress
-                        value={item.stepProgress.cloudflare?.progress || 0}
-                        className="h-1"
-                      />
-                      {item.stepProgress.cloudflare?.message && (
-                        <p className="text-gray-500">
-                          {item.stepProgress.cloudflare.message}
-                        </p>
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span>AI Analysis</span>
-                        <span>{item.stepProgress.openai?.progress || 0}%</span>
-                      </div>
-                      <Progress
-                        value={item.stepProgress.openai?.progress || 0}
-                        className="h-1"
-                      />
-                      {item.stepProgress.openai?.message && (
-                        <p className="text-gray-500">
-                          {item.stepProgress.openai.message}
-                        </p>
-                      )}
-                    </div>
+                {fileProgress.error && (
+                  <div className="text-xs text-red-500 px-1">
+                    {fileProgress.error}
                   </div>
                 )}
               </div>
             ))}
+          </div>
+
+          {/* Overall progress */}
+          <div className="space-y-1 pt-2 border-t border-border">
+            <div className="flex items-center justify-between text-sm font-medium">
+              <span>Overall Progress</span>
+              <span>{overallPercent}%</span>
+            </div>
+            <Progress
+              value={overallPercent}
+              className={cn("h-2", allComplete && "bg-green-100")}
+            />
           </div>
         </div>
       )}
 
       {/* Success Message */}
       {uploadSuccess && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-          <div className="flex items-center">
-            <Check className="w-5 h-5 text-green-500 mr-2" />
-            <span className="text-sm font-medium text-green-800">
-              All images uploaded successfully!
-            </span>
+        <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center">
+              <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
+              <div>
+                <p className="text-green-800 font-medium">
+                  Upload and Analysis Complete!
+                </p>
+                <p className="text-green-600 text-sm">
+                  Successfully uploaded and analyzed {progress.length} image(s)
+                  with AI metadata including angle, view, and description.
+                </p>
+                <p className="text-green-600 text-xs mt-1">
+                  Closing automatically in 2 seconds...
+                </p>
+              </div>
+            </div>
+            {onComplete && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onComplete}
+                className="ml-4 flex-shrink-0"
+              >
+                Close Now
+              </Button>
+            )}
           </div>
         </div>
       )}

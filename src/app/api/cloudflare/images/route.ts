@@ -86,9 +86,9 @@ const ANALYSIS_RETRY_COUNT = 2;
 const ANALYSIS_CONCURRENCY = 4;
 
 // File size limits and validation
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB (Cloudflare Images limit)
-const MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB total request size for Vercel Pro
-const VERCEL_CHUNK_SIZE = 4 * 1024 * 1024; // 4MB chunks to stay under Vercel body limits
+const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB per file to avoid Vercel limits
+const MAX_TOTAL_SIZE = 8 * 1024 * 1024; // 8MB total request size to avoid 413 errors
+const VERCEL_CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunks to stay well under Vercel body limits
 const SUPPORTED_MIME_TYPES = [
   "image/jpeg",
   "image/jpg",
