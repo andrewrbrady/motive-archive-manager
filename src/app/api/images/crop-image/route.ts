@@ -23,17 +23,17 @@ interface CropImageRequest {
 }
 
 export async function POST(request: NextRequest) {
-  console.log("🚀 Crop-image API called");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚀 Crop-image API called");
 
   try {
     // Test Sharp availability first
     try {
-      console.log("🔍 Testing Sharp availability...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Testing Sharp availability...");
       // Just check if Sharp is importable and has the expected methods
       if (typeof sharp !== "function") {
         throw new Error("Sharp is not a function");
       }
-      console.log("✅ Sharp is available");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Sharp is available");
     } catch (sharpError) {
       console.error("❌ Sharp test failed:", sharpError);
       return NextResponse.json(
@@ -51,10 +51,10 @@ export async function POST(request: NextRequest) {
     const body: CropImageRequest = await request.json();
 
     // 🐛 SIMPLIFIED DEBUG: Check sourceImageWidth
-    console.log("🚨🚨🚨 BACKEND RECEIVED 🚨🚨🚨");
-    console.log("sourceImageWidth:", body.sourceImageWidth);
-    console.log("uploadToCloudflare:", body.uploadToCloudflare);
-    console.log("scale:", body.scale);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚨🚨🚨 BACKEND RECEIVED 🚨🚨🚨");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("sourceImageWidth:", body.sourceImageWidth);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("uploadToCloudflare:", body.uploadToCloudflare);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("scale:", body.scale);
 
     console.log("📝 Request body received:", {
       imageUrl: body.imageUrl?.substring(0, 100) + "...",
@@ -165,10 +165,10 @@ export async function POST(request: NextRequest) {
 
     try {
       // Always use Sharp for image processing - reliable on both local and Vercel
-      console.log("🔧 Using Sharp for image processing");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔧 Using Sharp for image processing");
 
       // Local processing using Sharp (in-memory)
-      console.log("📥 Downloading image from:", processableImageUrl);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📥 Downloading image from:", processableImageUrl);
       console.log("🔍 Image URL details:", {
         url: processableImageUrl,
         length: processableImageUrl?.length,
@@ -187,12 +187,12 @@ export async function POST(request: NextRequest) {
 
         // If it's a Cloudflare Image Delivery URL, we might need special handling
         if (processableImageUrl.includes("imagedelivery.net")) {
-          console.log("🔧 Detected Cloudflare Image Delivery URL");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔧 Detected Cloudflare Image Delivery URL");
           // Add any necessary headers for Cloudflare
           fetchHeaders["Accept"] = "image/*";
         }
 
-        console.log("🌐 Making fetch request with headers:", fetchHeaders);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🌐 Making fetch request with headers:", fetchHeaders);
 
         imageResponse = await fetch(processableImageUrl, {
           headers: fetchHeaders,
@@ -239,12 +239,12 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      console.log("📦 Converting image response to buffer...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📦 Converting image response to buffer...");
       let imageBuffer;
       try {
         const arrayBuffer = await imageResponse.arrayBuffer();
         imageBuffer = Buffer.from(arrayBuffer);
-        console.log("✅ Image buffer created, size:", imageBuffer.length);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Image buffer created, size:", imageBuffer.length);
       } catch (bufferError) {
         console.error("❌ Failed to create buffer:", bufferError);
         throw new Error(
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Get actual dimensions of the downloaded image
-      console.log("📏 Getting image metadata...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📏 Getting image metadata...");
       let imageMetadata;
       try {
         imageMetadata = await sharp(imageBuffer).metadata();
@@ -267,14 +267,9 @@ export async function POST(request: NextRequest) {
       const actualWidth = imageMetadata.width!;
       const actualHeight = imageMetadata.height!;
 
-      console.log("📏 Actual image dimensions:", { actualWidth, actualHeight });
-      console.log("📐 Original crop coordinates (from frontend):", {
-        cropX,
-        cropY,
-        cropWidth,
-        cropHeight,
-      });
-      console.log("📱 Preview image dimensions:", previewImageDimensions);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📏 Actual image dimensions:", { actualWidth, actualHeight });
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📐 Original crop coordinates (from frontend):", [data omitted]);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📱 Preview image dimensions:", previewImageDimensions);
 
       // Calculate scaling factor if we have preview dimensions
       let scaledCropX = cropX;
@@ -391,7 +386,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      console.log("✂️ Processing image with Sharp...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✂️ Processing image with Sharp...");
 
       // Process the image using Sharp (in-memory)
       let processedImageBuffer;
@@ -437,7 +432,7 @@ export async function POST(request: NextRequest) {
       // Upload to Cloudflare if requested
       if (uploadToCloudflare) {
         try {
-          console.log("☁️ Uploading to Cloudflare...");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("☁️ Uploading to Cloudflare...");
 
           // Create FormData for the upload
           const formData = new FormData();
@@ -509,11 +504,11 @@ export async function POST(request: NextRequest) {
             }
           );
 
-          console.log("📥 Upload response status:", uploadResponse.status);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📥 Upload response status:", uploadResponse.status);
 
           if (uploadResponse.ok) {
             const uploadResult = await uploadResponse.json();
-            console.log("✅ Upload result:", uploadResult);
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Upload result:", uploadResult);
             console.log("🔍 Upload result structure:", {
               success: uploadResult.success,
               hasImages: !!uploadResult.images,
@@ -543,7 +538,7 @@ export async function POST(request: NextRequest) {
                 "✅ Processed upload result:",
                 result.cloudflareUpload
               );
-              console.log("🔍 MongoDB ID extracted:", uploadedImage.id);
+              // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 MongoDB ID extracted:", uploadedImage.id);
             } else {
               console.error(
                 "❌ Upload result missing images array:",
@@ -552,7 +547,7 @@ export async function POST(request: NextRequest) {
               result.cloudflareUpload = uploadResult;
             }
 
-            console.log("✅ Cloudflare upload successful");
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Cloudflare upload successful");
           } else {
             const errorText = await uploadResponse.text();
             console.error(
@@ -591,7 +586,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      console.log("🎉 Crop operation completed successfully");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎉 Crop operation completed successfully");
       return NextResponse.json(result);
     } catch (error) {
       console.error("❌ Error in crop-image processing:", error);

@@ -89,12 +89,19 @@ export function GenerationControls({
   enableStreaming,
   onStreamingToggle,
 }: GenerationControlsProps) {
-  if (selectedCarIds.length === 0) {
-    return null;
-  }
-
   return (
     <div className="space-y-6">
+      {/* Show a warning if no cars are selected */}
+      {selectedCarIds.length === 0 && (
+        <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            ℹ️ No cars selected. You can still generate captions based on your
+            prompt template and additional context. Add cars for
+            vehicle-specific content.
+          </p>
+        </div>
+      )}
+
       {/* Prompt Selection and Action Buttons */}
       <div className="grid grid-cols-[1fr_auto_auto] items-end gap-2">
         <div className="flex-grow">
@@ -278,33 +285,35 @@ export function GenerationControls({
         </div>
       </div>
 
-      {/* Data Filtering Options */}
-      <div className="space-y-3 p-4 rounded-lg bg-[var(--background-secondary)] border border-[hsl(var(--border-subtle))]">
-        <div className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white">
-          Data Filtering Options
-        </div>
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="minimal-car-data"
-              checked={useMinimalCarData}
-              onCheckedChange={(checked) => {
-                onUseMinimalCarDataChange(checked as boolean);
-              }}
-            />
-            <label
-              htmlFor="minimal-car-data"
-              className="text-sm text-[hsl(var(--foreground))] dark:text-white cursor-pointer"
-            >
-              Use minimal car data
-            </label>
+      {/* Data Filtering Options - only show if cars are selected */}
+      {selectedCarIds.length > 0 && (
+        <div className="space-y-3 p-4 rounded-lg bg-[var(--background-secondary)] border border-[hsl(var(--border-subtle))]">
+          <div className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white">
+            Data Filtering Options
           </div>
-          <p className="text-xs text-[hsl(var(--foreground-muted))] ml-6">
-            Excludes car descriptions from the data sent to the LLM to reduce
-            verbosity
-          </p>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="minimal-car-data"
+                checked={useMinimalCarData}
+                onCheckedChange={(checked) => {
+                  onUseMinimalCarDataChange(checked as boolean);
+                }}
+              />
+              <label
+                htmlFor="minimal-car-data"
+                className="text-sm text-[hsl(var(--foreground))] dark:text-white cursor-pointer"
+              >
+                Use minimal car data
+              </label>
+            </div>
+            <p className="text-xs text-[hsl(var(--foreground-muted))] ml-6">
+              Excludes car descriptions from the data sent to the LLM to reduce
+              verbosity
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* LLM Preview Toggle */}
       <div className="space-y-2">
@@ -376,14 +385,16 @@ export function GenerationControls({
                   Selected Cars ({selectedCarIds.length})
                 </div>
                 <div className="text-xs text-[hsl(var(--foreground))] dark:text-white max-h-20 overflow-y-auto">
-                  {selectedCarIds
-                    .map((carId) => {
-                      const car = projectCars.find((c) => c._id === carId);
-                      return car
-                        ? `${car.year} ${car.make} ${car.model}`
-                        : carId;
-                    })
-                    .join(", ") || "None"}
+                  {selectedCarIds.length > 0
+                    ? selectedCarIds
+                        .map((carId) => {
+                          const car = projectCars.find((c) => c._id === carId);
+                          return car
+                            ? `${car.year} ${car.make} ${car.model}`
+                            : carId;
+                        })
+                        .join(", ")
+                    : "No cars selected"}
                 </div>
               </div>
 
@@ -476,15 +487,10 @@ export function GenerationControls({
         </div>
       )}
 
-      {/* Generate Button */}
+      {/* Generate Button - show but disable when requirements not met */}
       <Button
         onClick={onGenerate}
-        disabled={
-          isGenerating ||
-          selectedCarIds.length === 0 ||
-          !selectedSystemPromptId ||
-          !selectedPrompt
-        }
+        disabled={isGenerating || !selectedSystemPromptId || !selectedPrompt}
         variant="outline"
         className="w-full bg-[var(--background-primary)] hover:bg-black dark:bg-[var(--background-primary)] dark:hover:bg-black text-white border-[hsl(var(--border))]"
       >
@@ -492,9 +498,13 @@ export function GenerationControls({
           ? enableStreaming
             ? "✨ Streaming..."
             : "Generating..."
-          : enableStreaming
-            ? "✨ Stream Caption"
-            : "Generate Caption"}
+          : !selectedSystemPromptId
+            ? "Select System Prompt to Generate"
+            : !selectedPrompt
+              ? "Select Prompt Template to Generate"
+              : enableStreaming
+                ? "✨ Stream Caption"
+                : "Generate Caption"}
       </Button>
 
       {error && (

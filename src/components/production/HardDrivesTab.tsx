@@ -183,7 +183,7 @@ export default function HardDrivesTab() {
 
     try {
       setLoading(true);
-      // [REMOVED] // [REMOVED] console.log(`Fetching details for drive ID: ${driveId}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Fetching details for drive ID: ${driveId}`);
       const driveData = (await api.get(
         `hard-drives/${driveId}`
       )) as HardDriveWithDetails;
@@ -210,7 +210,7 @@ export default function HardDrivesTab() {
     }
 
     try {
-      // [REMOVED] // [REMOVED] console.log(`Fetching hard drives (attempt ${fetchAttempts + 1})...`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Fetching hard drives (attempt ${fetchAttempts + 1})...`);
 
       let endpoint = `hard-drives?page=${currentPage}&search=${encodeURIComponent(
         searchTerm
@@ -233,18 +233,18 @@ export default function HardDrivesTab() {
       }
 
       // Debug info to console
-      // [REMOVED] // [REMOVED] console.log("API Response data structure:", Object.keys(actualData));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API Response data structure:", Object.keys(actualData));
 
       // Log debug information if available
       if (actualData.debug) {
-        // [REMOVED] // [REMOVED] console.log("Hard drives API debug info:", actualData.debug);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Hard drives API debug info:", actualData.debug);
       }
 
       // Try different possible response formats
       let drivesList: HardDriveWithDetails[] = [];
 
       if (actualData.data && Array.isArray(actualData.data)) {
-        // [REMOVED] // [REMOVED] console.log(`Using data.data array with ${actualData.data.length} items`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Using data.data array with ${actualData.data.length} items`);
         drivesList = actualData.data;
       } else if (actualData.drives && Array.isArray(actualData.drives)) {
         console.log(
@@ -333,11 +333,11 @@ export default function HardDrivesTab() {
           const responseData = await (err as any).response?.json();
           if (responseData?.debug) {
             debugInfo = responseData.debug;
-            // [REMOVED] // [REMOVED] console.log("Extracted debug info from error response:", debugInfo);
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Extracted debug info from error response:", debugInfo);
           }
         }
       } catch (e) {
-        // [REMOVED] // [REMOVED] console.log("Could not extract debug info from error");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Could not extract debug info from error");
       }
     }
   };
@@ -350,11 +350,11 @@ export default function HardDrivesTab() {
   useEffect(() => {
     const driveParam = getParam("drive");
     const templateParam = getParam("template");
-    // [REMOVED] // [REMOVED] console.log("URL drive parameter changed:", driveParam);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("URL drive parameter changed:", driveParam);
 
     // If template parameter exists, remove it immediately as it shouldn't be in this tab
     if (templateParam) {
-      // [REMOVED] // [REMOVED] console.log("HardDrivesTab: Removing unexpected template parameter");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("HardDrivesTab: Removing unexpected template parameter");
       // Create an updates object that preserves all necessary parameters except template
       updateParams(
         { template: null },
@@ -374,26 +374,26 @@ export default function HardDrivesTab() {
     }
 
     if (driveParam) {
-      // [REMOVED] // [REMOVED] console.log("Setting selectedDriveId from URL parameter:", driveParam);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Setting selectedDriveId from URL parameter:", driveParam);
 
       // Always update the selectedDriveId when the URL parameter changes
       setSelectedDriveId(driveParam);
       setIsDetailsModalOpen(true);
 
       // Always fetch drive details when navigating to this tab with a drive parameter
-      // [REMOVED] // [REMOVED] console.log("Fetching drive details for:", driveParam);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching drive details for:", driveParam);
       fetchDriveDetailsById(driveParam);
     } else if (!driveParam && selectedDriveId) {
       // Only clear the state if this wasn't triggered by our own handleViewDetails function
       // This prevents the immediate closing of the modal after setting the URL parameter
-      // [REMOVED] // [REMOVED] console.log("Checking if we should clear selectedDriveId");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Checking if we should clear selectedDriveId");
 
       // Add a small delay to avoid race conditions with URL updates
       const timeoutId = setTimeout(() => {
         // Check again if the parameter is still not present
         const currentDriveParam = getParam("drive");
         if (!currentDriveParam) {
-          // [REMOVED] // [REMOVED] console.log("Clearing selectedDriveId as URL parameter is empty");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Clearing selectedDriveId as URL parameter is empty");
           setSelectedDriveId(null);
           setIsDetailsModalOpen(false);
           setSelectedDriveForDetails(undefined);
@@ -456,18 +456,18 @@ export default function HardDrivesTab() {
   const handleCloseDetails = () => {
     // Don't do anything if the modal is already closed
     if (!isDetailsModalOpen && !selectedDriveForDetails) {
-      // [REMOVED] // [REMOVED] console.log("handleCloseDetails: Modal already closed, skipping");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("handleCloseDetails: Modal already closed, skipping");
       return;
     }
 
-    // [REMOVED] // [REMOVED] console.log("handleCloseDetails called");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("handleCloseDetails called");
 
     // First update the component state
     setIsDetailsModalOpen(false);
     setSelectedDriveForDetails(undefined);
     setSelectedDriveId(null);
 
-    // [REMOVED] // [REMOVED] console.log("Component state updated: selectedDriveId set to null");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Component state updated: selectedDriveId set to null");
 
     // Get the current template parameter and other preserved parameters
     const template = getParam("template");
@@ -479,7 +479,7 @@ export default function HardDrivesTab() {
     const view = getParam("view");
 
     // Use only the router-based update for consistency
-    // [REMOVED] // [REMOVED] console.log("Updating URL to remove drive parameter");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Updating URL to remove drive parameter");
 
     // Create an updates object with parameters to preserve
     const updates: Record<string, string | null> = {
@@ -494,11 +494,11 @@ export default function HardDrivesTab() {
       context: "tab:hard-drives",
     });
 
-    // [REMOVED] // [REMOVED] console.log("handleCloseDetails completed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("handleCloseDetails completed");
   };
 
   const handleCloseModal = () => {
-    // [REMOVED] // [REMOVED] console.log("Closing modal - clearing URL parameters");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Closing modal - clearing URL parameters");
 
     // Need to clear both parameters regardless of which one was set
     updateParams(
@@ -518,7 +518,7 @@ export default function HardDrivesTab() {
 
     // Check URL after closing
     setTimeout(() => {
-      // [REMOVED] // [REMOVED] console.log("URL after closing modal:", window.location.href);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("URL after closing modal:", window.location.href);
     }, 100);
   };
 
@@ -629,14 +629,14 @@ export default function HardDrivesTab() {
   };
 
   const handleEdit = (drive: HardDriveWithDetails) => {
-    // [REMOVED] // [REMOVED] console.log("Edit button clicked for drive:", drive);
-    // [REMOVED] // [REMOVED] console.log("Drive ID to be edited:", drive._id?.toString());
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Edit button clicked for drive:", drive);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Drive ID to be edited:", drive._id?.toString());
 
     setSelectedDrive(drive);
     setIsModalOpen(true);
 
     // Add URL parameter to make the edit mode shareable and bookmarkable
-    // [REMOVED] // [REMOVED] console.log("Setting editDrive URL parameter to:", drive._id?.toString());
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Setting editDrive URL parameter to:", drive._id?.toString());
     updateParams(
       {
         editDrive: drive._id?.toString() || "",
@@ -649,8 +649,8 @@ export default function HardDrivesTab() {
 
     // Check URL after a short delay
     setTimeout(() => {
-      // [REMOVED] // [REMOVED] console.log("URL after update:", window.location.href);
-      // [REMOVED] // [REMOVED] console.log("URL parameters after update:", window.location.search);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("URL after update:", window.location.href);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("URL parameters after update:", window.location.search);
     }, 100);
 
     // Force a delay to ensure state updates before checking
@@ -677,14 +677,14 @@ export default function HardDrivesTab() {
   // Handle editDrive parameter from URL
   useEffect(() => {
     const editDriveId = getParam("editDrive");
-    // [REMOVED] // [REMOVED] console.log("Checking editDrive URL parameter:", editDriveId);
-    // [REMOVED] // [REMOVED] console.log("Current URL:", window.location.href);
-    // [REMOVED] // [REMOVED] console.log("All URL params:", window.location.search);
-    // [REMOVED] // [REMOVED] console.log("Current drives array length:", drives.length);
-    // [REMOVED] // [REMOVED] console.log("isModalOpen state:", isModalOpen);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Checking editDrive URL parameter:", editDriveId);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Current URL:", window.location.href);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("All URL params:", window.location.search);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Current drives array length:", drives.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("isModalOpen state:", isModalOpen);
 
     if (editDriveId && !isModalOpen) {
-      // [REMOVED] // [REMOVED] console.log("Found editDrive parameter, looking for matching drive");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Found editDrive parameter, looking for matching drive");
 
       // Find the drive by ID
       const driveToEdit = drives.find(
@@ -692,7 +692,7 @@ export default function HardDrivesTab() {
       );
 
       if (driveToEdit) {
-        // [REMOVED] // [REMOVED] console.log("Found drive to edit:", driveToEdit);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Found drive to edit:", driveToEdit);
         setSelectedDrive(driveToEdit);
         setIsModalOpen(true);
         setIsAddingDrive(false);
@@ -758,7 +758,7 @@ export default function HardDrivesTab() {
 
   // Log when selectedDriveId changes
   useEffect(() => {
-    // [REMOVED] // [REMOVED] console.log("selectedDriveId changed:", selectedDriveId);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("selectedDriveId changed:", selectedDriveId);
   }, [selectedDriveId]);
 
   // Log before rendering
@@ -774,7 +774,7 @@ export default function HardDrivesTab() {
     // Check for and remove any template parameter on the hard-drives tab
     const templateParam = getParam("template");
     if (templateParam) {
-      // [REMOVED] // [REMOVED] console.log("HardDrivesTab: Initial check removing template parameter");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("HardDrivesTab: Initial check removing template parameter");
       updateParams(
         { template: null },
         {
@@ -900,7 +900,7 @@ export default function HardDrivesTab() {
               onClick={(e) => {
                 // Only handle click if not on a button
                 if (!(e.target as HTMLElement).closest("button")) {
-                  // [REMOVED] // [REMOVED] console.log("Grid item clicked for drive:", drive);
+                  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Grid item clicked for drive:", drive);
                   handleViewDetails(drive);
                 }
               }}
@@ -1055,7 +1055,7 @@ export default function HardDrivesTab() {
                       (e.target as HTMLElement).tagName === "TD" ||
                       (e.target as HTMLElement).closest("td:not(:last-child)")
                     ) {
-                      // [REMOVED] // [REMOVED] console.log("Table row clicked for drive:", drive);
+                      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Table row clicked for drive:", drive);
                       handleViewDetails(drive);
                     }
                   }}

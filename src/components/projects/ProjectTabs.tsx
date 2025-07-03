@@ -77,6 +77,11 @@ const ProjectGalleriesTab = lazy(() =>
     default: m.ProjectGalleriesTab,
   }))
 );
+const ProjectImageGallery = lazy(() =>
+  import("./ProjectImageGallery").then((m) => ({
+    default: m.ProjectImageGallery,
+  }))
+);
 const UnifiedCopywriter = lazy(() =>
   import("../copywriting/UnifiedCopywriter").then((m) => ({
     default: m.UnifiedCopywriter,
@@ -131,6 +136,7 @@ const tabs = [
   { value: "events", label: "Events" },
   { value: "team", label: "Team" },
   { value: "cars", label: "Cars" },
+  { value: "images", label: "Images" },
   { value: "galleries", label: "Galleries" },
   { value: "assets", label: "Assets" },
   { value: "deliverables", label: "Deliverables" },
@@ -158,10 +164,34 @@ export function ProjectTabs({
   preloadedCopywriterData,
 }: ProjectTabsProps) {
   const [hasLoadedTab, setHasLoadedTab] = useState<Record<string, boolean>>({
-    overview: true, // Always load overview first
+    overview: true, // Always load overview
+    // Preload critical tabs that are most commonly accessed
+    events: true,
+    cars: true,
+    images: true,
   });
 
-  // Mark tab as loaded when it becomes active
+  // Preload remaining tabs after initial render for better UX
+  useEffect(() => {
+    const preloadTimer = setTimeout(() => {
+      setHasLoadedTab((prev) => ({
+        ...prev,
+        timeline: true,
+        team: true,
+        galleries: true,
+        assets: true,
+        deliverables: true,
+        copywriter: true,
+        "content-studio": true,
+        "ai-chat": true,
+        calendar: true,
+      }));
+    }, 1000); // Preload after 1 second
+
+    return () => clearTimeout(preloadTimer);
+  }, []);
+
+  // Mark tab as loaded when it becomes active (fallback)
   useEffect(() => {
     if (activeTab && !hasLoadedTab[activeTab]) {
       setHasLoadedTab((prev) => ({
@@ -264,6 +294,15 @@ export function ProjectTabs({
               project={project}
               onProjectUpdate={onProjectUpdate}
               initialCars={preloadedCars}
+            />
+          </Suspense>
+        )}
+
+        {activeTab === "images" && hasLoadedTab.images && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ProjectImageGallery
+              projectId={project._id!}
+              projectInfo={project}
             />
           </Suspense>
         )}

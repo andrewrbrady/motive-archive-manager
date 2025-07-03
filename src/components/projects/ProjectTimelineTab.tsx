@@ -103,7 +103,7 @@ export function ProjectTimelineTab({
 
       setTimelineData(response.timeline);
       console.timeEnd("ProjectTimelineTab-fetch");
-      console.log("📊 ProjectTimelineTab: Timeline data loaded from API");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📊 ProjectTimelineTab: Timeline data loaded from API");
     } catch (error) {
       console.error("Error fetching timeline data:", error);
       // Fallback to project timeline data if API fails

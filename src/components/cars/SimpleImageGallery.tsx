@@ -188,7 +188,7 @@ export function SimpleImageGallery({
             payload
           )) as DeleteImageResponse;
 
-          console.log("Delete response from /api/cloudflare/images:", result);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Delete response from /api/cloudflare/images:", result);
 
           if (!result.success) {
             throw new Error(result.error || JSON.stringify(result));

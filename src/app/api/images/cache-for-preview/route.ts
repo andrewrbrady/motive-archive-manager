@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     try {
       // Download the image
-      console.log("Downloading image for cache:", imageUrl);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Downloading image for cache:", imageUrl);
       const imageResponse = await fetch(imageUrl);
       if (!imageResponse.ok) {
         throw new Error(`Failed to download image: ${imageResponse.status}`);
@@ -50,8 +50,8 @@ export async function POST(request: NextRequest) {
       // Save the image to cache
       fs.writeFileSync(cachePath, Buffer.from(imageBuffer));
 
-      console.log(`Image cached successfully: ${cachePath}`);
-      console.log(`Original dimensions: ${originalWidth}×${originalHeight}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Image cached successfully: ${cachePath}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Original dimensions: ${originalWidth}×${originalHeight}`);
 
       // Set up cleanup after 30 minutes
       setTimeout(
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
           try {
             if (fs.existsSync(cachePath)) {
               fs.unlinkSync(cachePath);
-              console.log(`Cleaned up cached image: ${cachePath}`);
+              // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Cleaned up cached image: ${cachePath}`);
             }
           } catch (cleanupError) {
             console.error("Error cleaning up cached image:", cleanupError);

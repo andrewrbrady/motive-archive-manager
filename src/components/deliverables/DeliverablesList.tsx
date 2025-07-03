@@ -138,7 +138,7 @@ export default function DeliverablesList() {
 
   const fetchCars = async () => {
     if (!api) {
-      console.log("API client not available for fetching cars");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API client not available for fetching cars");
       return;
     }
 

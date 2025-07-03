@@ -58,11 +58,11 @@ export function PlatformSelector({
         platform_id: platformValue,
       };
 
-      console.log("🔄 Sending updates:", updates);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Sending updates:", updates);
 
       await api.put(`/api/deliverables/${deliverableId}`, updates);
 
-      console.log("✅ Platform update successful");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Platform update successful");
 
       // Update local state
       setPlatformId(newPlatformId);

@@ -16,7 +16,7 @@ export async function GET(
     // Check authentication
     const authResult = await verifyAuthMiddleware(request);
     if (authResult) {
-      console.log("❌ GET /api/projects/[id]/timeline: Authentication failed");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ GET /api/projects/[id]/timeline: Authentication failed");
       return authResult;
     }
 
@@ -72,7 +72,7 @@ export async function PUT(
     // Check authentication
     const authResult = await verifyAuthMiddleware(request);
     if (authResult) {
-      console.log("❌ PUT /api/projects/[id]/timeline: Authentication failed");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ PUT /api/projects/[id]/timeline: Authentication failed");
       return authResult;
     }
 
@@ -155,7 +155,7 @@ export async function POST(
     // Check authentication
     const authResult = await verifyAuthMiddleware(request);
     if (authResult) {
-      console.log("❌ POST /api/projects/[id]/timeline: Authentication failed");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ POST /api/projects/[id]/timeline: Authentication failed");
       return authResult;
     }
 

@@ -1,6 +1,9 @@
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import { CloudflareImage } from "@/components/ui/CloudflareImage";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   X,
   ChevronLeft,
@@ -8,6 +11,7 @@ import {
   Copy,
   Info,
   Download,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ExtendedImageType } from "@/types/gallery";
@@ -25,6 +29,236 @@ interface ImageModalProps {
   onCopyUrl?: (useHighestQuality?: boolean) => void;
 }
 
+// Flexible metadata display component for gallery images
+function GalleryMetadataDisplay({ metadata }: { metadata: any }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+
+  if (!metadata || Object.keys(metadata).length === 0) {
+    return (
+      <div className="text-center text-muted-foreground py-4">
+        No metadata available
+      </div>
+    );
+  }
+
+  const metadataEntries = Object.entries(metadata);
+  const filteredEntries = searchTerm
+    ? metadataEntries.filter(
+        ([key, value]) =>
+          key.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          String(value).toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : metadataEntries;
+
+  const formatValue = (value: any): React.ReactNode => {
+    if (value === null || value === undefined) {
+      return <span className="text-gray-500 italic">null</span>;
+    }
+
+    if (typeof value === "boolean") {
+      return (
+        <Badge variant={value ? "default" : "secondary"} className="text-xs">
+          {value ? "Yes" : "No"}
+        </Badge>
+      );
+    }
+
+    if (typeof value === "number") {
+      return (
+        <span className="font-mono text-sm">{value.toLocaleString()}</span>
+      );
+    }
+
+    if (typeof value === "string") {
+      // Handle URLs
+      if (value.startsWith("http")) {
+        return (
+          <a
+            href={value}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 underline break-all text-sm"
+          >
+            {value}
+          </a>
+        );
+      }
+
+      // Handle very long strings
+      if (value.length > 80) {
+        return (
+          <div className="bg-black/20 p-2 rounded text-xs font-mono break-all max-h-24 overflow-y-auto">
+            {value}
+          </div>
+        );
+      }
+
+      return <span className="break-all text-sm">{value}</span>;
+    }
+
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        return (
+          <span className="text-gray-500 italic text-sm">Empty array</span>
+        );
+      }
+
+      return (
+        <div className="space-y-1">
+          {value.slice(0, 3).map((item, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                {index + 1}
+              </Badge>
+              <span className="text-xs">{formatValue(item)}</span>
+            </div>
+          ))}
+          {value.length > 3 && (
+            <div className="text-xs text-gray-500">
+              ... and {value.length - 3} more
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (typeof value === "object") {
+      return (
+        <div className="bg-black/20 p-2 rounded text-xs font-mono break-all max-h-24 overflow-y-auto">
+          <pre>{JSON.stringify(value, null, 2)}</pre>
+        </div>
+      );
+    }
+
+    return <span className="break-all text-sm">{String(value)}</span>;
+  };
+
+  const formatKey = (key: string): string => {
+    // Convert camelCase/snake_case to Title Case
+    return key
+      .replace(/([A-Z])/g, " $1")
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase())
+      .trim();
+  };
+
+  const getPriorityOrder = (key: string): number => {
+    // Define priority order for common fields
+    const priorities: { [key: string]: number } = {
+      description: 1,
+      category: 2,
+      angle: 3,
+      view: 4,
+      movement: 5,
+      tod: 6,
+      side: 7,
+      primary_subject: 8,
+      content_type: 9,
+      style: 10,
+      usage_context: 11,
+      dominant_colors: 12,
+      has_text: 13,
+      has_brand_elements: 14,
+      width: 15,
+      height: 16,
+      size: 17,
+      format: 18,
+      isPrimary: 100, // Show isPrimary at the end
+    };
+
+    return priorities[key] || 50; // Default priority for unknown fields
+  };
+
+  // Sort entries by priority, then alphabetically
+  const sortedEntries = filteredEntries.sort(([keyA], [keyB]) => {
+    const priorityA = getPriorityOrder(keyA);
+    const priorityB = getPriorityOrder(keyB);
+
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+
+    return keyA.localeCompare(keyB);
+  });
+
+  return (
+    <div className="space-y-3">
+      {/* Search/Filter controls */}
+      {metadataEntries.length > 5 && (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowSearch(!showSearch)}
+            className="h-7 text-white hover:bg-white/20"
+          >
+            <Search className="h-3 w-3" />
+          </Button>
+          {showSearch && (
+            <Input
+              placeholder="Search metadata..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-7 text-xs bg-black/20 border-white/20 text-white placeholder:text-gray-400"
+            />
+          )}
+          {searchTerm && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSearchTerm("")}
+              className="h-7 text-white hover:bg-white/20"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Metadata entries */}
+      <div className="space-y-2">
+        {sortedEntries.length === 0 ? (
+          <div className="text-center text-gray-400 py-4 text-sm">
+            No metadata matches your search
+          </div>
+        ) : (
+          sortedEntries.map(([key, value]) => (
+            <div key={key} className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400 text-xs font-medium">
+                  {formatKey(key)}:
+                </span>
+                {typeof value === "object" && !Array.isArray(value) && (
+                  <Badge variant="outline" className="text-xs">
+                    Object
+                  </Badge>
+                )}
+                {Array.isArray(value) && (
+                  <Badge variant="outline" className="text-xs">
+                    Array ({value.length})
+                  </Badge>
+                )}
+              </div>
+              <div className="pl-2">{formatValue(value)}</div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Metadata summary */}
+      {searchTerm && (
+        <div className="pt-2 border-t border-white/20">
+          <div className="text-xs text-gray-400">
+            {filteredEntries.length} of {metadataEntries.length} fields matching
+            "{searchTerm}"
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ImageModal({
   isOpen,
   onClose,
@@ -36,69 +270,35 @@ export function ImageModal({
   onToggleInfo,
   onCopyUrl,
 }: ImageModalProps) {
-  // Find current image index for navigation
-  const currentIndex = images.findIndex(
-    (img) => (img.id || img._id) === (currentImage?.id || currentImage?._id)
-  );
+  const currentIndex = images.findIndex((img) => img.id === currentImage?.id);
   const hasPrevious = currentIndex > 0;
   const hasNext = currentIndex < images.length - 1;
 
-  // Keyboard navigation in lightbox mode
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (!isOpen) return;
 
-      const isShiftPressed = event.shiftKey;
-      const key = event.key;
-
-      // Handle Shift + Key combinations
-      if (isShiftPressed) {
-        switch (key.toLowerCase()) {
-          case "i":
-            event.preventDefault();
-            onToggleInfo?.();
-            break;
-
-          case "c":
-            event.preventDefault();
-            onCopyUrl?.(false); // Standard quality in lightbox
-            break;
-        }
-        return;
-      }
-
-      // Handle regular keys
-      switch (key) {
+      switch (event.key) {
         case "ArrowLeft":
           event.preventDefault();
-          if (hasPrevious && onPrev) {
-            onPrev();
-          }
+          onPrev?.();
           break;
-
         case "ArrowRight":
           event.preventDefault();
-          if (hasNext && onNext) {
-            onNext();
-          }
+          onNext?.();
           break;
-
         case "Escape":
           event.preventDefault();
           onClose();
           break;
+        case "i":
+        case "I":
+          event.preventDefault();
+          onToggleInfo?.();
+          break;
       }
     },
-    [
-      isOpen,
-      hasPrevious,
-      hasNext,
-      onNext,
-      onPrev,
-      onClose,
-      onToggleInfo,
-      onCopyUrl,
-    ]
+    [isOpen, onPrev, onNext, onClose, onToggleInfo]
   );
 
   useEffect(() => {
@@ -134,35 +334,31 @@ export function ImageModal({
 
             {/* Control buttons */}
             <div className="flex gap-2">
-              {onToggleInfo && (
-                <button
-                  onClick={onToggleInfo}
-                  className={cn(
-                    "p-2 rounded-full text-white transition-colors",
-                    showImageInfo
-                      ? "bg-primary/80 hover:bg-primary"
-                      : "bg-black/50 hover:bg-black/70"
-                  )}
-                  title="Toggle image info (Shift+I)"
-                >
-                  <Info className="w-5 h-5" />
-                </button>
-              )}
+              <button
+                onClick={onToggleInfo}
+                className={cn(
+                  "p-2 rounded-full text-white transition-colors",
+                  showImageInfo
+                    ? "bg-blue-600/80 hover:bg-blue-600"
+                    : "bg-black/50 hover:bg-black/70"
+                )}
+                title="Toggle image info (I)"
+              >
+                <Info className="w-5 h-5" />
+              </button>
 
-              {onCopyUrl && (
-                <button
-                  onClick={() => onCopyUrl(false)}
-                  className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
-                  title="Copy image URL (Shift+C)"
-                >
-                  <Copy className="w-5 h-5" />
-                </button>
-              )}
+              <button
+                onClick={() => onCopyUrl?.(true)}
+                className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
+                title="Copy high-quality URL"
+              >
+                <Copy className="w-5 h-5" />
+              </button>
 
               <button
                 onClick={onClose}
                 className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
-                title="Close (Escape)"
+                title="Close (Esc)"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -172,31 +368,17 @@ export function ImageModal({
           {/* Navigation arrows */}
           {images.length > 1 && (
             <>
-              {/* Previous button */}
               <button
                 onClick={onPrev}
-                disabled={!hasPrevious}
-                className={cn(
-                  "absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full text-white transition-colors z-20",
-                  hasPrevious
-                    ? "bg-black/50 hover:bg-black/70"
-                    : "bg-black/20 text-white/40 cursor-not-allowed"
-                )}
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors z-20"
                 title="Previous image (←)"
               >
                 <ChevronLeft className="w-6 h-6" />
               </button>
 
-              {/* Next button */}
               <button
                 onClick={onNext}
-                disabled={!hasNext}
-                className={cn(
-                  "absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full text-white transition-colors z-20",
-                  hasNext
-                    ? "bg-black/50 hover:bg-black/70"
-                    : "bg-black/20 text-white/40 cursor-not-allowed"
-                )}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors z-20"
                 title="Next image (→)"
               >
                 <ChevronRight className="w-6 h-6" />
@@ -232,66 +414,15 @@ export function ImageModal({
                     </div>
                   </div>
 
-                  {/* Metadata */}
+                  {/* Flexible Metadata */}
                   <div>
                     <h3 className="text-lg font-semibold mb-3">Metadata</h3>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      {currentImage.metadata?.angle && (
-                        <div>
-                          <span className="text-gray-400">Angle:</span>
-                          <span className="ml-2">
-                            {currentImage.metadata.angle}
-                          </span>
-                        </div>
-                      )}
-                      {currentImage.metadata?.view && (
-                        <div>
-                          <span className="text-gray-400">View:</span>
-                          <span className="ml-2">
-                            {currentImage.metadata.view}
-                          </span>
-                        </div>
-                      )}
-                      {currentImage.metadata?.movement && (
-                        <div>
-                          <span className="text-gray-400">Movement:</span>
-                          <span className="ml-2">
-                            {currentImage.metadata.movement}
-                          </span>
-                        </div>
-                      )}
-                      {currentImage.metadata?.tod && (
-                        <div>
-                          <span className="text-gray-400">Time of Day:</span>
-                          <span className="ml-2">
-                            {currentImage.metadata.tod}
-                          </span>
-                        </div>
-                      )}
-                      {currentImage.metadata?.side && (
-                        <div>
-                          <span className="text-gray-400">Side:</span>
-                          <span className="ml-2">
-                            {currentImage.metadata.side}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <GalleryMetadataDisplay metadata={currentImage.metadata} />
                   </div>
                 </div>
               </div>
             </div>
           )}
-
-          {/* Keyboard shortcuts hint */}
-          <div className="absolute bottom-4 right-4 text-white/70 text-xs bg-black/50 px-3 py-2 rounded z-20">
-            <div className="flex gap-3">
-              <span>←/→ Navigate</span>
-              <span>Shift+I Info</span>
-              <span>Shift+C Copy</span>
-              <span>Esc Close</span>
-            </div>
-          </div>
         </div>
       </DialogContent>
     </Dialog>

@@ -42,7 +42,7 @@ export function ImageViewer({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log("Previous button clicked");
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Previous button clicked");
             onPrev();
           }}
           className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/60 rounded-full text-white hover:bg-black/80 transition-colors z-10"
@@ -55,7 +55,7 @@ export function ImageViewer({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log("Next button clicked");
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Next button clicked");
             onNext();
           }}
           className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/60 rounded-full text-white hover:bg-black/80 transition-colors z-10"

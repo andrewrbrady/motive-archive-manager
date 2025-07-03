@@ -413,7 +413,7 @@ const Specifications = ({
     setIsSaving(true);
     try {
       await onSave(localSpecs);
-      // [REMOVED] // [REMOVED] console.log("Save successful");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Save successful");
     } catch (error) {
       console.error("Error saving specifications:", error);
       toast.error("Failed to save specifications");

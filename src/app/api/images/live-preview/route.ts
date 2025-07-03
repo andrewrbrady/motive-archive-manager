@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
       const previewImageData = croppedImageBuffer.toString("base64");
 
       const processingTime = Date.now() - startTime;
-      console.log(`Preview generated in ${processingTime}ms using Sharp`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Preview generated in ${processingTime}ms using Sharp`);
 
       return NextResponse.json({
         success: true,

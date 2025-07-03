@@ -4,7 +4,7 @@ import { verifyFirebaseToken } from "@/lib/firebase-auth-middleware";
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("🔍 Debugging Authentication Issues...\n");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Debugging Authentication Issues...\n");
 
     // Get the current user from the request token
     const authHeader = request.headers.get("authorization");
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const adminUid = currentUserId || "G46fdpqaufe7bmhluKAhakVM44e2";
     const adminEmail = currentUserEmail || "andrew@andrewrbrady.com";
 
-    console.log(`Fixing authentication for user: ${adminEmail} (${adminUid})`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Fixing authentication for user: ${adminEmail} (${adminUid})`);
 
     const results = {
       firebaseAuth: null as any,
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     };
 
     // 1. Check Firebase Auth user
-    console.log("1. Checking Firebase Auth user...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("1. Checking Firebase Auth user...");
     const authUser = await adminAuth.getUser(adminUid);
     results.firebaseAuth = {
       email: authUser.email,
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     };
 
     // 2. Check Firestore user document
-    console.log("2. Checking Firestore user document...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("2. Checking Firestore user document...");
     const userDoc = await adminDb.collection("users").doc(adminUid).get();
 
     if (userDoc.exists) {
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 3. Fix admin access
-    console.log("3. Fixing admin access...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("3. Fixing admin access...");
 
     // Ensure admin roles in both places
     const adminRoles = ["user", "admin"];
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
 
     // Update Firebase Auth custom claims
     await adminAuth.setCustomUserClaims(adminUid, adminClaims);
-    console.log("   ✅ Updated Firebase Auth custom claims");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("   ✅ Updated Firebase Auth custom claims");
 
     // Update or create Firestore document
     const firestoreData = {
@@ -100,10 +100,10 @@ export async function GET(request: NextRequest) {
       .collection("users")
       .doc(adminUid)
       .set(firestoreData, { merge: true });
-    console.log("   ✅ Updated Firestore document");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("   ✅ Updated Firestore document");
 
     // 4. Verify fix
-    console.log("4. Verifying fix...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("4. Verifying fix...");
     const updatedAuthUser = await adminAuth.getUser(adminUid);
     const updatedUserDoc = await adminDb
       .collection("users")

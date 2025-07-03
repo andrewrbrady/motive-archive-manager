@@ -275,7 +275,7 @@ export function GalleryImageSelector({
     )
       return;
 
-    console.log("🔄 Loading more images, page:", nextPage);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Loading more images, page:", nextPage);
     setIsLoadingMore(true);
 
     try {
@@ -354,11 +354,11 @@ export function GalleryImageSelector({
           setNextPage((prev) => prev + 1);
           setHasMoreImages(hasMore);
         } else {
-          console.log("🚫 No new unique images to add");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚫 No new unique images to add");
           setNextPage((prev) => prev + 1);
         }
       } else {
-        console.log("🚫 No more images to load");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚫 No more images to load");
         setHasMoreImages(false);
       }
     } catch (error) {
@@ -408,7 +408,7 @@ export function GalleryImageSelector({
               !isLoadingRef.current &&
               loadMoreImagesRef.current
             ) {
-              console.log("🎯 Intersection detected, loading more images...");
+              // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎯 Intersection detected, loading more images...");
               loadMoreImagesRef.current();
             }
           }, 0);
@@ -705,11 +705,18 @@ export function GalleryImageSelector({
                   <div className="relative flex-1 flex items-center justify-center bg-background">
                     <img
                       src={(() => {
-                        // Use same logic as working ImageCard component
-                        if (!image.url.includes("imagedelivery.net"))
-                          return image.url;
+                        // Use same logic as working ImageCard component with debugging
+                        const originalUrl = image.url;
+                        if (!originalUrl.includes("imagedelivery.net")) {
+                          console.log(
+                            "🖼️ GalleryImageSelector: Non-Cloudflare URL, using as-is:",
+                            originalUrl
+                          );
+                          return originalUrl;
+                        }
+
                         const targetVariant = "medium"; // 600x400 for gallery thumbnails
-                        const urlParts = image.url.split("/");
+                        const urlParts = originalUrl.split("/");
                         if (urlParts.length >= 5) {
                           const lastPart = urlParts[urlParts.length - 1];
                           if (
@@ -717,10 +724,27 @@ export function GalleryImageSelector({
                             lastPart.includes("=")
                           ) {
                             urlParts[urlParts.length - 1] = targetVariant;
-                            return urlParts.join("/");
+                            const normalizedUrl = urlParts.join("/");
+                            console.log(
+                              "🔄 GalleryImageSelector URL normalized:",
+                              {
+                                filename: image.filename,
+                                original: originalUrl,
+                                normalized: normalizedUrl,
+                                variant: targetVariant,
+                              }
+                            );
+                            return normalizedUrl;
                           }
                         }
-                        return `${image.url}/${targetVariant}`;
+                        const appendedUrl = `${originalUrl}/${targetVariant}`;
+                        console.log("🔄 GalleryImageSelector URL appended:", {
+                          filename: image.filename,
+                          original: originalUrl,
+                          appended: appendedUrl,
+                          variant: targetVariant,
+                        });
+                        return appendedUrl;
                       })()}
                       alt={image.filename}
                       className="max-w-full max-h-[300px] w-auto h-auto object-contain"

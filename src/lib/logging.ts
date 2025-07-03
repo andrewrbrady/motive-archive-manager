@@ -80,9 +80,9 @@ export const logger = {
     // Mask sensitive data if specified
     if (entry.sensitive || entry.maskFields) {
       const maskedData = maskSensitiveData(logData, entry.maskFields);
-      // [REMOVED] // [REMOVED] console.log(JSON.stringify(maskedData));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(JSON.stringify(maskedData));
     } else {
-      // [REMOVED] // [REMOVED] console.log(JSON.stringify(logData));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(JSON.stringify(logData));
     }
   },
 
@@ -135,9 +135,9 @@ export const logger = {
       // Mask sensitive data if specified
       if (entry.sensitive || entry.maskFields) {
         const maskedData = maskSensitiveData(logData, entry.maskFields);
-        // [REMOVED] // [REMOVED] console.debug(JSON.stringify(maskedData));
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.debug(JSON.stringify(maskedData));
       } else {
-        // [REMOVED] // [REMOVED] console.debug(JSON.stringify(logData));
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.debug(JSON.stringify(logData));
       }
     }
   },
@@ -155,7 +155,7 @@ export const logger = {
 
       // Always mask sensitive data in dev logs
       const maskedData = maskSensitiveData(logData, entry.maskFields);
-      // [REMOVED] // [REMOVED] console.log(JSON.stringify(maskedData));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(JSON.stringify(maskedData));
     }
   },
 

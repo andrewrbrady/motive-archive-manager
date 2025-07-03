@@ -223,29 +223,12 @@ class APIClient {
     }
 
     // 🔍 DEBUG: Enhanced request debugging for gallery image processing issue
-    console.log("🚀 APIClient.request() DEBUG - Starting request:", {
-      originalEndpoint: endpoint,
-      constructedUrl: url,
-      method: requestOptions.method || "GET",
-      skipAuth,
-      hasBody: !!requestOptions.body,
-      bodyLength: requestOptions.body ? String(requestOptions.body).length : 0,
-      timestamp: new Date().toISOString(),
-    });
 
     try {
       // Get authentication headers (or skip if requested)
       const authHeaders = await this.getAuthHeaders(skipAuth);
 
       // 🔍 DEBUG: Log authentication headers (without sensitive data)
-      console.log("🔑 APIClient.request() DEBUG - Auth headers prepared:", {
-        hasAuthHeader: !!(authHeaders as any)?.Authorization,
-        authHeaderLength: (authHeaders as any)?.Authorization
-          ? String((authHeaders as any).Authorization).length
-          : 0,
-        contentType: (authHeaders as any)?.["Content-Type"],
-        skipAuth,
-      });
 
       const finalHeaders = {
         ...authHeaders,

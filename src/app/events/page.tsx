@@ -97,12 +97,6 @@ export default function EventsPage() {
             const carId = event.car_id;
             if (!carId) {
               // Don't log as error - car_id is optional for events
-              console.log("Event without car_id (project-level event):", {
-                id: event.id,
-                type: event.type,
-                title: event.title,
-                project_id: event.project_id,
-              });
               return event;
             }
             const car = (await api.get(`cars/${carId}`)) as Car;

@@ -53,7 +53,7 @@ function AuctionsFilters({
 
 export default async function AuctionsPage({ searchParams }: PageProps) {
   const params = await Promise.resolve(searchParams);
-  // [REMOVED] // [REMOVED] console.log("Page - Search Params:", params);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Page - Search Params:", params);
 
   const page = Number(params.page) || 1;
   const pageSize = Number(params.pageSize) || 24;
@@ -99,7 +99,7 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
     filters.maxYear = parseInt(params.maxYear);
   }
 
-  // [REMOVED] // [REMOVED] console.log("Page - Filters:", filters);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Page - Filters:", filters);
 
   // Fetch auctions, makes, and platforms
   const [auctionsData, makes, platforms] = await Promise.all([

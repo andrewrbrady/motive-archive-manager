@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get("action") || "create";
 
-    console.log(`🚀 Database optimization: ${action}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚀 Database optimization: ${action}`);
 
     const db = await getDatabase();
     let result: any = {};
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
  * Create all performance indexes
  */
 async function createIndexes(db: any) {
-  console.log("📊 Creating Performance Indexes");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📊 Creating Performance Indexes");
 
   await createPerformanceIndexes(db);
 
@@ -128,7 +128,7 @@ async function createIndexes(db: any) {
  * Analyze index performance
  */
 async function analyzePerformance(db: any) {
-  console.log("📈 Analyzing Index Performance");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📈 Analyzing Index Performance");
 
   const analysis = await analyzeIndexPerformance(db);
 
@@ -159,7 +159,7 @@ async function analyzePerformance(db: any) {
  * Clean all performance indexes
  */
 async function cleanIndexes(db: any) {
-  console.log("🗑️ Cleaning Performance Indexes");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🗑️ Cleaning Performance Indexes");
 
   await dropPerformanceIndexes(db);
 
@@ -173,7 +173,7 @@ async function cleanIndexes(db: any) {
  * Manage cache system
  */
 async function manageCaches() {
-  console.log("🔥 Managing Cache System");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔥 Managing Cache System");
 
   // Clear all caches
   cacheUtils.clearAll();

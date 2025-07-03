@@ -232,8 +232,8 @@ export function ImageMatteModal({
 
   // PHASE 1 DEBUGGING: Complete image data structure investigation
   useEffect(() => {
-    console.log("=== IMAGE MATTE MODAL - PHASE 1 DEBUG START ===");
-    console.log("Image prop object (complete):", image);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== IMAGE MATTE MODAL - PHASE 1 DEBUG START ===");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Image prop object (complete):", image);
     console.log("Image data structure breakdown:", {
       hasImage: !!image,
       imageId: image?._id,
@@ -250,7 +250,7 @@ export function ImageMatteModal({
 
     // Test URL accessibility
     if (image?.url) {
-      console.log("Testing original URL accessibility:", image.url);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Testing original URL accessibility:", image.url);
       fetch(image.url, { method: "HEAD", mode: "no-cors" })
         .then((response) => {
           console.log("Original URL fetch test result:", {
@@ -262,11 +262,7 @@ export function ImageMatteModal({
           });
         })
         .catch((error) => {
-          console.log("Original URL fetch test (expected CORS limitation):", {
-            url: image.url,
-            error: error.message,
-            note: "CORS errors are normal for cross-origin image requests",
-          });
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Original URL fetch test (expected CORS limitation):", [data omitted]);
         });
     }
 
@@ -300,7 +296,7 @@ export function ImageMatteModal({
       });
 
       // Test enhanced URL accessibility
-      console.log("Testing enhanced URL accessibility:", enhanced);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Testing enhanced URL accessibility:", enhanced);
       fetch(enhanced, { method: "HEAD", mode: "no-cors" })
         .then((response) => {
           console.log("Enhanced URL fetch test result:", {
@@ -312,15 +308,11 @@ export function ImageMatteModal({
           });
         })
         .catch((error) => {
-          console.log("Enhanced URL fetch test (expected CORS limitation):", {
-            url: enhanced,
-            error: error.message,
-            note: "CORS errors are normal for cross-origin image requests",
-          });
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Enhanced URL fetch test (expected CORS limitation):", [data omitted]);
         });
     }
 
-    console.log("=== IMAGE MATTE MODAL - PHASE 1 DEBUG END ===");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== IMAGE MATTE MODAL - PHASE 1 DEBUG END ===");
   }, [image, cloudflareWidth, cloudflareQuality]);
 
   // PHASE 1 TESTING: Hardcoded test image URL
@@ -640,7 +632,7 @@ export function ImageMatteModal({
       });
 
       if (result && result.success) {
-        console.log("✅ Image Matte processing completed successfully");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Image Matte processing completed successfully");
         setProcessedImage(result.processedImage);
         setShowPreview(true);
       } else {
@@ -701,7 +693,7 @@ export function ImageMatteModal({
       );
 
       if (result && result.success && onImageReplaced) {
-        console.log("✅ Image Matte replacement completed successfully");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Image Matte replacement completed successfully");
         onImageReplaced(result.originalImageId, result.processedImage);
         handleClose();
       } else {
@@ -759,7 +751,7 @@ export function ImageMatteModal({
                   setImageLoadError(true);
                 }}
                 onLoad={(e) => {
-                  console.log("Image loaded successfully");
+                  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Image loaded successfully");
                   setImageLoadError(false);
                 }}
                 fallbackContent={
@@ -791,7 +783,7 @@ export function ImageMatteModal({
                   setProcessedImageLoadError(true);
                 }}
                 onLoad={(e) => {
-                  console.log("Processed image loaded successfully");
+                  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Processed image loaded successfully");
                   setProcessedImageLoadError(false);
                 }}
                 fallbackContent={

@@ -19,14 +19,14 @@ async function getRoleStats(
     // Check cache first
     const now = Date.now();
     if (cachedRoleStats && now - cacheTimestamp < CACHE_DURATION) {
-      console.log("🚀 Role stats: Serving from cache");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚀 Role stats: Serving from cache");
       const response = NextResponse.json(cachedRoleStats);
       response.headers.set("X-Cache", "HIT");
       response.headers.set("Cache-Control", "private, max-age=1800"); // 30 minutes
       return response;
     }
 
-    console.log("🚀 Role stats: Cache miss, fetching fresh data");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚀 Role stats: Cache miss, fetching fresh data");
 
     // Query Firestore to get all users
     const usersSnapshot = await adminDb.collection("users").get();
@@ -74,7 +74,7 @@ async function getRoleStats(
     cachedRoleStats = responseData;
     cacheTimestamp = Date.now();
 
-    console.log("🚀 Role stats: Fresh data cached");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚀 Role stats: Fresh data cached");
 
     const response = NextResponse.json(responseData);
     response.headers.set("X-Cache", "MISS");

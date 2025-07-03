@@ -92,7 +92,7 @@ export default function UserManagement() {
       const queryParams = startAfter ? `?startAfter=${startAfter}` : "";
 
       if (process.env.NODE_ENV !== "production") {
-        // [REMOVED] // [REMOVED] console.log("Fetching users from API");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching users from API");
       }
 
       // Make the request with the useAPI hook
@@ -128,7 +128,7 @@ export default function UserManagement() {
         setLastId(data.lastId);
 
         if (process.env.NODE_ENV !== "production") {
-          // [REMOVED] // [REMOVED] console.log(`Loaded ${data.users.length} users`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Loaded ${data.users.length} users`);
         }
       } else {
         console.error("Invalid response format:", data);

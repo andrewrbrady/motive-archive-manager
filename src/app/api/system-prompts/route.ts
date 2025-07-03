@@ -19,12 +19,12 @@ export interface SystemPrompt {
 
 // GET - Fetch all system prompts
 export async function GET(request: NextRequest) {
-  console.log("🔒 GET /api/system-prompts: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/system-prompts: Starting request");
 
   // Check authentication and admin role
   const authResult = await verifyAuthMiddleware(request, ["admin"]);
   if (authResult) {
-    console.log("❌ GET /api/system-prompts: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ GET /api/system-prompts: Authentication failed");
     return authResult;
   }
 
@@ -57,12 +57,12 @@ export async function GET(request: NextRequest) {
 
 // POST - Create a new system prompt
 export async function POST(request: NextRequest) {
-  console.log("🔒 POST /api/system-prompts: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 POST /api/system-prompts: Starting request");
 
   // Check authentication and admin role
   const authResult = await verifyAuthMiddleware(request, ["admin"]);
   if (authResult) {
-    console.log("❌ POST /api/system-prompts: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ POST /api/system-prompts: Authentication failed");
     return authResult;
   }
 
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       .collection("systemPrompts")
       .insertOne(newSystemPrompt);
 
-    console.log("✅ POST /api/system-prompts: Successfully created prompt");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ POST /api/system-prompts: Successfully created prompt");
     return NextResponse.json({
       _id: result.insertedId,
       ...newSystemPrompt,
@@ -119,12 +119,12 @@ export async function POST(request: NextRequest) {
 
 // PUT - Update a system prompt
 export async function PUT(request: NextRequest) {
-  console.log("🔒 PUT /api/system-prompts: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 PUT /api/system-prompts: Starting request");
 
   // Check authentication and admin role
   const authResult = await verifyAuthMiddleware(request, ["admin"]);
   if (authResult) {
-    console.log("❌ PUT /api/system-prompts: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ PUT /api/system-prompts: Authentication failed");
     return authResult;
   }
 
@@ -175,7 +175,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    console.log("✅ PUT /api/system-prompts: Successfully updated prompt");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ PUT /api/system-prompts: Successfully updated prompt");
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error(
@@ -191,12 +191,12 @@ export async function PUT(request: NextRequest) {
 
 // DELETE - Delete a system prompt
 export async function DELETE(request: NextRequest) {
-  console.log("🔒 DELETE /api/system-prompts: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 DELETE /api/system-prompts: Starting request");
 
   // Check authentication and admin role
   const authResult = await verifyAuthMiddleware(request, ["admin"]);
   if (authResult) {
-    console.log("❌ DELETE /api/system-prompts: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ DELETE /api/system-prompts: Authentication failed");
     return authResult;
   }
 
@@ -221,7 +221,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    console.log("✅ DELETE /api/system-prompts: Successfully deleted prompt");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ DELETE /api/system-prompts: Successfully deleted prompt");
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error(

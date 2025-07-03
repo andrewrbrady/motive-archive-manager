@@ -43,7 +43,7 @@ async function retryOpenAICall<T>(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       if (attempt > 0) {
-        // [REMOVED] // [REMOVED] console.log(`Retry attempt ${attempt} for OpenAI analysis`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Retry attempt ${attempt} for OpenAI analysis`);
         // Exponential backoff
         await new Promise((resolve) =>
           setTimeout(resolve, initialDelay * Math.pow(2, attempt - 1))
@@ -70,7 +70,7 @@ function safeJSONParse(text: string): any {
     return JSON.parse(cleanText);
   } catch (error) {
     console.error("Failed to parse JSON from OpenAI response:", error);
-    // [REMOVED] // [REMOVED] console.log("Raw text:", text);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Raw text:", text);
     throw new Error("Failed to parse analysis result");
   }
 }
@@ -82,7 +82,7 @@ export async function analyzeImage(
 ): Promise<ImageAnalysis> {
   console.time("imageAnalysis");
   try {
-    // [REMOVED] // [REMOVED] console.log(`Analyzing image: ${imageUrl}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Analyzing image: ${imageUrl}`);
 
     const data = await api.post<{ analysis: ImageAnalysis }>(
       "/openai/analyze-image",

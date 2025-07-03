@@ -129,7 +129,7 @@ export default function DeliverableBatchManagement({}: DeliverableBatchManagemen
 
   const fetchBatches = async () => {
     if (!api) {
-      console.log("API client not available");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API client not available");
       setBatches([]);
       setIsLoading(false);
       return;
@@ -137,7 +137,7 @@ export default function DeliverableBatchManagement({}: DeliverableBatchManagemen
 
     try {
       setIsLoading(true);
-      console.log("Fetching batches...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching batches...");
 
       // Add timestamp to prevent caching
       const timestamp = Date.now();
@@ -147,10 +147,10 @@ export default function DeliverableBatchManagement({}: DeliverableBatchManagemen
         batches: BatchTemplate[];
       };
 
-      console.log("Batches response:", response);
-      console.log("Response batches:", response.batches);
-      console.log("Number of batches:", response.batches?.length);
-      console.log("Setting batches to:", response.batches || []);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Batches response:", response);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Response batches:", response.batches);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Number of batches:", response.batches?.length);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Setting batches to:", response.batches || []);
       setBatches(response.batches || []);
     } catch (error) {
       console.error("Error fetching batches:", error);
@@ -167,31 +167,31 @@ export default function DeliverableBatchManagement({}: DeliverableBatchManagemen
       return;
     }
 
-    console.log("handleSaveBatch called");
-    console.log("batchForm:", batchForm);
-    console.log("editingBatch:", editingBatch);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("handleSaveBatch called");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("batchForm:", batchForm);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("editingBatch:", editingBatch);
 
     try {
       setIsCreating(true);
 
       if (editingBatch) {
         // Update existing batch
-        console.log("Updating batch:", editingBatch.name);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Updating batch:", editingBatch.name);
         const updateData = {
           oldName: editingBatch.name,
           ...batchForm,
         };
-        console.log("Update data:", updateData);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Update data:", updateData);
         await api.put("/api/admin/deliverable-batches", updateData);
         toast.success("Batch updated successfully");
       } else {
         // Create new batch
-        console.log("Creating new batch with data:", batchForm);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Creating new batch with data:", batchForm);
         const response = await api.post(
           "/api/admin/deliverable-batches",
           batchForm
         );
-        console.log("Create response:", response);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Create response:", response);
         toast.success("Batch created successfully");
       }
 

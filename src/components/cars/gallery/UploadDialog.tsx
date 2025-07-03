@@ -35,7 +35,7 @@ export function UploadDialog({
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const handleUploadError = (error: string) => {
-    console.log("Upload error:", error);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Upload error:", error);
     setUploadError(error);
   };
 
@@ -59,7 +59,7 @@ export function UploadDialog({
               Upload Images
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
+          <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Upload Images</DialogTitle>
             </DialogHeader>
@@ -102,7 +102,7 @@ export function UploadDialog({
             Upload Images
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Upload Images</DialogTitle>
           </DialogHeader>
@@ -132,7 +132,7 @@ export function UploadDialog({
   // Regular dialog (controlled externally)
   return (
     <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Upload Images</DialogTitle>
         </DialogHeader>

@@ -145,31 +145,8 @@ export function ImageThumbnails({
   const preloadedPagesRef = useRef<Set<number | string>>(new Set());
   const preloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Early return if no images and no active filters/search
-  // This prevents the "Page 1 of 0" flash during initial load
-  const hasActiveFilters = Object.keys(filters || {}).length > 0;
-  const hasActiveSearch = searchQuery?.trim();
-  if (
-    images.length === 0 &&
-    !hasActiveFilters &&
-    !hasActiveSearch &&
-    !isLoadingMore
-  ) {
-    return (
-      <div className="w-full h-full flex flex-col">
-        <div className="bg-background rounded-lg p-4 flex flex-col flex-1 min-h-0">
-          <div className="flex items-center justify-center h-64">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-muted-foreground">Loading images...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Calculate page information based on server pagination or filtered results
+  // MOVED BEFORE EARLY RETURN TO FIX HOOKS ORDER VIOLATION
   const displayPagination = useMemo(() => {
     if (serverPagination) {
       // Use server-side pagination data for accurate filtered counts
@@ -201,10 +178,21 @@ export function ImageThumbnails({
     }
   }, [serverPagination, images.length, currentPage]);
 
-  // Keep original calculations for component logic (intersection observer, etc.)
-  const totalPages = Math.ceil(images.length / ITEMS_PER_PAGE);
-  const startIndex = currentPage * ITEMS_PER_PAGE;
-  const paginatedImages = images.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  // Calculate pagination based on whether we're using server-side or client-side pagination
+  const totalPages = serverPagination
+    ? serverPagination.totalPages
+    : Math.ceil(images.length / ITEMS_PER_PAGE);
+
+  const startIndex = serverPagination
+    ? 0 // Server pagination starts from 0 since images array is already the correct page
+    : currentPage * ITEMS_PER_PAGE;
+
+  const paginatedImages = serverPagination
+    ? images // Server already sent the correct page, use images directly
+    : images.slice(
+        currentPage * ITEMS_PER_PAGE,
+        (currentPage + 1) * ITEMS_PER_PAGE
+      );
 
   // VIRTUAL SCROLLING OPTIMIZATION: Calculate which thumbnails should be rendered
   const virtualizedImages = useMemo(() => {
@@ -545,6 +533,31 @@ export function ImageThumbnails({
     }
     return [];
   }, [currentPage, paginatedImages.length]); // Phase 2B Fix: Only depend on currentPage and paginatedImages length to prevent excessive re-renders
+
+  // Early return if no images and no active filters/search
+  // This prevents the "Page 1 of 0" flash during initial load
+  // MOVED AFTER ALL HOOKS TO FIX HOOKS ORDER VIOLATION
+  const hasActiveFilters = Object.keys(filters || {}).length > 0;
+  const hasActiveSearch = searchQuery?.trim();
+  if (
+    images.length === 0 &&
+    !hasActiveFilters &&
+    !hasActiveSearch &&
+    !isLoadingMore
+  ) {
+    return (
+      <div className="w-full h-full flex flex-col">
+        <div className="bg-background rounded-lg p-4 flex flex-col flex-1 min-h-0">
+          <div className="flex items-center justify-center h-64">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-muted-foreground">Loading images...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full flex flex-col">

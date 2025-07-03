@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
     }
 
     const db = await getDatabase();
-    // [REMOVED] // [REMOVED] console.log("Research Content API - MongoDB Connected");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Research Content API - MongoDB Connected");
 
     // First try to find the file in research_files collection
     const query = {
@@ -192,7 +192,7 @@ export async function GET(request: NextRequest) {
 
     // First check if content is stored in MongoDB
     if (researchFile.content) {
-      // [REMOVED] // [REMOVED] console.log("Research Content API - Returning content from MongoDB");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Research Content API - Returning content from MongoDB");
       return new NextResponse(researchFile.content, {
         headers: { "Content-Type": "text/plain" },
       });

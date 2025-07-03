@@ -298,7 +298,7 @@ export function CarTabs({ carId, vehicleInfo }: CarTabsProps) {
         }
       } catch (error) {
         // Silently handle prefetch errors - they shouldn't block UX
-        console.debug("Prefetch error for tab", tabValue, error);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.debug("Prefetch error for tab", tabValue, error);
       }
     },
     [carId, prefetch]

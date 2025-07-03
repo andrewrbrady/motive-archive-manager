@@ -1,5 +1,11 @@
-import React, { useRef, useState, useEffect, useCallback } from "react";
-import { Upload, Check, X as XIcon, Loader2, Plus } from "lucide-react";
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
+import { Upload, Check, X as XIcon, Loader2, Plus, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -14,6 +20,9 @@ import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { useAPI } from "@/hooks/useAPI";
 import { getValidToken } from "@/lib/api-client";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { LocationResponse } from "@/models/location";
 
 type UploadMode = "car" | "general";
 
@@ -69,7 +78,12 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   multiple = true,
   metadata = {},
 }) => {
-  console.log("📸 ImageUploader rendering with mode:", mode, "carId:", carId);
+  console.log("📸 ImageUploader rendering:", {
+    mode,
+    ...(mode === "car"
+      ? { carId, hasVehicleInfo: !!vehicleInfo }
+      : { hasMetadata: !!metadata }),
+  });
   const api = useAPI();
   const inputRef = useRef<HTMLInputElement>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -85,10 +99,27 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   >([]);
   const [isLoadingPrompts, setIsLoadingPrompts] = useState(true);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [imageContext, setImageContext] = useState<string>("");
+  const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+  const [locations, setLocations] = useState<LocationResponse[]>([]);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(true);
   const { user } = useFirebaseAuth();
 
   // Store original page title to restore later
   const [originalTitle, setOriginalTitle] = useState<string>("");
+
+  // Compute effective analysis settings
+  const shouldAnalyze = mode === "car";
+  const effectiveModelId =
+    selectedModelId ||
+    (shouldAnalyze
+      ? IMAGE_ANALYSIS_CONFIG.availableModels.find((m) => m.isDefault)?.id ||
+        "gpt-4o-mini"
+      : selectedModelId);
+  const effectivePromptId =
+    selectedPromptId && selectedPromptId !== "__default__"
+      ? selectedPromptId
+      : null;
 
   // Create stable callback reference
   const stableOnComplete = useCallback(() => {
@@ -106,11 +137,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
     const loadPrompts = async () => {
       try {
-        console.log("🔄 Loading AI analysis prompts...");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Loading AI analysis prompts...");
         const data = (await api.get(
           "admin/image-analysis-prompts/active"
         )) as ImageAnalysisPrompt[];
-        console.log("✅ Received prompts data:", data);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Received prompts data:", data);
         setAvailablePrompts(data || []);
 
         // Set default prompt if available
@@ -119,19 +150,39 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         );
         if (defaultPrompt) {
           setSelectedPromptId(defaultPrompt._id);
-          console.log("✅ Set default prompt:", defaultPrompt.name);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Set default prompt:", defaultPrompt.name);
         } else {
-          console.log("⚠️ No default prompt found");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("⚠️ No default prompt found");
         }
       } catch (error) {
         console.error("❌ Failed to load prompts:", error);
       } finally {
-        console.log("🏁 Setting isLoadingPrompts to false");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🏁 Setting isLoadingPrompts to false");
         setIsLoadingPrompts(false);
       }
     };
 
     loadPrompts();
+  }, [api]);
+
+  // Load locations on component mount
+  useEffect(() => {
+    if (!api) return;
+
+    const loadLocations = async () => {
+      try {
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Loading locations...");
+        const data = (await api.get("locations")) as LocationResponse[];
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Received locations data:", data);
+        setLocations(data || []);
+      } catch (error) {
+        console.error("❌ Failed to load locations:", error);
+      } finally {
+        setIsLoadingLocations(false);
+      }
+    };
+
+    loadLocations();
   }, [api]);
 
   // Store original title on mount and restore on unmount
@@ -147,11 +198,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   // Handle file selection or drop
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) {
-      console.log("No files provided");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("No files provided");
       return;
     }
 
-    console.log("handleFiles called with:", files.length, "files");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("handleFiles called with:", files.length, "files");
 
     const fileArray = Array.from(files);
     console.log(
@@ -181,10 +232,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       (file) => file.size > 8 * 1024 * 1024
     );
 
-    console.log("Oversized files:", oversizedFiles.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Oversized files:", oversizedFiles.length);
 
     if (oversizedFiles.length > 0) {
-      console.log("Calling onError for oversized files");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Calling onError for oversized files");
       onError?.(
         `The following files are too large (over 8MB): ${oversizedFiles.map((f) => f.name).join(", ")}. Please compress them before uploading.`
       );
@@ -193,8 +244,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
     // For large batches, we'll process them in chunks automatically
     const totalSize = fileArray.reduce((acc, file) => acc + file.size, 0);
-    console.log("Total size:", (totalSize / 1024 / 1024).toFixed(1), "MB");
-    console.log("Will process", fileArray.length, "files in chunks if needed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Total size:", (totalSize / 1024 / 1024).toFixed(1), "MB");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Will process", fileArray.length, "files in chunks if needed");
 
     setPendingFiles(fileArray);
     setProgress([]); // Reset progress if new files are selected
@@ -202,8 +253,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   // Create chunks of files for upload
   const createUploadChunks = (files: File[]): File[][] => {
-    console.log("=== CHUNK CREATION START ===");
-    console.log("Input files:", files.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== CHUNK CREATION START ===");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Input files:", files.length);
     console.log(
       "Files details:",
       files.map((f) => ({
@@ -248,7 +299,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       );
     }
 
-    console.log(`Created ${chunks.length} chunks from ${files.length} files`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Created ${chunks.length} chunks from ${files.length} files`);
     console.log(
       "Chunk summary:",
       chunks.map((chunk, i) => ({
@@ -259,7 +310,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           "MB",
       }))
     );
-    console.log("=== CHUNK CREATION END ===");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== CHUNK CREATION END ===");
 
     return chunks;
   };
@@ -268,23 +319,13 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   const startUpload = async () => {
     if (pendingFiles.length === 0) return;
 
-    // Validate required fields
-    if (!selectedPromptId) {
-      onError?.("Please select an analysis prompt before uploading.");
-      return;
-    }
-
-    if (!selectedModelId) {
-      onError?.("Please select an AI model before uploading.");
-      return;
-    }
-
-    console.log("🚀 Starting upload process...");
-    console.log("Selected prompt:", selectedPromptId);
-    console.log("Selected model:", selectedModelId);
-    console.log("Mode:", mode);
-    console.log("Car ID:", carId);
-    console.log("Files to upload:", pendingFiles.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚀 Starting upload process...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Selected prompt:", effectivePromptId || "default");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Selected model:", effectiveModelId || "none");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Mode:", mode);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car ID:", carId);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Analysis enabled:", shouldAnalyze);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Files to upload:", pendingFiles.length);
     setIsUploading(true);
     setUploadSuccess(false);
 
@@ -304,7 +345,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     try {
       // Create chunks for upload
       const chunks = createUploadChunks(pendingFiles);
-      console.log(`Processing ${chunks.length} chunks`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Processing ${chunks.length} chunks`);
 
       let globalFileIndex = 0;
 
@@ -350,7 +391,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         }
       }
 
-      console.log("✅ All chunks processed successfully");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ All chunks processed successfully");
       setUploadSuccess(true);
     } catch (error) {
       console.error("❌ Upload process failed:", error);
@@ -367,7 +408,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     globalOffset: number,
     totalFiles: number
   ) => {
-    console.log(`=== PROCESSING CHUNK ${chunkIndex + 1} ===`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`=== PROCESSING CHUNK ${chunkIndex + 1} ===`);
     console.log(
       "Chunk files:",
       chunk.map((f) => f.name)
@@ -412,7 +453,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           const formData = new FormData();
           formData.append("file", file);
 
-          console.log(`Direct Cloudflare upload for: ${file.name}`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Direct Cloudflare upload for: ${file.name}`);
 
           const cloudflareResponse = await fetch("/api/cloudflare/thumbnails", {
             method: "POST",
@@ -470,10 +511,18 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           analysisFormData.append("cloudflareId", cloudflareId);
           analysisFormData.append("imageUrl", imageUrl);
           analysisFormData.append("fileName", file.name);
-          analysisFormData.append("selectedPromptId", selectedPromptId);
-          analysisFormData.append("selectedModelId", selectedModelId);
+          analysisFormData.append(
+            "selectedPromptId",
+            effectivePromptId || "default"
+          );
+          analysisFormData.append(
+            "selectedModelId",
+            effectiveModelId || "none"
+          );
 
+          // Add entity-specific data based on upload mode
           if (mode === "car" && carId) {
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚗 Car upload mode - adding carId: ${carId}`);
             analysisFormData.append("carId", carId);
             if (vehicleInfo) {
               analysisFormData.append(
@@ -481,8 +530,26 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                 JSON.stringify(vehicleInfo)
               );
             }
+          } else if (mode === "general") {
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`📁 General upload mode - adding metadata for project`);
+            const enhancedMetadata = {
+              ...metadata,
+              imageContext: imageContext.trim() || undefined,
+              locationId:
+                selectedLocationId && selectedLocationId !== "none"
+                  ? selectedLocationId
+                  : undefined,
+            };
+            analysisFormData.append(
+              "metadata",
+              JSON.stringify(enhancedMetadata)
+            );
           } else {
-            analysisFormData.append("metadata", JSON.stringify(metadata));
+            console.warn(`⚠️ Invalid upload mode or missing parameters:`, {
+              mode,
+              carId,
+              metadata,
+            });
           }
 
           // Call our backend for AI analysis and database storage
@@ -503,7 +570,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
               const analysisResult = await analysisResponse.json();
               if (analysisResult.success) {
                 analysisSuccess = true;
-                console.log(`✅ AI analysis completed for ${file.name}`);
+                // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ AI analysis completed for ${file.name}`);
 
                 // Update progress with analysis results
                 setProgress((prev) => {
@@ -562,7 +629,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
             });
           }
 
-          console.log(`✅ File ${file.name} processed successfully`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ File ${file.name} processed successfully`);
         } catch (error) {
           console.error(`❌ Error processing file ${file.name}:`, error);
 
@@ -582,7 +649,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         }
       }
 
-      console.log(`✅ Chunk ${chunkIndex + 1} processed successfully`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ Chunk ${chunkIndex + 1} processed successfully`);
     } catch (error) {
       console.error(`❌ Chunk ${chunkIndex + 1} processing failed:`, error);
 
@@ -644,7 +711,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       });
 
       if (completedCount + errorCount === totalCount) {
-        console.log("🏁 All uploads finished, triggering completion");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🏁 All uploads finished, triggering completion");
 
         // Restore original page title
         if (originalTitle) {
@@ -653,7 +720,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
         // Trigger completion callback after a short delay
         setTimeout(() => {
-          console.log("🎯 Calling onComplete callback");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎯 Calling onComplete callback");
           stableOnComplete();
         }, 1000);
       }
@@ -675,7 +742,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         "✅ All uploads completed successfully, setting delayed completion"
       );
       setTimeout(() => {
-        console.log("🎯 Delayed completion trigger");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎯 Delayed completion trigger");
         stableOnComplete();
       }, 2000);
     }
@@ -736,67 +803,188 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       {/* AI Analysis Settings - Show before file selection like original */}
       {progress.length === 0 && !isUploading && (
         <div className="space-y-4">
-          {isLoadingPrompts ? (
+          {isLoadingPrompts || isLoadingLocations ? (
             <div className="flex items-center space-x-2">
               <Loader2 className="w-4 h-4 animate-spin" />
               <span className="text-sm text-muted-foreground">
-                Loading prompts...
+                Loading {isLoadingPrompts ? "prompts" : "locations"}...
               </span>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
-                  Analysis Prompt
-                </label>
-                <Select
-                  value={selectedPromptId}
-                  onValueChange={setSelectedPromptId}
-                >
-                  <SelectTrigger>
-                    <SelectValue>
-                      {selectedPromptId
-                        ? availablePrompts.find(
-                            (p) => p._id === selectedPromptId
-                          )?.name
-                        : "Select analysis prompt"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availablePrompts.map((prompt) => (
-                      <SelectItem key={prompt._id} value={prompt._id}>
-                        {prompt.name}
+            <div className="space-y-4">
+              {/* Auto-analysis info for car mode */}
+              {mode === "car" && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm font-medium text-blue-900">
+                      AI Analysis Enabled
+                    </span>
+                  </div>
+                  <p className="text-xs text-blue-700 mt-1">
+                    {selectedPromptId && selectedPromptId !== "__default__"
+                      ? `Using custom prompt: ${availablePrompts.find((p) => p._id === selectedPromptId)?.name}`
+                      : "Using default analysis prompt"}{" "}
+                    • Model: {effectiveModelId}
+                  </p>
+                </div>
+              )}
+
+              {/* Context and location fields */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="image-context"
+                    className="text-sm font-medium"
+                  >
+                    Additional Context for Analysis
+                    <span className="text-xs text-muted-foreground ml-2">
+                      (Optional - helps AI understand the images better)
+                    </span>
+                  </Label>
+                  <Textarea
+                    id="image-context"
+                    placeholder="Describe what's in these images or what you want the AI to focus on..."
+                    value={imageContext}
+                    onChange={(e) => setImageContext(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="location-select"
+                    className="text-sm font-medium"
+                  >
+                    Location
+                    <span className="text-xs text-muted-foreground ml-2">
+                      (Optional - where these images were taken)
+                    </span>
+                  </Label>
+                  <Select
+                    value={selectedLocationId}
+                    onValueChange={setSelectedLocationId}
+                  >
+                    <SelectTrigger id="location-select">
+                      <SelectValue placeholder="Select a location...">
+                        {selectedLocationId && selectedLocationId !== "none" ? (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4" />
+                            {
+                              locations.find((l) => l.id === selectedLocationId)
+                                ?.name
+                            }
+                          </div>
+                        ) : selectedLocationId === "none" ? (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-muted-foreground" />
+                            No location
+                          </div>
+                        ) : (
+                          "Select a location..."
+                        )}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-muted-foreground" />
+                          No location
+                        </div>
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      {locations.map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4" />
+                            {location.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
-                  AI Model
-                </label>
-                <Select
-                  value={selectedModelId}
-                  onValueChange={setSelectedModelId}
-                >
-                  <SelectTrigger>
-                    <SelectValue>
-                      {selectedModelId
-                        ? IMAGE_ANALYSIS_CONFIG.availableModels.find(
-                            (m) => m.id === selectedModelId
-                          )?.name
-                        : "Select AI model"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {IMAGE_ANALYSIS_CONFIG.availableModels.map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        {model.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Analysis Prompt{" "}
+                    {mode === "car" && (
+                      <span className="text-xs text-muted-foreground">
+                        (optional)
+                      </span>
+                    )}
+                  </label>
+                  <Select
+                    value={selectedPromptId}
+                    onValueChange={setSelectedPromptId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue>
+                        {selectedPromptId
+                          ? availablePrompts.find(
+                              (p) => p._id === selectedPromptId
+                            )?.name
+                          : mode === "car"
+                            ? "Default analysis prompt"
+                            : "Select analysis prompt"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mode === "car" && (
+                        <SelectItem value="__default__">
+                          <span className="text-muted-foreground">
+                            Default analysis prompt
+                          </span>
+                        </SelectItem>
+                      )}
+                      {availablePrompts.map((prompt) => (
+                        <SelectItem key={prompt._id} value={prompt._id}>
+                          {prompt.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    AI Model{" "}
+                    {mode === "car" && (
+                      <span className="text-xs text-muted-foreground">
+                        (auto-selected)
+                      </span>
+                    )}
+                  </label>
+                  <Select
+                    value={selectedModelId}
+                    onValueChange={setSelectedModelId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue>
+                        {effectiveModelId
+                          ? IMAGE_ANALYSIS_CONFIG.availableModels.find(
+                              (m) => m.id === effectiveModelId
+                            )?.name
+                          : "Select AI model"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {IMAGE_ANALYSIS_CONFIG.availableModels.map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          <div className="flex items-center space-x-2">
+                            <span>{model.name}</span>
+                            {model.isDefault && (
+                              <span className="text-xs bg-blue-100 text-blue-800 px-1 rounded">
+                                Default
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           )}
@@ -866,7 +1054,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                 className="flex items-center justify-between p-4 bg-card border border-border rounded-lg"
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-card-foreground truncate">
+                  <p
+                    className="text-sm font-medium text-card-foreground truncate max-w-[400px]"
+                    title={file.name}
+                  >
                     {file.name}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -952,36 +1143,41 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           <div className="space-y-4 max-h-96 overflow-y-auto">
             {progress.map((fileProgress) => (
               <div key={fileProgress.fileId} className="space-y-2">
-                {/* File name and status on same line */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2 flex-1 min-w-0">
-                    <span className="text-sm font-medium text-foreground truncate">
-                      {fileProgress.fileName}
-                    </span>
-                    {fileProgress.status === "complete" && (
-                      <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
-                    )}
-                    {fileProgress.status === "error" && (
-                      <XIcon className="w-4 h-4 text-destructive flex-shrink-0" />
-                    )}
-                    {fileProgress.status === "uploading" && (
-                      <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
-                    )}
-                    {fileProgress.status === "analyzing" && (
-                      <Loader2 className="w-4 h-4 animate-spin text-blue-500 flex-shrink-0" />
-                    )}
-                    {/* Status message inline with filename */}
-                    {fileProgress.currentStep && (
-                      <span className="text-xs text-muted-foreground truncate">
-                        - {fileProgress.currentStep}
+                {/* File name and status - improved layout for long filenames */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2 flex-1 min-w-0">
+                      <span
+                        className="text-sm font-medium text-foreground truncate max-w-[400px]"
+                        title={fileProgress.fileName}
+                      >
+                        {fileProgress.fileName}
                       </span>
-                    )}
+                      {fileProgress.status === "complete" && (
+                        <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                      )}
+                      {fileProgress.status === "error" && (
+                        <XIcon className="w-4 h-4 text-destructive flex-shrink-0" />
+                      )}
+                      {fileProgress.status === "uploading" && (
+                        <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
+                      )}
+                      {fileProgress.status === "analyzing" && (
+                        <Loader2 className="w-4 h-4 animate-spin text-blue-500 flex-shrink-0" />
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2 flex-shrink-0">
+                      <span className="text-xs text-muted-foreground">
+                        {fileProgress.progress}%
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2 flex-shrink-0">
-                    <span className="text-xs text-muted-foreground">
-                      {fileProgress.progress}%
-                    </span>
-                  </div>
+                  {/* Status message on separate line for better readability */}
+                  {fileProgress.currentStep && (
+                    <div className="text-xs text-muted-foreground pl-0">
+                      {fileProgress.currentStep}
+                    </div>
+                  )}
                 </div>
 
                 {/* Progress bar */}

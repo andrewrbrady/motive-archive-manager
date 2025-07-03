@@ -49,10 +49,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`Re-analyzing image: ${image.cloudflareId}`);
-    console.log("Current metadata:", JSON.stringify(image.metadata, null, 2));
-    console.log("Using prompt ID:", promptId || "default");
-    console.log("Using model ID:", modelId || "default");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Re-analyzing image: ${image.cloudflareId}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Current metadata:", JSON.stringify(image.metadata, null, 2));
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Using prompt ID:", promptId || "default");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Using model ID:", modelId || "default");
 
     // Prepare request body for analysis
     const analysisRequestBody: any = {
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
       throw new Error("Failed to update image metadata");
     }
 
-    console.log("Successfully re-analyzed image with enhanced validation");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Successfully re-analyzed image with enhanced validation");
 
     return NextResponse.json({
       success: true,

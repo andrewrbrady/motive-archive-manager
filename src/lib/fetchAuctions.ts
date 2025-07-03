@@ -156,7 +156,7 @@ export const fetchAuctions = cache(async function fetchAuctions(
     }
 
     if (process.env.NODE_ENV !== "production") {
-      // [REMOVED] // [REMOVED] console.log("MongoDB Query:", JSON.stringify(query, null, 2));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("MongoDB Query:", JSON.stringify(query, null, 2));
     }
 
     // Build the aggregation pipeline with default sorting
@@ -178,7 +178,7 @@ export const fetchAuctions = cache(async function fetchAuctions(
     }));
 
     if (process.env.NODE_ENV !== "production") {
-      // [REMOVED] // [REMOVED] console.log(`Successfully fetched ${auctions.length} auctions`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Successfully fetched ${auctions.length} auctions`);
     }
 
     return {

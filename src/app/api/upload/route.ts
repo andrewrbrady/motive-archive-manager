@@ -13,7 +13,7 @@ async function saveFile(file: File, originalFilename: string): Promise<string> {
   try {
     await mkdir(uploadsDir, { recursive: true });
   } catch (error) {
-    // [REMOVED] // [REMOVED] console.log("Directory already exists or error creating directory:", error);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Directory already exists or error creating directory:", error);
   }
 
   // Generate a unique filename
@@ -32,42 +32,42 @@ async function saveFile(file: File, originalFilename: string): Promise<string> {
   const buffer = Buffer.from(bytes);
   await writeFile(filePath, buffer);
 
-  // [REMOVED] // [REMOVED] console.log("File saved successfully");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("File saved successfully");
 
   // Return the URL path to the file
   return `/uploads/${uniqueFilename}`;
 }
 
 export async function POST(request: NextRequest) {
-  // [REMOVED] // [REMOVED] console.log("Upload API called");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Upload API called");
   try {
     // In App Router, we can use the built-in formData method
-    // [REMOVED] // [REMOVED] console.log("Parsing form data...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Parsing form data...");
     const formData = await request.formData();
 
     // Log form data entries for debugging
-    // [REMOVED] // [REMOVED] console.log("Form data entries:");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Form data entries:");
     for (const [key, value] of formData.entries()) {
       if (value instanceof File) {
         console.log(
           `${key}: File (${value.name}, ${value.type}, ${value.size} bytes)`
         );
       } else {
-        // [REMOVED] // [REMOVED] console.log(`${key}: ${value}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`${key}: ${value}`);
       }
     }
 
     // Get the uploaded file
     const file = formData.get("file") as File | null;
     if (!file) {
-      // [REMOVED] // [REMOVED] console.log("No file provided in request");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("No file provided in request");
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
     // Check if itemId was provided
     const itemId = formData.get("itemId") as string | null;
     if (!itemId) {
-      // [REMOVED] // [REMOVED] console.log("No itemId provided in request");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("No itemId provided in request");
       return NextResponse.json(
         { error: "No itemId provided" },
         { status: 400 }
@@ -75,9 +75,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Save the file and get its URL
-    // [REMOVED] // [REMOVED] console.log("Saving file to disk...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Saving file to disk...");
     const fileUrl = await saveFile(file, file.name);
-    // [REMOVED] // [REMOVED] console.log("File URL:", fileUrl);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("File URL:", fileUrl);
 
     // Success! Return the image URL with the same format as the original API
     const response = {
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       imageUrl: fileUrl,
     };
 
-    // [REMOVED] // [REMOVED] console.log("Returning response:", response);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Returning response:", response);
     return NextResponse.json(response);
   } catch (error) {
     console.error("Error in upload API:", error);

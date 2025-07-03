@@ -48,9 +48,13 @@ interface EventWithCar extends Event {
 
 interface ProjectClientWrapperProps {
   project: Project;
+  initialTab?: string;
 }
 
-export function ProjectClientWrapper({ project }: ProjectClientWrapperProps) {
+export function ProjectClientWrapper({
+  project,
+  initialTab,
+}: ProjectClientWrapperProps) {
   const { data: session, status } = useSession();
   const { user, isAuthenticated, loading: authLoading } = useFirebaseAuth();
   const router = useRouter();
@@ -62,8 +66,46 @@ export function ProjectClientWrapper({ project }: ProjectClientWrapperProps) {
   const retryAttemptRef = useRef(0);
   const maxRetries = 2;
 
-  // Get tab from URL searchParams, default to "overview"
-  const [activeTab, setActiveTab] = useState("overview");
+  // Fix tab flashing: Use initialTab from SSR or fallback to client-side detection
+  const [activeTab, setActiveTab] = useState(() => {
+    // Prefer server-provided initialTab for SSR optimization
+    if (initialTab) {
+      return initialTab;
+    }
+
+    // Fallback to client-side detection (for direct navigation)
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabFromUrl = urlParams.get("tab");
+
+      // Migration: redirect old "captions" tab to new "copywriter" tab
+      if (tabFromUrl === "captions") {
+        return "copywriter";
+      }
+
+      if (
+        tabFromUrl &&
+        [
+          "overview",
+          "timeline",
+          "events",
+          "team",
+          "cars",
+          "images",
+          "galleries",
+          "assets",
+          "deliverables",
+          "copywriter",
+          "content-studio",
+          "ai-chat",
+          "calendar",
+        ].includes(tabFromUrl)
+      ) {
+        return tabFromUrl;
+      }
+    }
+    return "overview";
+  });
 
   // State for member details
   const [memberDetails, setMemberDetails] = useState<
@@ -102,36 +144,18 @@ export function ProjectClientWrapper({ project }: ProjectClientWrapperProps) {
   // const [isPreloadingTabs, setIsPreloadingTabs] = useState(false); // Removed: now using React Query
   const hasPreloadedRef = useRef(false);
 
-  // Check for URL parameters on mount
+  // Handle URL migration for old "captions" tab on mount
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabFromUrl = urlParams.get("tab");
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabFromUrl = urlParams.get("tab");
 
-    // Migration: redirect old "captions" tab to new "copywriter" tab
-    if (tabFromUrl === "captions") {
-      const url = new URL(window.location.href);
-      url.searchParams.set("tab", "copywriter");
-      window.history.replaceState({}, "", url.toString());
-      setActiveTab("copywriter");
-      return;
-    }
-
-    if (
-      tabFromUrl &&
-      [
-        "overview",
-        "timeline",
-        "events",
-        "team",
-        "cars",
-        "galleries",
-        "assets",
-        "deliverables",
-        "copywriter",
-        "calendar",
-      ].includes(tabFromUrl)
-    ) {
-      setActiveTab(tabFromUrl);
+      // Migration: redirect old "captions" tab to new "copywriter" tab
+      if (tabFromUrl === "captions") {
+        const url = new URL(window.location.href);
+        url.searchParams.set("tab", "copywriter");
+        window.history.replaceState({}, "", url.toString());
+      }
     }
   }, []);
 
@@ -158,10 +182,13 @@ export function ProjectClientWrapper({ project }: ProjectClientWrapperProps) {
           "events",
           "team",
           "cars",
+          "images",
           "galleries",
           "assets",
           "deliverables",
           "copywriter",
+          "content-studio",
+          "ai-chat",
           "calendar",
         ].includes(tabFromUrl)
       ) {
@@ -220,7 +247,7 @@ export function ProjectClientWrapper({ project }: ProjectClientWrapperProps) {
       // Set cars data
       if (data.cars?.cars && !preloadedCars) {
         setPreloadedCars(data.cars.cars);
-        console.log("✅ Pre-loaded cars data:", data.cars.cars.length, "cars");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Pre-loaded cars data:", data.cars.cars.length, "cars");
       }
 
       // Set copywriter data
@@ -273,12 +300,12 @@ export function ProjectClientWrapper({ project }: ProjectClientWrapperProps) {
   // Enhanced fetchMemberDetails with defensive error handling
   const fetchMemberDetails = async (userIds: string[]) => {
     if (!api) {
-      console.log("No API client available for fetching member details");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("No API client available for fetching member details");
       return;
     }
 
     try {
-      console.log("👥 Fetching member details for users:", userIds);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("👥 Fetching member details for users:", userIds);
       // Use the project-specific users endpoint (no admin required)
       const response = await api.get("projects/users");
       const data = response as any;
@@ -444,7 +471,7 @@ export function ProjectClientWrapper({ project }: ProjectClientWrapperProps) {
 
   // Fallback method for when optimized preload fails
   const fetchCriticalTabDataFallback = async () => {
-    console.log("🔄 Using fallback individual API calls...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Using fallback individual API calls...");
 
     // Only fetch essential data to minimize connection usage
     const [eventsData, carsData] = await Promise.allSettled([

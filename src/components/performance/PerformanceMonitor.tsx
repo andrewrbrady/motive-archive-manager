@@ -20,7 +20,7 @@ export function PerformanceMonitor({
     const endTime = Date.now();
     const duration = endTime - startTimeRef.current;
 
-    console.log(`🚀 ${name} - Component mounted in: ${duration}ms`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚀 ${name} - Component mounted in: ${duration}ms`);
     hasLoggedRef.current = true;
 
     // Track critical performance metrics
@@ -79,7 +79,7 @@ export function usePerformanceTimer(
   const logTime = (operation: string) => {
     if (!enabled) return;
     const duration = Date.now() - startTime.current;
-    console.log(`⚡ ${name} - ${operation}: ${duration}ms`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`⚡ ${name} - ${operation}: ${duration}ms`);
   };
 
   const resetTimer = () => {

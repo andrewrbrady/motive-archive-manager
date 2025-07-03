@@ -34,7 +34,7 @@ export async function verifyFirebaseToken(
   token: string
 ): Promise<TokenData | null> {
   if (!token || token.trim() === "") {
-    console.log("🔒 verifyFirebaseToken: Empty or missing token");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 verifyFirebaseToken: Empty or missing token");
     return null;
   }
 
@@ -78,7 +78,7 @@ export async function verifyFirebaseToken(
 
       // ✅ Enhanced token validation - check if token is invalid format
       if (firebaseError.code === "auth/argument-error") {
-        console.log("🔒 verifyFirebaseToken: Invalid token format");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 verifyFirebaseToken: Invalid token format");
         return null;
       }
 
@@ -186,7 +186,7 @@ export async function verifyAuthMiddleware(
   const tokenData = await verifyFirebaseToken(token);
 
   if (!tokenData) {
-    console.log("❌ verifyAuthMiddleware: Token verification failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ verifyAuthMiddleware: Token verification failed");
     return NextResponse.json(
       {
         error: "Authentication failed",
@@ -206,7 +206,7 @@ export async function verifyAuthMiddleware(
 
   // Check roles if specified
   if (requiredRoles.length > 0) {
-    console.log("🔒 verifyAuthMiddleware: Checking roles", { requiredRoles });
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 verifyAuthMiddleware: Checking roles", { requiredRoles });
 
     // For API tokens, fetch user data from Firestore to check roles
     if (tokenData.tokenType === "api_token") {
@@ -237,7 +237,7 @@ export async function verifyAuthMiddleware(
             );
           }
         } else {
-          console.log("❌ verifyAuthMiddleware: User not found in Firestore");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ verifyAuthMiddleware: User not found in Firestore");
           return NextResponse.json(
             {
               error: "User not found",

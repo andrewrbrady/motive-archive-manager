@@ -10,7 +10,7 @@ import { auth } from "./firebase";
  * Test the centralized authentication functions
  */
 export async function testAuthIntegration() {
-  console.log("🧪 Testing authentication integration...");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🧪 Testing authentication integration...");
 
   try {
     // Test 1: Check if we can get the current auth state
@@ -21,7 +21,7 @@ export async function testAuthIntegration() {
     );
 
     if (!currentUser) {
-      console.log("ℹ️ No user logged in, skipping token tests");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("ℹ️ No user logged in, skipping token tests");
       return {
         success: true,
         message: "No user logged in - authentication functions are ready",
@@ -29,9 +29,9 @@ export async function testAuthIntegration() {
     }
 
     // Test 2: Try to get a valid token
-    console.log("🔑 Testing getValidToken...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔑 Testing getValidToken...");
     const token = await getValidToken();
-    console.log("🔑 Token received:", token ? "✅ Success" : "❌ Failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔑 Token received:", token ? "✅ Success" : "❌ Failed");
 
     if (!token) {
       throw new Error("Failed to get valid token");
@@ -42,10 +42,10 @@ export async function testAuthIntegration() {
     if (tokenParts.length !== 3) {
       throw new Error("Token is not a valid JWT format");
     }
-    console.log("🔍 Token format:", "✅ Valid JWT");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Token format:", "✅ Valid JWT");
 
     // Test 4: Try to refresh token
-    console.log("🔄 Testing refreshToken...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Testing refreshToken...");
     const refreshedToken = await refreshToken();
     console.log(
       "🔄 Refreshed token:",
@@ -56,7 +56,7 @@ export async function testAuthIntegration() {
       throw new Error("Failed to refresh token");
     }
 
-    console.log("✅ Authentication integration test passed!");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Authentication integration test passed!");
     return {
       success: true,
       message: "All authentication functions working correctly",
@@ -80,22 +80,22 @@ export async function testAuthIntegration() {
  * Test the APIClient authentication flow
  */
 export async function testAPIClientAuth() {
-  console.log("🧪 Testing APIClient authentication flow...");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🧪 Testing APIClient authentication flow...");
 
   try {
     const { api } = await import("./api-client");
 
     // Test API health check (should work without auth)
-    console.log("🏥 Testing API health check...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🏥 Testing API health check...");
     const healthResult = await api.healthCheck();
-    console.log("🏥 Health check:", healthResult ? "✅ Success" : "❌ Failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🏥 Health check:", healthResult ? "✅ Success" : "❌ Failed");
 
     // Test authenticated endpoint (if available)
     // Note: This might fail if no API endpoints are available, but it tests the auth flow
-    console.log("🔒 Testing authenticated API call...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 Testing authenticated API call...");
     try {
       await api.get("/test");
-      console.log("🔒 Authenticated call:", "✅ Success");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 Authenticated call:", "✅ Success");
     } catch (error: any) {
       // This is expected if the endpoint doesn't exist
       if (error.status === 404) {
@@ -104,7 +104,7 @@ export async function testAPIClientAuth() {
           "✅ Auth headers sent (404 expected)"
         );
       } else if (error.message.includes("Authentication required")) {
-        console.log("🔒 Authenticated call:", "❌ Auth failed");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 Authenticated call:", "❌ Auth failed");
         throw error;
       } else {
         console.log(
@@ -114,7 +114,7 @@ export async function testAPIClientAuth() {
       }
     }
 
-    console.log("✅ APIClient authentication test passed!");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ APIClient authentication test passed!");
     return {
       success: true,
       message: "APIClient authentication working correctly",

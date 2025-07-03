@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     // If transcribe is true, you would trigger a transcription job here
     if (transcribe) {
       // In a real implementation, you would trigger a transcription job
-      // [REMOVED] // [REMOVED] console.log(`Transcription requested for video ${video_id}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Transcription requested for video ${video_id}`);
       // You could make an API call to a transcription service here
       // For example:
       /*
@@ -167,7 +167,7 @@ export async function PUT(req: NextRequest) {
     // Handle different actions
     if (action === "transcribe") {
       // In a real implementation, you would trigger a transcription job
-      // [REMOVED] // [REMOVED] console.log(`Transcription requested for video ${video_id}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Transcription requested for video ${video_id}`);
 
       // You could make an API call to a transcription service here
       // For example:

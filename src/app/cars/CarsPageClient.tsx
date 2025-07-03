@@ -257,7 +257,7 @@ export default function CarsPageClient({
             api.get("clients"),
           ]);
 
-        console.log("✅ API calls completed successfully");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ API calls completed successfully");
 
         // Process cars data
         const carsData = carsResponse as any;

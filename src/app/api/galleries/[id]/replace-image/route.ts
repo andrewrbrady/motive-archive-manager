@@ -249,7 +249,7 @@ export async function POST(request: NextRequest) {
         });
       }
     } else {
-      console.log("🔄 Gallery Replace - No orderedImages to update");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Gallery Replace - No orderedImages to update");
     }
 
     if (updateResult.modifiedCount === 0) {
@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("✅ Gallery Replace - Successfully updated gallery!");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Gallery Replace - Successfully updated gallery!");
 
     return NextResponse.json({
       success: true,

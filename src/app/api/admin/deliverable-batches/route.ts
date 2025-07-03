@@ -20,11 +20,11 @@ interface BatchTemplate {
 
 export async function GET() {
   try {
-    console.log("GET /api/admin/deliverable-batches called");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("GET /api/admin/deliverable-batches called");
     const db = await getDatabase();
 
-    console.log("Connected to database:", db.databaseName);
-    console.log("Checking collection deliverable_batches...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Connected to database:", db.databaseName);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Checking collection deliverable_batches...");
 
     // Check if collection exists
     const collections = await db.listCollections().toArray();
@@ -37,8 +37,8 @@ export async function GET() {
       .collection("deliverable_batches")
       .find({})
       .toArray();
-    console.log("Raw batches from MongoDB:", JSON.stringify(batches, null, 2));
-    console.log("Number of batches found:", batches.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Raw batches from MongoDB:", JSON.stringify(batches, null, 2));
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Number of batches found:", batches.length);
 
     // Return empty array if no batches in DB
     const response = {
@@ -62,16 +62,16 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("POST /api/admin/deliverable-batches called");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("POST /api/admin/deliverable-batches called");
     const body = await request.json();
-    console.log("POST body received:", body);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("POST body received:", body);
     const { name, templates } = body;
 
-    console.log("Extracted name:", name);
-    console.log("Extracted templates:", templates);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Extracted name:", name);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Extracted templates:", templates);
 
     if (!name || !templates || !Array.isArray(templates)) {
-      console.log("Validation failed - missing name or templates");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Validation failed - missing name or templates");
       return NextResponse.json(
         { error: "Name and templates array are required" },
         { status: 400 }
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       .collection("deliverable_batches")
       .findOne({ name });
     if (existingBatch) {
-      console.log("Batch already exists:", name);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Batch already exists:", name);
       return NextResponse.json(
         { error: "Batch template with this name already exists" },
         { status: 409 }
@@ -108,24 +108,24 @@ export async function POST(request: NextRequest) {
       templates: processedTemplates,
     };
 
-    console.log("Creating batch template:", batchTemplate);
-    console.log("About to insert into MongoDB...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Creating batch template:", batchTemplate);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("About to insert into MongoDB...");
 
     try {
       const result = await db
         .collection("deliverable_batches")
         .insertOne(batchTemplate);
-      console.log("MongoDB insert result:", result);
-      console.log("Batch saved to MongoDB with ID:", result.insertedId);
-      console.log("Insert acknowledged:", result.acknowledged);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("MongoDB insert result:", result);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Batch saved to MongoDB with ID:", result.insertedId);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Insert acknowledged:", result.acknowledged);
 
       // Verify the document was actually saved
       const savedDoc = await db
         .collection("deliverable_batches")
         .findOne({ _id: result.insertedId });
-      console.log("Verification - document found:", !!savedDoc);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Verification - document found:", !!savedDoc);
       if (savedDoc) {
-        console.log("Saved document:", JSON.stringify(savedDoc, null, 2));
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Saved document:", JSON.stringify(savedDoc, null, 2));
       }
     } catch (insertError) {
       console.error("MongoDB insert failed:", insertError);
@@ -147,9 +147,9 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    console.log("PUT /api/admin/deliverable-batches called");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("PUT /api/admin/deliverable-batches called");
     const body = await request.json();
-    console.log("PUT body received:", body);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("PUT body received:", body);
     const { oldName, name, templates } = body;
 
     if (!oldName || !name || !templates || !Array.isArray(templates)) {
@@ -201,14 +201,14 @@ export async function PUT(request: NextRequest) {
       templates: processedTemplates,
     };
 
-    console.log("Updating batch template:", updatedBatch);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Updating batch template:", updatedBatch);
 
     // Update the batch (MongoDB will update the same document even if name changes)
     const result = await db
       .collection("deliverable_batches")
       .replaceOne({ name: oldName }, updatedBatch);
 
-    console.log("Batch updated in MongoDB:", result.modifiedCount);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Batch updated in MongoDB:", result.modifiedCount);
 
     return NextResponse.json({
       success: true,
@@ -225,9 +225,9 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    console.log("DELETE /api/admin/deliverable-batches called");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("DELETE /api/admin/deliverable-batches called");
     const body = await request.json();
-    console.log("DELETE body received:", body);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("DELETE body received:", body);
     const { name } = body;
 
     if (!name) {
@@ -250,11 +250,11 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    console.log("Deleting batch template:", name);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Deleting batch template:", name);
     const result = await db
       .collection("deliverable_batches")
       .deleteOne({ name });
-    console.log("Batch deleted from MongoDB:", result.deletedCount);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Batch deleted from MongoDB:", result.deletedCount);
 
     return NextResponse.json({
       success: true,

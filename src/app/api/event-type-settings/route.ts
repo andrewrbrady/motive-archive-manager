@@ -4,12 +4,12 @@ import { defaultEventTypeSettings, EventTypeSetting } from "@/types/eventType";
 import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 
 export async function GET(request: NextRequest) {
-  console.log("🔒 GET /api/event-type-settings: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/event-type-settings: Starting request");
 
   // Check authentication (allow all authenticated users, not just admins)
   const authResult = await verifyAuthMiddleware(request);
   if (authResult) {
-    console.log("❌ GET /api/event-type-settings: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ GET /api/event-type-settings: Authentication failed");
     return authResult;
   }
 
@@ -53,12 +53,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log("🔒 POST /api/event-type-settings: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 POST /api/event-type-settings: Starting request");
 
   // Check authentication and admin role
   const authResult = await verifyAuthMiddleware(request, ["admin"]);
   if (authResult) {
-    console.log("❌ POST /api/event-type-settings: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ POST /api/event-type-settings: Authentication failed");
     return authResult;
   }
 

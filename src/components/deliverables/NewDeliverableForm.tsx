@@ -89,7 +89,7 @@ export default function NewDeliverableForm({
   // Memoize fetch functions to prevent infinite re-renders
   const fetchUsers = useCallback(async () => {
     if (!api) {
-      console.log("API client not available for fetching users");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API client not available for fetching users");
       return;
     }
 
@@ -97,15 +97,15 @@ export default function NewDeliverableForm({
       const response = await api.get("users/editors");
       const data = response as any;
 
-      console.log("NewDeliverableForm: Raw API response:", data);
-      console.log("NewDeliverableForm: Data is array:", Array.isArray(data));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Raw API response:", data);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Data is array:", Array.isArray(data));
 
       if (Array.isArray(data)) {
         const activeUsers = data.filter(
           (user: FirestoreUser) => user.status === "active"
         );
-        console.log("NewDeliverableForm: Active users:", activeUsers.length);
-        console.log("NewDeliverableForm: Sample user:", activeUsers[0]);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Active users:", activeUsers.length);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Sample user:", activeUsers[0]);
         setUsers(activeUsers);
       } else {
         console.error("Unexpected API response structure:", data);
@@ -163,7 +163,7 @@ export default function NewDeliverableForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submission started");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Form submission started");
     console.log("Form data:", {
       title,
       selectedPlatforms,
@@ -175,13 +175,13 @@ export default function NewDeliverableForm({
     });
 
     if (!title || title.trim() === "") {
-      console.log("Validation failed - title is required");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Validation failed - title is required");
       toast.error("Please enter a title");
       return;
     }
 
     if (!api) {
-      console.log("API not available");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API not available");
       toast.error("Authentication required");
       return;
     }
@@ -192,13 +192,13 @@ export default function NewDeliverableForm({
     if (editor) {
       selectedUser = users.find((user) => user.uid === editor);
       if (!selectedUser) {
-        console.log("Selected user not found:", editor);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Selected user not found:", editor);
         toast.error("Please select a valid editor");
         return;
       }
     }
 
-    console.log("Starting API call...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Starting API call...");
     setIsLoading(true);
     try {
       const apiUrl = deliverableCarId
@@ -256,12 +256,12 @@ export default function NewDeliverableForm({
         requestBody.car_id = deliverableCarId;
       }
 
-      console.log("API URL:", apiUrl);
-      console.log("Request body:", requestBody);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API URL:", apiUrl);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Request body:", requestBody);
 
       await api.post(apiUrl, requestBody);
 
-      console.log("Deliverable created successfully");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Deliverable created successfully");
       toast.success("Deliverable created successfully!");
       resetForm();
       setIsOpen(false);

@@ -206,7 +206,7 @@ export class ProgressiveImageLoader {
 
       // Log performance in development
       if (process.env.NODE_ENV === "development") {
-        console.log(`📸 Image loaded: ${src} (${state.loadTime.toFixed(2)}ms)`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`📸 Image loaded: ${src} (${state.loadTime.toFixed(2)}ms)`);
       }
     } catch (error) {
       const err = error instanceof Error ? error : new Error("Unknown error");

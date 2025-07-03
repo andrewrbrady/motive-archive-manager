@@ -23,13 +23,13 @@ export async function PUT(request: Request) {
 
     // Handle car association updates (carId field from frontend)
     if ("carId" in data) {
-      console.log(`🚗 Car association update: carId=${data.carId}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚗 Car association update: carId=${data.carId}`);
       if (data.carId === undefined || data.carId === null) {
         updateData.car_id = null; // Explicitly remove car association
-        console.log(`🚗 Removing car association: setting car_id to null`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚗 Removing car association: setting car_id to null`);
       } else {
         updateData.car_id = data.carId; // Set car association
-        console.log(`🚗 Setting car association: car_id=${data.carId}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚗 Setting car association: car_id=${data.carId}`);
       }
     }
 

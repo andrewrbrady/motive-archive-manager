@@ -173,7 +173,7 @@ export async function GET(request: Request) {
 
       // Update debug info
       debugInfo.returnedCount = rawAssets.length;
-      // [REMOVED] // [REMOVED] console.log(`Returning ${rawAssets.length} raw assets for page ${page}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Returning ${rawAssets.length} raw assets for page ${page}`);
 
       // Ensure assets is always an array, even if the database returns null or undefined
       const safelyTypedAssets = Array.isArray(rawAssets) ? rawAssets : [];

@@ -137,7 +137,7 @@ export async function uploadToCloudflare(
   formData.append("itemId", "inventory-item"); // Add a default itemId that the endpoint requires
 
   try {
-    // [REMOVED] // [REMOVED] console.log("Sending request to /api/upload");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Sending request to /api/upload");
     const result = await api.upload<any>("/upload", formData);
 
     // Extract image ID either from result.id or from imageUrl path
@@ -156,7 +156,7 @@ export async function uploadToCloudflare(
     // Ensure the URL is properly constructed with /public at the end
     const imageUrl = result.imageUrl || `${baseUrl}/public`;
 
-    // [REMOVED] // [REMOVED] console.log("Final image URL:", imageUrl);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Final image URL:", imageUrl);
 
     return {
       id: imageId,

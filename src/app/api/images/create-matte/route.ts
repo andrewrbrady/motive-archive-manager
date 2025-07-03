@@ -99,8 +99,8 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      console.log("🌐 Trying remote matte service...");
-      console.log("🔗 Remote service URL:", remoteServiceUrl);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🌐 Trying remote matte service...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔗 Remote service URL:", remoteServiceUrl);
 
       // ADDED: Transform Cloudflare URLs for remote service compatibility (copied from canvas extension)
       let processableImageUrl = imageUrl;
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
 
       if (remoteResponse.ok) {
         const remoteResult = await remoteResponse.json();
-        console.log("✅ Successfully processed with remote Cloud Run service");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Successfully processed with remote Cloud Run service");
 
         // If uploadToCloudflare is requested, upload the result
         if (uploadToCloudflare && remoteResult.processedImageUrl) {
@@ -345,7 +345,7 @@ export async function POST(request: NextRequest) {
         );
       }
     } catch (remoteError) {
-      console.log("⚠️ Remote matte service error");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("⚠️ Remote matte service error");
       console.error("Remote matte service error details:", remoteError);
 
       return NextResponse.json(

@@ -103,7 +103,7 @@ export default function FullCalendarTab({ carId }: FullCalendarTabProps) {
 
   const handleSelectEvent = useCallback((event: any) => {
     // Implementation for event selection
-    // [REMOVED] // [REMOVED] console.log("Event selected:", event);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Event selected:", event);
   }, []);
 
   // Phase 3A improvement: Non-blocking loading state with tab switching message

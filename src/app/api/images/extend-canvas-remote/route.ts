@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     // Get the remote service URL from environment variables
     const remoteServiceUrl = process.env.CANVAS_EXTENSION_SERVICE_URL;
-    console.log("🔧 Remote service URL:", remoteServiceUrl);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔧 Remote service URL:", remoteServiceUrl);
 
     if (!remoteServiceUrl) {
       console.error("❌ CANVAS_EXTENSION_SERVICE_URL not configured");
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     try {
       // Call the remote canvas extension service with authentication
-      console.log("🚀 Calling remote canvas extension service...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚀 Calling remote canvas extension service...");
 
       // Get an identity token for the service
       let headers: Record<string, string> = {
@@ -93,13 +93,13 @@ export async function POST(request: NextRequest) {
 
       // Try to get an identity token for authentication
       try {
-        console.log("🔐 Attempting to get Google Cloud identity token...");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔐 Attempting to get Google Cloud identity token...");
 
         let idToken: string | null = null;
 
         // Skip authentication if explicitly configured (for testing)
         if (process.env.SKIP_CLOUD_RUN_AUTH === "true") {
-          console.log("⚠️ Skipping authentication (SKIP_CLOUD_RUN_AUTH=true)");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("⚠️ Skipping authentication (SKIP_CLOUD_RUN_AUTH=true)");
         } else {
           // Try OIDC authentication first (for Vercel production)
           if (process.env.NODE_ENV === "production" && process.env.VERCEL) {
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
                 process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID &&
                 process.env.GCP_SERVICE_ACCOUNT_EMAIL
               ) {
-                console.log("🔑 Using OIDC authentication for Vercel...");
+                // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔑 Using OIDC authentication for Vercel...");
 
                 const authClient = ExternalAccountClient.fromJSON({
                   type: "external_account",
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
                   const accessTokenResponse = await authClient.getAccessToken();
                   if (accessTokenResponse.token) {
                     idToken = accessTokenResponse.token;
-                    console.log("✅ Successfully obtained OIDC identity token");
+                    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Successfully obtained OIDC identity token");
                   }
                 }
               } else {
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
 
           // Fallback to GoogleAuth if OIDC didn't work
           if (!idToken) {
-            console.log("🔑 Using GoogleAuth for authentication...");
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔑 Using GoogleAuth for authentication...");
 
             // Use the default service account in the Vercel environment
             // This will work when deployed to Vercel with proper Google Cloud credentials
@@ -170,16 +170,16 @@ export async function POST(request: NextRequest) {
 
           if (idToken) {
             headers["Authorization"] = `Bearer ${idToken}`;
-            console.log("✅ Successfully obtained Google Cloud identity token");
-            console.log("🔑 Token length:", idToken.length);
-            console.log("🔑 Token preview:", idToken.substring(0, 50) + "...");
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Successfully obtained Google Cloud identity token");
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔑 Token length:", idToken.length);
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔑 Token preview:", idToken.substring(0, 50) + "...");
           } else {
             throw new Error("No identity token received");
           }
         }
       } catch (authError) {
         console.error("⚠️ Could not get identity token:", authError);
-        console.log("🔄 Proceeding without authentication...");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Proceeding without authentication...");
 
         // For development/testing, try without auth first
         // In production, this should fail gracefully
@@ -190,8 +190,8 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      console.log("📡 Making request to:", `${remoteServiceUrl}/extend-canvas`);
-      console.log("📋 Request headers:", Object.keys(headers));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📡 Making request to:", `${remoteServiceUrl}/extend-canvas`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📋 Request headers:", Object.keys(headers));
 
       const requestPayload = {
         imageUrl,
@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
         signal: AbortSignal.timeout(60000),
       });
 
-      console.log("📨 Response status:", remoteResponse.status);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📨 Response status:", remoteResponse.status);
       console.log(
         "📨 Response headers:",
         Object.fromEntries(remoteResponse.headers.entries())
@@ -230,9 +230,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      console.log("✅ Remote service responded successfully");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Remote service responded successfully");
       const remoteResult = await remoteResponse.json();
-      console.log("📄 Remote result keys:", Object.keys(remoteResult));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📄 Remote result keys:", Object.keys(remoteResult));
 
       if (!remoteResult.success) {
         console.error("❌ Remote processing failed:", remoteResult.error);
@@ -241,7 +241,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      console.log("🎉 Remote processing successful!");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎉 Remote processing successful!");
       let result: any = {
         success: true,
         processedImageUrl: remoteResult.processedImageUrl,

@@ -206,7 +206,7 @@ export const cacheUtils = {
    * Warm up cache with frequently accessed data
    */
   async warmupCache(): Promise<void> {
-    console.log("🔥 Warming up cache...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔥 Warming up cache...");
 
     // Skip cache warmup during build time
     if (
@@ -214,7 +214,7 @@ export const cacheUtils = {
       (process.env.NEXT_PHASE === "phase-production-build" ||
         !process.env.NEXTAUTH_URL)
     ) {
-      console.log("⏭️ Skipping cache warmup during build time");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("⏭️ Skipping cache warmup during build time");
       return;
     }
 
@@ -268,7 +268,7 @@ export const cacheUtils = {
         ),
       ]);
 
-      console.log("✅ Cache warmup completed");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Cache warmup completed");
     } catch (error) {
       console.error("❌ Cache warmup failed:", error);
     }
@@ -293,7 +293,7 @@ export const cacheUtils = {
    */
   clearAll(): void {
     Object.values(caches).forEach((cache) => cache.clear());
-    console.log("🗑️  All caches cleared");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🗑️  All caches cleared");
   },
 };
 
@@ -318,12 +318,12 @@ export function withCache<T>(
       // Try cache first
       const cached = cache.get<T>(cacheKey);
       if (cached !== null) {
-        console.log(`🎯 Cache hit: ${cacheKey}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🎯 Cache hit: ${cacheKey}`);
         return cached;
       }
 
       // Execute original method
-      console.log(`🔍 Cache miss: ${cacheKey}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🔍 Cache miss: ${cacheKey}`);
       const result = await method.apply(this, args);
 
       // Cache the result

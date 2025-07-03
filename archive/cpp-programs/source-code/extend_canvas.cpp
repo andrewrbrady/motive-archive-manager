@@ -1,6 +1,7 @@
-// extend_canvas.cpp  (v6.0)
+// extend_canvas.cpp  (v6.1)
 // Added support for requestedWidth and requestedHeight parameters
-// to constrain output dimensions and maintain proper aspect ratios.
+// to constrain output dimensions while maintaining proper aspect ratios.
+// Fixed: Final resize now preserves aspect ratio and centers content.
 //
 // Build:
 //   g++ -std=c++17 -O2 -Wall -o extend_canvas extend_canvas.cpp `pkg-config --cflags --libs opencv4`
@@ -11,8 +12,7 @@
 //        •  0‑255         set manually
 //      requested_w, requested_h:
 //        • omit → use original width, desired height
-//        • specify both → resize final output to exact dimensions
-//
+//        • specify both → resize final output to fit dimensions while preserving aspect ratio
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <string>
@@ -124,8 +124,44 @@ int main(int argc, char *argv[])
         // Apply final resize if requested dimensions are specified
         if (requestedW > 0 && requestedH > 0)
         {
-            resize(result, result, Size(requestedW, requestedH), 0, 0, INTER_LANCZOS4);
-            std::cout << "Resized to requested dimensions: " << requestedW << "x" << requestedH << std::endl;
+            // Calculate the scaling factor to fit within requested dimensions while preserving aspect ratio
+            double scaleX = static_cast<double>(requestedW) / result.cols;
+            double scaleY = static_cast<double>(requestedH) / result.rows;
+            double scale = std::min(scaleX, scaleY); // Use the smaller scale to maintain aspect ratio
+
+            // Calculate the new dimensions that preserve aspect ratio
+            int newWidth = static_cast<int>(result.cols * scale);
+            int newHeight = static_cast<int>(result.rows * scale);
+
+            // Resize while preserving aspect ratio
+            Mat resized;
+            resize(result, resized, Size(newWidth, newHeight), 0, 0, INTER_LANCZOS4);
+
+            // Create a canvas with the requested dimensions and center the resized image
+            Mat finalCanvas(requestedH, requestedW, result.type(), Scalar(255, 255, 255)); // White background
+
+            // Calculate position to center the resized image
+            int xOffset = (requestedW - newWidth) / 2;
+            int yOffset = (requestedH - newHeight) / 2;
+
+            // Ensure offsets are non-negative
+            xOffset = std::max(0, xOffset);
+            yOffset = std::max(0, yOffset);
+
+            // Copy the resized image to the center of the final canvas
+            if (xOffset + newWidth <= requestedW && yOffset + newHeight <= requestedH)
+            {
+                Rect roi(xOffset, yOffset, newWidth, newHeight);
+                resized.copyTo(finalCanvas(roi));
+                result = finalCanvas;
+                std::cout << "Resized to requested dimensions with aspect ratio preserved: " << requestedW << "x" << requestedH << std::endl;
+            }
+            else
+            {
+                // Fallback: just resize without centering if there's an issue
+                resize(result, result, Size(requestedW, requestedH), 0, 0, INTER_LANCZOS4);
+                std::cout << "Resized to requested dimensions (fallback): " << requestedW << "x" << requestedH << std::endl;
+            }
         }
 
         imwrite(outP, result);
@@ -154,8 +190,44 @@ int main(int argc, char *argv[])
     // Apply final resize if requested dimensions are specified
     if (requestedW > 0 && requestedH > 0)
     {
-        resize(canvas, canvas, Size(requestedW, requestedH), 0, 0, INTER_LANCZOS4);
-        std::cout << "Extended canvas resized to requested dimensions: " << requestedW << "x" << requestedH << std::endl;
+        // Calculate the scaling factor to fit within requested dimensions while preserving aspect ratio
+        double scaleX = static_cast<double>(requestedW) / canvas.cols;
+        double scaleY = static_cast<double>(requestedH) / canvas.rows;
+        double scale = std::min(scaleX, scaleY); // Use the smaller scale to maintain aspect ratio
+
+        // Calculate the new dimensions that preserve aspect ratio
+        int newWidth = static_cast<int>(canvas.cols * scale);
+        int newHeight = static_cast<int>(canvas.rows * scale);
+
+        // Resize while preserving aspect ratio
+        Mat resized;
+        resize(canvas, resized, Size(newWidth, newHeight), 0, 0, INTER_LANCZOS4);
+
+        // Create a canvas with the requested dimensions and center the resized image
+        Mat finalCanvas(requestedH, requestedW, canvas.type(), Scalar(255, 255, 255)); // White background
+
+        // Calculate position to center the resized image
+        int xOffset = (requestedW - newWidth) / 2;
+        int yOffset = (requestedH - newHeight) / 2;
+
+        // Ensure offsets are non-negative
+        xOffset = std::max(0, xOffset);
+        yOffset = std::max(0, yOffset);
+
+        // Copy the resized image to the center of the final canvas
+        if (xOffset + newWidth <= requestedW && yOffset + newHeight <= requestedH)
+        {
+            Rect roi(xOffset, yOffset, newWidth, newHeight);
+            resized.copyTo(finalCanvas(roi));
+            canvas = finalCanvas;
+            std::cout << "Extended canvas resized to requested dimensions with aspect ratio preserved: " << requestedW << "x" << requestedH << std::endl;
+        }
+        else
+        {
+            // Fallback: just resize without centering if there's an issue
+            resize(canvas, canvas, Size(requestedW, requestedH), 0, 0, INTER_LANCZOS4);
+            std::cout << "Extended canvas resized to requested dimensions (fallback): " << requestedW << "x" << requestedH << std::endl;
+        }
     }
 
     imwrite(outP, canvas);

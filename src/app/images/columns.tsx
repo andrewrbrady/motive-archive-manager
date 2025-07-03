@@ -21,13 +21,36 @@ export type ImageData = {
   width: number;
   height: number;
   metadata: {
+    // Car-specific fields
     angle?: string;
     movement?: string;
     tod?: string;
     view?: string;
+    side?: string;
     description?: string;
+    category?: string;
+
+    // General image analysis fields
+    content_type?: string;
+    primary_subject?: string;
+    dominant_colors?: string;
+    style?: string;
+    usage_context?: string;
+    has_text?: boolean;
+    has_brand_elements?: boolean;
+
+    // Vehicle info for car detection
+    vehicleInfo?: {
+      make?: string;
+      model?: string;
+      year?: number;
+      [key: string]: any;
+    };
+
+    // Allow any additional fields
+    [key: string]: any;
   };
-  carId: string;
+  carId?: string;
   createdAt: string;
   updatedAt: string;
 };

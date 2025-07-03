@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useCallback, useRef, useMemo } from "react";
-import { useImageGallery } from "@/hooks/useImageGallery";
+import { useGenericImageGallery } from "@/hooks/useGenericImageGallery";
 import { ImageFilters } from "./gallery/ImageFilters";
 import { ImageViewer } from "./gallery/ImageViewer";
 import { ImageThumbnails } from "./gallery/ImageThumbnails";
@@ -44,7 +44,6 @@ export function CarImageGallery({
 
   const {
     // Data
-    images,
     filteredImages,
     currentImage,
     filterOptions,
@@ -86,7 +85,11 @@ export function CarImageGallery({
     reanalyzeImage,
     handleSetPrimaryImage,
     loadMoreImages,
-  } = useImageGallery(carId, vehicleInfo);
+  } = useGenericImageGallery({
+    entityId: carId,
+    entityType: "car",
+    entityInfo: vehicleInfo,
+  });
 
   // Function to toggle edit mode via URL parameters
   const toggleEditMode = useCallback(() => {
@@ -327,7 +330,7 @@ export function CarImageGallery({
 
   useEffect(() => {
     // Only log essential information when data changes
-  }, [carId, images.length]);
+  }, [carId, filteredImages.length]);
 
   // Clear filters handler
   const handleClearFilters = useCallback(() => {
@@ -388,7 +391,7 @@ export function CarImageGallery({
   }
 
   // FIXED: Better empty state logic - only after loading is complete
-  const isTrulyEmpty = !hasImages && images.length === 0;
+  const isTrulyEmpty = !hasImages && filteredImages.length === 0;
   const hasFilteredResults = filteredImages.length > 0;
   const hasActiveFiltersOrSearch = hasActiveFilters || hasActiveSearch;
 
@@ -471,7 +474,7 @@ export function CarImageGallery({
         <div className="w-full lg:w-1/3 lg:max-w-[400px] min-w-[280px]">
           <ImageThumbnails
             images={filteredImages}
-            currentImage={currentImage}
+            currentImage={currentImage || undefined}
             selectedImages={selectedImages}
             currentPage={currentPage}
             isEditMode={isEditMode}
@@ -481,7 +484,12 @@ export function CarImageGallery({
             totalImagesAvailable={totalImagesAvailable}
             filters={filters}
             searchQuery={searchQuery}
-            onImageSelect={setMainImage}
+            onImageSelect={(imageId: string) => {
+              const image = filteredImages.find(
+                (img) => (img.id || img._id) === imageId
+              );
+              if (image) setMainImage(image);
+            }}
             onToggleSelection={toggleImageSelection}
             onPageChange={setCurrentPage}
             onToggleInfo={setShowImageInfo}
@@ -501,7 +509,7 @@ export function CarImageGallery({
       <ImageModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        currentImage={currentImage}
+        currentImage={currentImage || undefined}
         images={filteredImages}
         onNext={handleNext}
         onPrev={handlePrev}

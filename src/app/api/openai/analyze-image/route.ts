@@ -18,12 +18,25 @@ const openai = new OpenAI({
 });
 
 interface ImageAnalysis {
+  // Car-specific fields
   angle?: string;
   view?: string;
   movement?: string;
   tod?: string;
   side?: string;
   description?: string;
+
+  // General image fields
+  content_type?: string;
+  primary_subject?: string;
+  dominant_colors?: string[];
+  style?: string;
+  usage_context?: string;
+  has_text?: boolean;
+  has_brand_elements?: boolean;
+
+  // Allow any additional fields
+  [key: string]: any;
 }
 
 interface VehicleInfo {
@@ -124,19 +137,27 @@ function normalizeValue(
     : "";
 }
 
-function normalizeAnalysis(analysis: ImageAnalysis): ImageAnalysis {
+function normalizeAnalysis(
+  analysis: ImageAnalysis,
+  isCarImage: boolean = true
+): ImageAnalysis {
   if (!analysis) return {};
 
-  const normalized = {
-    angle: normalizeValue("angle", analysis.angle || ""),
-    view: normalizeValue("view", analysis.view || ""),
-    movement: normalizeValue("movement", analysis.movement || ""),
-    tod: normalizeValue("tod", analysis.tod || ""),
-    side: normalizeValue("side", analysis.side || ""),
-    description: analysis.description || "",
-  };
-
-  return normalized;
+  if (isCarImage) {
+    // Normalize car-specific fields
+    const normalized = {
+      angle: normalizeValue("angle", analysis.angle || ""),
+      view: normalizeValue("view", analysis.view || ""),
+      movement: normalizeValue("movement", analysis.movement || ""),
+      tod: normalizeValue("tod", analysis.tod || ""),
+      side: normalizeValue("side", analysis.side || ""),
+      description: analysis.description || "",
+    };
+    return normalized;
+  } else {
+    // For general images, return all fields as-is (no normalization needed)
+    return { ...analysis };
+  }
 }
 
 async function validateColorWithSerper(
@@ -195,7 +216,7 @@ function safeJsonParse(text: string, defaultValue: any = {}): any {
     return JSON.parse(cleanJson);
   } catch (error) {
     console.error("JSON Parse Error:", error);
-    // [REMOVED] // [REMOVED] console.debug("Failed to parse text:", text);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.debug("Failed to parse text:", text);
     return defaultValue;
   }
 }
@@ -211,7 +232,7 @@ async function retryOpenAICall<T>(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       if (attempt > 0) {
-        // [REMOVED] // [REMOVED] console.log(`Retry attempt ${attempt} for OpenAI API call`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Retry attempt ${attempt} for OpenAI API call`);
         // Exponential backoff
         await new Promise((resolve) =>
           setTimeout(resolve, delay * Math.pow(2, attempt - 1))
@@ -276,7 +297,10 @@ async function retryOpenAICall<T>(
 }
 
 // Validation function to check if analysis results are acceptable
-function validateAnalysisResults(analysis: ImageAnalysis): {
+function validateAnalysisResults(
+  analysis: ImageAnalysis,
+  isCarImage: boolean = true
+): {
   isValid: boolean;
   missingFields: string[];
   invalidFields: string[];
@@ -284,10 +308,12 @@ function validateAnalysisResults(analysis: ImageAnalysis): {
   const missingFields: string[] = [];
   const invalidFields: string[] = [];
 
-  // Check required fields
-  if (!analysis.angle) missingFields.push("angle");
-  if (!analysis.view) missingFields.push("view");
-  if (!analysis.movement) missingFields.push("movement");
+  // Check required fields only for car images
+  if (isCarImage) {
+    if (!analysis.angle) missingFields.push("angle");
+    if (!analysis.view) missingFields.push("view");
+    if (!analysis.movement) missingFields.push("movement");
+  }
 
   // Check field validity
   if (analysis.angle && !allowedValues.angle.includes(analysis.angle as any)) {
@@ -319,7 +345,8 @@ async function analyzeImageWithValidation(
   analysisImageUrl: string,
   prompt: string,
   model: string,
-  maxValidationRetries = 2
+  maxValidationRetries = 2,
+  isCarImage: boolean = true
 ): Promise<ImageAnalysis> {
   let lastAnalysis: ImageAnalysis = {};
   let lastValidation: {
@@ -394,10 +421,10 @@ async function analyzeImageWithValidation(
     const analysis = safeJsonParse(analysisText) as ImageAnalysis;
 
     // Normalize the analysis values
-    const normalizedAnalysis = normalizeAnalysis(analysis);
+    const normalizedAnalysis = normalizeAnalysis(analysis, isCarImage);
 
     // Validate the results
-    const validation = validateAnalysisResults(normalizedAnalysis);
+    const validation = validateAnalysisResults(normalizedAnalysis, isCarImage);
 
     console.log(`Validation attempt ${validationAttempt + 1}:`, {
       isValid: validation.isValid,
@@ -407,7 +434,7 @@ async function analyzeImageWithValidation(
     });
 
     if (validation.isValid) {
-      console.log(`Analysis successful on attempt ${validationAttempt + 1}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Analysis successful on attempt ${validationAttempt + 1}`);
       return normalizedAnalysis;
     }
 
@@ -445,16 +472,18 @@ async function analyzeImageWithValidation(
 export async function POST(request: NextRequest) {
   console.time("analyze-image-total");
   try {
-    const { imageUrl, vehicleInfo, promptId, modelId } = await request.json();
-    // [REMOVED] // [REMOVED] console.log("Analyzing image:", imageUrl);
+    const { imageUrl, vehicleInfo, promptId, modelId, imageContext } =
+      await request.json();
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Analyzing image:", imageUrl);
     console.log(
       "Vehicle info:",
       vehicleInfo
         ? JSON.stringify(vehicleInfo).substring(0, 200) + "..."
         : "None provided"
     );
-    console.log("Prompt ID:", promptId || "Using default");
-    console.log("Model ID:", modelId || "Using default");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Prompt ID:", promptId || "Using default");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Model ID:", modelId || "Using default");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Image Context:", imageContext || "None provided");
 
     if (!imageUrl) {
       return NextResponse.json(
@@ -499,7 +528,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate that the constructed URL is accessible
-    console.log("Final image URL for analysis:", analysisImageUrl);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Final image URL for analysis:", analysisImageUrl);
 
     // Basic URL validation
     try {
@@ -545,7 +574,7 @@ export async function POST(request: NextRequest) {
             );
           }
         } else {
-          console.log("Image accessibility check passed");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Image accessibility check passed");
         }
       } catch (accessibilityError) {
         console.warn(
@@ -574,52 +603,61 @@ export async function POST(request: NextRequest) {
 
         if (customPrompt) {
           prompt = customPrompt.prompt;
-          console.log("Using custom prompt:", customPrompt.name);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Using custom prompt:", customPrompt.name);
         } else {
           console.warn("Custom prompt not found or inactive, using default");
         }
       } catch (error) {
         console.error("Error fetching custom prompt:", error);
-        console.log("Falling back to default prompt");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Falling back to default prompt");
       }
     }
 
-    // Add style guide
-    prompt +=
-      "\n\nStyle Guide for Descriptions:\n" + IMAGE_ANALYSIS_CONFIG.styleGuide;
+    // Add user-provided image context if available (ALWAYS, regardless of prompt type)
+    if (imageContext && imageContext.trim()) {
+      prompt += `\n\nUser provided context: ${imageContext.trim()}\n\nPlease incorporate this context into your analysis and description.\n\n`;
+    }
 
-    if (vehicleInfo && vehicleInfo.make && vehicleInfo.model) {
-      let vehicleContext = `\n\nVehicle Information:`;
-      vehicleContext += `\n- Make: ${vehicleInfo.make}`;
-      vehicleContext += `\n- Model: ${vehicleInfo.model}`;
+    // Only add car-specific instructions if using default prompt or dealing with car images
+    if (!promptId) {
+      // Add style guide for default prompt
+      prompt +=
+        "\n\nStyle Guide for Descriptions:\n" +
+        IMAGE_ANALYSIS_CONFIG.styleGuide;
 
-      if (vehicleInfo.year) {
-        vehicleContext += `\n- Year: ${vehicleInfo.year}`;
-      }
+      if (vehicleInfo && vehicleInfo.make && vehicleInfo.model) {
+        let vehicleContext = `\n\nVehicle Information:`;
+        vehicleContext += `\n- Make: ${vehicleInfo.make}`;
+        vehicleContext += `\n- Model: ${vehicleInfo.model}`;
 
-      if (vehicleInfo.engine?.type) {
-        vehicleContext += `\n- Engine: ${vehicleInfo.engine.type}`;
-      }
+        if (vehicleInfo.year) {
+          vehicleContext += `\n- Year: ${vehicleInfo.year}`;
+        }
 
-      if (vehicleInfo.condition) {
-        vehicleContext += `\n- Condition: ${vehicleInfo.condition}`;
-      }
+        if (vehicleInfo.engine?.type) {
+          vehicleContext += `\n- Engine: ${vehicleInfo.engine.type}`;
+        }
 
-      if (vehicleInfo.color) {
-        vehicleContext += `\n- Color: ${vehicleInfo.color}`;
-      }
+        if (vehicleInfo.condition) {
+          vehicleContext += `\n- Condition: ${vehicleInfo.condition}`;
+        }
 
-      if (vehicleInfo.additionalContext) {
-        vehicleContext += `\n\nAdditional context: ${vehicleInfo.additionalContext}`;
+        if (vehicleInfo.color) {
+          vehicleContext += `\n- Color: ${vehicleInfo.color}`;
+        }
+
+        if (vehicleInfo.additionalContext) {
+          vehicleContext += `\n\nAdditional context: ${vehicleInfo.additionalContext}`;
+        }
+
+        prompt +=
+          vehicleContext +
+          "\n\nPlease analyze the image with this vehicle information in mind and ensure the description accurately reflects these details.\n\n";
       }
 
       prompt +=
-        vehicleContext +
-        "\n\nPlease analyze the image with this vehicle information in mind and ensure the description accurately reflects these details.\n\n";
+        "Provide:\n- angle (front, front 3/4, side, rear 3/4, rear, overhead, under)\n- view (exterior, interior)\n- movement (static, motion)\n- tod (sunrise, day, sunset, night)\n- side (driver, passenger, rear, overhead)\n- description (brief description of what's shown in the image, focusing on visible features)";
     }
-
-    prompt +=
-      "Provide:\n- angle (front, front 3/4, side, rear 3/4, rear, overhead, under)\n- view (exterior, interior)\n- movement (static, motion)\n- tod (sunrise, day, sunset, night)\n- side (driver, passenger, rear, overhead)\n- description (brief description of what's shown in the image, focusing on visible features)";
 
     console.time("openai-api-call");
 
@@ -644,14 +682,26 @@ export async function POST(request: NextRequest) {
       selectedModel = defaultModel?.id || "gpt-4o-mini";
     }
 
-    console.log("Using OpenAI model:", selectedModel);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Using OpenAI model:", selectedModel);
+
+    // Determine if this is a car image based on vehicle info
+    // Don't treat general uploads as car images even if they have vehicleInfo
+    const isCarImage = !!(
+      vehicleInfo &&
+      vehicleInfo.make &&
+      vehicleInfo.model &&
+      vehicleInfo.year &&
+      vehicleInfo.make !== "Unknown" &&
+      vehicleInfo.model !== "General Upload"
+    );
 
     // Use the enhanced analysis function with validation and retry
     const normalizedAnalysis = await analyzeImageWithValidation(
       analysisImageUrl,
       prompt,
       selectedModel,
-      2 // maxValidationRetries
+      2, // maxValidationRetries
+      isCarImage
     );
 
     console.timeEnd("openai-api-call");

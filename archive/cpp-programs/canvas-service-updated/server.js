@@ -1,4 +1,5 @@
-// Canvas Extension and Matte Service v2.4 - with coordinate scaling fix for crop-image endpoint
+// Canvas Extension Service v6.2 - Fixed aspect ratio preservation in extend_canvas.cpp
+// Updated: 2025-01-18 - Resolves vertical stretching issues with requestedWidth/Height parameters
 const express = require("express");
 const { exec } = require("child_process");
 const { promisify } = require("util");

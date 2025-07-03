@@ -83,12 +83,12 @@ function DashboardInner() {
 
   const fetchUserDeliverables = async () => {
     if (!session?.user?.id) {
-      console.log("Dashboard: No session user ID, skipping fetch");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Dashboard: No session user ID, skipping fetch");
       return;
     }
 
     if (!api) {
-      console.log("Dashboard: API client not available yet, skipping fetch");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Dashboard: API client not available yet, skipping fetch");
       return;
     }
 
@@ -194,7 +194,7 @@ function DashboardInner() {
       setDeliverables([]);
       setIsLoading(false);
     } else if (!api) {
-      console.log("Dashboard: API client not ready yet, waiting...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Dashboard: API client not ready yet, waiting...");
       setIsLoading(true);
     } else if (session?.user?.id && api) {
       // ✅ PHASE 4F: Debounce API calls to prevent excessive requests
@@ -203,7 +203,7 @@ function DashboardInner() {
       );
 
       fetchDeliverablesTimeoutRef.current = setTimeout(() => {
-        console.log("Dashboard: Executing debounced fetchUserDeliverables");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Dashboard: Executing debounced fetchUserDeliverables");
         fetchUserDeliverables();
       }, DEBOUNCE_MS);
     } else {

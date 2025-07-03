@@ -7,19 +7,19 @@ import {
 export const dynamic = "force-dynamic";
 
 async function validateToken(request: NextRequest) {
-  console.log("🔒 GET /api/auth/validate - Token validation endpoint starting");
-  console.log("🔒 Request URL:", request.url);
-  console.log("🔒 Request method:", request.method);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/auth/validate - Token validation endpoint starting");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 Request URL:", request.url);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 Request method:", request.method);
 
   try {
     // Get the token from the authorization header
     const authHeader = request.headers.get("authorization") || "";
-    console.log("🔒 Auth header received:", authHeader ? "Yes" : "No");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 Auth header received:", authHeader ? "Yes" : "No");
 
     const token = authHeader.split("Bearer ")[1];
 
     if (!token) {
-      console.log("❌ validateToken: No token provided");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ validateToken: No token provided");
       return NextResponse.json(
         {
           valid: false,
@@ -30,12 +30,12 @@ async function validateToken(request: NextRequest) {
       );
     }
 
-    console.log("🔒 Token received, length:", token.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 Token received, length:", token.length);
 
     const tokenData = await verifyFirebaseToken(token);
 
     if (!tokenData) {
-      console.log("❌ validateToken: Token verification failed");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ validateToken: Token verification failed");
       return NextResponse.json(
         {
           valid: false,

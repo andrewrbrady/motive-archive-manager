@@ -291,45 +291,67 @@ export function GalleryCropModal({
   );
 
   // Get processing image URL (higher resolution)
-  const getProcessingImageUrl = useCallback((baseUrl: string) => {
-    if (!baseUrl.includes("imagedelivery.net")) return baseUrl;
+  const getProcessingImageUrl = useCallback(
+    (baseUrl: string) => {
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔧 getProcessingImageUrl input:", baseUrl);
 
-    const params = ["w=3000", "q=100"];
+      if (!baseUrl.includes("imagedelivery.net")) {
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Non-Cloudflare URL, returning as-is");
+        return baseUrl;
+      }
 
-    // Handle different Cloudflare URL formats
-    // Format: https://imagedelivery.net/account/image-id/public
-    // Should become: https://imagedelivery.net/account/image-id/w=3000,q=100
-    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
-      // Replace the last segment (usually 'public') with our parameters
-      const urlParts = baseUrl.split("/");
+      // First, normalize to medium variant for consistency
+      const mediumUrl = getMediumVariantUrl(baseUrl);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Normalized to medium variant:", mediumUrl);
+
+      // Then apply high-resolution parameters for processing
+      const params = [`w=${cloudflareWidth}`, "q=100"];
+
+      // Replace the medium variant with our processing parameters
+      const urlParts = mediumUrl.split("/");
       urlParts[urlParts.length - 1] = params.join(",");
-      return urlParts.join("/");
-    } else {
-      // URL doesn't have a variant, append transformations
-      // This handles cases where database URLs are missing /public suffix
-      return `${baseUrl}/${params.join(",")}`;
-    }
-  }, []);
+      const processedUrl = urlParts.join("/");
+
+      console.log("🔧 Processing URL result:", {
+        original: baseUrl,
+        medium: mediumUrl,
+        processed: processedUrl,
+        width: cloudflareWidth,
+      });
+
+      return processedUrl;
+    },
+    [cloudflareWidth]
+  );
 
   // Get preview image URL (medium resolution for caching)
   const getPreviewImageUrl = useCallback((baseUrl: string) => {
-    if (!baseUrl.includes("imagedelivery.net")) return baseUrl;
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 getPreviewImageUrl input:", baseUrl);
 
+    if (!baseUrl.includes("imagedelivery.net")) {
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Non-Cloudflare URL, returning as-is");
+      return baseUrl;
+    }
+
+    // First, normalize to medium variant for consistency
+    const mediumUrl = getMediumVariantUrl(baseUrl);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Normalized to medium variant:", mediumUrl);
+
+    // Then apply preview parameters
     const params = ["w=1500", "q=90"];
 
-    // Handle different Cloudflare URL formats
-    // Format: https://imagedelivery.net/account/image-id/public
-    // Should become: https://imagedelivery.net/account/image-id/w=1500,q=90
-    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
-      // Replace the last segment (usually 'public') with our parameters
-      const urlParts = baseUrl.split("/");
-      urlParts[urlParts.length - 1] = params.join(",");
-      return urlParts.join("/");
-    } else {
-      // URL doesn't have a variant, append transformations
-      // This handles cases where database URLs are missing /public suffix
-      return `${baseUrl}/${params.join(",")}`;
-    }
+    // Replace the medium variant with our preview parameters
+    const urlParts = mediumUrl.split("/");
+    urlParts[urlParts.length - 1] = params.join(",");
+    const previewUrl = urlParts.join("/");
+
+    console.log("🔍 Preview URL result:", {
+      original: baseUrl,
+      medium: mediumUrl,
+      preview: previewUrl,
+    });
+
+    return previewUrl;
   }, []);
 
   // Cache image locally for live preview
@@ -469,7 +491,40 @@ export function GalleryCropModal({
     return baseUrl;
   };
 
-  // Memoize the enhanced image URL
+  // Helper function to get consistent medium variant URL for dimension calculations
+  const getMediumVariantUrl = (baseUrl: string) => {
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎯 getMediumVariantUrl input:", baseUrl);
+
+    if (!baseUrl.includes("imagedelivery.net")) {
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Non-Cloudflare URL, returning as-is");
+      return baseUrl;
+    }
+
+    // Always use 'medium' variant for consistent dimensions
+    const urlParts = baseUrl.split("/");
+    const lastPart = urlParts[urlParts.length - 1];
+
+    // Check if the last part is a variant (alphabetic or has parameters)
+    if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+      // Replace with medium variant
+      urlParts[urlParts.length - 1] = "medium";
+    } else {
+      // No variant specified, append medium
+      urlParts.push("medium");
+    }
+
+    const mediumUrl = urlParts.join("/");
+    console.log("🎯 getMediumVariantUrl result:", {
+      original: baseUrl,
+      lastPart: lastPart,
+      medium: mediumUrl,
+      wasNormalized: baseUrl !== mediumUrl,
+    });
+
+    return mediumUrl;
+  };
+
+  // Memoize the enhanced image URL for processing (uses cloudflareWidth)
   const enhancedImageUrl = useMemo(() => {
     if (!image?.url) return null;
     const enhanced = getEnhancedImageUrl(
@@ -480,10 +535,16 @@ export function GalleryCropModal({
     return enhanced;
   }, [image?.url, cloudflareWidth, cloudflareQuality]);
 
+  // Memoize the medium variant URL for dimension calculations
+  const mediumImageUrl = useMemo(() => {
+    if (!image?.url) return null;
+    return getMediumVariantUrl(image.url);
+  }, [image?.url]);
+
   // Load original image dimensions
   useEffect(() => {
     if (!api) return; // Add conditional check inside async function
-    if (enhancedImageUrl && !originalDimensions) {
+    if (mediumImageUrl && !originalDimensions) {
       const img = new window.Image();
       img.onload = () => {
         const dimensions = {
@@ -491,6 +552,10 @@ export function GalleryCropModal({
           height: img.naturalHeight,
         };
         setOriginalDimensions(dimensions);
+
+        console.log(
+          `🖼️ Loaded dimensions from medium variant: ${dimensions.width}×${dimensions.height}`
+        );
 
         // Check if image is large enough for the tallest preset (1920px)
         const minRequiredHeight = 1920;
@@ -507,9 +572,22 @@ export function GalleryCropModal({
           parseInt(outputHeight)
         );
       };
-      img.src = enhancedImageUrl;
+      img.onerror = (error) => {
+        console.error(
+          "Failed to load medium variant image for dimensions:",
+          error
+        );
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Falling back to enhanced image URL for dimensions");
+
+        // Fallback to enhanced image URL if medium variant fails
+        if (enhancedImageUrl) {
+          img.src = enhancedImageUrl;
+        }
+      };
+      img.src = mediumImageUrl;
     }
   }, [
+    mediumImageUrl,
     enhancedImageUrl,
     originalDimensions,
     initializeCropArea,
@@ -584,7 +662,7 @@ export function GalleryCropModal({
   // Draw the crop preview on canvas
   const drawCropPreview = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !enhancedImageUrl || !originalDimensions) {
+    if (!canvas || !mediumImageUrl || !originalDimensions) {
       return;
     }
 
@@ -678,8 +756,23 @@ export function GalleryCropModal({
         );
       });
     };
-    img.src = enhancedImageUrl;
-  }, [enhancedImageUrl, originalDimensions, cropArea, canvasScale]);
+    img.onerror = (error) => {
+      console.error("Failed to load medium variant for canvas:", error);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Canvas fallback to enhanced image URL");
+
+      // Fallback to enhanced image URL if medium variant fails
+      if (enhancedImageUrl) {
+        img.src = enhancedImageUrl;
+      }
+    };
+    img.src = mediumImageUrl;
+  }, [
+    mediumImageUrl,
+    enhancedImageUrl,
+    originalDimensions,
+    cropArea,
+    canvasScale,
+  ]);
 
   // Update canvas when crop area or enhanced image changes
   useEffect(() => {
@@ -981,7 +1074,7 @@ export function GalleryCropModal({
   };
 
   const handleReplaceImage = async (multiplier: 1 | 2) => {
-    console.log("🚨🚨🚨 REPLACE IMAGE FUNCTION CALLED 🚨🚨🚨", multiplier);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚨🚨🚨 REPLACE IMAGE FUNCTION CALLED 🚨🚨🚨", multiplier);
     if (!api) return; // Add conditional check inside async function
     if (!image || !processedImageUrl) return;
 
@@ -1007,23 +1100,23 @@ export function GalleryCropModal({
       return;
     }
 
-    console.log(`🎯 handleReplaceImage(${multiplier}) starting...`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🎯 handleReplaceImage(${multiplier}) starting...`);
     setLastProcessingTime(now);
 
     try {
       // Set the specific multiplier state first
       if (multiplier === 1) {
         setIsReplacing1x(true);
-        console.log("🔒 Locked 1x processing");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 Locked 1x processing");
       } else {
         setIsReplacing2x(true);
-        console.log("🔒 Locked 2x processing");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 Locked 2x processing");
       }
 
       // Set general replacing state
       setIsReplacing(true);
 
-      console.log(`📤 Making API call with multiplier: ${multiplier}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`📤 Making API call with multiplier: ${multiplier}`);
 
       // Use the selected multiplier for the processing
       const processingImageUrl = getProcessingImageUrl(image.url || "");
@@ -1046,19 +1139,19 @@ export function GalleryCropModal({
       };
 
       // 🐛 DEBUG: Log the actual request data being sent
-      console.log(`🚨🚨🚨 2X DEBUG ${multiplier}x REQUEST 🚨🚨🚨`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚨🚨🚨 2X DEBUG ${multiplier}x REQUEST 🚨🚨🚨`);
       console.log(
         `sourceImageWidth in request:`,
         processingRequestData.sourceImageWidth
       );
-      console.log(`Full request:`, processingRequestData);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Full request:`, processingRequestData);
 
       const processingResult = await api.post<CropImageResponse>(
         "images/crop-image",
         processingRequestData
       );
 
-      console.log(`✅ Processing result for ${multiplier}x:`, processingResult);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ Processing result for ${multiplier}x:`, processingResult);
 
       if (!processingResult.success) {
         const errorMessage =
@@ -1093,22 +1186,22 @@ export function GalleryCropModal({
         replaceRequestData
       );
 
-      console.log(`✅ Gallery replacement result for ${multiplier}x:`, result);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ Gallery replacement result for ${multiplier}x:`, result);
 
       // Verify the new image is available before updating UI
       if (result && result.processedImage && result.processedImage.url) {
         // Immediately update the UI - no need to wait for CDN propagation
         // The image component will handle loading states naturally
-        console.log("🎯 Immediately updating UI with new image data...");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎯 Immediately updating UI with new image data...");
 
         if (onImageProcessed && result.originalImageId) {
-          console.log("🎯 Calling onImageProcessed and closing modal...");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎯 Calling onImageProcessed and closing modal...");
           onImageProcessed(result.originalImageId, result.processedImage);
           handleClose();
         }
       }
 
-      console.log(`🎉 Successfully completed ${multiplier}x processing`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🎉 Successfully completed ${multiplier}x processing`);
 
       toast({
         title: "Success",
@@ -1126,7 +1219,7 @@ export function GalleryCropModal({
         variant: "destructive",
       });
     } finally {
-      console.log(`🔓 Unlocking states for ${multiplier}x processing`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🔓 Unlocking states for ${multiplier}x processing`);
       setIsReplacing(false);
       setIsReplacing1x(false);
       setIsReplacing2x(false);

@@ -834,7 +834,7 @@ function AttachEventDialog({
 
   const fetchAvailableEvents = async () => {
     if (!api) {
-      console.log("No API available for fetching available events");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("No API available for fetching available events");
       return;
     }
 

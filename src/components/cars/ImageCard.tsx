@@ -67,11 +67,31 @@ export function ImageCard({
   const handleCopyUrl = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent triggering the card click
     try {
-      await navigator.clipboard.writeText(image.url);
+      // Normalize to medium variant for consistent quality
+      let urlToCopy = image.url;
+
+      if (image.url.includes("imagedelivery.net")) {
+        // Always use medium variant for clipboard copy
+        const urlParts = image.url.split("/");
+        const lastPart = urlParts[urlParts.length - 1];
+
+        // Check if the last part is a variant (alphabetic or has parameters)
+        if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+          // Replace with medium variant
+          urlParts[urlParts.length - 1] = "medium";
+        } else {
+          // No variant specified, append medium
+          urlParts.push("medium");
+        }
+
+        urlToCopy = urlParts.join("/");
+      }
+
+      await navigator.clipboard.writeText(urlToCopy);
       setCopiedUrl(true);
       toast({
         title: "Copied!",
-        description: "Image URL copied to clipboard",
+        description: "Image URL (medium quality) copied to clipboard",
       });
       setTimeout(() => setCopiedUrl(false), 2000);
     } catch (err) {
@@ -103,7 +123,7 @@ export function ImageCard({
   };
 
   const handleDelete = (e: React.MouseEvent) => {
-    // [REMOVED] // [REMOVED] console.log("Delete button clicked for image:", image);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Delete button clicked for image:", image);
     e.stopPropagation();
     if (!onDelete) return;
 
@@ -153,7 +173,7 @@ export function ImageCard({
   };
 
   if (onDelete) {
-    // [REMOVED] // [REMOVED] console.log("Rendering delete button for image:", image);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Rendering delete button for image:", image);
   }
 
   return (

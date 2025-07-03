@@ -268,21 +268,16 @@ export function ImageCropModal({
     (baseUrl: string) => {
       if (!baseUrl.includes("imagedelivery.net")) return baseUrl;
 
+      // First, normalize to medium variant for consistency
+      const mediumUrl = getMediumVariantUrl(baseUrl);
+
+      // Then apply high-resolution parameters
       const params = [`w=${cloudflareWidth}`, "q=100"];
 
-      // Handle different Cloudflare URL formats
-      // Format: https://imagedelivery.net/account/image-id/public
-      // Should become: https://imagedelivery.net/account/image-id/w=3000,q=100
-      if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
-        // Replace the last segment (usually 'public') with our parameters
-        const urlParts = baseUrl.split("/");
-        urlParts[urlParts.length - 1] = params.join(",");
-        return urlParts.join("/");
-      } else {
-        // URL doesn't have a variant, append transformations
-        // This handles cases where database URLs are missing /public suffix
-        return `${baseUrl}/${params.join(",")}`;
-      }
+      // Replace the medium variant with our processing parameters
+      const urlParts = mediumUrl.split("/");
+      urlParts[urlParts.length - 1] = params.join(",");
+      return urlParts.join("/");
     },
     [cloudflareWidth]
   );
@@ -306,21 +301,16 @@ export function ImageCropModal({
   const getPreviewImageUrl = useCallback((baseUrl: string) => {
     if (!baseUrl.includes("imagedelivery.net")) return baseUrl;
 
+    // First, normalize to medium variant for consistency
+    const mediumUrl = getMediumVariantUrl(baseUrl);
+
+    // Then apply preview parameters
     const params = ["w=1500", "q=90"];
 
-    // Handle different Cloudflare URL formats
-    // Format: https://imagedelivery.net/account/image-id/public
-    // Should become: https://imagedelivery.net/account/image-id/w=1500,q=90
-    if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
-      // Replace the last segment (usually 'public') with our parameters
-      const urlParts = baseUrl.split("/");
-      urlParts[urlParts.length - 1] = params.join(",");
-      return urlParts.join("/");
-    } else {
-      // URL doesn't have a variant, append transformations
-      // This handles cases where database URLs are missing /public suffix
-      return `${baseUrl}/${params.join(",")}`;
-    }
+    // Replace the medium variant with our preview parameters
+    const urlParts = mediumUrl.split("/");
+    urlParts[urlParts.length - 1] = params.join(",");
+    return urlParts.join("/");
   }, []);
 
   // Cache image locally for live preview - disabled for cloud-only
@@ -486,6 +476,26 @@ export function ImageCropModal({
     return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
   };
 
+  // Helper function to get consistent medium variant URL for dimension calculations
+  const getMediumVariantUrl = (baseUrl: string) => {
+    if (!baseUrl.includes("imagedelivery.net")) return baseUrl;
+
+    // Always use 'medium' variant for consistent dimensions
+    const urlParts = baseUrl.split("/");
+    const lastPart = urlParts[urlParts.length - 1];
+
+    // Check if the last part is a variant (alphabetic or has parameters)
+    if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+      // Replace with medium variant
+      urlParts[urlParts.length - 1] = "medium";
+    } else {
+      // No variant specified, append medium
+      urlParts.push("medium");
+    }
+
+    return urlParts.join("/");
+  };
+
   // Memoize the enhanced image URL
   const enhancedImageUrl = useMemo(() => {
     if (!image?.url) return null;
@@ -494,18 +504,18 @@ export function ImageCropModal({
       cloudflareWidth,
       cloudflareQuality
     );
-    console.log("URL transformation:", {
-      original: image.url,
-      enhanced: enhanced,
-      width: cloudflareWidth,
-      quality: cloudflareQuality,
-    });
     return enhanced;
   }, [image?.url, cloudflareWidth, cloudflareQuality]);
 
+  // Memoize the medium variant URL for dimension calculations
+  const mediumImageUrl = useMemo(() => {
+    if (!image?.url) return null;
+    return getMediumVariantUrl(image.url);
+  }, [image?.url]);
+
   // Load original image dimensions
   useEffect(() => {
-    if (enhancedImageUrl) {
+    if (mediumImageUrl) {
       const img = new window.Image();
       img.onload = () => {
         const dimensions = {
@@ -513,6 +523,10 @@ export function ImageCropModal({
           height: img.naturalHeight,
         };
         setOriginalDimensions(dimensions);
+
+        console.log(
+          `🖼️ Cars modal - Loaded dimensions from medium variant: ${dimensions.width}×${dimensions.height}`
+        );
 
         // Check if image is large enough for the tallest preset (1920px)
         const minRequiredHeight = 1920;
@@ -529,14 +543,34 @@ export function ImageCropModal({
           parseInt(outputHeight)
         );
       };
-      img.src = enhancedImageUrl;
+      img.onerror = (error) => {
+        console.error(
+          "Failed to load medium variant image for dimensions:",
+          error
+        );
+        console.log(
+          "🔄 Cars modal - Falling back to enhanced image URL for dimensions"
+        );
+
+        // Fallback to enhanced image URL if medium variant fails
+        if (enhancedImageUrl) {
+          img.src = enhancedImageUrl;
+        }
+      };
+      img.src = mediumImageUrl;
     }
-  }, [enhancedImageUrl, outputWidth, outputHeight, initializeCropArea]);
+  }, [
+    mediumImageUrl,
+    enhancedImageUrl,
+    outputWidth,
+    outputHeight,
+    initializeCropArea,
+  ]);
 
   // Draw the crop preview on canvas
   const drawCropPreview = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !enhancedImageUrl || !originalDimensions) return;
+    if (!canvas || !mediumImageUrl || !originalDimensions) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -626,8 +660,17 @@ export function ImageCropModal({
         );
       });
     };
-    img.src = enhancedImageUrl;
-  }, [enhancedImageUrl, originalDimensions, cropArea]);
+    img.onerror = (error) => {
+      console.error("Failed to load medium variant for canvas:", error);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Cars modal - Canvas fallback to enhanced image URL");
+
+      // Fallback to enhanced image URL if medium variant fails
+      if (enhancedImageUrl) {
+        img.src = enhancedImageUrl;
+      }
+    };
+    img.src = mediumImageUrl;
+  }, [mediumImageUrl, enhancedImageUrl, originalDimensions, cropArea]);
 
   // Redraw canvas when crop area changes
   useEffect(() => {
@@ -787,11 +830,11 @@ export function ImageCropModal({
         previewImageDimensions: originalDimensions,
       };
 
-      console.log("🚀 Crop API request data:", requestData);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚀 Crop API request data:", requestData);
 
       const result = await api.post<any>("/images/crop-image", requestData);
 
-      console.log("📥 Crop API response:", result);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📥 Crop API response:", result);
 
       if (result.success) {
         // Handle both local API (imageData) and cloud service (processedImageUrl) responses
@@ -1147,7 +1190,7 @@ export function ImageCropModal({
       });
 
       if (result && result.success) {
-        console.log("✅ Image Crop processing completed successfully");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Image Crop processing completed successfully");
         setProcessedImage(result.processedImage);
         setShowPreview(true);
       } else {
@@ -1211,7 +1254,7 @@ export function ImageCropModal({
       );
 
       if (result && result.success && onImageReplaced) {
-        console.log("✅ Image Crop replacement completed successfully");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Image Crop replacement completed successfully");
         onImageReplaced(result.originalImageId, result.processedImage);
         handleClose();
       } else {
@@ -1244,10 +1287,10 @@ export function ImageCropModal({
       "🚨🚨🚨 ImageCropModal.handleDownloadLocal CALLED 🚨🚨🚨",
       scale
     );
-    console.log("🔍 Current cropArea state:", cropArea);
-    console.log("🔍 Original dimensions:", originalDimensions);
-    console.log("🔍 Output dimensions:", { outputWidth, outputHeight });
-    console.log("🔍 Scale factor:", scale);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Current cropArea state:", cropArea);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Original dimensions:", originalDimensions);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Output dimensions:", { outputWidth, outputHeight });
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Scale factor:", scale);
 
     if (
       !image ||

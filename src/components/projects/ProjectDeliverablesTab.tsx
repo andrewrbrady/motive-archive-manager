@@ -36,6 +36,7 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { useGalleries } from "@/hooks/use-galleries";
 import DeliverablesTable from "@/components/deliverables/deliverables-tab/components/DeliverablesTable";
+import ResizableDeliverablesTable from "@/components/deliverables/deliverables-tab/components/ResizableDeliverablesTable";
 import DeliverableCard from "@/components/deliverables/deliverables-tab/components/DeliverableCard";
 import DeliverableModal from "@/components/deliverables/deliverables-tab/components/DeliverableModal";
 import { Deliverable } from "@/types/deliverable";
@@ -153,13 +154,13 @@ export function ProjectDeliverablesTab({
 
   const fetchProjectDeliverables = useCallback(async () => {
     if (!api) {
-      console.log("API not available for fetching project deliverables");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API not available for fetching project deliverables");
       return;
     }
 
     try {
       setIsLoadingDeliverables(true);
-      console.log("📦 Fetching project deliverables...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📦 Fetching project deliverables...");
 
       const data = (await api.get(`projects/${project._id}/deliverables`)) as {
         deliverables: any[];
@@ -209,7 +210,7 @@ export function ProjectDeliverablesTab({
       if (!api || !carIds || carIds.length === 0) return;
 
       try {
-        console.log("🚗 Fetching car details for deliverables:", carIds);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚗 Fetching car details for deliverables:", carIds);
         const carPromises = carIds.map(async (carId) => {
           try {
             const carData = await api.get(`cars/${carId}`);
@@ -284,7 +285,7 @@ export function ProjectDeliverablesTab({
           ? overridePublishedFilter
           : filterOutPublished;
       if (!api) {
-        console.log("API not available for fetching existing deliverables");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API not available for fetching existing deliverables");
         return;
       }
 
@@ -306,7 +307,7 @@ export function ProjectDeliverablesTab({
             typeof carId === "string" ? carId : String(carId)
           );
 
-          console.log("🎯 FILTER: Project cars:", projectCarIds);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎯 FILTER: Project cars:", projectCarIds);
 
           const filteredDeliverables = availableDeliverables.filter(
             (deliverable: any) => {
@@ -316,7 +317,7 @@ export function ProjectDeliverablesTab({
               const matches = projectCarIds.includes(deliverableCarId);
 
               if (matches) {
-                console.log(`✅ "${deliverable.title}" matches project car`);
+                // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ "${deliverable.title}" matches project car`);
               }
 
               return matches;
@@ -446,7 +447,7 @@ export function ProjectDeliverablesTab({
         requestBody
       );
 
-      console.log("✅ RESPONSE RECEIVED:", response);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ RESPONSE RECEIVED:", response);
 
       // Refresh project data and deliverables
       await onProjectUpdate();
@@ -587,7 +588,7 @@ export function ProjectDeliverablesTab({
         requestBody
       );
 
-      console.log("✅ EDIT - RESPONSE RECEIVED:", response);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ EDIT - RESPONSE RECEIVED:", response);
       console.log(
         "✅ EDIT - UPDATED DELIVERABLE:",
         (response as any).deliverable
@@ -788,7 +789,7 @@ export function ProjectDeliverablesTab({
       setIsSubmittingJson(true);
 
       const result = (await api.post(
-        `projects/${project._id}/deliverables/batch`,
+        `projects/${project._id}/deliverables/batch-relaxed`,
         { deliverables: jsonData }
       )) as { created: number };
 
@@ -796,7 +797,7 @@ export function ProjectDeliverablesTab({
         title: "Success",
         description: `Created ${result.created} deliverable${
           result.created !== 1 ? "s" : ""
-        } successfully`,
+        } successfully with relaxed validation`,
       });
 
       // Refresh the deliverables list
@@ -812,6 +813,7 @@ export function ProjectDeliverablesTab({
             : "Failed to create deliverables",
         variant: "destructive",
       });
+      throw error; // Re-throw to prevent modal from closing
     } finally {
       setIsSubmittingJson(false);
     }
@@ -929,14 +931,81 @@ export function ProjectDeliverablesTab({
       handleRemoveDeliverable(deliverableId);
     },
     onDuplicate: async (deliverable: Deliverable) => {
-      // TODO: Implement duplicate functionality for project deliverables
-      toast({
-        title: "Feature Coming Soon",
-        description: "Deliverable duplication will be available soon.",
-      });
+      if (!api) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to duplicate deliverables",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        // Create a duplicate deliverable with modified title
+        const duplicateData = {
+          title: `${deliverable.title} (Copy)`,
+          description: deliverable.description || "",
+          type: deliverable.type || "Video",
+          platforms: deliverable.platforms || [],
+          duration: deliverable.duration || 30,
+          aspectRatio: deliverable.aspect_ratio || "16:9",
+          editDeadline: deliverable.edit_deadline
+            ? new Date(deliverable.edit_deadline).toISOString()
+            : undefined,
+          releaseDate: deliverable.release_date
+            ? new Date(deliverable.release_date).toISOString()
+            : undefined,
+          assignedTo: deliverable.firebase_uid || undefined,
+          carId: null, // Don't copy car assignment to duplicates
+          scheduled: deliverable.scheduled || false,
+          gallery_ids: deliverable.gallery_ids || [],
+          caption_ids: deliverable.caption_ids || [],
+        };
+
+        console.log("🔄 Duplicating deliverable:", {
+          original: deliverable.title,
+          duplicate: duplicateData.title,
+          projectId: project._id,
+        });
+
+        const response = await api.post(
+          `projects/${project._id}/deliverables`,
+          duplicateData
+        );
+
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Deliverable duplicated successfully:", response);
+
+        // Only refresh the deliverables list - no need for full project refresh
+        await fetchProjectDeliverables();
+
+        toast({
+          title: "Success",
+          description: `Deliverable "${deliverable.title}" duplicated successfully`,
+        });
+      } catch (error) {
+        console.error("💥 Error duplicating deliverable:", error);
+        toast({
+          title: "Error",
+          description:
+            error instanceof Error
+              ? error.message
+              : "Failed to duplicate deliverable",
+          variant: "destructive",
+        });
+      }
     },
     onStatusChange: (deliverableId: string, newStatus: string) => {
       handleUpdateDeliverableStatus(deliverableId, newStatus);
+    },
+    onUpdate: (deliverableId: string, updates: Partial<Deliverable>) => {
+      // Optimistic update - update local state immediately
+      setProjectDeliverables((prev) =>
+        prev.map((deliverable) =>
+          deliverable._id === deliverableId
+            ? { ...deliverable, ...updates }
+            : deliverable
+        )
+      );
     },
     onRefresh: () => {
       fetchProjectDeliverables();
@@ -1028,7 +1097,7 @@ export function ProjectDeliverablesTab({
               onClick={() => setShowJsonUpload(true)}
             >
               <FileJson className="h-4 w-4 mr-2" />
-              JSON Upload
+              Batch JSON
             </Button>
             <Dialog
               open={isLinkDeliverableOpen}
@@ -2179,8 +2248,8 @@ export function ProjectDeliverablesTab({
         )}
       </div>
 
-      {/* Desktop View - Table - Full width */}
-      <DeliverablesTable
+      {/* Desktop View - Table - Full width with Resizable Columns */}
+      <ResizableDeliverablesTable
         deliverables={sortedDeliverables}
         isLoading={isLoadingDeliverables}
         actions={deliverableActions}
@@ -2205,9 +2274,9 @@ export function ProjectDeliverablesTab({
         isOpen={showJsonUpload}
         onClose={() => setShowJsonUpload(false)}
         onSubmit={handleJsonSubmit}
-        title="Batch Create Deliverables from JSON"
-        description="Upload a JSON file or paste JSON data to create multiple deliverables at once. The JSON should be an array of deliverable objects."
-        expectedType="deliverables"
+        title="Batch Create Deliverables from JSON (Relaxed)"
+        description="Upload a JSON file or paste JSON data to create multiple deliverables at once. The JSON should be an array of deliverable objects with minimal validation - only title is required. Platform and editor assignments can be done later."
+        expectedType="deliverables-relaxed"
         isSubmitting={isSubmittingJson}
       />
     </Card>

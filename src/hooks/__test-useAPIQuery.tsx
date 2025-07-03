@@ -18,7 +18,7 @@ function TestUseAPIQuery() {
   // Test mutation
   const createUserMutation = useAPIMutation("/users", {
     onSuccess: (data) => {
-      console.log("User created successfully:", data);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("User created successfully:", data);
     },
     onError: (error) => {
       console.error("Failed to create user:", error);

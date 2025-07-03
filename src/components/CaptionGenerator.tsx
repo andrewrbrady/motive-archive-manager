@@ -47,6 +47,7 @@ import {
   findModelById,
 } from "@/lib/llmProviders";
 import { useAPI } from "@/hooks/useAPI";
+import { useBrandTones } from "@/hooks/useBrandTones";
 import { toast } from "react-hot-toast";
 
 type Platform = "instagram" | "youtube";
@@ -161,6 +162,14 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
   const [lengthSettingsError, setLengthSettingsError] = useState<string | null>(
     null
   );
+
+  // Brand tone state - Phase 2A
+  const [selectedBrandToneId, setSelectedBrandToneId] = useState<string>("");
+  const {
+    brandTones,
+    isLoading: loadingBrandTones,
+    error: brandToneError,
+  } = useBrandTones();
 
   // Group models by provider for UI display
   const modelsByProvider = Object.values(llmProviders).map((provider) => ({
@@ -434,6 +443,15 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
         template,
         aiModel: model,
         systemPromptId: selectedSystemPromptId,
+        // Phase 2B: AI Prompt Integration - Add brand tone data
+        brandToneId:
+          selectedBrandToneId && selectedBrandToneId !== "default"
+            ? selectedBrandToneId
+            : null,
+        brandTone:
+          selectedBrandToneId && selectedBrandToneId !== "default"
+            ? brandTones.find((tone) => tone._id === selectedBrandToneId)
+            : null,
       })) as { caption: string };
 
       // If we're editing, update the existing caption
@@ -1151,6 +1169,98 @@ export default function CaptionGenerator({ carId }: CaptionGeneratorProps) {
         ) : (
           <div className="text-sm text-[hsl(var(--foreground-muted))]">
             No system prompts available for this length setting.
+          </div>
+        )}
+      </div>
+
+      {/* Brand Tone Selection - Phase 2A */}
+      <div className="space-y-3 p-4 rounded-lg bg-[var(--background-secondary)] border border-[hsl(var(--border-subtle))]">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-white">
+            Brand Tone
+          </h3>
+          {brandToneError && (
+            <span className="text-xs text-red-500">
+              {String(brandToneError)}
+            </span>
+          )}
+        </div>
+
+        {loadingBrandTones ? (
+          <div className="text-sm text-[hsl(var(--foreground-muted))]">
+            Loading brand tones...
+          </div>
+        ) : brandTones.length > 0 ? (
+          <div className="space-y-2">
+            <Select
+              value={selectedBrandToneId}
+              onValueChange={setSelectedBrandToneId}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Choose a brand tone (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">
+                  <div className="flex flex-col">
+                    <span className="font-medium">Default</span>
+                    <span className="text-xs text-[hsl(var(--foreground-muted))]">
+                      No specific brand tone
+                    </span>
+                  </div>
+                </SelectItem>
+                {brandTones
+                  .filter((tone): tone is typeof tone & { _id: string } =>
+                    Boolean(tone._id && tone._id.trim() !== "")
+                  )
+                  .map((tone) => (
+                    <SelectItem key={tone._id} value={tone._id}>
+                      <div className="flex flex-col w-full">
+                        <span className="font-medium">{tone.name}</span>
+                        <span className="text-xs text-[hsl(var(--foreground-muted))]">
+                          {tone.description}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            {selectedBrandToneId && selectedBrandToneId !== "default" && (
+              <div className="text-xs text-[hsl(var(--foreground-muted))]">
+                {(() => {
+                  const selectedTone = brandTones.find(
+                    (tone) => tone._id === selectedBrandToneId
+                  );
+                  if (selectedTone) {
+                    return (
+                      <div className="space-y-1">
+                        <div className="font-medium">Instructions:</div>
+                        <div className="text-xs">
+                          {selectedTone.tone_instructions.length > 150
+                            ? `${selectedTone.tone_instructions.substring(0, 150)}...`
+                            : selectedTone.tone_instructions}
+                        </div>
+                        {selectedTone.example_phrases.length > 0 && (
+                          <div className="space-y-1">
+                            <div className="font-medium">Example phrases:</div>
+                            <div className="text-xs">
+                              {selectedTone.example_phrases
+                                .slice(0, 3)
+                                .join(", ")}
+                              {selectedTone.example_phrases.length > 3 && "..."}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-sm text-[hsl(var(--foreground-muted))]">
+            No brand tones available. Configure them in admin settings.
           </div>
         )}
       </div>

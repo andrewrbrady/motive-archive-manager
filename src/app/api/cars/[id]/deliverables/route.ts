@@ -12,11 +12,11 @@ export async function GET(
 ) {
   try {
     const resolvedParams = await params;
-    // [REMOVED] // [REMOVED] console.log("Car-specific API - Querying for car ID:", resolvedParams.id);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car-specific API - Querying for car ID:", resolvedParams.id);
 
     const db = await getDatabase();
-    // [REMOVED] // [REMOVED] console.log("Car-specific API - Database name:", db.databaseName);
-    // [REMOVED] // [REMOVED] console.log("Car-specific API - Querying collection: deliverables");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car-specific API - Database name:", db.databaseName);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car-specific API - Querying collection: deliverables");
 
     // Validate that the id is a proper MongoDB ObjectId
     if (!/^[0-9a-fA-F]{24}$/.test(resolvedParams.id)) {
@@ -33,12 +33,12 @@ export async function GET(
       .sort({ edit_deadline: 1 })
       .toArray();
 
-    // [REMOVED] // [REMOVED] console.log("Car-specific API - Found deliverables:", deliverables.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car-specific API - Found deliverables:", deliverables.length);
     console.log(
       "Car-specific API - Deliverable IDs:",
       deliverables.map((d) => d._id)
     );
-    // [REMOVED] // [REMOVED] console.log("Car-specific API - Sample deliverable:", deliverables[0]);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car-specific API - Sample deliverable:", deliverables[0]);
 
     return NextResponse.json(deliverables);
   } catch (error) {

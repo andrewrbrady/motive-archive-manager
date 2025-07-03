@@ -26,7 +26,7 @@ export default function SigninForm() {
 
     // If user is authenticated (has Firebase user), redirect to dashboard
     if (status === "authenticated" && user) {
-      console.log("SigninForm: Redirecting authenticated user to dashboard");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("SigninForm: Redirecting authenticated user to dashboard");
       router.push("/dashboard");
     }
   }, [status, user, router]); // Removed data dependency to prevent unnecessary re-renders

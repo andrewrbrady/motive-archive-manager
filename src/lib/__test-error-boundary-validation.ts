@@ -16,12 +16,12 @@ export const errorBoundaryTests = {
    * Test 1: Direct API client authentication error
    */
   async testAPIClientAuthError() {
-    console.log("🧪 Testing APIClient authentication error...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🧪 Testing APIClient authentication error...");
     try {
       // This should trigger an auth error if user is not logged in
       await api.get("/test-nonexistent-auth-endpoint");
     } catch (error: any) {
-      console.log("✅ APIClient auth error caught:", error.message);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ APIClient auth error caught:", error.message);
       // Re-throw to trigger error boundary
       throw error;
     }
@@ -31,7 +31,7 @@ export const errorBoundaryTests = {
    * Test 2: Manual authentication error
    */
   testManualAuthError() {
-    console.log("🧪 Testing manual authentication error...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🧪 Testing manual authentication error...");
     throw new Error("Authentication required - no user logged in");
   },
 
@@ -39,7 +39,7 @@ export const errorBoundaryTests = {
    * Test 3: Manual general error
    */
   testManualGeneralError() {
-    console.log("🧪 Testing manual general error...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🧪 Testing manual general error...");
     throw new Error("Something went wrong with the application");
   },
 
@@ -47,7 +47,7 @@ export const errorBoundaryTests = {
    * Test 4: Simulate API 401 error
    */
   testAPI401Error() {
-    console.log("🧪 Testing API 401 error simulation...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🧪 Testing API 401 error simulation...");
     throw new Error("HTTP 401: Authentication failed - please sign in again");
   },
 
@@ -55,7 +55,7 @@ export const errorBoundaryTests = {
    * Test 5: Token refresh error
    */
   testTokenRefreshError() {
-    console.log("🧪 Testing token refresh error...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🧪 Testing token refresh error...");
     throw new Error("Failed to refresh token - please sign in again");
   },
 };
@@ -64,7 +64,7 @@ export const errorBoundaryTests = {
  * Validation function to check if error boundary is properly integrated
  */
 export function validateErrorBoundaryIntegration(): boolean {
-  console.log("🔍 Validating error boundary integration...");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Validating error boundary integration...");
 
   // Check if AuthErrorBoundary is available
   try {
@@ -78,7 +78,7 @@ export function validateErrorBoundaryIntegration(): boolean {
       return false;
     }
 
-    console.log("✅ Error boundary validation passed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Error boundary validation passed");
     return true;
   } catch (error) {
     console.error("❌ Error boundary validation failed:", error);
@@ -97,9 +97,9 @@ export function logErrorBoundaryTest(
   const timestamp = new Date().toISOString();
   const status = success ? "✅ PASS" : "❌ FAIL";
 
-  console.log(`[${timestamp}] ${status} Error Boundary Test: ${testName}`);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[${timestamp}] ${status} Error Boundary Test: ${testName}`);
 
   if (error) {
-    console.log(`  Error: ${error.message}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`  Error: ${error.message}`);
   }
 }

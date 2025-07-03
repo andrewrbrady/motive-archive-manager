@@ -48,6 +48,7 @@ interface Image {
   filename: string;
   metadata: any;
   carId: ObjectId | null;
+  projectId: ObjectId | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -71,11 +72,20 @@ interface Gallery {
   updatedAt: string;
 }
 
+interface Project {
+  _id: ObjectId;
+  imageIds: ObjectId[];
+  updatedAt: string;
+  name: string;
+  description?: string;
+}
+
 // Add type for MongoDB collections
 interface Collections {
   images: Collection<Image>;
   cars: Collection<Car>;
   galleries: Collection<Gallery>;
+  projects: Collection<Project>;
 }
 
 // Batch size for MongoDB operations
@@ -148,23 +158,23 @@ export async function POST(request: NextRequest) {
   const requestHeaders = Object.fromEntries([...request.headers.entries()]);
   const requestStartTime = Date.now();
 
-  console.log("=== CLOUDFLARE IMAGES UPLOAD REQUEST START ===");
-  console.log("Timestamp:", new Date().toISOString());
-  console.log("Request URL:", request.url);
-  console.log("Method:", request.method);
-  console.log("Content-Type:", requestHeaders["content-type"]);
-  console.log("Content-Length:", requestHeaders["content-length"] || "unknown");
-  console.log("User-Agent:", requestHeaders["user-agent"]);
-  console.log("Environment:", process.env.NODE_ENV);
-  console.log("Vercel Environment:", process.env.VERCEL_ENV || "unknown");
-  console.log("All Request Headers:", JSON.stringify(requestHeaders, null, 2));
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== CLOUDFLARE IMAGES UPLOAD REQUEST START ===");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Timestamp:", new Date().toISOString());
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Request URL:", request.url);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Method:", request.method);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Content-Type:", requestHeaders["content-type"]);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Content-Length:", requestHeaders["content-length"] || "unknown");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("User-Agent:", requestHeaders["user-agent"]);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Environment:", process.env.NODE_ENV);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Vercel Environment:", process.env.VERCEL_ENV || "unknown");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("All Request Headers:", JSON.stringify(requestHeaders, null, 2));
 
   // Log Vercel limits for reference
-  console.log("=== VERCEL LIMITS ===");
-  console.log("Vercel Body Size Limit: 4.5MB (4,718,592 bytes)");
-  console.log("Our MAX_TOTAL_SIZE config:", MAX_TOTAL_SIZE, "bytes");
-  console.log("Our MAX_FILE_SIZE config:", MAX_FILE_SIZE, "bytes");
-  console.log("Our VERCEL_CHUNK_SIZE config:", VERCEL_CHUNK_SIZE, "bytes");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== VERCEL LIMITS ===");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Vercel Body Size Limit: 4.5MB (4,718,592 bytes)");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Our MAX_TOTAL_SIZE config:", MAX_TOTAL_SIZE, "bytes");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Our MAX_FILE_SIZE config:", MAX_FILE_SIZE, "bytes");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Our VERCEL_CHUNK_SIZE config:", VERCEL_CHUNK_SIZE, "bytes");
 
   const sendProgress = async (data: any) => {
     await writer.write(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
@@ -179,6 +189,7 @@ export async function POST(request: NextRequest) {
           images: db.collection<Image>("images"),
           cars: db.collection<Car>("cars"),
           galleries: db.collection<Gallery>("galleries"),
+          projects: db.collection<Project>("projects"),
         };
       } catch (error) {
         retryCount++;
@@ -207,32 +218,31 @@ export async function POST(request: NextRequest) {
   const processFile = async (
     file: File,
     i: number,
-    carId: string,
-    vehicleInfo: any,
+    entityId: string,
+    entityInfo: any,
     collections: Collections,
     now: string,
     selectedPromptId?: string,
     selectedModelId?: string,
-    isCarMode: boolean = true
+    isCarMode: boolean = true,
+    isProjectMode: boolean = false
   ) => {
-    const fileId = `${i}-${file.name}`;
+    const fileId = `${Date.now()}-${Math.random().toString(36).substring(2)}`;
+    const formData = new FormData();
+    formData.append("file", file);
+
     try {
       await sendProgress({
-        type: "progress",
+        type: "start",
         fileIndex: i,
         fileId,
         fileName: file.name,
         status: "uploading",
         progress: 0,
-        message: "Starting upload to Cloudflare",
+        message: "Starting upload...",
       });
 
-      // Log file information for debugging
-      console.log(
-        `Uploading file: ${file.name}, Size: ${(file.size / 1024 / 1024).toFixed(2)}MB, Type: ${file.type}`
-      );
-
-      // Update progress for Cloudflare upload with enhanced progress tracking
+      // Upload to Cloudflare Images
       await sendProgress({
         type: "progress",
         fileIndex: i,
@@ -240,20 +250,20 @@ export async function POST(request: NextRequest) {
         fileName: file.name,
         status: "uploading",
         progress: 25,
-        message: "Uploading to Cloudflare...",
+        message: "Uploading to Cloudflare Images...",
         stepProgress: {
           cloudflare: {
             status: "uploading",
-            progress: 50,
-            message: "Uploading file to Cloudflare Images",
+            progress: 25,
+            message: "Uploading to Cloudflare Images",
+          },
+          openai: {
+            status: "pending",
+            progress: 0,
+            message: "Waiting for upload to complete",
           },
         },
       });
-
-      // Upload to Cloudflare with enhanced error handling
-      const uploadFormData = new FormData();
-      uploadFormData.append("file", file);
-      uploadFormData.append("requireSignedURLs", "false");
 
       const response = await fetch(
         `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1`,
@@ -262,91 +272,27 @@ export async function POST(request: NextRequest) {
           headers: {
             Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
           },
-          body: uploadFormData,
+          body: formData,
         }
       );
 
       if (!response.ok) {
-        if (response.status === 413) {
-          throw new Error(
-            `File ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB) is too large for upload. Maximum file size is ${MAX_FILE_SIZE / 1024 / 1024}MB. This suggests a Vercel body size limit issue - check your Vercel configuration.`
-          );
-        } else if (response.status === 400) {
-          const errorText = await response.text();
-          throw new Error(
-            `Cloudflare rejected file ${file.name}: ${response.statusText}. Details: ${errorText}`
-          );
-        } else {
-          throw new Error(
-            `Failed to upload ${file.name} to Cloudflare: ${response.status} ${response.statusText}`
-          );
-        }
+        const errorText = await response.text();
+        throw new Error(`Cloudflare upload failed: ${errorText}`);
       }
 
       const result = await response.json();
-      if (!result.success) {
-        throw new Error(
-          `Cloudflare API error: ${result.errors[0]?.message || "Unknown error"}`
-        );
-      }
 
-      // Improved URL construction with validation
-      if (!result.result?.variants || result.result.variants.length === 0) {
-        throw new Error("No image variants returned from Cloudflare");
-      }
+      // Construct the image URL using the new ID
+      const imageUrl = `https://imagedelivery.net/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/${result.result.id}/public`;
 
-      const originalVariantUrl = result.result.variants[0];
-      console.log("Original Cloudflare variant URL:", originalVariantUrl);
-
-      // Extract base URL by removing ANY variant suffix (not just /public)
-      // This handles cases where Cloudflare returns URLs with different variants
-      const baseUrlMatch = originalVariantUrl.match(
-        /^(https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+)/
-      );
-      if (!baseUrlMatch) {
-        throw new Error(
-          `Could not extract base URL from Cloudflare variant: ${originalVariantUrl}`
-        );
-      }
-
-      const imageUrl = baseUrlMatch[1]; // This is the clean base URL without any variant
-      console.log("Constructed base image URL (no variant):", imageUrl);
-
-      // Validate the base URL format
-      if (
-        !imageUrl.includes("imagedelivery.net") ||
-        !imageUrl.match(/^https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+$/)
-      ) {
-        console.error("Invalid Cloudflare base URL format:", imageUrl);
-        throw new Error(`Invalid Cloudflare image URL format: ${imageUrl}`);
-      }
-
-      // Update progress after successful Cloudflare upload with enhanced tracking
-      await sendProgress({
-        type: "progress",
-        fileIndex: i,
-        fileId,
-        fileName: file.name,
-        status: "uploading",
-        progress: 50,
-        message: "Cloudflare upload complete",
-        stepProgress: {
-          cloudflare: {
-            status: "complete",
-            progress: 100,
-            message: "Successfully uploaded to Cloudflare Images",
-          },
-        },
-      });
-
-      // Update progress for analysis phase with enhanced tracking
       await sendProgress({
         type: "progress",
         fileIndex: i,
         fileId,
         fileName: file.name,
         status: "analyzing",
-        progress: 75,
+        progress: 60,
         message: "Analyzing image with AI",
         stepProgress: {
           cloudflare: {
@@ -362,78 +308,109 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Try to analyze the image with retries
+      // ENHANCED: Auto-enable analysis with defaults if not provided
+      let analysisPromptId = selectedPromptId;
+      let analysisModelId = selectedModelId;
+
+      // If no explicit settings provided, use defaults for automatic analysis
+      if (!analysisPromptId && !analysisModelId && isCarMode) {
+        // Use default model for car images
+        const { IMAGE_ANALYSIS_CONFIG } = await import(
+          "@/constants/image-analysis"
+        );
+        const defaultModel = IMAGE_ANALYSIS_CONFIG.availableModels.find(
+          (model) => model.isDefault
+        );
+        analysisModelId = defaultModel?.id || "gpt-4o-mini";
+        console.log(
+          `🤖 Auto-enabling OpenAI analysis with default model: ${analysisModelId}`
+        );
+      }
+
+      // Try to analyze the image with retries (if analysis is enabled)
       let imageAnalysis = null;
       let analysisError = null;
 
-      for (let attempt = 0; attempt <= ANALYSIS_RETRY_COUNT; attempt++) {
-        try {
-          if (attempt > 0) {
-            await sendProgress({
-              type: "progress",
-              fileIndex: i,
-              fileId,
-              fileName: file.name,
-              status: "analyzing",
-              progress: 75,
-              message: `Retry #${attempt}: Analyzing image with AI`,
-              stepProgress: {
-                cloudflare: {
-                  status: "complete",
-                  progress: 100,
-                  message: "Upload complete",
+      // Only attempt analysis if we have at least a model ID
+      if (analysisModelId) {
+        for (let attempt = 0; attempt <= ANALYSIS_RETRY_COUNT; attempt++) {
+          try {
+            if (attempt > 0) {
+              await sendProgress({
+                type: "progress",
+                fileIndex: i,
+                fileId,
+                fileName: file.name,
+                status: "analyzing",
+                progress: 75,
+                message: `Retry #${attempt}: Analyzing image with AI`,
+                stepProgress: {
+                  cloudflare: {
+                    status: "complete",
+                    progress: 100,
+                    message: "Upload complete",
+                  },
+                  openai: {
+                    status: "retrying",
+                    progress: 50,
+                    message: `Retry attempt ${attempt} - analyzing image`,
+                  },
                 },
-                openai: {
-                  status: "retrying",
-                  progress: 50,
-                  message: `Retry attempt ${attempt} - analyzing image`,
-                },
-              },
-            });
-          }
-
-          const analysisResponse = await fetch(
-            `${request.nextUrl.origin}/api/openai/analyze-image`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                imageUrl,
-                vehicleInfo,
-                promptId: selectedPromptId,
-                modelId: selectedModelId,
-              }),
-              // Adding a longer timeout for the analysis request
-              signal: AbortSignal.timeout(ANALYSIS_TIMEOUT), // 30 seconds timeout
+              });
             }
-          );
 
-          if (!analysisResponse.ok) {
-            throw new Error(`Analysis failed: ${analysisResponse.statusText}`);
-          }
-
-          const { analysis } = await analysisResponse.json();
-          imageAnalysis = analysis;
-          // [REMOVED] // [REMOVED] console.log(`Image analysis result for ${file.name}:`, imageAnalysis);
-          break; // Success, exit retry loop
-        } catch (error) {
-          analysisError = error;
-          console.error(
-            `OpenAI analysis attempt ${attempt + 1} failed:`,
-            error
-          );
-
-          if (attempt === ANALYSIS_RETRY_COUNT) {
-            console.warn(`All analysis attempts failed for image ${file.name}`);
-          } else {
-            // Wait before retry
-            await new Promise((resolve) =>
-              setTimeout(resolve, 2000 * (attempt + 1))
+            const analysisResponse = await fetch(
+              `${request.nextUrl.origin}/api/openai/analyze-image`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  imageUrl,
+                  vehicleInfo: isCarMode ? entityInfo : undefined,
+                  projectInfo: isProjectMode ? entityInfo : undefined,
+                  promptId: analysisPromptId,
+                  modelId: analysisModelId,
+                }),
+                // Adding a longer timeout for the analysis request
+                signal: AbortSignal.timeout(ANALYSIS_TIMEOUT), // 30 seconds timeout
+              }
             );
+
+            if (!analysisResponse.ok) {
+              throw new Error(
+                `Analysis failed: ${analysisResponse.statusText}`
+              );
+            }
+
+            const { analysis } = await analysisResponse.json();
+            imageAnalysis = analysis;
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Image analysis result for ${file.name}:`, imageAnalysis);
+            break; // Success, exit retry loop
+          } catch (error) {
+            analysisError = error;
+            console.error(
+              `OpenAI analysis attempt ${attempt + 1} failed:`,
+              error
+            );
+
+            if (attempt === ANALYSIS_RETRY_COUNT) {
+              console.warn(
+                `All analysis attempts failed for image ${file.name}`
+              );
+            } else {
+              // Wait before retry
+              await new Promise((resolve) =>
+                setTimeout(resolve, 2000 * (attempt + 1))
+              );
+            }
           }
         }
+      } else {
+        console.log(
+          `⚠️ Skipping OpenAI analysis for ${file.name} - no model selected`
+        );
       }
 
       // Create image document
@@ -443,19 +420,37 @@ export async function POST(request: NextRequest) {
         url: imageUrl,
         filename: file.name,
         metadata: {
-          category: isCarMode ? "exterior" : "unclassified",
+          category: isCarMode
+            ? "exterior"
+            : isProjectMode
+              ? "project"
+              : "unclassified",
           isPrimary: false,
-          vehicleInfo,
+          vehicleInfo: isCarMode ? entityInfo : undefined,
+          projectInfo: isProjectMode ? entityInfo : undefined,
           ...(imageAnalysis || {}),
           aiAnalysis: imageAnalysis,
-          analysisStatus: imageAnalysis ? "success" : "failed",
+          analysisStatus: imageAnalysis
+            ? "success"
+            : analysisModelId
+              ? "failed"
+              : "skipped",
           analysisError: analysisError
             ? analysisError instanceof Error
               ? analysisError.message
               : String(analysisError)
             : null,
+          // Store analysis settings used
+          analysisSettings: analysisModelId
+            ? {
+                promptId: analysisPromptId || "default",
+                modelId: analysisModelId,
+                autoEnabled: !selectedPromptId && !selectedModelId,
+              }
+            : null,
         },
-        carId: isCarMode && carId ? new ObjectId(carId) : null,
+        carId: isCarMode && entityId ? new ObjectId(entityId) : null,
+        projectId: isProjectMode && entityId ? new ObjectId(entityId) : null,
         createdAt: now,
         updatedAt: now,
       };
@@ -470,7 +465,9 @@ export async function POST(request: NextRequest) {
         progress: 100,
         message: imageAnalysis
           ? "Upload and analysis complete"
-          : "Upload complete, analysis failed",
+          : analysisModelId
+            ? "Upload complete, analysis failed"
+            : "Upload complete (analysis not enabled)",
         imageUrl,
         metadata: imageDoc.metadata,
         stepProgress: {
@@ -480,11 +477,17 @@ export async function POST(request: NextRequest) {
             message: "Successfully uploaded to Cloudflare Images",
           },
           openai: {
-            status: imageAnalysis ? "complete" : "failed",
-            progress: imageAnalysis ? 100 : 0,
+            status: imageAnalysis
+              ? "complete"
+              : analysisModelId
+                ? "failed"
+                : "skipped",
+            progress: imageAnalysis ? 100 : analysisModelId ? 0 : 100,
             message: imageAnalysis
               ? "AI analysis completed successfully"
-              : "AI analysis failed - will retry",
+              : analysisModelId
+                ? "AI analysis failed - will retry"
+                : "AI analysis skipped",
           },
         },
       });
@@ -659,28 +662,28 @@ export async function POST(request: NextRequest) {
   const processImages = async () => {
     let mongoClient;
     try {
-      console.log("=== PARSING FORM DATA ===");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== PARSING FORM DATA ===");
       const formDataParseStart = Date.now();
 
       const formData = await request.formData();
       const formDataParseTime = Date.now() - formDataParseStart;
 
-      console.log("FormData parsing time:", formDataParseTime, "ms");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("FormData parsing time:", formDataParseTime, "ms");
 
       // Log FormData structure for debugging
-      console.log("FormData entries:");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("FormData entries:");
       for (const [key, value] of formData.entries()) {
         if (value instanceof File) {
-          console.log(`  ${key}: File {`);
-          console.log(`    name: "${value.name}"`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`  ${key}: File {`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`    name: "${value.name}"`);
           console.log(
             `    size: ${value.size} bytes (${(value.size / 1024 / 1024).toFixed(2)}MB)`
           );
-          console.log(`    type: "${value.type}"`);
-          console.log(`    lastModified: ${value.lastModified}`);
-          console.log(`  }`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`    type: "${value.type}"`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`    lastModified: ${value.lastModified}`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`  }`);
         } else {
-          console.log(`  ${key}: "${value}"`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`  ${key}: "${value}"`);
         }
       }
 
@@ -694,13 +697,13 @@ export async function POST(request: NextRequest) {
       const isCarMode = carId && carId !== "undefined" && carId !== "null";
       const isGeneralMode = !isCarMode;
 
-      console.log("=== EXTRACTED PARAMETERS ===");
-      console.log("Car ID:", carId);
-      console.log("File Count:", fileCount);
-      console.log("Selected Prompt ID:", selectedPromptId);
-      console.log("Selected Model ID:", selectedModelId);
-      console.log("Metadata:", metadata);
-      console.log("Upload Mode:", isCarMode ? "car" : "general");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== EXTRACTED PARAMETERS ===");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car ID:", carId);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("File Count:", fileCount);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Selected Prompt ID:", selectedPromptId);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Selected Model ID:", selectedModelId);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Metadata:", metadata);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Upload Mode:", isCarMode ? "car" : "general");
 
       // For car mode, carId is required. For general mode, it's optional
       if (isCarMode && !carId) {
@@ -712,7 +715,7 @@ export async function POST(request: NextRequest) {
       const files: File[] = [];
       let totalSize = 0;
 
-      console.log("=== COLLECTING FILES ===");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== COLLECTING FILES ===");
 
       for (let i = 0; i < fileCount; i++) {
         const file = formData.get(`file${i}`) as File;
@@ -730,7 +733,7 @@ export async function POST(request: NextRequest) {
             `  File ${i}: ${file.name} - ${file.size} bytes (${(file.size / 1024 / 1024).toFixed(2)}MB)`
           );
         } else {
-          console.log(`  File ${i} not found in FormData`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`  File ${i} not found in FormData`);
         }
       }
 
@@ -739,7 +742,7 @@ export async function POST(request: NextRequest) {
         ? parseInt(requestHeaders["content-length"])
         : null;
 
-      console.log("=== PAYLOAD SIZE ANALYSIS ===");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== PAYLOAD SIZE ANALYSIS ===");
       console.log(
         "Raw files total size:",
         totalSize,
@@ -764,7 +767,7 @@ export async function POST(request: NextRequest) {
           "bytes",
           `(${(overhead / 1024 / 1024).toFixed(2)}MB)`
         );
-        console.log("Overhead percentage:", overheadPercent + "%");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Overhead percentage:", overheadPercent + "%");
 
         // Log proximity to Vercel limit
         const vercelLimit = 4718592; // 4.5MB in bytes
@@ -772,7 +775,7 @@ export async function POST(request: NextRequest) {
           (requestContentLength / vercelLimit) *
           100
         ).toFixed(1);
-        console.log("Proximity to Vercel 4.5MB limit:", proximityToLimit + "%");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Proximity to Vercel 4.5MB limit:", proximityToLimit + "%");
 
         if (requestContentLength > vercelLimit) {
           console.error("🚨 REQUEST EXCEEDS VERCEL LIMIT!");
@@ -884,11 +887,11 @@ export async function POST(request: NextRequest) {
       const requestEndTime = Date.now();
       const totalProcessingTime = requestEndTime - requestStartTime;
 
-      console.log("=== REQUEST COMPLETION ===");
-      console.log("Total processing time:", totalProcessingTime, "ms");
-      console.log("Successful uploads:", results.length);
-      console.log("Failed uploads:", fileCount - results.length);
-      console.log("Request completed successfully");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== REQUEST COMPLETION ===");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Total processing time:", totalProcessingTime, "ms");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Successful uploads:", results.length);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Failed uploads:", fileCount - results.length);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Request completed successfully");
 
       await sendProgress({
         type: "complete",
@@ -942,9 +945,9 @@ export async function POST(request: NextRequest) {
     } finally {
       const requestEndTime = Date.now();
       const totalRequestTime = requestEndTime - requestStartTime;
-      console.log("=== REQUEST CLEANUP ===");
-      console.log("Total request duration:", totalRequestTime, "ms");
-      console.log("Closing writer stream");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== REQUEST CLEANUP ===");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Total request duration:", totalRequestTime, "ms");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Closing writer stream");
       await writer.close();
     }
   };
@@ -965,13 +968,13 @@ export async function DELETE(request: NextRequest) {
     const requestData = await request.json();
     const { imageIds = [], cloudflareIds = [] } = requestData;
 
-    // [REMOVED] // [REMOVED] console.log("======== CLOUDFLARE DIRECT DELETE API CALLED ========");
-    // [REMOVED] // [REMOVED] console.log("Request URL:", request.url);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("======== CLOUDFLARE DIRECT DELETE API CALLED ========");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Request URL:", request.url);
     console.log(
       "Request headers:",
       Object.fromEntries([...request.headers.entries()])
     );
-    // [REMOVED] // [REMOVED] console.log("DELETE body:", JSON.stringify(requestData, null, 2));
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("DELETE body:", JSON.stringify(requestData, null, 2));
 
     if (imageIds.length === 0 && cloudflareIds.length === 0) {
       return NextResponse.json(
@@ -993,7 +996,7 @@ export async function DELETE(request: NextRequest) {
 
     for (const id of allPossibleIds) {
       try {
-        // [REMOVED] // [REMOVED] console.log(`Attempting to delete image ${id} from Cloudflare`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Attempting to delete image ${id} from Cloudflare`);
         const response = await fetch(
           `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1/${id}`,
           {
@@ -1007,7 +1010,7 @@ export async function DELETE(request: NextRequest) {
         const result = await response.json();
 
         if (result.success) {
-          // [REMOVED] // [REMOVED] console.log(`Successfully deleted image ${id} from Cloudflare`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Successfully deleted image ${id} from Cloudflare`);
           deletedFromCloudflare.push(id);
         } else {
           console.error(
@@ -1036,7 +1039,7 @@ export async function DELETE(request: NextRequest) {
 
     // First check if these are UUIDs rather than ObjectIds (Cloudflare IDs)
     // Handle both ObjectIds and string IDs to maximize compatibility
-    // [REMOVED] // [REMOVED] console.log("Building query to match MongoDB documents...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Building query to match MongoDB documents...");
 
     // Try multiple query strategies for maximum effectiveness
     const objectIdQuery = allPossibleIds
@@ -1050,7 +1053,7 @@ export async function DELETE(request: NextRequest) {
       })
       .filter((item) => item !== null);
 
-    // [REMOVED] // [REMOVED] console.log(`Generated ${objectIdQuery.length} valid ObjectId queries`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Generated ${objectIdQuery.length} valid ObjectId queries`);
 
     const cloudflareIdQuery = { cloudflareId: { $in: allPossibleIds } };
 
@@ -1060,11 +1063,11 @@ export async function DELETE(request: NextRequest) {
     queryConditions.push(cloudflareIdQuery);
 
     const query = { $or: queryConditions };
-    // [REMOVED] // [REMOVED] console.log("Final MongoDB query:", JSON.stringify(query, null, 2));
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Final MongoDB query:", JSON.stringify(query, null, 2));
 
     // Find all matching images
     const imagesToDelete = await imagesCollection.find(query).toArray();
-    // [REMOVED] // [REMOVED] console.log(`Found ${imagesToDelete.length} images to delete in MongoDB`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Found ${imagesToDelete.length} images to delete in MongoDB`);
 
     if (imagesToDelete.length > 0) {
       console.log("Sample image found:", {
@@ -1188,7 +1191,7 @@ export async function DELETE(request: NextRequest) {
         const deleteResult = await imagesCollection.deleteOne({
           _id: image._id,
         });
-        // [REMOVED] // [REMOVED] console.log(`Image deletion result: ${JSON.stringify(deleteResult)}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Image deletion result: ${JSON.stringify(deleteResult)}`);
 
         const resultItem = {
           imageId: image._id.toString(),

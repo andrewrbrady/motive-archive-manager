@@ -93,7 +93,7 @@ export default function CarImageEditor({
             responseData
           );
         } else {
-          // [REMOVED] // [REMOVED] console.log("Successfully saved image to database");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Successfully saved image to database");
         }
       } catch (error) {
         console.error("Error updating database:", error);

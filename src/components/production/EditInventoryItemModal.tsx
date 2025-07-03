@@ -249,11 +249,11 @@ export default function EditInventoryItemModal({
         };
         setUploadProgress((prev) => [...prev, uploadingProgress]);
 
-        // [REMOVED] // [REMOVED] console.log(`Starting upload for ${file.name}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Starting upload for ${file.name}`);
 
         // Upload to Cloudflare
         const result = await uploadToCloudflare(file);
-        // [REMOVED] // [REMOVED] console.log(`Upload successful for ${file.name}:`, result);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Upload successful for ${file.name}:`, result);
 
         // Update progress to complete
         handleImageProgress({
@@ -263,7 +263,7 @@ export default function EditInventoryItemModal({
           imageUrl: result.url,
         });
 
-        // [REMOVED] // [REMOVED] console.log(`Image added to form data: ${result.url}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Image added to form data: ${result.url}`);
       } catch (error) {
         console.error(`Error uploading ${file.name}:`, error);
 

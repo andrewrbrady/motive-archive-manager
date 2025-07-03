@@ -11,7 +11,8 @@ export type ContentBlockType =
   | "divider"
   | "button"
   | "spacer"
-  | "columns";
+  | "columns"
+  | "frontmatter";
 
 // Base interface for all content blocks
 export interface BaseContentBlock {
@@ -65,6 +66,18 @@ export interface ImageBlock extends BaseContentBlock {
   height?: string;
   alignment?: "left" | "center" | "right";
   caption?: string;
+  linkUrl?: string; // Optional link URL for the image
+  linkTarget?: string; // Link target (_blank, _self, etc.)
+  // Email-specific properties for fluid-hybrid pattern
+  email?: {
+    isFullWidth?: boolean; // Triggers fluid-hybrid wrapper
+    outlookWidth?: string; // Fixed width for Outlook (default: "600")
+    maxWidth?: string; // Max width for modern clients (default: "1200")
+    backgroundColor?: string; // Background color for full-width sections
+    minHeight?: string; // Minimum height for full-width images
+    mobileMinHeight?: string; // Minimum height for mobile devices
+    useCenterCrop?: boolean; // Whether to use center crop for full-width images
+  };
 }
 
 export interface DividerBlock extends BaseContentBlock {
@@ -96,6 +109,22 @@ export interface ColumnsBlock extends BaseContentBlock {
   gap?: string;
 }
 
+export interface FrontmatterBlock extends BaseContentBlock {
+  type: "frontmatter";
+  data: {
+    title?: string;
+    subtitle?: string;
+    author?: string;
+    date?: string;
+    status?: string;
+    cover?: string;
+    tags?: string[];
+    callToAction?: string;
+    callToActionUrl?: string;
+    [key: string]: any; // Allow custom fields
+  };
+}
+
 // Backward compatibility - HeadingBlock is now just a TextBlock with heading element
 export type HeadingBlock = TextBlock & {
   element: "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
@@ -108,7 +137,8 @@ export type ContentBlock =
   | DividerBlock
   | ButtonBlock
   | SpacerBlock
-  | ColumnsBlock;
+  | ColumnsBlock
+  | FrontmatterBlock;
 
 // Template structure
 export interface ContentTemplate {

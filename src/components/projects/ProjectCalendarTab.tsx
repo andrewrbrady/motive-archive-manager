@@ -119,7 +119,7 @@ export function ProjectCalendarTab({ projectId }: ProjectCalendarTabProps) {
 
   const handleSelectEvent = (event: any) => {
     // Implementation for event selection
-    console.log("Event selected:", event);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Event selected:", event);
   };
 
   const handleDeliverableUpdate = async () => {

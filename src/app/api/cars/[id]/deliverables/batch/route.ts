@@ -40,7 +40,7 @@ export async function POST(
         !deliverable.type ||
         !deliverable.edit_deadline
       ) {
-        console.log(`Deliverable ${i} missing required fields:`, deliverable);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Deliverable ${i} missing required fields:`, deliverable);
         return NextResponse.json(
           {
             error: `Deliverable at index ${i} missing required fields: title, platform, type, edit_deadline`,
@@ -51,7 +51,7 @@ export async function POST(
 
       // Check if firebase_uid is provided and not empty
       if (!deliverable.firebase_uid) {
-        console.log(`Deliverable ${i} missing firebase_uid:`, deliverable);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Deliverable ${i} missing firebase_uid:`, deliverable);
         return NextResponse.json(
           {
             error: `Deliverable at index ${i} missing required field: firebase_uid`,
@@ -67,7 +67,7 @@ export async function POST(
           new Date(deliverable.release_date);
         }
       } catch (error) {
-        console.log(`Deliverable ${i} has invalid date format:`, error);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Deliverable ${i} has invalid date format:`, error);
         return NextResponse.json(
           {
             error: `Deliverable at index ${i} has invalid date format`,

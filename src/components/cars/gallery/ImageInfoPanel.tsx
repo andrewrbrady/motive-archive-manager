@@ -76,11 +76,6 @@ const getEnhancedImageUrl = (
 
   // Fallback for other URL formats - try to replace /public if it exists
   const transformedUrl = baseUrl.replace(/\/public$/, `/${params.join(",")}`);
-  console.log("ImageInfoPanel URL transformation (fallback):", {
-    baseUrl,
-    transformedUrl,
-    params,
-  });
   return transformedUrl;
 };
 

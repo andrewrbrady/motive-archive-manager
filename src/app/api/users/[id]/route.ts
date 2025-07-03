@@ -32,13 +32,13 @@ interface IUser {
  * Requires admin role
  */
 export async function GET(request: NextRequest) {
-  console.log("🔒 GET /api/users/[id]: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/users/[id]: Starting request");
 
   try {
     // Check authentication and admin role
     const authResult = await verifyAuthMiddleware(request, ["admin"]);
     if (authResult) {
-      console.log("❌ GET /api/users/[id]: Authentication failed");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ GET /api/users/[id]: Authentication failed");
       return authResult;
     }
 
@@ -54,13 +54,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log("🔒 GET /api/users/[id]: Fetching user data", { userId });
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/users/[id]: Fetching user data", { userId });
     const user = await getUserWithAuth(userId);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    console.log("✅ GET /api/users/[id]: Successfully fetched user");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ GET /api/users/[id]: Successfully fetched user");
     return NextResponse.json(user);
   } catch (error) {
     console.error("💥 GET /api/users/[id]: Error fetching user:", error);
@@ -78,13 +78,13 @@ export async function GET(request: NextRequest) {
  * Requires admin role
  */
 export async function PUT(request: NextRequest) {
-  console.log("🔒 PUT /api/users/[id]: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 PUT /api/users/[id]: Starting request");
 
   try {
     // Check authentication and admin role
     const authResult = await verifyAuthMiddleware(request, ["admin"]);
     if (authResult) {
-      console.log("❌ PUT /api/users/[id]: Authentication failed");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ PUT /api/users/[id]: Authentication failed");
       return authResult;
     }
 
@@ -159,7 +159,7 @@ export async function PUT(request: NextRequest) {
 
       // Get the updated user data
       const updatedUser = await getUserWithAuth(userId);
-      console.log("✅ PUT /api/users/[id]: Successfully updated user roles");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ PUT /api/users/[id]: Successfully updated user roles");
       return NextResponse.json({ user: updatedUser });
     } else if (data.updateType === "profile") {
       // Handle profile update
@@ -171,7 +171,7 @@ export async function PUT(request: NextRequest) {
         );
       }
 
-      console.log("🔒 PUT /api/users/[id]: Updating user profile", { userId });
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 PUT /api/users/[id]: Updating user profile", { userId });
 
       // Update user profile in Firestore
       await adminDb.collection("users").doc(userId).update({
@@ -181,7 +181,7 @@ export async function PUT(request: NextRequest) {
 
       // Get the updated user
       const updatedUser = await getUserWithAuth(userId);
-      console.log("✅ PUT /api/users/[id]: Successfully updated user profile");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ PUT /api/users/[id]: Successfully updated user profile");
       return NextResponse.json(updatedUser);
     }
 
@@ -202,13 +202,13 @@ export async function PUT(request: NextRequest) {
  * Requires admin role
  */
 export async function DELETE(request: NextRequest) {
-  console.log("🔒 DELETE /api/users/[id]: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 DELETE /api/users/[id]: Starting request");
 
   try {
     // Check authentication and admin role
     const authResult = await verifyAuthMiddleware(request, ["admin"]);
     if (authResult) {
-      console.log("❌ DELETE /api/users/[id]: Authentication failed");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ DELETE /api/users/[id]: Authentication failed");
       return authResult;
     }
 
@@ -224,7 +224,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    console.log("🔒 DELETE /api/users/[id]: Deleting user", { userId });
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 DELETE /api/users/[id]: Deleting user", { userId });
 
     // Delete user from Firebase Auth
     await adminAuth.deleteUser(userId);
@@ -232,7 +232,7 @@ export async function DELETE(request: NextRequest) {
     // Delete user document from Firestore
     await adminDb.collection("users").doc(userId).delete();
 
-    console.log("✅ DELETE /api/users/[id]: Successfully deleted user");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ DELETE /api/users/[id]: Successfully deleted user");
     return NextResponse.json({ message: "User deleted successfully" });
   } catch (error) {
     console.error("💥 DELETE /api/users/[id]: Error deleting user:", error);

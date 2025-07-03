@@ -49,7 +49,7 @@ export default function DocumentationOptimized({
 
       // Log performance improvement
       const loadTime = performance.now() - loadStartTime;
-      console.log(`Documentation upload completed in ${loadTime.toFixed(2)}ms`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Documentation upload completed in ${loadTime.toFixed(2)}ms`);
     },
     [loadStartTime]
   );

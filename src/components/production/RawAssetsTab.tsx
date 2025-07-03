@@ -56,7 +56,7 @@ const fetchWithTimeout = async (url: string, options = {}, timeout = 30000) => {
   const controller = new AbortController();
   const { signal } = controller;
 
-  // [REMOVED] // [REMOVED] console.log(`Starting fetch with ${timeout}ms timeout: ${url}`);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Starting fetch with ${timeout}ms timeout: ${url}`);
   const timeoutId = setTimeout(() => {
     console.warn(`Request to ${url} timed out after ${timeout}ms`);
     controller.abort();
@@ -297,12 +297,12 @@ export default function RawAssetsTab() {
 
       // Queue batch fetches without causing immediate API calls
       if (carIds.size) {
-        // [REMOVED] // [REMOVED] console.log(`Prefetching ${carIds.size} car labels`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Prefetching ${carIds.size} car labels`);
         fetchCarLabels(Array.from(carIds));
       }
 
       if (driveIds.size) {
-        // [REMOVED] // [REMOVED] console.log(`Prefetching ${driveIds.size} hard drive labels`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Prefetching ${driveIds.size} hard drive labels`);
         fetchDriveLabels(Array.from(driveIds));
       }
     },
@@ -332,7 +332,7 @@ export default function RawAssetsTab() {
 
         // Use an increasing timeout based on retry attempts
         const timeout = 30000 + fetchAttempts * 15000; // Increased timeouts: 30s, 45s, 60s
-        // [REMOVED] // [REMOVED] console.log(`Using timeout of ${timeout}ms for this request`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Using timeout of ${timeout}ms for this request`);
 
         // Get the current URL search parameters
         const hardDriveId = getParam("hardDriveId") || "";
@@ -348,7 +348,7 @@ export default function RawAssetsTab() {
           queryUrl += `&hardDriveId=${encodeURIComponent(hardDriveId)}`;
         }
 
-        // [REMOVED] // [REMOVED] console.log("Fetching from URL:", queryUrl);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching from URL:", queryUrl);
 
         // Use the fetchWithTimeout function
         const response = await fetchWithTimeout(queryUrl, {}, timeout);
@@ -363,17 +363,17 @@ export default function RawAssetsTab() {
         console.timeEnd(timerName);
 
         // Log the API response structure to help debug
-        // [REMOVED] // [REMOVED] console.log("Raw Assets API Response structure:", Object.keys(data));
-        // [REMOVED] // [REMOVED] console.log("Raw Assets meta:", data.meta);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Raw Assets API Response structure:", Object.keys(data));
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Raw Assets meta:", data.meta);
 
         // Log debug info if available
         if (data.debug) {
-          // [REMOVED] // [REMOVED] console.log("Raw assets API debug info:", data.debug);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Raw assets API debug info:", data.debug);
         }
 
         // Add better data validation before setting state
         const assetsList = Array.isArray(data.data) ? data.data : [];
-        // [REMOVED] // [REMOVED] console.log(`Received ${assetsList.length} raw assets`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Received ${assetsList.length} raw assets`);
 
         // Add defensive check to ensure each asset has required properties
         const sanitizedAssets = assetsList.map((asset: any) => ({
@@ -452,7 +452,7 @@ export default function RawAssetsTab() {
           setLoading(true);
           const nextAttempt = fetchAttempts + 1;
           setFetchAttempts(nextAttempt);
-          // [REMOVED] // [REMOVED] console.log(`Retry attempt ${nextAttempt} of ${maxRetries}`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Retry attempt ${nextAttempt} of ${maxRetries}`);
 
           // Exponential backoff for retries with jitter for resource errors
           // Add extra backoff time for resource errors
@@ -585,7 +585,7 @@ export default function RawAssetsTab() {
     if (!selectedAssetId) {
       // If no asset selected in URL and modal is open, close it
       if (isEditModalOpen && !isEdit) {
-        // [REMOVED] // [REMOVED] console.log("Closing edit modal due to URL parameter changes");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Closing edit modal due to URL parameter changes");
         setIsEditModalOpen(false);
       }
       return;
@@ -608,7 +608,7 @@ export default function RawAssetsTab() {
           // Only set the asset data if the edit modal is not already open
           // This prevents overwriting the current edit with stale data
           if (!isEditModalOpen) {
-            // [REMOVED] // [REMOVED] console.log("Opening edit modal for asset:", asset._id);
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Opening edit modal for asset:", asset._id);
             const rawAssetData: RawAssetData = {
               _id: asset._id as unknown as ObjectId,
               date: asset.date,
@@ -635,16 +635,16 @@ export default function RawAssetsTab() {
             updatedAt: asset.updatedAt,
           });
           setIsDetailsModalOpen(true);
-          // [REMOVED] // [REMOVED] console.log("Opening details modal for asset:", asset._id);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Opening details modal for asset:", asset._id);
         }
       } else {
-        // [REMOVED] // [REMOVED] console.log("Asset not found in loaded assets, fetching from API");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Asset not found in loaded assets, fetching from API");
         // Asset not found in currently loaded assets, fetch it directly
         fetchAssetById(selectedAssetId);
       }
     } else {
       // If assets aren't loaded yet, fetch the specific asset
-      // [REMOVED] // [REMOVED] console.log("Assets not loaded yet, fetching specific asset");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Assets not loaded yet, fetching specific asset");
       fetchAssetById(selectedAssetId);
     }
   }, [assets, getParam, isEditModalOpen, isDetailsModalOpen]); // Removed fetchAssetById from dependencies
@@ -938,7 +938,7 @@ export default function RawAssetsTab() {
         handleCloseAddAsset();
         fetchAssets();
 
-        // [REMOVED] // [REMOVED] console.log("Asset added successfully");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Asset added successfully");
       } catch (error) {
         console.error("Error adding asset:", error);
         toast.error("Failed to add asset");

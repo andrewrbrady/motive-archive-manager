@@ -37,7 +37,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<object>> {
   const startTime = Date.now();
 
   try {
-    console.log("🔧 Length Settings API: Starting request");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔧 Length Settings API: Starting request");
 
     const { db } = await connectToDatabase();
     const settings = await db
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<object>> {
     });
 
     // Return defaults on error to ensure the app keeps working
-    console.log("🔧 Length Settings API: Returning defaults due to error");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔧 Length Settings API: Returning defaults due to error");
     return NextResponse.json(defaultLengthSettings);
   }
 }

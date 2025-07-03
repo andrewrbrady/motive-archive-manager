@@ -3,7 +3,14 @@
 import React, { useMemo, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GripVertical, Type, ImageIcon, Heading, Minus } from "lucide-react";
+import {
+  GripVertical,
+  Type,
+  ImageIcon,
+  Heading,
+  Minus,
+  FileText,
+} from "lucide-react";
 import {
   ContentBlock,
   TextBlock,
@@ -13,6 +20,7 @@ import {
   DividerBlock,
   SpacerBlock,
   ColumnsBlock,
+  FrontmatterBlock,
   ContentBlockType,
 } from "./types";
 import { EmailHeaderState } from "./EmailHeaderConfig";
@@ -36,6 +44,9 @@ interface IntegratedPreviewEditorProps {
   onDragEnd: () => void;
   onDragOver: (index: number) => void;
   onBlocksChange: (blocks: ContentBlock[]) => void;
+  // Frontmatter conversion
+  onConvertTextToFrontmatter?: (textBlockId: string) => void;
+  detectFrontmatterInTextBlock?: (textBlock: TextBlock) => any;
 }
 
 /**
@@ -61,6 +72,8 @@ export const IntegratedPreviewEditor = React.memo<IntegratedPreviewEditorProps>(
     onDragEnd,
     onDragOver,
     onBlocksChange,
+    onConvertTextToFrontmatter,
+    detectFrontmatterInTextBlock,
   }) {
     // Performance optimization: Memoize block count and sorting
     const blockCount = useMemo(() => blocks.length, [blocks]);
@@ -231,6 +244,10 @@ export const IntegratedPreviewEditor = React.memo<IntegratedPreviewEditorProps>(
                         onDragEnd={onDragEnd}
                         onDragOver={() => onDragOver(index)}
                         onBlocksChange={onBlocksChange}
+                        onConvertTextToFrontmatter={onConvertTextToFrontmatter}
+                        detectFrontmatterInTextBlock={
+                          detectFrontmatterInTextBlock
+                        }
                       />
                     ))}
                   </div>
@@ -263,6 +280,9 @@ interface EditablePreviewBlockProps {
   onDragEnd: () => void;
   onDragOver: () => void;
   onBlocksChange: (blocks: ContentBlock[]) => void;
+  // Frontmatter conversion
+  onConvertTextToFrontmatter?: (textBlockId: string) => void;
+  detectFrontmatterInTextBlock?: (textBlock: TextBlock) => any;
 }
 
 const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
@@ -282,6 +302,8 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
     onDragEnd,
     onDragOver,
     onBlocksChange,
+    onConvertTextToFrontmatter,
+    detectFrontmatterInTextBlock,
   }) {
     const getBlockIcon = (type: ContentBlockType) => {
       switch (type) {
@@ -297,6 +319,8 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
           return <Minus className="h-3 w-3" />;
         case "columns":
           return <Type className="h-3 w-3" />;
+        case "frontmatter":
+          return <FileText className="h-3 w-3" />;
         default:
           return <Type className="h-3 w-3" />;
       }
@@ -455,6 +479,8 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
                   blocks={blocks}
                   onUpdate={onUpdate}
                   onBlocksChange={onBlocksChange}
+                  onConvertTextToFrontmatter={onConvertTextToFrontmatter}
+                  detectFrontmatterInTextBlock={detectFrontmatterInTextBlock}
                 />
               </div>
             ) : (
@@ -498,6 +524,8 @@ const PreviewBlock = React.memo<PreviewBlockProps>(function PreviewBlock({
       return <ImageBlockPreview block={block as ImageBlock} />;
     case "divider":
       return <DividerBlockPreview block={block as DividerBlock} />;
+    case "frontmatter":
+      return <FrontmatterBlockPreview block={block as FrontmatterBlock} />;
     case "button":
     case "spacer":
     case "columns":
@@ -657,14 +685,42 @@ const ImageBlockPreview = React.memo<{ block: ImageBlock }>(
       [block.imageUrl]
     );
 
+    const isFullWidthEmail = block.email?.isFullWidth;
+
     return (
-      <div className="p-6 text-center">
+      <div
+        className={`p-6 text-center ${isFullWidthEmail ? "bg-blue-50/30 border-l-4 border-blue-400" : ""}`}
+      >
+        {/* Full-width email indicator */}
+        {isFullWidthEmail && (
+          <div className="mb-3 text-left">
+            <span className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+              📧 Full-Width Email Header
+              <span className="text-blue-500">
+                ({block.email?.outlookWidth || "600"}px →{" "}
+                {block.email?.maxWidth || "1200"}px)
+              </span>
+            </span>
+          </div>
+        )}
+
         {hasImage ? (
           <div>
             <img
               src={block.imageUrl}
               alt={block.altText || ""}
-              className="max-w-full h-auto rounded-lg border border-border/20 mx-auto"
+              className={`max-w-full h-auto rounded-lg border border-border/20 mx-auto ${
+                isFullWidthEmail ? "shadow-md" : ""
+              }`}
+              style={
+                isFullWidthEmail
+                  ? {
+                      backgroundColor:
+                        block.email?.backgroundColor || "#111111",
+                      padding: "8px",
+                    }
+                  : undefined
+              }
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = "none";
@@ -709,6 +765,81 @@ const DividerBlockPreview = React.memo<{ block: DividerBlock }>(
             backgroundColor: block.color || "#e5e7eb",
           }}
         />
+      </div>
+    );
+  }
+);
+
+const FrontmatterBlockPreview = React.memo<{ block: FrontmatterBlock }>(
+  function FrontmatterBlockPreview({ block }) {
+    const { data } = block;
+
+    return (
+      <div className="mx-6 my-4 border border-border/40 rounded-lg bg-transparent overflow-hidden">
+        <div className="bg-muted/10 px-4 py-2 border-b border-border/40">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium text-foreground">
+              Article Metadata
+            </span>
+          </div>
+        </div>
+        <div className="p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="font-medium text-muted-foreground">Title:</span>
+              <p className="text-foreground mt-1">{data.title || "Not set"}</p>
+            </div>
+            <div>
+              <span className="font-medium text-muted-foreground">Author:</span>
+              <p className="text-foreground mt-1">{data.author || "Not set"}</p>
+            </div>
+            <div>
+              <span className="font-medium text-muted-foreground">Date:</span>
+              <p className="text-foreground mt-1">{data.date || "Not set"}</p>
+            </div>
+            <div>
+              <span className="font-medium text-muted-foreground">Status:</span>
+              <p className="text-foreground mt-1">{data.status || "Not set"}</p>
+            </div>
+          </div>
+
+          {data.subtitle && (
+            <div>
+              <span className="font-medium text-muted-foreground">
+                Subtitle:
+              </span>
+              <p className="text-foreground mt-1">{data.subtitle}</p>
+            </div>
+          )}
+
+          {data.tags && data.tags.length > 0 && (
+            <div>
+              <span className="font-medium text-muted-foreground">Tags:</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {data.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="inline-block bg-muted/20 text-foreground text-xs px-2 py-1 rounded border border-border/40"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {data.cover && (
+            <div>
+              <span className="font-medium text-muted-foreground">
+                Cover Image:
+              </span>
+              <p className="text-foreground mt-1 text-xs font-mono bg-muted/10 p-2 rounded border border-border/20">
+                {data.cover}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     );
   }

@@ -5,10 +5,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    console.log("🔍 Debug: Connecting to database...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Debug: Connecting to database...");
     const db = await getDatabase();
 
-    console.log("📊 Debug: Checking car data for primaryImageId...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📊 Debug: Checking car data for primaryImageId...");
     const sampleCars = await db.collection("cars").find({}).limit(5).toArray();
 
     const carData = [];
@@ -39,7 +39,7 @@ export async function GET() {
       carData.push(carInfo);
     }
 
-    console.log("🖼️ Debug: Checking sample image data...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🖼️ Debug: Checking sample image data...");
     const sampleImages = await db
       .collection("images")
       .find({})

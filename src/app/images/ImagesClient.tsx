@@ -390,7 +390,7 @@ export default function ImagesClient() {
                     Upload Images
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
                   <DialogHeader>
                     <DialogTitle>Upload Images</DialogTitle>
                     <DialogDescription>
@@ -422,7 +422,7 @@ export default function ImagesClient() {
                         "🔄 ImagesClient: Calling mutate() to refresh images"
                       );
                       mutate();
-                      console.log("🔄 ImagesClient: Closing upload dialog");
+                      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 ImagesClient: Closing upload dialog");
                       setIsUploadDialogOpen(false);
                     }}
                     onError={(error: string) => {

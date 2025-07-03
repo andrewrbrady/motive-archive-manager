@@ -196,7 +196,7 @@ export default function GalleriesClient() {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       // Check if component is still mounted before any state updates
       if (!mounted.current) {
-        console.log("🛡️ Preventing search input update - component unmounted");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🛡️ Preventing search input update - component unmounted");
         return;
       }
 

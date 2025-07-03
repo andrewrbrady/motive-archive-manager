@@ -182,7 +182,7 @@ export const PERFORMANCE_INDEXES: IndexDefinition[] = [
 export async function createPerformanceIndexes(db?: Db): Promise<void> {
   const database = db || (await getDatabase());
 
-  console.log("🚀 Creating performance indexes...");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚀 Creating performance indexes...");
 
   for (const indexDef of PERFORMANCE_INDEXES) {
     try {
@@ -201,7 +201,7 @@ export async function createPerformanceIndexes(db?: Db): Promise<void> {
 
       if (!indexExists) {
         await collection.createIndex(indexDef.index, indexDef.options);
-        console.log(`✅ Created index: ${indexName} on ${indexDef.collection}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ Created index: ${indexName} on ${indexDef.collection}`);
       } else {
         console.log(
           `⏭️  Index already exists: ${indexName} on ${indexDef.collection}`
@@ -215,7 +215,7 @@ export async function createPerformanceIndexes(db?: Db): Promise<void> {
     }
   }
 
-  console.log("🎉 Performance indexes creation completed!");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎉 Performance indexes creation completed!");
 }
 
 /**
@@ -224,7 +224,7 @@ export async function createPerformanceIndexes(db?: Db): Promise<void> {
 export async function dropPerformanceIndexes(db?: Db): Promise<void> {
   const database = db || (await getDatabase());
 
-  console.log("🗑️  Dropping performance indexes...");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🗑️  Dropping performance indexes...");
 
   for (const indexDef of PERFORMANCE_INDEXES) {
     try {
@@ -233,7 +233,7 @@ export async function dropPerformanceIndexes(db?: Db): Promise<void> {
         indexDef.options?.name || generateIndexName(indexDef.index);
 
       await collection.dropIndex(indexName);
-      console.log(`✅ Dropped index: ${indexName} on ${indexDef.collection}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ Dropped index: ${indexName} on ${indexDef.collection}`);
     } catch (error) {
       // Index might not exist, which is fine
       console.log(
@@ -242,7 +242,7 @@ export async function dropPerformanceIndexes(db?: Db): Promise<void> {
     }
   }
 
-  console.log("🎉 Performance indexes cleanup completed!");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎉 Performance indexes cleanup completed!");
 }
 
 /**

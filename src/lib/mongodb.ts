@@ -135,7 +135,7 @@ export async function getDatabase(): Promise<Db> {
         await db.admin().ping();
         lastValidationTime = now;
       } catch (pingError) {
-        console.log("Connection validation failed, attempting reconnection...");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Connection validation failed, attempting reconnection...");
 
         // Clear cached client and try once more
         global._mongoClientPromise = null;
@@ -159,7 +159,7 @@ export async function getDatabase(): Promise<Db> {
     global._lastConnectionTime = 0;
 
     try {
-      console.log("Creating fresh MongoDB connection");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Creating fresh MongoDB connection");
       const client = await getMongoClient();
       const db = client.db(DB_NAME);
 
@@ -343,7 +343,7 @@ export async function getMongoClient(
   // Reset if too many attempts
   if (global._connectionAttempts > 5) {
     // ⚡ REDUCED: Lower threshold
-    console.log("Too many connection attempts detected. Resetting connection.");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Too many connection attempts detected. Resetting connection.");
     global._mongoClientPromise = null;
     clientPromise = null;
     client = null;
@@ -448,7 +448,7 @@ if (!isBuildTime && !isStaticGeneration) {
           const client = await clientPromise;
           await client.close();
         }
-        // [REMOVED] // [REMOVED] console.log("MongoDB connections closed.");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("MongoDB connections closed.");
         process.exit(0);
       } catch (err) {
         console.error("Error closing MongoDB connections:", err);

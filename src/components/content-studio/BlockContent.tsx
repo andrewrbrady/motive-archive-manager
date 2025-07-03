@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import {
   Italic,
   ChevronDown,
   ChevronUp,
+  FileText,
 } from "lucide-react";
 import {
   ContentBlock,
@@ -19,6 +21,7 @@ import {
   HeadingBlock,
   ImageBlock,
   DividerBlock,
+  FrontmatterBlock,
 } from "./types";
 
 /**
@@ -33,6 +36,9 @@ interface BlockContentProps {
   blocks: ContentBlock[];
   onUpdate: (updates: Partial<ContentBlock>) => void;
   onBlocksChange: (blocks: ContentBlock[]) => void;
+  // Frontmatter conversion
+  onConvertTextToFrontmatter?: (textBlockId: string) => void;
+  detectFrontmatterInTextBlock?: (textBlock: TextBlock) => any;
 }
 
 // Custom comparison function for React.memo to prevent unnecessary re-renders
@@ -93,7 +99,11 @@ const areBlockContentPropsEqual = (
         prevImage.imageUrl === nextImage.imageUrl &&
         prevImage.altText === nextImage.altText &&
         prevImage.width === nextImage.width &&
-        prevImage.height === nextImage.height
+        prevImage.height === nextImage.height &&
+        prevImage.caption === nextImage.caption &&
+        prevImage.linkUrl === nextImage.linkUrl &&
+        prevImage.linkTarget === nextImage.linkTarget &&
+        JSON.stringify(prevImage.email) === JSON.stringify(nextImage.email)
       );
     }
     case "divider": {
@@ -115,6 +125,8 @@ const BlockContent = React.memo<BlockContentProps>(function BlockContent({
   blocks,
   onUpdate,
   onBlocksChange,
+  onConvertTextToFrontmatter,
+  detectFrontmatterInTextBlock,
 }) {
   // Performance optimization: Memoize block type to prevent unnecessary switch recalculation
   const blockType = useMemo(() => block.type, [block.type]);
@@ -127,6 +139,8 @@ const BlockContent = React.memo<BlockContentProps>(function BlockContent({
           blocks={blocks}
           onUpdate={onUpdate}
           onBlocksChange={onBlocksChange}
+          onConvertTextToFrontmatter={onConvertTextToFrontmatter}
+          detectFrontmatterInTextBlock={detectFrontmatterInTextBlock}
         />
       );
     case "image":
@@ -137,6 +151,13 @@ const BlockContent = React.memo<BlockContentProps>(function BlockContent({
       return (
         <DividerBlockContent
           block={block as DividerBlock}
+          onUpdate={onUpdate}
+        />
+      );
+    case "frontmatter":
+      return (
+        <FrontmatterBlockContent
+          block={block as FrontmatterBlock}
           onUpdate={onUpdate}
         />
       );
@@ -188,14 +209,45 @@ interface TextBlockContentProps {
   blocks: ContentBlock[];
   onUpdate: (updates: Partial<ContentBlock>) => void;
   onBlocksChange: (blocks: ContentBlock[]) => void;
+  // Frontmatter conversion
+  onConvertTextToFrontmatter?: (textBlockId: string) => void;
+  detectFrontmatterInTextBlock?: (textBlock: TextBlock) => any;
 }
 
 const TextBlockContent = React.memo<TextBlockContentProps>(
-  function TextBlockContent({ block, blocks, onUpdate, onBlocksChange }) {
+  function TextBlockContent({
+    block,
+    blocks,
+    onUpdate,
+    onBlocksChange,
+    onConvertTextToFrontmatter,
+    detectFrontmatterInTextBlock,
+  }) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [showLinkDialog, setShowLinkDialog] = useState(false);
     const [linkText, setLinkText] = useState("");
     const [linkUrl, setLinkUrl] = useState("");
+
+    // Handle Escape key to close modal
+    React.useEffect(() => {
+      const handleEscape = (event: KeyboardEvent) => {
+        if (event.key === "Escape" && showLinkDialog) {
+          setShowLinkDialog(false);
+        }
+      };
+
+      if (showLinkDialog) {
+        document.addEventListener("keydown", handleEscape);
+        // Prevent body scroll when modal is open
+        document.body.style.overflow = "hidden";
+      }
+
+      return () => {
+        document.removeEventListener("keydown", handleEscape);
+        // Restore body scroll
+        document.body.style.overflow = "unset";
+      };
+    }, [showLinkDialog]);
 
     // Get the content to display - always use rich formatted content if available
     const displayContent = useMemo(() => {
@@ -419,6 +471,14 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
       }, 0);
     };
 
+    // Handle Enter key in modal inputs
+    const handleKeyDown = (event: React.KeyboardEvent) => {
+      if (event.key === "Enter" && linkText && linkUrl) {
+        event.preventDefault();
+        handleLinkInsert();
+      }
+    };
+
     // Update the formatted content (always in rich mode)
     const updateFormattedContent = (newContent: string) => {
       const hasLinks = /\[([^\]]+)\]\(([^)]+)\)/.test(newContent);
@@ -445,6 +505,47 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
 
     return (
       <div className="space-y-3">
+        {/* Frontmatter Detection and Conversion */}
+        {detectFrontmatterInTextBlock &&
+          onConvertTextToFrontmatter &&
+          (() => {
+            const frontmatterInfo = detectFrontmatterInTextBlock(block);
+            return frontmatterInfo ? (
+              <div className="p-3 bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        YAML Frontmatter Detected
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+                      This text block contains YAML frontmatter that can be
+                      converted to a structured metadata block for better
+                      editing.
+                    </p>
+                    {frontmatterInfo.frontmatterData && (
+                      <div className="text-xs text-blue-600 dark:text-blue-400 mb-3">
+                        <strong>Detected fields:</strong>{" "}
+                        {Object.keys(frontmatterInfo.frontmatterData).join(
+                          ", "
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    onClick={() => onConvertTextToFrontmatter(block.id)}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap"
+                  >
+                    Convert to Metadata Block
+                  </Button>
+                </div>
+              </div>
+            ) : null;
+          })()}
+
         {/* Element Type Selector */}
         <div className="flex items-center space-x-2">
           <Label className="text-sm font-medium text-muted-foreground">
@@ -524,62 +625,70 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
           </div>
         </div>
 
-        {/* Link Dialog */}
-        {showLinkDialog && (
-          <div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-            onClick={() => setShowLinkDialog(false)}
-          >
+        {/* Link Dialog - Using React portal to render outside parent containers to avoid stacking context issues */}
+        {showLinkDialog &&
+          typeof document !== "undefined" &&
+          createPortal(
             <div
-              className="bg-background p-6 rounded-lg border shadow-lg max-w-md w-full mx-4"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center"
+              style={{ zIndex: 9999 }}
+              onClick={() => setShowLinkDialog(false)}
             >
-              <h3 className="text-lg font-semibold mb-4">Insert Link</h3>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="link-text" className="text-sm font-medium">
-                    Link Text
-                  </Label>
-                  <Input
-                    id="link-text"
-                    placeholder="Enter link text"
-                    value={linkText}
-                    onChange={(e) => setLinkText(e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="link-url" className="text-sm font-medium">
-                    Link URL
-                  </Label>
-                  <Input
-                    id="link-url"
-                    placeholder="https://example.com"
-                    value={linkUrl}
-                    onChange={(e) => setLinkUrl(e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowLinkDialog(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleLinkInsert}
-                    disabled={!linkText || !linkUrl}
-                  >
-                    Insert Link
-                  </Button>
+              <div
+                className="bg-background p-6 rounded-lg border shadow-lg max-w-md w-full mx-4 relative"
+                style={{ zIndex: 10000 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-semibold mb-4">Insert Link</h3>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="link-text" className="text-sm font-medium">
+                      Link Text
+                    </Label>
+                    <Input
+                      id="link-text"
+                      placeholder="Enter link text"
+                      value={linkText}
+                      onChange={(e) => setLinkText(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      className="mt-1"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="link-url" className="text-sm font-medium">
+                      Link URL
+                    </Label>
+                    <Input
+                      id="link-url"
+                      placeholder="https://example.com"
+                      value={linkUrl}
+                      onChange={(e) => setLinkUrl(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowLinkDialog(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleLinkInsert}
+                      disabled={!linkText || !linkUrl}
+                    >
+                      Insert Link
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            </div>,
+            document.body
+          )}
       </div>
     );
   }
@@ -718,6 +827,321 @@ const ImageBlockContent = React.memo<ImageBlockContentProps>(
                 className="bg-transparent border-border/40 focus:border-border/60"
               />
             </div>
+
+            {/* Caption Input */}
+            <div>
+              <Label
+                htmlFor={`image-caption-${block.id}`}
+                className="text-sm font-medium"
+              >
+                Caption (optional)
+              </Label>
+              <Input
+                id={`image-caption-${block.id}`}
+                placeholder="Add a caption..."
+                value={block.caption || ""}
+                onChange={(e) =>
+                  onUpdate({ caption: e.target.value } as Partial<ImageBlock>)
+                }
+                className="bg-transparent border-border/40 focus:border-border/60"
+              />
+            </div>
+
+            {/* Link URL Input */}
+            <div>
+              <Label
+                htmlFor={`image-link-${block.id}`}
+                className="text-sm font-medium"
+              >
+                Link URL (optional)
+              </Label>
+              <Input
+                id={`image-link-${block.id}`}
+                placeholder="https://example.com"
+                value={block.linkUrl || ""}
+                onChange={(e) =>
+                  onUpdate({ linkUrl: e.target.value } as Partial<ImageBlock>)
+                }
+                className="bg-transparent border-border/40 focus:border-border/60"
+              />
+            </div>
+
+            {/* Link Target Checkbox */}
+            {block.linkUrl && (
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">Open in new tab</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Opens link in a new window/tab
+                  </p>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`link-target-${block.id}`}
+                    checked={block.linkTarget === "_blank"}
+                    onChange={(e) =>
+                      onUpdate({
+                        linkTarget: e.target.checked ? "_blank" : "_self",
+                      } as Partial<ImageBlock>)
+                    }
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Email Settings Section */}
+            <div className="border-t border-border/20 pt-3 mt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm font-medium text-muted-foreground">
+                  📧 Email Settings
+                </span>
+                <span className="text-xs text-muted-foreground bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                  Fluid-Hybrid
+                </span>
+              </div>
+
+              {/* Full Width Toggle */}
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <Label className="text-sm font-medium">
+                    Full-Width Email Header
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Edge-to-edge in modern clients, centered in Outlook
+                  </p>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`full-width-${block.id}`}
+                    checked={block.email?.isFullWidth || false}
+                    onChange={(e) =>
+                      onUpdate({
+                        email: {
+                          ...block.email,
+                          isFullWidth: e.target.checked,
+                        },
+                      } as Partial<ImageBlock>)
+                    }
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Email-specific controls - only show when full-width is enabled */}
+              {block.email?.isFullWidth && (
+                <div className="space-y-3 pt-3 border-t border-border/20">
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Outlook Width */}
+                    <div>
+                      <Label
+                        htmlFor={`outlook-width-${block.id}`}
+                        className="text-sm font-medium"
+                      >
+                        Outlook Width
+                      </Label>
+                      <Input
+                        id={`outlook-width-${block.id}`}
+                        placeholder="600"
+                        value={block.email?.outlookWidth || "600"}
+                        onChange={(e) =>
+                          onUpdate({
+                            email: {
+                              ...block.email,
+                              outlookWidth: e.target.value,
+                            },
+                          } as Partial<ImageBlock>)
+                        }
+                        className="bg-transparent border-border/40 focus:border-border/60 text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Fixed width for Outlook desktop (px)
+                      </p>
+                    </div>
+
+                    {/* Max Width */}
+                    <div>
+                      <Label
+                        htmlFor={`max-width-${block.id}`}
+                        className="text-sm font-medium"
+                      >
+                        Max Width
+                      </Label>
+                      <Input
+                        id={`max-width-${block.id}`}
+                        placeholder="1200"
+                        value={block.email?.maxWidth || "1200"}
+                        onChange={(e) =>
+                          onUpdate({
+                            email: {
+                              ...block.email,
+                              maxWidth: e.target.value,
+                            },
+                          } as Partial<ImageBlock>)
+                        }
+                        className="bg-transparent border-border/40 focus:border-border/60 text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Max width for modern clients (px)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Background Color */}
+                  <div>
+                    <Label
+                      htmlFor={`bg-color-${block.id}`}
+                      className="text-sm font-medium"
+                    >
+                      Background Color
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id={`bg-color-${block.id}`}
+                        type="color"
+                        value={block.email?.backgroundColor || "#111111"}
+                        onChange={(e) =>
+                          onUpdate({
+                            email: {
+                              ...block.email,
+                              backgroundColor: e.target.value,
+                            },
+                          } as Partial<ImageBlock>)
+                        }
+                        className="w-12 h-8 p-1 border-border/40 rounded cursor-pointer"
+                      />
+                      <Input
+                        placeholder="#111111"
+                        value={block.email?.backgroundColor || "#111111"}
+                        onChange={(e) =>
+                          onUpdate({
+                            email: {
+                              ...block.email,
+                              backgroundColor: e.target.value,
+                            },
+                          } as Partial<ImageBlock>)
+                        }
+                        className="bg-transparent border-border/40 focus:border-border/60 text-sm flex-1"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Background color for full-width section
+                    </p>
+                  </div>
+
+                  {/* Desktop and Mobile Heights */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Desktop Height */}
+                    <div>
+                      <Label
+                        htmlFor={`min-height-${block.id}`}
+                        className="text-sm font-medium"
+                      >
+                        Desktop Height
+                      </Label>
+                      <Input
+                        id={`min-height-${block.id}`}
+                        placeholder="300"
+                        value={block.email?.minHeight || "300"}
+                        onChange={(e) =>
+                          onUpdate({
+                            email: {
+                              ...block.email,
+                              minHeight: e.target.value,
+                            },
+                          } as Partial<ImageBlock>)
+                        }
+                        className="bg-transparent border-border/40 focus:border-border/60 text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Height in pixels for desktop
+                      </p>
+                    </div>
+
+                    {/* Mobile Height */}
+                    <div>
+                      <Label
+                        htmlFor={`mobile-height-${block.id}`}
+                        className="text-sm font-medium"
+                      >
+                        Mobile Min Height
+                      </Label>
+                      <Input
+                        id={`mobile-height-${block.id}`}
+                        placeholder="100"
+                        value={block.email?.mobileMinHeight || "100"}
+                        onChange={(e) =>
+                          onUpdate({
+                            email: {
+                              ...block.email,
+                              mobileMinHeight: e.target.value,
+                            },
+                          } as Partial<ImageBlock>)
+                        }
+                        className="bg-transparent border-border/40 focus:border-border/60 text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Min height, crops sides on mobile
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Center Crop Toggle */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-medium">
+                        Full-Width Crop
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Show image at full width with fixed height and center
+                        cropping
+                      </p>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`center-crop-${block.id}`}
+                        checked={block.email?.useCenterCrop || false}
+                        onChange={(e) =>
+                          onUpdate({
+                            email: {
+                              ...block.email,
+                              useCenterCrop: e.target.checked,
+                            },
+                          } as Partial<ImageBlock>)
+                        }
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email Pattern Info */}
+                  <div className="border-t border-border/20 pt-3">
+                    <p className="text-xs text-muted-foreground font-medium mb-1">
+                      ✨ Fluid-Hybrid Pattern
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      This creates an edge-to-edge header that expands to full
+                      device width in Gmail, Apple Mail, and mobile clients,
+                      while showing a centered{" "}
+                      {block.email?.outlookWidth || "600"}px version in Outlook
+                      desktop.
+                    </p>
+                    {block.email?.useCenterCrop && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        <strong>Full-Width Crop:</strong> Desktop shows{" "}
+                        {block.email?.minHeight || "300"}px height with center
+                        crop. Mobile shows natural height (min{" "}
+                        {block.email?.mobileMinHeight || "100"}px) and crops
+                        sides.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -845,6 +1269,245 @@ const DividerBlockContent = React.memo<DividerBlockContentProps>(
             </div>
           </div>
         )}
+      </div>
+    );
+  }
+);
+
+/**
+ * FrontmatterBlockContent - Memoized frontmatter block editor
+ * Provides structured editing interface for article metadata
+ */
+interface FrontmatterBlockContentProps {
+  block: FrontmatterBlock;
+  onUpdate: (updates: Partial<ContentBlock>) => void;
+}
+
+const FrontmatterBlockContent = React.memo<FrontmatterBlockContentProps>(
+  function FrontmatterBlockContent({ block, onUpdate }) {
+    const [tags, setTags] = useState<string[]>(block.data?.tags || []);
+    const [newTag, setNewTag] = useState("");
+
+    // Sync tags state with block data when it changes
+    React.useEffect(() => {
+      setTags(block.data?.tags || []);
+    }, [block.data?.tags]);
+
+    const handleDataUpdate = (field: string, value: any) => {
+      const updatedData = {
+        ...block.data,
+        [field]: value,
+      };
+      onUpdate({ data: updatedData } as Partial<FrontmatterBlock>);
+    };
+
+    const addTag = () => {
+      if (newTag.trim() && !tags.includes(newTag.trim())) {
+        const updatedTags = [...tags, newTag.trim()];
+        setTags(updatedTags);
+        handleDataUpdate("tags", updatedTags);
+        setNewTag("");
+      }
+    };
+
+    const removeTag = (tagToRemove: string) => {
+      const updatedTags = tags.filter((tag) => tag !== tagToRemove);
+      setTags(updatedTags);
+      handleDataUpdate("tags", updatedTags);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addTag();
+      }
+    };
+
+    return (
+      <div className="space-y-4">
+        {/* Title */}
+        <div>
+          <Label htmlFor="frontmatter-title" className="text-sm font-medium">
+            Title
+          </Label>
+          <Input
+            id="frontmatter-title"
+            value={block.data?.title || ""}
+            onChange={(e) => handleDataUpdate("title", e.target.value)}
+            placeholder="Article title"
+            className="mt-1"
+          />
+        </div>
+
+        {/* Subtitle */}
+        <div>
+          <Label htmlFor="frontmatter-subtitle" className="text-sm font-medium">
+            Subtitle
+          </Label>
+          <Input
+            id="frontmatter-subtitle"
+            value={block.data?.subtitle || ""}
+            onChange={(e) => handleDataUpdate("subtitle", e.target.value)}
+            placeholder="Article subtitle or description"
+            className="mt-1"
+          />
+        </div>
+
+        {/* Author and Date Row */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="frontmatter-author" className="text-sm font-medium">
+              Author
+            </Label>
+            <Input
+              id="frontmatter-author"
+              value={block.data?.author || ""}
+              onChange={(e) => handleDataUpdate("author", e.target.value)}
+              placeholder="Author name"
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <Label htmlFor="frontmatter-date" className="text-sm font-medium">
+              Date
+            </Label>
+            <Input
+              id="frontmatter-date"
+              type="date"
+              value={block.data?.date || ""}
+              onChange={(e) => handleDataUpdate("date", e.target.value)}
+              className="mt-1"
+            />
+          </div>
+        </div>
+
+        {/* Status and Type Row */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="frontmatter-status" className="text-sm font-medium">
+              Status
+            </Label>
+            <select
+              id="frontmatter-status"
+              value={block.data?.status || ""}
+              onChange={(e) => handleDataUpdate("status", e.target.value)}
+              className="mt-1 w-full px-3 py-2 border border-input rounded-md bg-background text-foreground focus:border-ring focus:ring-1 focus:ring-ring transition-colors text-sm"
+            >
+              <option value="">Select status</option>
+              <option value="LIVE AUCTION">Live Auction</option>
+              <option value="SOLD">Sold</option>
+              <option value="DRAFT">Draft</option>
+              <option value="PUBLISHED">Published</option>
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="frontmatter-type" className="text-sm font-medium">
+              Type
+            </Label>
+            <select
+              id="frontmatter-type"
+              value={block.data?.type || ""}
+              onChange={(e) => handleDataUpdate("type", e.target.value)}
+              className="mt-1 w-full px-3 py-2 border border-input rounded-md bg-background text-foreground focus:border-ring focus:ring-1 focus:ring-ring transition-colors text-sm"
+            >
+              <option value="">Select type</option>
+              <option value="listing">Listing</option>
+              <option value="article">Article</option>
+              <option value="news">News</option>
+              <option value="review">Review</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Cover Image */}
+        <div>
+          <Label htmlFor="frontmatter-cover" className="text-sm font-medium">
+            Cover Image URL
+          </Label>
+          <Input
+            id="frontmatter-cover"
+            value={block.data?.cover || ""}
+            onChange={(e) => handleDataUpdate("cover", e.target.value)}
+            placeholder="https://example.com/image.jpg"
+            className="mt-1"
+          />
+        </div>
+
+        {/* Tags */}
+        <div>
+          <Label className="text-sm font-medium">Tags</Label>
+          <div className="mt-1 space-y-2">
+            {/* Tag Display */}
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-md border border-primary/20"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => removeTag(tag)}
+                      className="ml-1 text-primary/70 hover:text-primary transition-colors"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Add Tag Input */}
+            <div className="flex gap-2">
+              <Input
+                value={newTag}
+                onChange={(e) => setNewTag(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Add a tag"
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                onClick={addTag}
+                disabled={!newTag.trim()}
+                size="sm"
+              >
+                Add
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Call to Action */}
+        <div>
+          <Label htmlFor="frontmatter-cta" className="text-sm font-medium">
+            Call to Action Text
+          </Label>
+          <Input
+            id="frontmatter-cta"
+            value={block.data?.callToAction || ""}
+            onChange={(e) => handleDataUpdate("callToAction", e.target.value)}
+            placeholder="Call to action text"
+            className="mt-1"
+          />
+        </div>
+
+        {/* Call to Action URL */}
+        <div>
+          <Label htmlFor="frontmatter-cta-url" className="text-sm font-medium">
+            Call to Action URL
+          </Label>
+          <Input
+            id="frontmatter-cta-url"
+            value={block.data?.callToActionUrl || ""}
+            onChange={(e) =>
+              handleDataUpdate("callToActionUrl", e.target.value)
+            }
+            placeholder="https://example.com"
+            className="mt-1"
+          />
+        </div>
       </div>
     );
   }

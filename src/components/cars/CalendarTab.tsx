@@ -87,7 +87,7 @@ export default function CalendarTab({ carId }: CalendarTabProps) {
 
   const handleSelectEvent = (event: any) => {
     // Implementation for event selection
-    // [REMOVED] // [REMOVED] console.log("Event selected:", event);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Event selected:", event);
   };
 
   // Phase 2 improvement: Non-blocking loading state with tab switching message

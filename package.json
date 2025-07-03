@@ -54,7 +54,10 @@
     "cleanup-users": "tsx src/scripts/cleanup-mongodb-refs.ts",
     "migrate:string-to-objectids": "node scripts/migrate-string-ids-to-objectids.js",
     "migrate:string-to-objectids:dry-run": "node scripts/migrate-string-ids-to-objectids.js --dry-run",
-    "migrate:cloudflare-images": "tsx scripts/migrate-to-cloudflare-images.ts"
+    "migrate:cloudflare-images": "tsx scripts/migrate-to-cloudflare-images.ts",
+    "debug:run": "tsx",
+    "debug:node": "node --loader ts-node/esm",
+    "debug:cjs": "node"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.36.3",

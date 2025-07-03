@@ -75,11 +75,11 @@ export function EditorSelector({
         editor: editorName,
       };
 
-      console.log("🔄 Sending updates:", updates);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Sending updates:", updates);
 
       await api.put(`/api/deliverables/${deliverableId}`, updates);
 
-      console.log("✅ Editor update successful");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Editor update successful");
 
       // Update local state with UID
       setEditor(newEditorUid);

@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(cached);
     }
 
-    console.log(`🔍 Cache miss for images: ${cacheKey}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🔍 Cache miss for images: ${cacheKey}`);
 
     // Build optimized aggregation pipeline
     const pipeline: any[] = [];

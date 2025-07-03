@@ -209,7 +209,7 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
   // Fetch captions for the car
   const fetchCaptions = async () => {
     if (!deliverable.car_id) {
-      console.log("No car_id available for fetching captions");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("No car_id available for fetching captions");
       return;
     }
 
@@ -379,8 +379,8 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
 
     setIsUploading(true);
     try {
-      console.log("Starting YouTube upload for deliverable:", deliverable._id);
-      console.log("Dropbox link:", deliverable.dropbox_link);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Starting YouTube upload for deliverable:", deliverable._id);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Dropbox link:", deliverable.dropbox_link);
 
       const deliverableId = String(deliverable._id!);
 
@@ -427,7 +427,7 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
         throw new Error(errorMessage);
       }
 
-      console.log("YouTube upload successful:", response);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("YouTube upload successful:", response);
       toast.success(
         `Video uploaded to YouTube successfully! ${response.youtube_url ? `\nVideo ID: ${response.video_id}` : ""}`
       );

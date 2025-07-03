@@ -29,6 +29,7 @@ import LengthSettingsContent from "./LengthSettingsContent";
 import PlatformSettingsContent from "./PlatformSettingsContent";
 import EventTypeSettingsContent from "./EventTypeSettingsContent";
 import ImageAnalysisPromptsContent from "./ImageAnalysisPromptsContent";
+import BrandTonesContent from "./BrandTonesContent";
 import { ModelsConfigurator } from "@/components/admin/ModelsConfigurator";
 import DeliverableBatchManagement from "@/components/admin/DeliverableBatchManagement";
 import { useAPI } from "@/hooks/useAPI";
@@ -329,6 +330,11 @@ export default function AdminTabs() {
       value: "system-prompts",
       label: "System Prompts",
       content: <SystemPromptsContent />,
+    },
+    {
+      value: "brand-tones",
+      label: "Brand Tones",
+      content: <BrandTonesContent />,
     },
     {
       value: "ai-models",

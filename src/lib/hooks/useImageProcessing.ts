@@ -8,6 +8,7 @@ import {
   ProcessedImageData,
   ImageDimensions,
 } from "@/components/ui/image-processing/types";
+import { getMediumVariantUrl } from "@/lib/imageUtils";
 
 interface CloudflareUploadResult {
   success: boolean;
@@ -77,17 +78,38 @@ export function useImageProcessing({
   // Parameters for processing
   const [parameters, setParameters] = useState<any>({});
 
-  // Load image dimensions when image changes
+  // Load image dimensions when image changes - using normalized medium variant for consistency
   useEffect(() => {
     if (image?.url) {
+      console.log(
+        "🔄 useImageProcessing: Loading dimensions for image:",
+        image?.filename || "unnamed"
+      );
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 useImageProcessing: Original URL:", image.url);
+
+      // Normalize URL to medium variant for consistent dimensions
+      const normalizedUrl = getMediumVariantUrl(image.url);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 useImageProcessing: Normalized URL:", normalizedUrl);
+
       const img = new Image();
       img.onload = () => {
-        setOriginalDimensions({ width: img.width, height: img.height });
+        const dimensions = {
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        };
+        setOriginalDimensions(dimensions);
+        console.log(
+          "✅ useImageProcessing: Loaded dimensions from medium variant:",
+          dimensions
+        );
       };
       img.onerror = () => {
+        console.error(
+          "❌ useImageProcessing: Failed to load image dimensions from medium variant"
+        );
         setError("Failed to load image dimensions");
       };
-      img.src = image.url;
+      img.src = normalizedUrl;
     }
   }, [image?.url]);
 
@@ -115,12 +137,20 @@ export function useImageProcessing({
         throw new Error("Authentication required");
       }
 
+      // Normalize image URL for processing to ensure consistent medium variant
+      const normalizedImageUrl = getMediumVariantUrl(image.url);
+      console.log("🔧 useImageProcessing: Processing with normalized URL:", {
+        original: image.url,
+        normalized: normalizedImageUrl,
+        filename: image.filename,
+      });
+
       const payload = {
         imageId: image._id,
         processingType,
         parameters: {
           ...parameters,
-          imageUrl: image.url,
+          imageUrl: normalizedImageUrl, // Use normalized URL for processing
           originalFilename: image.filename,
           originalCarId: image.carId,
           scaleMultiplier: 1, // Add scale multiplier for canvas extension
@@ -184,12 +214,24 @@ export function useImageProcessing({
         throw new Error("Authentication required");
       }
 
+      // Normalize image URL for high-res processing to ensure consistent medium variant
+      const normalizedImageUrl = getMediumVariantUrl(image.url);
+      console.log(
+        "🔧 useImageProcessing: High-res processing with normalized URL:",
+        {
+          original: image.url,
+          normalized: normalizedImageUrl,
+          filename: image.filename,
+          multiplier: multiplier,
+        }
+      );
+
       const payload = {
         imageId: image._id,
         processingType,
         parameters: {
           ...parameters,
-          imageUrl: image.url,
+          imageUrl: normalizedImageUrl, // Use normalized URL for processing
           originalFilename: image.filename,
           originalCarId: image.carId,
           outputWidth: (parseInt(parameters.outputWidth) || 1080) * multiplier,

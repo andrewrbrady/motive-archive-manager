@@ -38,10 +38,10 @@ const firebaseAdmin = !apps.length
 // Initialize Firestore
 const adminDb = getFirestore();
 
-// [REMOVED] // [REMOVED] console.log("Firebase Admin initialized successfully");
+// [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Firebase Admin initialized successfully");
 
 // Initialize Firebase Admin services
 const adminAuth = getAuth(firebaseAdmin);
-// [REMOVED] // [REMOVED] console.log("✅ Firebase Admin Auth initialized");
+// [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Firebase Admin Auth initialized");
 
 export { firebaseAdmin, adminDb, adminAuth };

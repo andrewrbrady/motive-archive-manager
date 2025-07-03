@@ -94,7 +94,7 @@ async function validateModelSelection(
       .countDocuments();
 
     if (configCount === 0) {
-      console.log("No model configurations found, initializing defaults...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("No model configurations found, initializing defaults...");
 
       // Initialize default configurations
       const now = new Date();
@@ -112,7 +112,7 @@ async function validateModelSelection(
 
       try {
         await db.collection("ai_model_configs").insertMany(defaultConfigs);
-        console.log("Default model configurations initialized successfully");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Default model configurations initialized successfully");
       } catch (insertError) {
         console.error("Error initializing model configs:", insertError);
         // Continue with fallback validation below

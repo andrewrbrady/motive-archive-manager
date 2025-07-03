@@ -7,7 +7,7 @@ export const revalidate = 3600;
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("🚗 /api/cars/makes - Starting optimized request");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚗 /api/cars/makes - Starting optimized request");
     console.log("🚗 /api/cars/makes - Request headers:", {
       authorization: request.headers.get("authorization") || "MISSING",
       "user-agent": request.headers.get("user-agent"),
@@ -23,17 +23,17 @@ export async function GET(request: NextRequest) {
       return authResult;
     }
 
-    console.log("🚗 /api/cars/makes - Authentication successful");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚗 /api/cars/makes - Authentication successful");
 
     const db = await getDatabase();
-    console.log("🚗 /api/cars/makes - Database connection successful");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚗 /api/cars/makes - Database connection successful");
 
     // Parse query parameters for enhanced functionality
     const { searchParams } = new URL(request.url);
     const includeCounts = searchParams.get("counts") === "true";
 
     // ✅ CORRECTED: Source from curated makes database, not car inventory
-    console.log("🚗 /api/cars/makes - Fetching from curated makes database");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚗 /api/cars/makes - Fetching from curated makes database");
 
     // Get all active makes from the makes collection (curated database)
     const makes = await db
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ✅ ENHANCED FUNCTIONALITY: Include car counts when requested
-    console.log("🚗 /api/cars/makes - Enhanced mode with car counts");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚗 /api/cars/makes - Enhanced mode with car counts");
 
     // If counts are requested, get car counts for each make
     const makesWithCounts = await Promise.all(

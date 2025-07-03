@@ -85,7 +85,7 @@ export async function createPerformanceIndexes(): Promise<void> {
   try {
     const db = await getDatabase();
 
-    console.log("🔧 Creating performance indexes...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔧 Creating performance indexes...");
 
     const results = await Promise.allSettled(
       CRITICAL_INDEXES.map(async ({ collection, index, options }) => {

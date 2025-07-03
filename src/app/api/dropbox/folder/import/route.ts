@@ -4,7 +4,7 @@ import { ObjectId } from "mongodb";
 
 // POST /api/dropbox/folder/import - Import images from Dropbox folder to Cloudflare
 export async function POST(request: NextRequest) {
-  console.log("POST /api/dropbox/folder/import - Import endpoint called");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("POST /api/dropbox/folder/import - Import endpoint called");
 
   try {
     const { folderUrl, selectedImages, inspectionId } = await request.json();
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     for (const imagePath of selectedImages) {
       try {
-        console.log(`Processing image: ${imagePath}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Processing image: ${imagePath}`);
 
         // Download image using the Dropbox API instead of direct URLs
         const imageData = await downloadFileFromDropbox(
@@ -67,8 +67,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Upload to Cloudflare Images
-        console.log(`Attempting Cloudflare upload for: ${imagePath}`);
-        console.log(`Image data size: ${imageData.byteLength} bytes`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Attempting Cloudflare upload for: ${imagePath}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Image data size: ${imageData.byteLength} bytes`);
 
         const cloudflareResult = await uploadToCloudflare(imageData, imagePath);
 
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
         );
 
         if (cloudflareResult.success) {
-          console.log(`✅ Cloudflare upload successful for ${imagePath}`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ Cloudflare upload successful for ${imagePath}`);
 
           const uploadedImage: {
             originalPath: string;
@@ -195,7 +195,7 @@ async function createDirectDownloadLink(
     const baseUrl = folderUrl.replace("?dl=0", "").replace("&dl=0", "");
     const downloadUrl = `${baseUrl}/${encodeURIComponent(filename)}?dl=1`;
 
-    console.log("Created direct download URL:", downloadUrl);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Created direct download URL:", downloadUrl);
     return downloadUrl;
   } catch (error) {
     console.error("Error creating direct download link:", error);
@@ -209,8 +209,8 @@ async function downloadFileFromDropbox(
   accessToken: string
 ): Promise<Buffer | null> {
   try {
-    console.log(`[Dropbox API] Downloading file: ${filePath}`);
-    console.log(`[Dropbox API] From shared folder: ${sharedFolderUrl}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Dropbox API] Downloading file: ${filePath}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Dropbox API] From shared folder: ${sharedFolderUrl}`);
 
     // Use the sharing/get_shared_link_file endpoint for shared folder files
     const response = await fetch(
@@ -227,7 +227,7 @@ async function downloadFileFromDropbox(
       }
     );
 
-    console.log(`[Dropbox API] Download response status: ${response.status}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Dropbox API] Download response status: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -236,7 +236,7 @@ async function downloadFileFromDropbox(
     }
 
     const contentType = response.headers.get("content-type");
-    console.log(`[Dropbox API] Downloaded content-type: ${contentType}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Dropbox API] Downloaded content-type: ${contentType}`);
 
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -254,7 +254,7 @@ async function downloadFileFromDropbox(
       firstBytes[2] === 0x4e &&
       firstBytes[3] === 0x47;
 
-    console.log(`[Dropbox API] File type: JPEG=${isJPEG}, PNG=${isPNG}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Dropbox API] File type: JPEG=${isJPEG}, PNG=${isPNG}`);
 
     if (!isJPEG && !isPNG) {
       console.error(`[Dropbox API] Downloaded content is not a valid image`);
@@ -276,8 +276,8 @@ async function uploadToCloudflare(
   filename: string
 ): Promise<any> {
   try {
-    console.log(`[Cloudflare] Starting upload for: ${filename}`);
-    console.log(`[Cloudflare] Image data size: ${imageData.byteLength} bytes`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Cloudflare] Starting upload for: ${filename}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Cloudflare] Image data size: ${imageData.byteLength} bytes`);
 
     // Check environment variables
     const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
@@ -304,7 +304,7 @@ async function uploadToCloudflare(
     );
 
     const uploadUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v1`;
-    console.log(`[Cloudflare] Upload URL: ${uploadUrl}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Cloudflare] Upload URL: ${uploadUrl}`);
 
     const response = await fetch(uploadUrl, {
       method: "POST",
@@ -314,14 +314,14 @@ async function uploadToCloudflare(
       body: formData,
     });
 
-    console.log(`[Cloudflare] Response status: ${response.status}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Cloudflare] Response status: ${response.status}`);
     console.log(
       `[Cloudflare] Response headers:`,
       Object.fromEntries(response.headers.entries())
     );
 
     const result = await response.json();
-    console.log(`[Cloudflare] Response body:`, result);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Cloudflare] Response body:`, result);
 
     return result;
   } catch (error) {

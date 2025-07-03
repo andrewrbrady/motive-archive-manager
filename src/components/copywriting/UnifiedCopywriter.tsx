@@ -157,17 +157,17 @@ export function UnifiedCopywriter({
       if (projectId && normalizedCarIds.length === 0) {
         // Project cars response - API returns {cars: [...]}
         const result = Array.isArray(data?.cars) ? data.cars : [];
-        console.log(`🚗 UnifiedCopywriter: Project cars parsed:`, result);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚗 UnifiedCopywriter: Project cars parsed:`, result);
         return result;
       } else if (normalizedCarIds.length === 1) {
         // Single car response
         const result = [data];
-        console.log(`🚗 UnifiedCopywriter: Single car parsed:`, result);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚗 UnifiedCopywriter: Single car parsed:`, result);
         return result;
       } else {
         // Batch cars response
         const result = Array.isArray(data) ? data : data?.cars || [];
-        console.log(`🚗 UnifiedCopywriter: Batch cars parsed:`, result);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚗 UnifiedCopywriter: Batch cars parsed:`, result);
         return result;
       }
     },
@@ -209,7 +209,7 @@ export function UnifiedCopywriter({
     retryDelay: 1000,
     refetchOnWindowFocus: false,
     select: (data: any) => {
-      console.log(`🔧 UnifiedCopywriter: Full car details response:`, data);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🔧 UnifiedCopywriter: Full car details response:`, data);
       if (projectCarIds.length === 1) {
         return [data];
       } else {
@@ -241,7 +241,7 @@ export function UnifiedCopywriter({
     }
 
     // Fallback: Use basic car data
-    console.log(`🚗 UnifiedCopywriter: Using basic car data:`, carsData || []);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚗 UnifiedCopywriter: Using basic car data:`, carsData || []);
     return carsData || [];
   }, [initialCopywriterData?.cars, projectId, fullCarsData, carsData]);
 
@@ -271,12 +271,59 @@ export function UnifiedCopywriter({
     error: captionsError,
     refetch: refetchCaptions,
   } = useAPIQuery<any[]>(captionsQuery, {
-    enabled: !!carsEndpoint && !initialCopywriterData?.captions, // Don't fetch if we have initial data
+    enabled: !!captionsQuery && !initialCopywriterData?.captions, // Don't fetch if we have initial data
     staleTime: 1 * 60 * 1000,
     retry: 2,
     retryDelay: 1000,
     refetchOnWindowFocus: false,
   });
+
+  // Enhanced debugging for loading states
+  React.useEffect(() => {
+    console.log("🐛 UnifiedCopywriter Debug Info:", {
+      projectId,
+      normalizedCarIds,
+      carsEndpoint,
+      captionsQuery,
+      eventsEndpoint,
+      initialCopywriterData: !!initialCopywriterData,
+      isLoadingCars,
+      isLoadingFullCars,
+      isLoadingEvents,
+      isLoadingCaptions,
+      carsData: carsData?.length || 0,
+      fullCarsData: fullCarsData?.length || 0,
+      finalCarsData: finalCarsData?.length || 0,
+      eventsData: eventsData?.length || 0,
+      captionsData: captionsData?.length || 0,
+      errors: {
+        carsError: !!carsError,
+        fullCarsError: !!fullCarsError,
+        eventsError: !!eventsError,
+        captionsError: !!captionsError,
+      },
+    });
+  }, [
+    projectId,
+    normalizedCarIds,
+    carsEndpoint,
+    captionsQuery,
+    eventsEndpoint,
+    initialCopywriterData,
+    isLoadingCars,
+    isLoadingFullCars,
+    isLoadingEvents,
+    isLoadingCaptions,
+    carsData,
+    fullCarsData,
+    finalCarsData,
+    eventsData,
+    captionsData,
+    carsError,
+    fullCarsError,
+    eventsError,
+    captionsError,
+  ]);
 
   // Loading and error states - don't show loading if we have initial data
   const isLoading =
@@ -356,12 +403,35 @@ export function UnifiedCopywriter({
     );
   }
 
-  if (!api || !finalCarsData || finalCarsData.length === 0) {
+  if (!api) {
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚨 UnifiedCopywriter: No API available");
     return (
       <div className="flex items-center justify-center h-96">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Initializing...</p>
+          <p className="text-sm text-muted-foreground">Initializing API...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Allow copywriter to work with no cars (for project-only content)
+  if ((!finalCarsData || finalCarsData.length === 0) && mode === "car") {
+    console.log("🚨 UnifiedCopywriter: No car data available for car mode", {
+      finalCarsDataLength: finalCarsData?.length || 0,
+      finalCarsData: finalCarsData,
+      projectId,
+      normalizedCarIds,
+      initialCopywriterData: !!initialCopywriterData,
+    });
+
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">
+            {!finalCarsData ? "Loading car data..." : "No cars found..."}
+          </p>
         </div>
       </div>
     );
@@ -437,12 +507,52 @@ export function UnifiedCopywriter({
             updatedAt: event.updatedAt,
           }));
 
-        // Convert captions to unified format - use initial data if available
-        const savedCaptions = (
-          initialCopywriterData?.captions ||
-          captionsData ||
-          []
-        ).map((caption: any) => ({
+        // Convert captions to unified format - prioritize fresh API data over initial data
+        // Ensure we always have an array before mapping
+        let rawCaptionsData: any =
+          captionsData || initialCopywriterData?.captions || [];
+
+        // Handle cases where API returns captions wrapped in an object (e.g., {captions: [...], total: 10})
+        if (
+          rawCaptionsData &&
+          typeof rawCaptionsData === "object" &&
+          !Array.isArray(rawCaptionsData)
+        ) {
+          if (
+            (rawCaptionsData as any).captions &&
+            Array.isArray((rawCaptionsData as any).captions)
+          ) {
+            rawCaptionsData = (rawCaptionsData as any).captions;
+          } else if (
+            (rawCaptionsData as any).data &&
+            Array.isArray((rawCaptionsData as any).data)
+          ) {
+            rawCaptionsData = (rawCaptionsData as any).data;
+          } else {
+            console.warn(
+              "🚨 UnifiedCopywriter: Caption data is not in expected format:",
+              rawCaptionsData
+            );
+            rawCaptionsData = [];
+          }
+        }
+
+        const captionsArray = Array.isArray(rawCaptionsData)
+          ? rawCaptionsData
+          : [];
+
+        console.log(`🔍 UnifiedCopywriter: Processing captions data:`, {
+          captionsDataType: typeof captionsData,
+          captionsDataIsArray: Array.isArray(captionsData),
+          initialCaptionsType: typeof initialCopywriterData?.captions,
+          initialCaptionsIsArray: Array.isArray(
+            initialCopywriterData?.captions
+          ),
+          finalArrayLength: captionsArray.length,
+          rawCaptionsData: rawCaptionsData,
+        });
+
+        const savedCaptions = captionsArray.map((caption: any) => ({
           _id: caption._id,
           platform: caption.platform,
           context: caption.context,
@@ -470,10 +580,7 @@ export function UnifiedCopywriter({
           galleries: [],
           inspections: [],
           hasMoreEvents: events.length > 5,
-          hasMoreCaptions:
-            initialCopywriterData?.captions || captionsData
-              ? (initialCopywriterData?.captions || captionsData)!.length >= 4
-              : false,
+          hasMoreCaptions: captionsArray.length >= 4,
         };
       } catch (error) {
         console.error("Error fetching copywriter data:", error);
@@ -585,8 +692,7 @@ export function UnifiedCopywriter({
           description: "Caption saved successfully",
         });
 
-        // Refresh captions
-        await refetchCaptions();
+        // Note: onRefresh will handle the data refresh to avoid double-fetching
 
         // Trigger project update if provided
         if (onProjectUpdate) {
@@ -665,10 +771,19 @@ export function UnifiedCopywriter({
     },
 
     onRefresh: async (): Promise<void> => {
-      await Promise.all([
-        refetchCaptions(),
-        // Could add more refresh operations here
-      ]);
+      try {
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 UnifiedCopywriter: Refreshing caption data...");
+        await refetchCaptions();
+        console.log(
+          "✅ UnifiedCopywriter: Caption data refreshed successfully"
+        );
+      } catch (error) {
+        console.error(
+          "❌ UnifiedCopywriter: Error refreshing caption data:",
+          error
+        );
+        // Don't throw to prevent breaking the UI
+      }
     },
   };
 

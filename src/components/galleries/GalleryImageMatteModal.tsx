@@ -219,7 +219,7 @@ export function GalleryImageMatteModal({
     });
 
     if (result) {
-      console.log("✅ Image Matte processing completed successfully");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Image Matte processing completed successfully");
       setProcessedImage(result.processedImage);
       setShowPreview(true);
     } else {
@@ -257,7 +257,7 @@ export function GalleryImageMatteModal({
     );
 
     if (result && onImageReplaced) {
-      console.log("✅ Image Matte replacement completed successfully");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Image Matte replacement completed successfully");
       onImageReplaced(result.originalImageId, result.processedImage);
       handleClose();
     } else {

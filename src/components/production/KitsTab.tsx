@@ -117,11 +117,11 @@ export default function KitsTab() {
     if (!api) return;
 
     if (isCreateModalOpen) {
-      // [REMOVED] // [REMOVED] console.log("Modal opened, initializing form state");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Modal opened, initializing form state");
 
       if (currentKit) {
         // Edit mode - populate form with current kit data
-        // [REMOVED] // [REMOVED] console.log("Edit mode for kit:", currentKit);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Edit mode for kit:", currentKit);
         setFormName(currentKit.name || "");
         setFormDescription(currentKit.description || "");
         setFormStatus(currentKit.status || "available");
@@ -134,11 +134,11 @@ export default function KitsTab() {
         kitItems.forEach((id) => {
           itemsMap[id] = true;
         });
-        // [REMOVED] // [REMOVED] console.log("Setting selected items map:", itemsMap);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Setting selected items map:", itemsMap);
         setSelectedItemsMap(itemsMap);
       } else {
         // Create mode - reset form to defaults
-        // [REMOVED] // [REMOVED] console.log("Create mode - resetting form");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Create mode - resetting form");
         setFormName("");
         setFormDescription("");
         setFormStatus("available");
@@ -149,7 +149,7 @@ export default function KitsTab() {
       fetchInventoryItems();
     } else {
       // Modal closed, clear selections
-      // [REMOVED] // [REMOVED] console.log("Modal closed, clearing form state");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Modal closed, clearing form state");
       setSelectedItemsMap({});
     }
   }, [isCreateModalOpen, currentKit, api]);
@@ -174,7 +174,7 @@ export default function KitsTab() {
       item.model?.toLowerCase().includes(query);
     // Debug: Log the item ID to ensure it exists and is correct
     if (isCreateModalOpen && matches) {
-      // [REMOVED] // [REMOVED] console.log("Matched item:", item.id, item.name);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Matched item:", item.id, item.name);
     }
     return matches;
   });
@@ -440,7 +440,7 @@ export default function KitsTab() {
         id: item.id || item._id,
       }));
 
-      // [REMOVED] // [REMOVED] console.log("Fetched items sample:", processedItems.slice(0, 3));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetched items sample:", processedItems.slice(0, 3));
 
       // Filter out items that are already in other kits
       const availableItems = processedItems.filter(
@@ -464,12 +464,12 @@ export default function KitsTab() {
 
   // Toggle selection of an inventory item with new approach
   const toggleItemSelection = (itemId: string) => {
-    // [REMOVED] // [REMOVED] console.log("Toggling item:", itemId);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Toggling item:", itemId);
 
     setSelectedItemsMap((prev) => {
       const newMap = { ...prev };
       newMap[itemId] = !prev[itemId];
-      // [REMOVED] // [REMOVED] console.log("New selection map:", newMap);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("New selection map:", newMap);
       return newMap;
     });
   };
@@ -757,9 +757,9 @@ export default function KitsTab() {
           <Dialog
             open={isCreateModalOpen}
             onOpenChange={(open) => {
-              // [REMOVED] // [REMOVED] console.log("Dialog onOpenChange:", open);
+              // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Dialog onOpenChange:", open);
               if (!open) {
-                // [REMOVED] // [REMOVED] console.log("Dialog closing, cleaning up state");
+                // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Dialog closing, cleaning up state");
                 setSelectedItemsMap({});
                 setIsCreateModalOpen(false);
                 setCurrentKit(null);
@@ -850,7 +850,7 @@ export default function KitsTab() {
                       <div className="flex flex-col gap-2">
                         {filteredInventoryItems.map((item) => {
                           // Debug: Log each item being rendered
-                          // [REMOVED] // [REMOVED] console.log("Rendering item:", item.id, item.name);
+                          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Rendering item:", item.id, item.name);
                           const isSelected = !!selectedItemsMap[item.id];
 
                           return (

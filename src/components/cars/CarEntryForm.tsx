@@ -245,7 +245,7 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
       // Fetch clients when component mounts
       const fetchClients = async () => {
         if (!api) {
-          console.log("API client not available for fetching clients");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API client not available for fetching clients");
           return;
         }
 
@@ -408,7 +408,7 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
       const errorCodes = String(data.error.code)
         .split(",")
         .map((code) => code.trim());
-      // [REMOVED] // [REMOVED] console.log("Processing error codes:", errorCodes);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Processing error codes:", errorCodes);
 
       // Check if we have position-specific errors
       const positionErrors = data.validationStatus?.possibleValues
@@ -574,7 +574,7 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
       }
 
       if (process.env.NODE_ENV !== "production") {
-        // [REMOVED] // [REMOVED] console.log("Starting VIN decode for:", `***${correctedVin.slice(-4)}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Starting VIN decode for:", `***${correctedVin.slice(-4)}`);
       }
       setIsDecodingVinWithCorrections(true);
 
@@ -672,8 +672,8 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
           doors: data.doors || formData.doors,
         } as typeof formData;
 
-        // [REMOVED] // [REMOVED] console.log("Dimensions data received:", data.dimensions);
-        // [REMOVED] // [REMOVED] console.log("Updated dimensions in form:", updatedFormData.dimensions);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Dimensions data received:", data.dimensions);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Updated dimensions in form:", updatedFormData.dimensions);
 
         // Add AI analysis insights if available
         if ("aiAnalysis" in data) {

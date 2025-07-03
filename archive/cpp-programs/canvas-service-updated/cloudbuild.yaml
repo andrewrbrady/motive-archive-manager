@@ -6,19 +6,19 @@ steps:
       - "-f"
       - "Dockerfile.canvas-service-simple"
       - "-t"
-      - "us-central1-docker.pkg.dev/motive-archive-manager-460909/cloud-run-source-deploy/canvas-service:v6.1"
+      - "us-central1-docker.pkg.dev/motive-archive-manager-460909/cloud-run-source-deploy/canvas-service:v6.2"
       - "."
   - name: "gcr.io/cloud-builders/docker"
     args:
       - "push"
-      - "us-central1-docker.pkg.dev/motive-archive-manager-460909/cloud-run-source-deploy/canvas-service:v6.1"
+      - "us-central1-docker.pkg.dev/motive-archive-manager-460909/cloud-run-source-deploy/canvas-service:v6.2"
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     entrypoint: "gcloud"
     args:
       - "run"
       - "deploy"
       - "canvas-service-public"
-      - "--image=us-central1-docker.pkg.dev/motive-archive-manager-460909/cloud-run-source-deploy/canvas-service:v6.1"
+      - "--image=us-central1-docker.pkg.dev/motive-archive-manager-460909/cloud-run-source-deploy/canvas-service:v6.2"
       - "--platform=managed"
       - "--region=us-central1"
       - "--allow-unauthenticated"
@@ -28,7 +28,7 @@ steps:
       - "--timeout=300"
 
 images:
-  - "us-central1-docker.pkg.dev/motive-archive-manager-460909/cloud-run-source-deploy/canvas-service:v6.1"
+  - "us-central1-docker.pkg.dev/motive-archive-manager-460909/cloud-run-source-deploy/canvas-service:v6.2"
 
 options:
   substitution_option: ALLOW_LOOSE

@@ -228,7 +228,7 @@ export default function GalleryPage() {
 
     try {
       // Force refresh the gallery data and wait for it
-      console.log("🔄 Fetching latest gallery data before download...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Fetching latest gallery data before download...");
       console.log("📊 Current gallery state:", {
         imageCount: gallery?.images?.length || 0,
         imageIds: gallery?.imageIds?.slice(0, 3) || [],
@@ -269,7 +269,7 @@ export default function GalleryPage() {
           throw new Error("API call failed");
         }
       } catch (apiError) {
-        console.log("API call failed, falling back to SWR mutate...");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API call failed, falling back to SWR mutate...");
         await mutate();
         // Wait a bit for revalidation to complete
         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -325,18 +325,13 @@ export default function GalleryPage() {
       });
 
       // Log detailed image info to compare with UI
-      console.log("🔍 Detailed image processing order:");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Detailed image processing order:");
       imagesToProcess.slice(0, 10).forEach((img: any, index: number) => {
-        console.log(`${index + 1}. ${img.filename} (${img._id})`, {
-          url: img.url,
-          originalOrder: currentGallery.orderedImages?.find(
-            (item: any) => item.id === img._id
-          )?.order,
-        });
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`${index + 1}. ${img.filename} (${img._id})`, [data omitted]);
       });
 
       // Also log the first few from orderedImages for comparison
-      console.log("🎯 Gallery ordered images (first 10):");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎯 Gallery ordered images (first 10):");
       if (currentGallery.orderedImages?.length) {
         currentGallery.orderedImages
           .sort((a: any, b: any) => a.order - b.order)
@@ -348,7 +343,7 @@ export default function GalleryPage() {
             );
           });
       } else {
-        console.log("No orderedImages found, using imageIds order");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("No orderedImages found, using imageIds order");
         currentGallery.imageIds
           .slice(0, 10)
           .forEach((id: string, index: number) => {
@@ -391,8 +386,8 @@ export default function GalleryPage() {
           console.log(
             `Downloading image ${i + 1}/${imagesToProcess.length}: ${filenameInZip}`
           );
-          console.log(`  Original URL: ${image.url}`);
-          console.log(`  Download URL: ${downloadUrl}`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`  Original URL: ${image.url}`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`  Download URL: ${downloadUrl}`);
 
           const response = await fetch(downloadUrl);
           if (!response.ok) {
@@ -524,11 +519,11 @@ export default function GalleryPage() {
 
       // Also trigger a revalidation after a short delay to ensure fresh data
       setTimeout(() => {
-        console.log("🔄 Triggering SWR revalidation...");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Triggering SWR revalidation...");
         mutate();
       }, 100);
 
-      console.log("✅ Gallery state updated successfully");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Gallery state updated successfully");
 
       // Show success message
       toast({
@@ -677,6 +672,72 @@ export default function GalleryPage() {
                 Gallery Images
               </h2>
               <div className="flex gap-2">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <Code className="h-4 w-4 mr-2" />
+                      Generate YAML
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+                    <DialogHeader>
+                      <DialogTitle>Gallery YAML</DialogTitle>
+                      <DialogDescription>
+                        Copy and paste this YAML into your configuration files.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="relative flex-1 min-h-0">
+                      <pre className="p-4 bg-muted rounded-lg h-full overflow-y-auto">
+                        <code className="text-sm block">
+                          {`gallery:
+${(() => {
+  // Create a map of images by their ID for quick lookup
+  const imageMap = new Map(
+    gallery.images?.map((image) => [image._id, image]) || []
+  );
+
+  // Get ordered images array, falling back to default order if not available
+  const orderedImageIds = gallery.orderedImages?.length
+    ? gallery.orderedImages
+        .sort((a, b) => a.order - b.order)
+        .map((item) => item.id)
+    : gallery.imageIds;
+
+  // Map the ordered IDs to their corresponding images
+  return orderedImageIds
+    .map((id, index) => {
+      const image = imageMap.get(id);
+      if (!image) return null;
+      return `  - id: "img${index + 1}"
+    src: "${image.url}"
+    alt: "${image.alt || image.filename || `Gallery Image ${index + 1}`}"`;
+    })
+    .filter(Boolean)
+    .join("\n");
+})()}`}
+                        </code>
+                      </pre>
+                      <Button
+                        className="absolute top-4 right-4"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            document.querySelector("pre code")?.textContent ||
+                              ""
+                          );
+                          toast({
+                            title: "Copied!",
+                            description: "YAML code copied to clipboard",
+                          });
+                        }}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button variant="outline">

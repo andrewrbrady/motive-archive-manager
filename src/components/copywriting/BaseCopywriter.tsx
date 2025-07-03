@@ -16,6 +16,7 @@ import {
 import { CarSelection } from "../projects/caption-generator/CarSelection";
 import { EventSelection } from "../projects/caption-generator/EventSelection";
 import { SystemPromptSelection } from "../projects/caption-generator/SystemPromptSelection";
+import { BrandToneSelection } from "../projects/caption-generator/BrandToneSelection";
 import { CaptionPreview } from "../projects/caption-generator/CaptionPreview";
 import { GenerationControls } from "../projects/caption-generator/GenerationControls";
 import { PromptEditModal } from "../projects/caption-generator/PromptEditModal";
@@ -38,6 +39,7 @@ import type {
 } from "../projects/caption-generator/types";
 import type { ProviderId } from "@/lib/llmProviders";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useBrandTones } from "@/hooks/useBrandTones";
 import {
   saveSystemPrompt,
   restoreSystemPrompt,
@@ -153,6 +155,13 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     refetchOnWindowFocus: false,
   });
 
+  // Brand tone data - Phase 2A: Fetch active brand tones for copywriter UI
+  const {
+    brandTones,
+    isLoading: isLoadingBrandTones,
+    error: brandTonesError,
+  } = useBrandTones();
+
   // Entity-specific data query - calls onDataFetch for cars/events/captions
   const {
     data: entityData,
@@ -181,6 +190,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
       lengthSettings: Array.isArray(sharedLengthSettings)
         ? sharedLengthSettings
         : [],
+      brandTones: Array.isArray(brandTones) ? brandTones : [], // Phase 2A: Include brand tones
       savedCaptions: Array.isArray(entityData?.savedCaptions)
         ? entityData.savedCaptions
         : [],
@@ -212,6 +222,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     entityData,
     sharedSystemPrompts,
     sharedLengthSettings,
+    brandTones, // Phase 2A: Include brand tones dependency
     conditionalData,
     dataSections,
   ]);
@@ -220,16 +231,25 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   const isLoading =
     isLoadingSharedSystemPrompts ||
     isLoadingSharedLengthSettings ||
+    isLoadingBrandTones ||
     isLoadingEntityData;
 
   const hasError =
-    sharedSystemPromptsError || sharedLengthSettingsError || entityDataError;
+    sharedSystemPromptsError ||
+    sharedLengthSettingsError ||
+    brandTonesError ||
+    entityDataError;
 
   // Selection states
   const [selectedCarIds, setSelectedCarIds] = useState<string[]>([]);
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
   const [selectedSystemPromptId, setSelectedSystemPromptId] =
     useState<string>("");
+  const [selectedBrandToneId, setSelectedBrandToneId] = useState<string>(""); // Phase 2A: Brand tone selection
+  const [
+    hasUserInteractedWithCarSelection,
+    setHasUserInteractedWithCarSelection,
+  ] = useState(false);
 
   // Car and event detail states
   const [carDetails, setCarDetails] = useState<any[]>([]);
@@ -332,7 +352,8 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     if (
       config.mode === "project" &&
       memoizedDataWithConditional.cars.length > 0 &&
-      selectedCarIds.length === 0
+      selectedCarIds.length === 0 &&
+      !hasUserInteractedWithCarSelection
     ) {
       // In project mode, auto-select all cars to enable generation controls
       const allCarIds = memoizedDataWithConditional.cars.map((car) => car._id);
@@ -343,11 +364,16 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
         `🚗 BaseCopywriter: Auto-selected ${allCarIds.length} cars for project mode`
       );
     }
-  }, [config.mode, memoizedDataWithConditional.cars, selectedCarIds.length]);
+  }, [
+    config.mode,
+    memoizedDataWithConditional.cars,
+    selectedCarIds.length,
+    hasUserInteractedWithCarSelection,
+  ]);
 
   // Fetch prompts when component mounts
   React.useEffect(() => {
-    console.log("BaseCopywriter: useEffect calling fetchPrompts...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("BaseCopywriter: useEffect calling fetchPrompts...");
     promptHandlers.fetchPrompts();
   }, [promptHandlers.fetchPrompts]);
 
@@ -487,7 +513,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     try {
       // This would need to be implemented in the callbacks
       // For now, just log that it was called
-      console.log("🔄 Load more events requested");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Load more events requested");
       // TODO: Implement actual load more logic in callbacks
     } catch (error) {
       console.error("Error loading more events:", error);
@@ -501,6 +527,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     (carId: string) => {
       if (!config.features.allowMultipleCars) return;
 
+      setHasUserInteractedWithCarSelection(true);
       setSelectedCarIds((prev) => {
         const newSelection = prev.includes(carId)
           ? prev.filter((id) => id !== carId)
@@ -521,10 +548,22 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   const handleSelectAllCars = useCallback(() => {
     if (!config.features.allowMultipleCars) return;
 
+    setHasUserInteractedWithCarSelection(true);
     const allCarIds = memoizedDataWithConditional.cars.map((car) => car._id);
-    setSelectedCarIds(allCarIds);
-    setCarDetails(memoizedDataWithConditional.cars);
-  }, [memoizedDataWithConditional.cars, config.features.allowMultipleCars]);
+
+    // If all cars are selected, deselect all; otherwise select all
+    if (selectedCarIds.length === allCarIds.length) {
+      setSelectedCarIds([]);
+      setCarDetails([]);
+    } else {
+      setSelectedCarIds(allCarIds);
+      setCarDetails(memoizedDataWithConditional.cars);
+    }
+  }, [
+    memoizedDataWithConditional.cars,
+    config.features.allowMultipleCars,
+    selectedCarIds.length,
+  ]);
 
   // System prompt handler with localStorage persistence
   const handleSystemPromptChange = useCallback((promptId: string) => {
@@ -618,6 +657,21 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     if (systemPrompt) {
       llmText += `SYSTEM PROMPT: ${systemPrompt.name}\n`;
       llmText += `${systemPrompt.prompt}\n\n`;
+    }
+
+    // Add brand tone instructions (Phase 2B: AI Prompt Integration)
+    if (selectedBrandToneId && selectedBrandToneId !== "default") {
+      const selectedBrandTone = brandTones.find(
+        (tone) => tone._id === selectedBrandToneId
+      );
+      if (selectedBrandTone) {
+        llmText += `BRAND TONE: ${selectedBrandTone.name}\n`;
+        llmText += `TONE INSTRUCTIONS: ${selectedBrandTone.tone_instructions}\n`;
+        if (selectedBrandTone.example_phrases.length > 0) {
+          llmText += `EXAMPLE PHRASES: ${selectedBrandTone.example_phrases.join(", ")}\n`;
+        }
+        llmText += `\n`;
+      }
     }
 
     // Add form context
@@ -804,6 +858,8 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     carDetails,
     selectedSystemPromptId,
     memoizedDataWithConditional.systemPrompts,
+    selectedBrandToneId,
+    brandTones,
     formState,
     eventDetails,
     derivedLength,
@@ -873,7 +929,8 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
 
   // Content actions
   const handleGenerateContent = async () => {
-    if (carDetails.length === 0) return;
+    // Allow generation even without cars - users might want project-level or general content
+    // if (carDetails.length === 0) return;
 
     const context: GenerationContext = {
       projectId: config.mode === "project" ? config.entityId : "",
@@ -973,7 +1030,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
               projectId: context.projectId,
               selectedCarIds: context.selectedCarIds,
               selectedEventIds: context.selectedEventIds,
-              systemPromptId: context.selectedSystemPromptId,
+              selectedSystemPromptId: context.selectedSystemPromptId,
               useMinimalCarData: context.useMinimalCarData,
               customLLMText: context.editableLLMText,
             }),
@@ -998,7 +1055,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
           description: "Watch your caption appear in real-time!",
         });
 
-        console.log("🎬 Frontend: Starting stream reading...");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎬 Frontend: Starting stream reading...");
 
         // Read the stream and build caption progressively with timeout protection
         const streamTimeout = setTimeout(() => {
@@ -1129,9 +1186,16 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
         .onSaveCaption(captionData)
         .then((success) => {
           if (success) {
+            // Force refresh of the main entity data to update UI immediately
+            refreshData().catch((error) => {
+              console.error("Error refreshing entity data after save:", error);
+            });
+
+            // Also call the callback refresh for consistency
             callbacks.onRefresh().catch((error) => {
               console.error("Error refreshing after save:", error);
             });
+
             setContentViewMode("saved");
             toast({
               title: "Success",
@@ -1162,9 +1226,19 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
         .onDeleteCaption(contentId)
         .then((success) => {
           if (success) {
+            // Force refresh of the main entity data to update UI immediately
+            refreshData().catch((error) => {
+              console.error(
+                "Error refreshing entity data after delete:",
+                error
+              );
+            });
+
+            // Also call the callback refresh for consistency
             callbacks.onRefresh().catch((error) => {
               console.error("Error refreshing after delete:", error);
             });
+
             toast({
               title: "Success",
               description: "Caption deleted and refreshed successfully",
@@ -1202,7 +1276,14 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
         // Only close edit mode after successful save
         handleCancelEdit();
 
-        // Refresh the data
+        // Force refresh of the main entity data to update UI immediately
+        try {
+          await refreshData();
+        } catch (error) {
+          console.error("Error refreshing entity data after update:", error);
+        }
+
+        // Also refresh through callback for consistency
         try {
           await callbacks.onRefresh();
         } catch (error) {
@@ -1270,7 +1351,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     try {
       // This would need to be implemented in the callbacks
       // For now, just log that it was called
-      console.log("🔄 Load more captions requested");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Load more captions requested");
       // TODO: Implement actual load more logic in callbacks
     } catch (error) {
       console.error("Error loading more captions:", error);
@@ -1353,6 +1434,15 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
               sharedSystemPromptsError ? String(sharedSystemPromptsError) : null
             }
             onSystemPromptChange={handleSystemPromptChange}
+          />
+
+          {/* Brand Tone Selection - Phase 2A */}
+          <BrandToneSelection
+            brandTones={memoizedDataWithConditional.brandTones}
+            selectedBrandToneId={selectedBrandToneId}
+            loadingBrandTones={isLoadingBrandTones}
+            brandToneError={brandTonesError ? String(brandTonesError) : null}
+            onBrandToneChange={setSelectedBrandToneId}
           />
 
           {/* Data Source Sections - Collapsible with Lazy Loading */}

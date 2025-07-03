@@ -87,7 +87,7 @@ export default function ShotListTemplateCard({
             className="h-8 w-8"
             onClick={() => {
               // TODO: Implement edit functionality
-              // [REMOVED] // [REMOVED] console.log("Edit template:", template._id);
+              // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Edit template:", template._id);
             }}
           >
             <PencilIcon className="h-4 w-4" />

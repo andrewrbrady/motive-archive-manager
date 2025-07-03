@@ -107,8 +107,8 @@ export default function DeliverableAssignment({
   // Add a useEffect for logging the users
   useEffect(() => {
     if (users.length > 0) {
-      // [REMOVED] // [REMOVED] console.log("Users state updated:", users.length);
-      // [REMOVED] // [REMOVED] console.log("User names:", users.map((u) => u.name).join(", "));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Users state updated:", users.length);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("User names:", users.map((u) => u.name).join(", "));
     }
   }, [users]);
 

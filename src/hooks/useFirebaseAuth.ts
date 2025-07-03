@@ -59,7 +59,7 @@ const throttledLog = (messageType: string, message: string, ...args: any[]) => {
   const lastLogTime = messageThrottleCache[messageType] || 0;
 
   if (now - lastLogTime > MESSAGE_THROTTLE_MS) {
-    console.log(message, ...args);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(message, ...args);
     messageThrottleCache[messageType] = now;
   }
 };

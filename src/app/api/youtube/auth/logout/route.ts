@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     cookieStore.delete("youtube_access_token");
     cookieStore.delete("youtube_refresh_token");
 
-    console.log("YouTube authentication cookies cleared");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("YouTube authentication cookies cleared");
 
     return NextResponse.json({
       success: true,

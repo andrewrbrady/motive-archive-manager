@@ -404,7 +404,7 @@ export default function StudioInventoryTab() {
     }
 
     try {
-      // [REMOVED] // [REMOVED] console.log("Sending to API:", newItem);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Sending to API:", newItem);
 
       // Ensure required fields are present
       if (!newItem.name || !newItem.category || !newItem.model) {

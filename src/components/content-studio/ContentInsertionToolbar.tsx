@@ -11,6 +11,7 @@ import {
   ImageIcon,
   Save,
   Loader2,
+  FileText,
 } from "lucide-react";
 import { ImageGalleryPopup } from "./ImageGalleryPopup";
 
@@ -20,6 +21,7 @@ interface ContentInsertionToolbarProps {
   onToggleExpanded: () => void;
   onAddTextBlock: () => void;
   onAddDividerBlock: () => void;
+  onAddFrontmatterBlock?: () => void;
   // Image gallery props
   finalImages?: any[];
   loadingImages?: boolean;
@@ -46,6 +48,7 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
     onToggleExpanded,
     onAddTextBlock,
     onAddDividerBlock,
+    onAddFrontmatterBlock,
     finalImages = [],
     loadingImages = false,
     projectId,
@@ -123,6 +126,18 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                       </Button>
                     </ImageGalleryPopup>
                   )}
+                  {onAddFrontmatterBlock && (
+                    <Button
+                      onClick={onAddFrontmatterBlock}
+                      variant="ghost"
+                      size="sm"
+                      className="hover:bg-muted/20"
+                      title="Add Article Metadata"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </Button>
+                  )}
+
                   <Button
                     onClick={onAddTextBlock}
                     variant="ghost"
@@ -199,6 +214,19 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                         Add Images
                       </Button>
                     </ImageGalleryPopup>
+                  )}
+
+                  {/* Frontmatter Block Button */}
+                  {onAddFrontmatterBlock && (
+                    <Button
+                      onClick={onAddFrontmatterBlock}
+                      variant="outline"
+                      size="sm"
+                      className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Article Metadata
+                    </Button>
                   )}
 
                   {/* Text Block Button */}

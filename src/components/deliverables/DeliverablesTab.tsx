@@ -7,6 +7,7 @@ import { useAPI } from "@/hooks/useAPI";
 import DeliverablesHeader from "./deliverables-tab/components/DeliverablesHeader";
 import DeliverableCard from "./deliverables-tab/components/DeliverableCard";
 import DeliverablesTable from "./deliverables-tab/components/DeliverablesTable";
+import ResizableDeliverablesTable from "./deliverables-tab/components/ResizableDeliverablesTable";
 import DeliverableModal from "./deliverables-tab/components/DeliverableModal";
 import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
 import { toast } from "sonner";
@@ -63,11 +64,13 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
       setIsSubmittingJson(true);
 
       const result = (await api.post(
-        `/api/cars/${actualCarId}/deliverables/batch`,
+        `/api/cars/${actualCarId}/deliverables/batch-relaxed`,
         { deliverables: jsonData }
       )) as any;
 
-      toast.success(`Successfully created ${result.count} deliverables`);
+      toast.success(
+        `Successfully created ${result.count} deliverables with relaxed validation`
+      );
 
       // Refresh the deliverables list
       fetchDeliverables();
@@ -140,8 +143,8 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         )}
       </div>
 
-      {/* Desktop View - Table */}
-      <DeliverablesTable
+      {/* Desktop View - Table with Resizable Columns */}
+      <ResizableDeliverablesTable
         deliverables={deliverables}
         isLoading={isLoading}
         actions={actions}
@@ -162,9 +165,9 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         isOpen={showJsonUpload}
         onClose={() => setShowJsonUpload(false)}
         onSubmit={handleJsonSubmit}
-        title="Batch Create Deliverables from JSON"
-        description="Upload a JSON file or paste JSON data to create multiple deliverables at once. The JSON should be an array of deliverable objects."
-        expectedType="deliverables"
+        title="Batch Create Deliverables from JSON (Relaxed)"
+        description="Upload a JSON file or paste JSON data to create multiple deliverables at once. The JSON should be an array of deliverable objects with minimal validation - only title is required. Platform and editor assignments can be done later."
+        expectedType="deliverables-relaxed"
         isSubmitting={isSubmittingJson}
       />
     </div>

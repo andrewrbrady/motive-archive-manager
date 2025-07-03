@@ -11,12 +11,12 @@ export const dynamic = "force-dynamic";
  * Accessible to all authenticated users (not just admins)
  */
 export async function GET(request: NextRequest) {
-  console.log("🔒 GET /api/users/editors: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/users/editors: Starting request");
 
   // Check authentication (any authenticated user can access this)
   const authResult = await verifyAuthMiddleware(request);
   if (authResult) {
-    console.log("❌ GET /api/users/editors: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ GET /api/users/editors: Authentication failed");
     return authResult;
   }
 

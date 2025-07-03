@@ -19,7 +19,7 @@ export async function fetchMakes() {
     const db = await getDatabase();
 
     if (process.env.NODE_ENV !== "production") {
-      // [REMOVED] // [REMOVED] console.log("Fetching makes from MongoDB...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching makes from MongoDB...");
     }
 
     const makes = await db
@@ -29,7 +29,7 @@ export async function fetchMakes() {
       .toArray();
 
     if (process.env.NODE_ENV !== "production") {
-      // [REMOVED] // [REMOVED] console.log(`Successfully fetched ${makes.length} makes`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Successfully fetched ${makes.length} makes`);
     }
 
     return makes.map((make) => ({

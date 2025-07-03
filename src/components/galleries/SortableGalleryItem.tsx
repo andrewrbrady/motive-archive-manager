@@ -112,7 +112,7 @@ export function SortableGalleryItem({
   // Load image dimensions to determine if it's horizontal (for button visibility)
   React.useEffect(() => {
     if (!api) return; // Add conditional check inside async function
-    console.log(`🖼️ Image URL updated for ${image.filename}: ${image.url}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🖼️ Image URL updated for ${image.filename}: ${image.url}`);
     const img = new window.Image();
     img.onload = () => {
       setImageDimensions({
@@ -137,11 +137,31 @@ export function SortableGalleryItem({
 
   const handleCopyUrl = async () => {
     try {
-      await navigator.clipboard.writeText(image.url);
+      // Normalize to medium variant for consistent quality
+      let urlToCopy = image.url;
+
+      if (image.url.includes("imagedelivery.net")) {
+        // Always use medium variant for clipboard copy
+        const urlParts = image.url.split("/");
+        const lastPart = urlParts[urlParts.length - 1];
+
+        // Check if the last part is a variant (alphabetic or has parameters)
+        if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+          // Replace with medium variant
+          urlParts[urlParts.length - 1] = "medium";
+        } else {
+          // No variant specified, append medium
+          urlParts.push("medium");
+        }
+
+        urlToCopy = urlParts.join("/");
+      }
+
+      await navigator.clipboard.writeText(urlToCopy);
       setIsCopied(true);
       uiToast({
         title: "Success",
-        description: "Image URL copied to clipboard",
+        description: "Image URL (medium quality) copied to clipboard",
       });
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {

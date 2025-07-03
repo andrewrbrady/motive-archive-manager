@@ -19,17 +19,17 @@ interface SerperResult {
 
 // Helper function to get MongoDB client
 async function getMongoClient() {
-  // [REMOVED] // [REMOVED] console.log("🔄 Connecting to MongoDB...");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Connecting to MongoDB...");
   const client = new MongoClient(
     process.env.MONGODB_URI || "mongodb://localhost:27017"
   );
   await client.connect();
-  // [REMOVED] // [REMOVED] console.log("✅ MongoDB connected");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ MongoDB connected");
   return client;
 }
 
 async function searchVehicleInfo(query: string) {
-  // [REMOVED] // [REMOVED] console.log(`\n🔍 Searching Serper for: "${query}"`);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`\n🔍 Searching Serper for: "${query}"`);
   const response = await fetch("https://google.serper.dev/search", {
     method: "POST",
     headers: {
@@ -48,7 +48,7 @@ async function searchVehicleInfo(query: string) {
   }
 
   const results = await response.json();
-  // [REMOVED] // [REMOVED] console.log(`✅ Found ${results.organic?.length || 0} organic results`);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ Found ${results.organic?.length || 0} organic results`);
   return results;
 }
 
@@ -56,7 +56,7 @@ async function cleanAndStructureData(
   searchResults: SerperResult[],
   existingCarData: Car
 ): Promise<Partial<Car>> {
-  // [REMOVED] // [REMOVED] console.log("\n🧹 Cleaning and structuring search data...");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("\n🧹 Cleaning and structuring search data...");
 
   // Generate specific questions based on missing fields and car details
   const questions = [];
@@ -267,7 +267,7 @@ Return a JSON object with validated data that EXACTLY matches this structure.`,
 
   const data = await response.json();
   const aiData = JSON.parse(data.choices[0].message.content);
-  // [REMOVED] // [REMOVED] console.log("✅ Data cleaned and structured:", aiData);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Data cleaned and structured:", aiData);
 
   // Transform the AI response into our car data structure
   const enrichedData: Partial<Car> = {
@@ -319,7 +319,7 @@ Return a JSON object with validated data that EXACTLY matches this structure.`,
         : existingCarData.interior_color,
   };
 
-  // [REMOVED] // [REMOVED] console.log("✅ Transformed enriched data:", enrichedData);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Transformed enriched data:", enrichedData);
   return enrichedData;
 }
 
@@ -466,7 +466,7 @@ export async function POST(request: Request) {
     const segments = url.pathname.split("/");
     const id = segments[segments.length - 2];
 
-    // [REMOVED] // [REMOVED] console.log("\n🚀 Starting car data enrichment process...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("\n🚀 Starting car data enrichment process...");
     const client = await getMongoClient();
 
     try {
@@ -482,14 +482,14 @@ export async function POST(request: Request) {
 
       // Identify missing fields
       const missingFields = getMissingFields(existingCarData);
-      // [REMOVED] // [REMOVED] console.log("Missing fields:", missingFields);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Missing fields:", missingFields);
 
       // Generate targeted search queries
       const searchQueries = generateSearchQueries(
         existingCarData,
         missingFields
       );
-      // [REMOVED] // [REMOVED] console.log("Generated search queries:", searchQueries);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Generated search queries:", searchQueries);
 
       // Perform searches concurrently
       const searchPromises = searchQueries.map((query) =>

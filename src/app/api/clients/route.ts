@@ -33,14 +33,14 @@ export async function GET(request: NextRequest) {
     const collection = db.collection<Client>("clients");
 
     // Log the database and collection being used
-    // [REMOVED] // [REMOVED] console.log("Using database:", db.databaseName);
-    // [REMOVED] // [REMOVED] console.log("Using collection:", collection.collectionName);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Using database:", db.databaseName);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Using collection:", collection.collectionName);
 
     // First, let's see what's in the database
     const allClients = await collection.find({}).toArray();
-    // [REMOVED] // [REMOVED] console.log("Total clients in database:", allClients.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Total clients in database:", allClients.length);
     if (allClients.length > 0) {
-      // [REMOVED] // [REMOVED] console.log("Sample client:", allClients[0]);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Sample client:", allClients[0]);
     }
 
     // Build the query
@@ -55,11 +55,11 @@ export async function GET(request: NextRequest) {
       query.businessType = { $regex: `^${businessType}$`, $options: "i" };
     }
 
-    // [REMOVED] // [REMOVED] console.log("Query:", JSON.stringify(query, null, 2));
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Query:", JSON.stringify(query, null, 2));
 
     // Get total count for pagination
     const total = await collection.countDocuments(query);
-    // [REMOVED] // [REMOVED] console.log("Total matching clients:", total);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Total matching clients:", total);
 
     // Get paginated results
     const skip = (page - 1) * limit;
@@ -70,9 +70,9 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .toArray();
 
-    // [REMOVED] // [REMOVED] console.log(`Found ${clients.length} clients for page ${page}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Found ${clients.length} clients for page ${page}`);
     if (clients.length > 0) {
-      // [REMOVED] // [REMOVED] console.log("Sample client:", JSON.stringify(clients[0], null, 2));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Sample client:", JSON.stringify(clients[0], null, 2));
     }
 
     // Get all primary contact IDs from the clients

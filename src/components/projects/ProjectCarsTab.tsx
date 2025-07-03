@@ -242,7 +242,7 @@ export function ProjectCarsTab({
       console.time("ProjectCarsTab-fetchProjectCars");
 
       if (!api) {
-        console.log("ProjectCarsTab: No API available for fetchProjectCars");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("ProjectCarsTab: No API available for fetchProjectCars");
         throw new Error("No authenticated API found");
       }
 
@@ -305,7 +305,7 @@ export function ProjectCarsTab({
       projectCars.length === 0 &&
       !loadingProjectCars
     ) {
-      console.log("ProjectCarsTab: API became available, fetching cars...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("ProjectCarsTab: API became available, fetching cars...");
       fetchProjectCars();
     }
   }, [api]);
@@ -344,7 +344,7 @@ export function ProjectCarsTab({
       setIsLinkingCar(true);
 
       if (!api) {
-        console.log("ProjectCarsTab: No API available for handleLinkCars");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("ProjectCarsTab: No API available for handleLinkCars");
         throw new Error("No authenticated API found");
       }
 
@@ -378,7 +378,7 @@ export function ProjectCarsTab({
   const handleUnlinkCar = async (carId: string) => {
     try {
       if (!api) {
-        console.log("ProjectCarsTab: No API available for handleUnlinkCar");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("ProjectCarsTab: No API available for handleUnlinkCar");
         throw new Error("No authenticated API found");
       }
 

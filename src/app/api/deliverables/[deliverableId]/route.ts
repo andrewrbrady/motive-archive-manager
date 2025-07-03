@@ -17,7 +17,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ deliverableId: string }> }
 ) {
-  console.log("🔒 GET /api/deliverables/[deliverableId]: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/deliverables/[deliverableId]: Starting request");
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
@@ -69,12 +69,12 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ deliverableId: string }> }
 ) {
-  console.log("🎯🎯🎯 NEW CENTRALIZED ENDPOINT HIT! 🎯🎯🎯");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎯🎯🎯 NEW CENTRALIZED ENDPOINT HIT! 🎯🎯🎯");
   console.log(
     "🔒 PUT /api/deliverables/[deliverableId]: Starting request [NEW CENTRALIZED ENDPOINT]"
   );
-  console.log("🔍 REQUEST URL:", request.url);
-  console.log("🔍 REQUEST METHOD:", request.method);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 REQUEST URL:", request.url);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 REQUEST METHOD:", request.method);
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
@@ -102,13 +102,13 @@ export async function PUT(
     const { deliverableId } = await params;
     const body = await request.json();
 
-    console.log("🔍 REQUEST BODY:", JSON.stringify(body, null, 2));
-    console.log("🔍 CAR_ID IN BODY:", body.carId);
-    console.log("🔍 CAR_ID TYPE:", typeof body.carId);
-    console.log("🔍 CAR_ID === undefined:", body.carId === undefined);
-    console.log("🔍 CAR_ID === null:", body.carId === null);
-    console.log("🔍 CAR_ID === '':", body.carId === "");
-    console.log("🔍 'carId' in body:", "carId" in body);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 REQUEST BODY:", JSON.stringify(body, null, 2));
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 CAR_ID IN BODY:", body.carId);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 CAR_ID TYPE:", typeof body.carId);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 CAR_ID === undefined:", body.carId === undefined);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 CAR_ID === null:", body.carId === null);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 CAR_ID === '':", body.carId === "");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 'carId' in body:", "carId" in body);
 
     // Validate ID format
     if (!ObjectId.isValid(deliverableId)) {
@@ -151,17 +151,17 @@ export async function PUT(
 
     // Handle car association updates - CRITICAL FIX
     if ("carId" in body) {
-      console.log(`🚗 Car association update: carId=${body.carId}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚗 Car association update: carId=${body.carId}`);
       if (
         body.carId === undefined ||
         body.carId === null ||
         body.carId === ""
       ) {
         updateData.car_id = null; // Explicitly remove car association
-        console.log(`🚗 Removing car association: setting car_id to null`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚗 Removing car association: setting car_id to null`);
       } else {
         updateData.car_id = body.carId; // Set car association
-        console.log(`🚗 Setting car association: car_id=${body.carId}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚗 Setting car association: car_id=${body.carId}`);
       }
     }
 
@@ -260,7 +260,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ deliverableId: string }> }
 ) {
-  console.log("🔒 DELETE /api/deliverables/[deliverableId]: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 DELETE /api/deliverables/[deliverableId]: Starting request");
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);

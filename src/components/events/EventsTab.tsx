@@ -118,11 +118,11 @@ export default function EventsTab({ carId }: { carId: string }) {
 
     try {
       setIsLoading(true);
-      console.log("Fetching events for car:", carId); // Debug log
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching events for car:", carId); // Debug log
 
       const data = (await api.get(`cars/${carId}/events`)) as Event[];
 
-      console.log("Received events data:", data); // Debug log
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Received events data:", data); // Debug log
 
       // Transform the data to match our Event interface
       const transformedEvents: Event[] = data.map((event: any) => ({
@@ -145,7 +145,7 @@ export default function EventsTab({ carId }: { carId: string }) {
         updatedAt: event.updatedAt,
       }));
 
-      console.log("Transformed events:", transformedEvents); // Debug log
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Transformed events:", transformedEvents); // Debug log
       setEvents(transformedEvents);
     } catch (error) {
       console.error("Error fetching events:", error);

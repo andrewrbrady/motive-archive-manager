@@ -5,6 +5,7 @@ import { toast } from "@/components/ui/use-toast";
 import { CarSelection } from "../projects/caption-generator/CarSelection";
 import { EventSelection } from "../projects/caption-generator/EventSelection";
 import { SystemPromptSelection } from "../projects/caption-generator/SystemPromptSelection";
+import { BrandToneSelection } from "../projects/caption-generator/BrandToneSelection";
 import { CaptionPreview } from "../projects/caption-generator/CaptionPreview";
 import { GenerationControls } from "../projects/caption-generator/GenerationControls";
 import { PromptEditModal } from "../projects/caption-generator/PromptEditModal";
@@ -30,6 +31,7 @@ import type { BaTCarDetails } from "@/types/car-page";
 import type { Event } from "@/types/event";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { useAPI } from "@/hooks/useAPI";
+import { useBrandTones } from "@/hooks/useBrandTones";
 
 interface CarCopywriterProps {
   carId: string;
@@ -73,6 +75,14 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
 
   // Length settings state
   const [lengthSettings, setLengthSettings] = useState<any[]>([]);
+
+  // Brand tone state - Phase 2A
+  const [selectedBrandToneId, setSelectedBrandToneId] = useState<string>("");
+  const {
+    brandTones,
+    isLoading: loadingBrandTones,
+    error: brandToneError,
+  } = useBrandTones();
 
   // Saved captions state - managed locally with pagination
   const [savedCaptions, setSavedCaptions] = useState<CarSavedCaption[]>([]);
@@ -200,6 +210,21 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
       llmText += `${systemPrompt.prompt}\n\n`;
     }
 
+    // Add brand tone instructions (Phase 2B: AI Prompt Integration)
+    if (selectedBrandToneId && selectedBrandToneId !== "default") {
+      const selectedBrandTone = brandTones.find(
+        (tone) => tone._id === selectedBrandToneId
+      );
+      if (selectedBrandTone) {
+        llmText += `BRAND TONE: ${selectedBrandTone.name}\n`;
+        llmText += `TONE INSTRUCTIONS: ${selectedBrandTone.tone_instructions}\n`;
+        if (selectedBrandTone.example_phrases.length > 0) {
+          llmText += `EXAMPLE PHRASES: ${selectedBrandTone.example_phrases.join(", ")}\n`;
+        }
+        llmText += `\n`;
+      }
+    }
+
     // Add form context
     if (formState.context) {
       llmText += `CONTEXT:\n${formState.context}\n\n`;
@@ -275,6 +300,8 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     carDetails,
     selectedSystemPromptId,
     systemPrompts,
+    selectedBrandToneId,
+    brandTones,
     formState.context,
     formState.additionalContext,
     eventDetails,
@@ -350,9 +377,9 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
       const sizeInBytes = JSON.stringify(data).length;
       const sizeInKB = (sizeInBytes / 1024).toFixed(2);
 
-      console.log(`🚀 API Performance - ${endpoint}:`);
-      console.log(`   Duration: ${duration.toFixed(2)}ms`);
-      console.log(`   Payload Size: ${sizeInKB}KB (${sizeInBytes} bytes)`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚀 API Performance - ${endpoint}:`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`   Duration: ${duration.toFixed(2)}ms`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`   Payload Size: ${sizeInKB}KB (${sizeInBytes} bytes)`);
       console.log(
         `   Items Count: ${Array.isArray(data) ? data.length : "N/A"}`
       );
@@ -640,7 +667,7 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
 
     const fetchAllData = async () => {
       console.time("CarCopywriter-parallel-fetch");
-      console.log(`🎯 Starting CarCopywriter data fetch for car: ${carId}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🎯 Starting CarCopywriter data fetch for car: ${carId}`);
 
       try {
         // OPTIMIZATION 1 & 2: Add limits to events and captions API calls
@@ -772,7 +799,7 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
         setCarError("Failed to fetch car data");
       } finally {
         console.timeEnd("CarCopywriter-parallel-fetch");
-        console.log(`✅ CarCopywriter data fetch completed for car: ${carId}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ CarCopywriter data fetch completed for car: ${carId}`);
         setLoadingCar(false);
         setLoadingEvents(false);
         setLoadingSystemPrompts(false);
@@ -857,6 +884,15 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
             loadingSystemPrompts={loadingSystemPrompts}
             systemPromptError={systemPromptError}
             onSystemPromptChange={handleSystemPromptChange}
+          />
+
+          {/* Brand Tone Selection - Phase 2A */}
+          <BrandToneSelection
+            brandTones={brandTones}
+            selectedBrandToneId={selectedBrandToneId}
+            loadingBrandTones={loadingBrandTones}
+            brandToneError={brandToneError ? String(brandToneError) : null}
+            onBrandToneChange={setSelectedBrandToneId}
           />
 
           {/* Generation Controls */}

@@ -12,12 +12,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log("🔒 GET /api/projects/[id]/assets: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/projects/[id]/assets: Starting request");
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
   if (authResult) {
-    console.log("❌ GET /api/projects/[id]/assets: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ GET /api/projects/[id]/assets: Authentication failed");
     return authResult;
   }
 
@@ -78,12 +78,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log("🔒 POST /api/projects/[id]/assets: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 POST /api/projects/[id]/assets: Starting request");
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
   if (authResult) {
-    console.log("❌ POST /api/projects/[id]/assets: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ POST /api/projects/[id]/assets: Authentication failed");
     return authResult;
   }
 
@@ -187,7 +187,7 @@ export async function POST(
       );
     }
 
-    console.log("✅ POST /api/projects/[id]/assets: Successfully added asset");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ POST /api/projects/[id]/assets: Successfully added asset");
     return NextResponse.json({
       message: "Asset added successfully",
       asset: newAsset,
@@ -209,12 +209,12 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log("🔒 DELETE /api/projects/[id]/assets: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 DELETE /api/projects/[id]/assets: Starting request");
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
   if (authResult) {
-    console.log("❌ DELETE /api/projects/[id]/assets: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ DELETE /api/projects/[id]/assets: Authentication failed");
     return authResult;
   }
 

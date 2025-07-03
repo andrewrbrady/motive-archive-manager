@@ -479,7 +479,7 @@ export function CanvasExtensionModal({
       });
 
       if (result && result.success) {
-        console.log("✅ Canvas Extension processing completed successfully");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Canvas Extension processing completed successfully");
         setProcessedImage(result.processedImage);
         setShowPreview(true);
       } else {
@@ -539,7 +539,7 @@ export function CanvasExtensionModal({
       );
 
       if (result && result.success && onImageReplaced) {
-        console.log("✅ Canvas Extension replacement completed successfully");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Canvas Extension replacement completed successfully");
         onImageReplaced(result.originalImageId, result.processedImage);
         handleClose();
       } else {
@@ -622,7 +622,7 @@ export function CanvasExtensionModal({
                   setImageLoadError(true);
                 }}
                 onLoad={(e) => {
-                  console.log("Image loaded successfully");
+                  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Image loaded successfully");
                   setImageLoadError(false);
                 }}
                 fallbackContent={
@@ -660,7 +660,7 @@ export function CanvasExtensionModal({
                   setProcessedImageLoadError(true);
                 }}
                 onLoad={(e) => {
-                  console.log("Processed image loaded successfully");
+                  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Processed image loaded successfully");
                   setProcessedImageLoadError(false);
                 }}
                 fallbackContent={

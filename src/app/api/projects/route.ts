@@ -18,12 +18,12 @@ import { ProjectTemplate } from "@/models/ProjectTemplate";
 import { convertProjectForFrontend } from "@/utils/objectId";
 
 async function createProject(request: NextRequest) {
-  console.log("🔒 POST /api/projects: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 POST /api/projects: Starting request");
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
   if (authResult) {
-    console.log("❌ POST /api/projects: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ POST /api/projects: Authentication failed");
     return authResult;
   }
 
@@ -462,7 +462,7 @@ async function getProjects(request: NextRequest) {
 
       // ⚡ OPTIMIZED: Only add image lookup if specifically requested
       if (includeImages) {
-        console.log("🔍 Adding image lookup to projects pipeline");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Adding image lookup to projects pipeline");
         pipeline.push(
           {
             $lookup: {
@@ -548,7 +548,7 @@ async function getProjects(request: NextRequest) {
 
       const totalPages = Math.ceil(total / pageSize);
 
-      console.log("🔍 Raw projects from aggregation:", projects.length);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Raw projects from aggregation:", projects.length);
 
       // ⚡ OPTIMIZED: Simplified image processing
       const processedProjects = projects.map((project) => {
@@ -567,7 +567,7 @@ async function getProjects(request: NextRequest) {
             finalUrl = `${finalUrl}/public`;
           }
 
-          console.log("🔍 Final URL:", finalUrl);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Final URL:", finalUrl);
 
           return {
             ...project,

@@ -26,7 +26,7 @@ interface CarSpecifications {
 // Function to fetch car by ID with detailed information
 export async function getCarById(carId: string): Promise<Car | null> {
   if (process.env.NODE_ENV !== "production") {
-    // [REMOVED] // [REMOVED] console.log(`Fetching car details for ID: ${carId.substring(0, 8)}***`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Fetching car details for ID: ${carId.substring(0, 8)}***`);
   }
 
   try {
@@ -34,13 +34,13 @@ export async function getCarById(carId: string): Promise<Car | null> {
     const apiUrl = `/api/cars/${carId}`;
 
     if (process.env.NODE_ENV !== "production") {
-      // [REMOVED] // [REMOVED] console.log(`Making API request to: ${apiUrl}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Making API request to: ${apiUrl}`);
     }
 
     const response = await fetch(apiUrl);
 
     if (process.env.NODE_ENV !== "production") {
-      // [REMOVED] // [REMOVED] console.log(`API response status: ${response.status}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`API response status: ${response.status}`);
     }
 
     if (!response.ok) {
@@ -53,7 +53,7 @@ export async function getCarById(carId: string): Promise<Car | null> {
     const data = await response.json();
 
     if (process.env.NODE_ENV !== "production") {
-      // [REMOVED] // [REMOVED] console.log(`Response data structure:`, Object.keys(data));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Response data structure:`, Object.keys(data));
     }
 
     // Handle different response formats - sometimes car data might be in data.car
@@ -61,12 +61,12 @@ export async function getCarById(carId: string): Promise<Car | null> {
     let car: Car;
     if (data.car) {
       if (process.env.NODE_ENV !== "production") {
-        // [REMOVED] // [REMOVED] console.log(`Car data is in data.car property`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Car data is in data.car property`);
       }
       car = data.car;
     } else if (data._id) {
       if (process.env.NODE_ENV !== "production") {
-        // [REMOVED] // [REMOVED] console.log(`Car data is directly in response data object`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Car data is directly in response data object`);
       }
       car = data;
     } else {
@@ -97,7 +97,7 @@ export async function getCarSpecifications(
     const car = await getCarById(carId);
 
     if (process.env.NODE_ENV !== "production") {
-      // [REMOVED] // [REMOVED] console.log(`Processing car data for specifications`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Processing car data for specifications`);
     }
 
     if (!car) {
@@ -150,7 +150,7 @@ export async function getCarSpecifications(
 
     if (process.env.NODE_ENV !== "production") {
       // Car specifications extracted successfully - Categories with data: nonEmptyFields.length/9
-      // [REMOVED] // [REMOVED] console.log(`Car has data for these fields:`, nonEmptyFields);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Car has data for these fields:`, nonEmptyFields);
     }
 
     if (process.env.NODE_ENV !== "production") {

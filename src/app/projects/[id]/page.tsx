@@ -10,6 +10,9 @@ interface ProjectPageProps {
   params: Promise<{
     id: string;
   }>;
+  searchParams: Promise<{
+    tab?: string;
+  }>;
 }
 
 async function getProject(id: string) {
@@ -253,19 +256,50 @@ async function getProject(id: string) {
   // DO NOT close the connection - getMongoClient() returns a shared connection
 }
 
-export default async function ProjectPage({ params }: ProjectPageProps) {
+export default async function ProjectPage({
+  params,
+  searchParams,
+}: ProjectPageProps) {
   const { id } = await params;
+  const { tab } = await searchParams;
   const project = await getProject(id);
 
   if (!project) {
     notFound();
   }
 
+  // Determine initial tab from searchParams for SSR optimization
+  let initialTab = "overview";
+  if (tab) {
+    // Migration: redirect old "captions" tab to new "copywriter" tab
+    if (tab === "captions") {
+      initialTab = "copywriter";
+    } else if (
+      [
+        "overview",
+        "timeline",
+        "events",
+        "team",
+        "cars",
+        "images",
+        "galleries",
+        "assets",
+        "deliverables",
+        "copywriter",
+        "content-studio",
+        "ai-chat",
+        "calendar",
+      ].includes(tab)
+    ) {
+      initialTab = tab;
+    }
+  }
+
   return (
     <AuthGuard>
       <div className="flex flex-col min-h-screen bg-background">
         <div className="container-wide px-6 py-8">
-          <ProjectClientWrapper project={project} />
+          <ProjectClientWrapper project={project} initialTab={initialTab} />
         </div>
       </div>
     </AuthGuard>

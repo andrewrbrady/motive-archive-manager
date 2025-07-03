@@ -32,6 +32,10 @@ export function useProjectData({
   const [selectedCarIds, setSelectedCarIds] = useState<string[]>([]);
   const [carDetails, setCarDetails] = useState<BaTCarDetails[]>([]);
   const [loadingCars, setLoadingCars] = useState(false);
+  const [
+    hasUserInteractedWithCarSelection,
+    setHasUserInteractedWithCarSelection,
+  ] = useState(false);
 
   // Event-related state
   const [projectEvents, setProjectEvents] = useState<ProjectEvent[]>([]);
@@ -99,8 +103,13 @@ export function useProjectData({
       };
       setProjectCars(data.cars || []);
 
-      // Auto-select all cars if none are selected
-      if (data.cars && data.cars.length > 0 && selectedCarIds.length === 0) {
+      // Auto-select all cars if none are selected AND user hasn't interacted yet
+      if (
+        data.cars &&
+        data.cars.length > 0 &&
+        selectedCarIds.length === 0 &&
+        !hasUserInteractedWithCarSelection
+      ) {
         setSelectedCarIds(data.cars.map((car: ProjectCar) => car._id));
       }
     } catch (error) {
@@ -311,6 +320,7 @@ export function useProjectData({
   }, [selectedPrompt]);
 
   const handleCarSelection = (carId: string) => {
+    setHasUserInteractedWithCarSelection(true);
     setSelectedCarIds((prev) => {
       if (prev.includes(carId)) {
         return prev.filter((id) => id !== carId);
@@ -321,11 +331,14 @@ export function useProjectData({
   };
 
   const handleSelectAllCars = () => {
-    if (selectedCarIds.length === projectCars.length) {
-      setSelectedCarIds([]);
-    } else {
-      setSelectedCarIds(projectCars.map((car) => car._id));
-    }
+    setHasUserInteractedWithCarSelection(true);
+    setSelectedCarIds((prevSelected) => {
+      if (prevSelected.length === projectCars.length) {
+        return [];
+      } else {
+        return projectCars.map((car) => car._id);
+      }
+    });
   };
 
   const handleEventSelection = (eventId: string) => {

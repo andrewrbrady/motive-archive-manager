@@ -136,11 +136,11 @@ export async function GET(req: NextRequest) {
       if (tokens.refresh_token) {
         if (process.env.NODE_ENV === "development") {
           await updateEnvironmentToken(tokens.refresh_token);
-          console.log("✅ Refresh token saved to .env.local");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Refresh token saved to .env.local");
         } else {
-          console.log("🔑 PRODUCTION REFRESH TOKEN (copy to Vercel env vars):");
-          console.log(`YOUTUBE_REFRESH_TOKEN="${tokens.refresh_token}"`);
-          console.log("📝 Add this to your Vercel environment variables");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔑 PRODUCTION REFRESH TOKEN (copy to Vercel env vars):");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`YOUTUBE_REFRESH_TOKEN="${tokens.refresh_token}"`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📝 Add this to your Vercel environment variables");
         }
       } else {
         console.warn(
@@ -325,7 +325,7 @@ async function updateEnvironmentToken(refreshToken: string) {
     try {
       envContent = fs.readFileSync(envPath, "utf8");
     } catch (error) {
-      console.log("Creating new .env.local file");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Creating new .env.local file");
     }
 
     // Update or add YOUTUBE_REFRESH_TOKEN
@@ -348,7 +348,7 @@ async function updateEnvironmentToken(refreshToken: string) {
     // Write back to file
     fs.writeFileSync(envPath, updatedLines.join("\n"));
 
-    console.log("✅ Environment file updated with new refresh token");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Environment file updated with new refresh token");
   } catch (error) {
     console.error("❌ Failed to update environment file:", error);
     // Don't throw - this is not critical for the OAuth flow

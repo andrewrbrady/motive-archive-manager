@@ -18,7 +18,7 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
   onCancel,
   multiple = true,
 }) => {
-  console.log("🚗 CarImageUpload rendering with:", { carId, mode: "car" });
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚗 CarImageUpload rendering with:", { carId, mode: "car" });
 
   return (
     <ImageUploader

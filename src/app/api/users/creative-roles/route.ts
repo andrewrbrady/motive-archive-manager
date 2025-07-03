@@ -5,12 +5,12 @@ import { FieldValue } from "firebase-admin/firestore";
 
 // Endpoint to add a new creative role
 export async function POST(request: NextRequest) {
-  console.log("🔒 POST /api/users/creative-roles: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 POST /api/users/creative-roles: Starting request");
 
   // Check authentication and admin role
   const authResult = await verifyAuthMiddleware(request, ["admin"]);
   if (authResult) {
-    console.log("❌ POST /api/users/creative-roles: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ POST /api/users/creative-roles: Authentication failed");
     return authResult;
   }
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
         roles: FieldValue.arrayUnion(role),
       });
 
-    console.log("✅ POST /api/users/creative-roles: Successfully added role");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ POST /api/users/creative-roles: Successfully added role");
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error(
@@ -48,12 +48,12 @@ export async function POST(request: NextRequest) {
 
 // Endpoint to remove a creative role
 export async function DELETE(request: NextRequest) {
-  console.log("🔒 DELETE /api/users/creative-roles: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 DELETE /api/users/creative-roles: Starting request");
 
   // Check authentication and admin role
   const authResult = await verifyAuthMiddleware(request, ["admin"]);
   if (authResult) {
-    console.log("❌ DELETE /api/users/creative-roles: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ DELETE /api/users/creative-roles: Authentication failed");
     return authResult;
   }
 
@@ -94,12 +94,12 @@ export async function DELETE(request: NextRequest) {
 
 // GET - Fetch all creative roles
 export async function GET(request: NextRequest) {
-  console.log("🔒 GET /api/users/creative-roles: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/users/creative-roles: Starting request");
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
   if (authResult) {
-    console.log("❌ GET /api/users/creative-roles: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ GET /api/users/creative-roles: Authentication failed");
     return authResult;
   }
 

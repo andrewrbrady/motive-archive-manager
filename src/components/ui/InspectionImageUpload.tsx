@@ -491,13 +491,13 @@ const InspectionImageUpload: React.FC<InspectionImageUploadProps> = ({
       };
 
       xhr.onload = () => {
-        console.log(`[Upload] Response status for "${file.name}":`, xhr.status);
-        console.log(`[Upload] Response headers:`, xhr.getAllResponseHeaders());
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Upload] Response status for "${file.name}":`, xhr.status);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Upload] Response headers:`, xhr.getAllResponseHeaders());
 
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const result = JSON.parse(xhr.responseText);
-            console.log(`[Upload] Response for "${file.name}":`, result);
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Upload] Response for "${file.name}":`, result);
 
             if (result.success && result.images && result.images.length > 0) {
               onProgress(100);

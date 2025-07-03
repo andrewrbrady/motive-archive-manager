@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log("Processing Dropbox URL:", dropbox_url);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Processing Dropbox URL:", dropbox_url);
 
     // Extract the file ID from the Dropbox URL
     const dropboxFileId = extractDropboxFileId(dropbox_url);
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log("Getting direct download URL...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Getting direct download URL...");
 
     // Convert shared link to direct download link
     const directDownloadUrl = await getDropboxDirectDownloadUrl(
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      console.log("Direct download URL test successful");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Direct download URL test successful");
     } catch (testError) {
       console.error("Error testing direct download URL:", testError);
       return NextResponse.json(
@@ -137,7 +137,7 @@ async function getDropboxDirectDownloadUrl(
   accessToken: string
 ): Promise<string | null> {
   try {
-    console.log("Converting Dropbox URL to direct download...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Converting Dropbox URL to direct download...");
 
     // Method 1: Simple URL conversion (works for most cases)
     if (shareUrl.includes("dropbox.com")) {
@@ -160,18 +160,18 @@ async function getDropboxDirectDownloadUrl(
         });
 
         if (testResponse.ok) {
-          console.log("Simple URL conversion successful");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Simple URL conversion successful");
           return directUrl;
         } else {
-          console.log("Simple URL conversion failed, trying API method");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Simple URL conversion failed, trying API method");
         }
       } catch (error) {
-        console.log("Simple URL test failed, trying API method");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Simple URL test failed, trying API method");
       }
     }
 
     // Method 2: Use Dropbox API
-    console.log("Using Dropbox API to get direct download URL...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Using Dropbox API to get direct download URL...");
 
     const response = await fetch(
       "https://api.dropboxapi.com/2/sharing/get_shared_link_metadata",
@@ -200,7 +200,7 @@ async function getDropboxDirectDownloadUrl(
         } else if (!directUrl.includes("dl=1")) {
           directUrl += (directUrl.includes("?") ? "&" : "?") + "dl=1";
         }
-        console.log("Falling back to URL conversion method");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Falling back to URL conversion method");
         return directUrl;
       }
 
@@ -208,7 +208,7 @@ async function getDropboxDirectDownloadUrl(
     }
 
     const metadata = await response.json();
-    console.log("Dropbox API response received");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Dropbox API response received");
 
     // Try to get direct download URL from metadata
     if (metadata.url) {
@@ -238,7 +238,7 @@ async function getDropboxDirectDownloadUrl(
       } else if (!directUrl.includes("dl=1")) {
         directUrl += (directUrl.includes("?") ? "&" : "?") + "dl=1";
       }
-      console.log("Error occurred, using fallback URL conversion");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Error occurred, using fallback URL conversion");
       return directUrl;
     }
 
@@ -251,7 +251,7 @@ async function getDropboxFileMetadata(
   accessToken: string
 ): Promise<any> {
   try {
-    console.log("Getting file metadata from Dropbox API...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Getting file metadata from Dropbox API...");
 
     const response = await fetch(
       "https://api.dropboxapi.com/2/sharing/get_shared_link_metadata",

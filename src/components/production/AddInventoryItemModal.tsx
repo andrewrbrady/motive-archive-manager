@@ -96,7 +96,7 @@ export default function AddInventoryItemModal({
       fetchContainers();
     } else {
       // Reset form data when modal is closed
-      // [REMOVED] // [REMOVED] console.log("Resetting form data on modal close");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Resetting form data on modal close");
       setFormData({
         name: "",
         category: "Other",
@@ -169,7 +169,7 @@ export default function AddInventoryItemModal({
     }
 
     // Log the form data before submission
-    // [REMOVED] // [REMOVED] console.log("Submitting form data:", formattedData);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Submitting form data:", formattedData);
 
     // Check if required fields are present
     if (!formattedData.name) {
@@ -238,11 +238,11 @@ export default function AddInventoryItemModal({
 
         setUploadProgress((prev) => [...prev, newProgress]);
 
-        // [REMOVED] // [REMOVED] console.log(`Starting upload for ${file.name}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Starting upload for ${file.name}`);
 
         // Use the fixed uploadToCloudflare function
         const result = await uploadToCloudflare(file);
-        // [REMOVED] // [REMOVED] console.log(`Upload successful for ${file.name}:`, result);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Upload successful for ${file.name}:`, result);
 
         // Update progress with complete status
         const completeProgress: FileUploadProgress = {

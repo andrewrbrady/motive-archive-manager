@@ -24,7 +24,7 @@ interface AuctionQuery {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    // [REMOVED] // [REMOVED] console.log("API Route - Search Params:", Object.fromEntries(searchParams));
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API Route - Search Params:", Object.fromEntries(searchParams));
 
     const page = parseInt(searchParams.get("page") || "1", 10);
     const pageSize = parseInt(searchParams.get("pageSize") || "24", 10);
@@ -97,7 +97,7 @@ export async function GET(request: Request) {
         $lte: endDateTime, // Date object
       };
 
-      // [REMOVED] // [REMOVED] console.log("Computed end_date filter:", query.end_date);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Computed end_date filter:", query.end_date);
     }
 
     const auctions = await db

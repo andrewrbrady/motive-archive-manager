@@ -71,7 +71,7 @@ Remember: Return ONLY the JSON object with no additional text.`;
       return NextResponse.json(analysis);
     } catch (parseError) {
       console.error("Failed to parse AI response:", parseError);
-      // [REMOVED] // [REMOVED] console.log("Raw AI response:", completion.choices[0].message.content);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Raw AI response:", completion.choices[0].message.content);
       return NextResponse.json(
         { error: "Failed to parse AI analysis" },
         { status: 500 }

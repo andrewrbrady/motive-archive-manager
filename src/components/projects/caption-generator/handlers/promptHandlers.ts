@@ -69,7 +69,7 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
   // Sync local state with API data
   React.useEffect(() => {
     if (promptsFromAPI) {
-      console.log("promptHandlers: Received prompts from API:", promptsFromAPI);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("promptHandlers: Received prompts from API:", promptsFromAPI);
       setPromptList(promptsFromAPI);
     }
   }, [promptsFromAPI]);
@@ -107,7 +107,7 @@ export function usePromptManager(callbacks?: PromptHandlerCallbacks) {
 
   // NON-BLOCKING: fetchPrompts now just triggers a refetch of cached data
   const fetchPrompts = useCallback(async () => {
-    console.log("promptHandlers: Non-blocking refetch prompts...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("promptHandlers: Non-blocking refetch prompts...");
     try {
       await refetchPrompts();
     } catch (error) {

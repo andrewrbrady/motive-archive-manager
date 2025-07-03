@@ -17,7 +17,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log("🔒 GET /api/projects/[id]/deliverables: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/projects/[id]/deliverables: Starting request");
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
@@ -44,7 +44,7 @@ export async function GET(
     const userId = getUserIdFromToken(tokenData);
 
     const { id } = await params;
-    console.log("📋 Project ID:", id);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📋 Project ID:", id);
 
     await connectToDatabase();
 
@@ -61,14 +61,14 @@ export async function GET(
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    console.log("📦 Project deliverable IDs:", project.deliverableIds);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📦 Project deliverable IDs:", project.deliverableIds);
 
     // Fetch actual deliverables from the deliverables collection
     const deliverables = await Deliverable.find({
       _id: { $in: project.deliverableIds.map((id) => new ObjectId(id)) },
     });
 
-    console.log("✅ Found deliverables:", deliverables.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Found deliverables:", deliverables.length);
 
     return NextResponse.json({
       deliverables: deliverables.map((d) => d.toPublicJSON()),
@@ -124,19 +124,19 @@ export async function POST(
     });
 
     const { id } = await params;
-    console.log("📋 Project ID from params:", id);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📋 Project ID from params:", id);
 
     await connectToDatabase();
 
-    console.log("🔗 Connecting to database...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔗 Connecting to database...");
     await connectToDatabase();
-    console.log("✅ Database connected successfully");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Database connected successfully");
 
-    console.log("🔍 Finding project with ID:", id);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Finding project with ID:", id);
     const project = await Project.findById(id);
 
     if (!project) {
-      console.log("❌ Project not found with ID:", id);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ Project not found with ID:", id);
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
@@ -149,18 +149,18 @@ export async function POST(
     });
 
     const body = await request.json();
-    console.log("📝 Request body received:", JSON.stringify(body, null, 2));
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📝 Request body received:", JSON.stringify(body, null, 2));
 
     // Check if this is a request to link an existing deliverable
     if (body.linkExisting && body.deliverableId) {
-      console.log("🔗 Linking existing deliverable:", body.deliverableId);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔗 Linking existing deliverable:", body.deliverableId);
 
       // Validate that the deliverable exists
       const existingDeliverable = await Deliverable.findById(
         body.deliverableId
       );
       if (!existingDeliverable) {
-        console.log("❌ Deliverable not found:", body.deliverableId);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ Deliverable not found:", body.deliverableId);
         return NextResponse.json(
           { error: "Deliverable not found" },
           { status: 404 }
@@ -169,7 +169,7 @@ export async function POST(
 
       // Check if deliverable is already linked to this project
       if (project.deliverableIds.includes(body.deliverableId)) {
-        console.log("❌ Deliverable already linked to project");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ Deliverable already linked to project");
         return NextResponse.json(
           { error: "Deliverable is already linked to this project" },
           { status: 400 }
@@ -181,7 +181,7 @@ export async function POST(
       project.updatedAt = new Date();
       await project.save();
 
-      console.log("✅ Existing deliverable linked to project successfully");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Existing deliverable linked to project successfully");
       return NextResponse.json({
         message: "Deliverable linked to project successfully",
         deliverable: existingDeliverable.toPublicJSON(),
@@ -205,7 +205,7 @@ export async function POST(
     } = body;
 
     if (!title?.trim()) {
-      console.log("❌ Validation failed - title is required");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ Validation failed - title is required");
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
@@ -223,22 +223,28 @@ export async function POST(
     });
 
     if (!canManage) {
-      console.log("❌ Permission denied - user cannot manage deliverables");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ Permission denied - user cannot manage deliverables");
       return NextResponse.json(
         { error: "Insufficient permissions" },
         { status: 403 }
       );
     }
 
-    // Determine car_id - use provided carId or first car from project (optional)
+    // Determine car_id - use provided carId, respect null values
     let selectedCarId = carId;
-    if (!selectedCarId && project.carIds.length > 0) {
+    // Only auto-assign if carId is undefined (not provided), not if it's explicitly null
+    if (selectedCarId === undefined && project.carIds.length > 0) {
       selectedCarId = project.carIds[0];
-      console.log("🚗 Using first car from project:", selectedCarId);
+      console.log(
+        "🚗 Using first car from project (auto-assigned):",
+        selectedCarId
+      );
+    } else if (selectedCarId === null) {
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📝 Explicitly creating deliverable without car assignment");
     }
 
     // Create new deliverable in the deliverables collection
-    console.log("🏗️ Creating new deliverable in deliverables collection...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🏗️ Creating new deliverable in deliverables collection...");
     const deliverableData: any = {
       title: title.trim(),
       description: description?.trim() || "",
@@ -267,7 +273,7 @@ export async function POST(
     // Only add car_id if we have a selectedCarId
     if (selectedCarId) {
       deliverableData.car_id = new ObjectId(selectedCarId);
-      console.log("🚗 Adding car_id to deliverable:", selectedCarId);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚗 Adding car_id to deliverable:", selectedCarId);
     } else {
       console.log(
         "📝 Creating deliverable without car_id (project-only deliverable)"
@@ -282,17 +288,17 @@ export async function POST(
     const newDeliverable = new Deliverable(deliverableData);
     const savedDeliverable = await newDeliverable.save();
 
-    console.log("✅ Deliverable created with ID:", savedDeliverable._id);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Deliverable created with ID:", savedDeliverable._id);
 
     // Add deliverable ID to project's deliverableIds array
-    console.log("📌 Adding deliverable ID to project...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📌 Adding deliverable ID to project...");
     if (!project.deliverableIds) {
       project.deliverableIds = [];
     }
     project.deliverableIds.push((savedDeliverable._id as any).toString());
     project.updatedAt = new Date();
 
-    console.log("💾 Saving project with new deliverable ID...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("💾 Saving project with new deliverable ID...");
     const savedProject = await project.save();
     console.log("✅ Project updated successfully:", {
       projectId: savedProject._id,
@@ -300,7 +306,7 @@ export async function POST(
       lastUpdated: savedProject.updatedAt,
     });
 
-    console.log("🎉 Deliverable creation completed successfully");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎉 Deliverable creation completed successfully");
     return NextResponse.json({
       message: "Deliverable added successfully",
       deliverable: savedDeliverable.toPublicJSON(),
@@ -359,7 +365,7 @@ export async function DELETE(
     const body = await request.json();
     const { deliverableId } = body;
 
-    console.log("🗑️ Removing deliverable:", deliverableId);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🗑️ Removing deliverable:", deliverableId);
 
     if (!deliverableId) {
       return NextResponse.json(
@@ -413,7 +419,7 @@ export async function DELETE(
 
     // Optionally delete the actual deliverable (or just unlink it)
     // For now, we'll just unlink it from the project
-    console.log("✅ Deliverable unlinked from project");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Deliverable unlinked from project");
 
     return NextResponse.json({
       message: "Deliverable removed from project successfully",

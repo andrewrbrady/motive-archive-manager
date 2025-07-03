@@ -111,7 +111,7 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
       const car = (await api.get(`cars/${carId}?includeGalleries=true`)) as {
         galleries?: Gallery[];
       };
-      console.log("[CarGalleries] Car galleries from API:", car.galleries);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[CarGalleries] Car galleries from API:", car.galleries);
       setAttachedGalleries(car.galleries || []);
     } catch (error: any) {
       console.error("[CarGalleries] Error fetching car galleries:", error);
@@ -220,7 +220,7 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
   // Attach gallery with proper state management
   const attachGallery = useCallback(
     async (galleryId: string) => {
-      // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Attempting to attach gallery ${galleryId}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Attempting to attach gallery ${galleryId}`);
 
       // Prevent double-clicking using Set operations
       if (operationInProgress.has(galleryId) || isUpdating) {
@@ -232,7 +232,7 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
 
       // Check if already attached
       if (attachedGalleries.some((g) => g._id === galleryId)) {
-        // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Gallery ${galleryId} is already attached`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Gallery ${galleryId} is already attached`);
         toast.info("Gallery is already attached");
         return;
       }
@@ -274,7 +274,7 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
   // Detach gallery with proper state management
   const detachGallery = useCallback(
     async (galleryId: string) => {
-      // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Attempting to detach gallery ${galleryId}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Attempting to detach gallery ${galleryId}`);
 
       // Prevent double-clicking using Set operations
       if (operationInProgress.has(galleryId) || isUpdating) {
@@ -286,7 +286,7 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
 
       // Check if actually attached
       if (!attachedGalleries.some((g) => g._id === galleryId)) {
-        // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Gallery ${galleryId} is not attached`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Gallery ${galleryId} is not attached`);
         toast.info("Gallery is not attached");
         return;
       }

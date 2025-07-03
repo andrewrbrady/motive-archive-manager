@@ -9,7 +9,7 @@ interface ProcessImageRequest {
 }
 
 export async function POST(request: NextRequest) {
-  console.log("🚀 Unified image processing API called");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚀 Unified image processing API called");
 
   try {
     const body: ProcessImageRequest = await request.json();

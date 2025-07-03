@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useSession } from "@/hooks/useFirebaseAuth";
 import { toast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api-client";
+import { getMediumVariantUrl } from "@/lib/imageUtils";
 
 export interface Gallery {
   _id: string;
@@ -86,20 +87,20 @@ export function useGalleries(
         pagination: PaginationData;
       }>(`/galleries?${searchParams.toString()}`);
 
-      console.log("🐛 useGalleries: Raw API result:", result);
-      console.log("🐛 useGalleries: Result type:", typeof result);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🐛 useGalleries: Raw API result:", result);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🐛 useGalleries: Result type:", typeof result);
       console.log(
         "🐛 useGalleries: Result keys:",
         result ? Object.keys(result) : null
       );
-      console.log("🐛 useGalleries: Galleries array:", result?.galleries);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🐛 useGalleries: Galleries array:", result?.galleries);
       console.log(
         "🐛 useGalleries: Galleries length:",
         result?.galleries?.length
       );
 
       setData(result);
-      console.log("🐛 useGalleries: Data set successfully");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🐛 useGalleries: Data set successfully");
     } catch (err) {
       console.error("🐛 useGalleries: Error:", err);
       setError(err as Error);
@@ -148,10 +149,40 @@ export function useGallery(id: string) {
       setError(null);
       const result = await api.get<Gallery>(`/galleries/${id}`);
 
+      // Normalize image URLs to medium variant for consistent gallery display
+      if (result.images && Array.isArray(result.images)) {
+        console.log(
+          `🔄 useGallery: Normalizing ${result.images.length} image URLs to medium variant`
+        );
+        result.images = result.images.map((image: any, index: number) => {
+          if (image && image.url) {
+            const originalUrl = image.url;
+            const normalizedUrl = getMediumVariantUrl(originalUrl);
+
+            if (originalUrl !== normalizedUrl) {
+              console.log(`🔄 useGallery: Normalized image ${index + 1}:`, {
+                filename: image.filename,
+                original: originalUrl,
+                normalized: normalizedUrl,
+              });
+            }
+
+            return {
+              ...image,
+              url: normalizedUrl,
+            };
+          }
+          return image;
+        });
+        console.log(
+          `✅ useGallery: URL normalization complete for ${result.images.length} images`
+        );
+      }
+
       // Log debug information if available to help troubleshoot image count mismatches
       if ((result as any)._debug) {
         const debugInfo = (result as any)._debug;
-        console.log(`🔍 Gallery ${id} Debug Info:`, debugInfo);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🔍 Gallery ${id} Debug Info:`, debugInfo);
         if (debugInfo.cleanupPerformed) {
           console.log(
             `🧹 Cleanup performed! Removed ${debugInfo.orphanedImageCount} orphaned image references`

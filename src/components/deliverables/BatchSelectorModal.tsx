@@ -68,21 +68,21 @@ export default function BatchSelectorModal({
 
   const fetchBatches = async () => {
     if (!api) {
-      console.log("API not available in BatchSelectorModal");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API not available in BatchSelectorModal");
       setIsLoading(false);
       return;
     }
 
     try {
       setIsLoading(true);
-      console.log("Fetching batches from admin API...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching batches from admin API...");
 
       const response = (await api.get("/api/admin/deliverable-batches")) as {
         batches: BatchTemplate[];
         success: boolean;
       };
 
-      console.log("Batches response:", response);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Batches response:", response);
       setBatches(response.batches || []);
     } catch (error) {
       console.error("Error fetching batches:", error);
@@ -124,7 +124,7 @@ export default function BatchSelectorModal({
 
       const deliverables = batch.templates.map(
         (template: DeliverableTemplate) => {
-          console.log(`Processing template: "${template.title}"`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Processing template: "${template.title}"`);
 
           // Handle platform assignment (convert platform_id or legacy platform name)
           let platformValue: string | undefined = template.platform;
@@ -193,7 +193,7 @@ export default function BatchSelectorModal({
         }
       );
 
-      console.log("Creating batch deliverables:", deliverables);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Creating batch deliverables:", deliverables);
 
       const result = (await api.post(`/api/cars/${carId}/deliverables/batch`, {
         deliverables,

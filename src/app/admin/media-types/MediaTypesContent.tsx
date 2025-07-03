@@ -66,11 +66,11 @@ export default function MediaTypesContent() {
 
     try {
       setIsLoading(true);
-      console.log("Fetching media types..."); // Debug log
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching media types..."); // Debug log
       const data = (await api.get(
         "media-types?includeInactive=true"
       )) as MediaTypesResponse;
-      console.log("Media types response:", data); // Debug log
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Media types response:", data); // Debug log
       setMediaTypes(data.mediaTypes);
       setFilteredMediaTypes(data.mediaTypes);
     } catch (error) {

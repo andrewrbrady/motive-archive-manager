@@ -147,9 +147,9 @@ export default function CarSelector({
   };
 
   const handleRemove = (carId: string) => {
-    // [REMOVED] // [REMOVED] console.log("Removing car with ID:", carId);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Removing car with ID:", carId);
     const updatedCars = selectedCars.filter((car) => car._id !== carId);
-    // [REMOVED] // [REMOVED] console.log("Updated car list:", updatedCars);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Updated car list:", updatedCars);
     onSelect(updatedCars);
   };
 

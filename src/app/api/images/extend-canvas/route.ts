@@ -223,8 +223,8 @@ export async function POST(request: NextRequest) {
 
       if (remoteResponse.ok) {
         const remoteResult = await remoteResponse.json();
-        console.log("✅ Successfully processed with remote C service");
-        console.log("📊 Remote result keys:", Object.keys(remoteResult));
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Successfully processed with remote C service");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📊 Remote result keys:", Object.keys(remoteResult));
 
         // If uploadToCloudflare is requested, upload the result
         if (uploadToCloudflare && remoteResult.processedImageUrl) {

@@ -597,14 +597,14 @@ export async function DELETE(request: Request) {
 
     try {
       session = client.startSession();
-      // [REMOVED] // [REMOVED] console.log("MongoDB session started");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("MongoDB session started");
 
       // Start a transaction
       let result = null;
 
       try {
         session.startTransaction();
-        // [REMOVED] // [REMOVED] console.log("Transaction started");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Transaction started");
 
         // Convert carId to ObjectId
         const carObjectId = new ObjectId(id);
@@ -663,12 +663,12 @@ export async function DELETE(request: Request) {
           query.cloudflareId = { $in: cloudflareIds };
         }
 
-        // [REMOVED] // [REMOVED] console.log("Image lookup query:", JSON.stringify(query));
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Image lookup query:", JSON.stringify(query));
 
         // Find all matching image documents
         imageDocs = await db.collection("images").find(query).toArray();
 
-        // [REMOVED] // [REMOVED] console.log(`Found ${imageDocs.length} image documents to delete`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Found ${imageDocs.length} image documents to delete`);
 
         // Extract the ObjectIds from the found documents
         const foundImageObjectIds = imageDocs.map((doc) => doc._id);
@@ -719,18 +719,18 @@ export async function DELETE(request: Request) {
           { session }
         );
 
-        // [REMOVED] // [REMOVED] console.log("Car update result:", updateResult);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car update result:", updateResult);
 
         // Delete the image documents
         const deleteImagesResult = await db
           .collection("images")
           .deleteMany({ _id: { $in: foundImageObjectIds } }, { session });
 
-        // [REMOVED] // [REMOVED] console.log("Delete images result:", deleteImagesResult);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Delete images result:", deleteImagesResult);
 
         // Commit the transaction
         await session.commitTransaction();
-        // [REMOVED] // [REMOVED] console.log("Transaction committed successfully");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Transaction committed successfully");
 
         // Delete from Cloudflare if requested
         const cloudflareResults: any[] = [];
@@ -821,7 +821,7 @@ export async function DELETE(request: Request) {
         // Abort transaction on error
         if (session.inTransaction()) {
           await session.abortTransaction();
-          // [REMOVED] // [REMOVED] console.log("Transaction aborted due to error");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Transaction aborted due to error");
         }
         throw txError;
       }
@@ -829,7 +829,7 @@ export async function DELETE(request: Request) {
       // End session if it exists
       if (session) {
         await session.endSession();
-        // [REMOVED] // [REMOVED] console.log("MongoDB session ended");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("MongoDB session ended");
       }
     }
   } catch (error) {

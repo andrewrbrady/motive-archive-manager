@@ -49,7 +49,7 @@ function validateAssignmentPayload(body: any) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log("🔒 POST /api/cars/[id]/deliverables/assign: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 POST /api/cars/[id]/deliverables/assign: Starting request");
 
   const requestId = crypto.randomUUID();
   const startTime = Date.now();

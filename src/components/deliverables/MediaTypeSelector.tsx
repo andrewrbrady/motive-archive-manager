@@ -63,11 +63,11 @@ export function MediaTypeSelector({
         updates.type = legacyTypeMapping[selectedMediaType.name] || "other";
       }
 
-      console.log("🔄 Sending updates:", updates);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Sending updates:", updates);
 
       await api.put(`/api/deliverables/${deliverableId}`, updates);
 
-      console.log("✅ Media type update successful");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Media type update successful");
 
       // Update local state
       setMediaTypeId(newMediaTypeId);

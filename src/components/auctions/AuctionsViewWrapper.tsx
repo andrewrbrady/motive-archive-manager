@@ -13,7 +13,7 @@ export function AuctionsViewWrapper({
   auctions,
   view,
 }: AuctionsViewWrapperProps) {
-  // [REMOVED] // [REMOVED] console.log("AuctionsViewWrapper - Received auctions:", auctions);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("AuctionsViewWrapper - Received auctions:", auctions);
 
   if (!auctions || auctions.length === 0) {
     return (

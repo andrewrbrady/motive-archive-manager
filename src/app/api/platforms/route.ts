@@ -36,7 +36,7 @@ export async function GET() {
     // Check if platforms exist, if not seed them
     const count = await collection.countDocuments();
     if (count === 0) {
-      console.log("No platforms found, seeding initial data...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("No platforms found, seeding initial data...");
       const now = new Date();
       const platformsToInsert = INITIAL_PLATFORMS.map((platform) => ({
         ...platform,
@@ -45,7 +45,7 @@ export async function GET() {
       }));
 
       await collection.insertMany(platformsToInsert);
-      console.log("Seeded", platformsToInsert.length, "platforms");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Seeded", platformsToInsert.length, "platforms");
     }
 
     const platforms = await collection

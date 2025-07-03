@@ -109,3 +109,41 @@ export function getEnhancedImageUrlBySize(
   const preset = IMAGE_SIZES[size];
   return getEnhancedImageUrl(baseUrl, preset.width, preset.quality);
 }
+
+/**
+ * Normalize image URL to medium variant for consistent gallery display
+ * This is the primary function for gallery image URL normalization
+ * @param baseUrl - The original image URL
+ * @returns URL normalized to medium variant with debugging logs
+ */
+export function getMediumVariantUrl(baseUrl: string): string {
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎯 getMediumVariantUrl input:", baseUrl);
+
+  if (!baseUrl || !baseUrl.includes("imagedelivery.net")) {
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Non-Cloudflare URL, returning as-is");
+    return baseUrl;
+  }
+
+  // Always use 'medium' variant for consistent dimensions and quality
+  const urlParts = baseUrl.split("/");
+  const lastPart = urlParts[urlParts.length - 1];
+
+  // Check if the last part is a variant (alphabetic or has parameters)
+  if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+    // Replace with medium variant
+    urlParts[urlParts.length - 1] = "medium";
+  } else {
+    // No variant specified, append medium
+    urlParts.push("medium");
+  }
+
+  const mediumUrl = urlParts.join("/");
+  console.log("🎯 getMediumVariantUrl result:", {
+    original: baseUrl,
+    lastPart: lastPart,
+    medium: mediumUrl,
+    wasNormalized: baseUrl !== mediumUrl,
+  });
+
+  return mediumUrl;
+}

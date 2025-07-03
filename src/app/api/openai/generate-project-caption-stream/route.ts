@@ -9,57 +9,76 @@ function formatCarSpecifications(
   carDetails: any,
   useMinimalCarData: boolean = false
 ): string {
-  if (!carDetails || !carDetails.cars || carDetails.cars.length === 0) {
-    return "";
+  // Handle empty or null car details
+  if (!carDetails || carDetails.count === 0) {
+    return "No vehicle specifications provided for this project.";
   }
 
-  const cars = carDetails.cars;
-  let specsText = "";
+  const projectSpecs: string[] = [];
 
-  if (cars.length === 1) {
-    // Single car format
-    const car = cars[0];
-    specsText += `Car: ${car.year} ${car.make} ${car.model}`;
-    if (car.color) specsText += ` (${car.color})`;
-    specsText += "\n";
+  // Project overview
+  projectSpecs.push(
+    `Project contains ${carDetails.count} vehicle${carDetails.count !== 1 ? "s" : ""}`
+  );
 
-    // Add detailed specs for single car
-    if (car.engine) {
-      if (car.engine.type) specsText += `Engine: ${car.engine.type}\n`;
-      if (car.engine.displacement) {
-        specsText += `Displacement: ${car.engine.displacement.value} ${car.engine.displacement.unit}\n`;
+  if (carDetails.makes && carDetails.makes.length > 0) {
+    projectSpecs.push(`Makes: ${carDetails.makes.join(", ")}`);
+  }
+
+  if (carDetails.years && carDetails.years.length > 0) {
+    const yearRange =
+      carDetails.years.length === 1
+        ? carDetails.years[0]
+        : `${carDetails.years[0]} - ${carDetails.years[carDetails.years.length - 1]}`;
+    projectSpecs.push(`Year Range: ${yearRange}`);
+  }
+
+  if (carDetails.colors && carDetails.colors.length > 0) {
+    projectSpecs.push(`Colors: ${carDetails.colors.join(", ")}`);
+  }
+
+  // Individual car details - limit to essential info to reduce prompt size
+  if (carDetails.cars && carDetails.cars.length > 0) {
+    projectSpecs.push("\nVehicle Details:");
+
+    carDetails.cars.forEach((car: any, index: number) => {
+      const carSpecs: string[] = [];
+
+      // Essential car info only
+      if (car.year) carSpecs.push(`${car.year}`);
+      if (car.make) carSpecs.push(`${car.make}`);
+      if (car.model) carSpecs.push(`${car.model}`);
+      if (car.color) carSpecs.push(`${car.color}`);
+
+      // Only include description if not using minimal data and it's short
+      if (
+        !useMinimalCarData &&
+        car.description &&
+        car.description.length < 200
+      ) {
+        carSpecs.push(`${car.description}`);
       }
-      if (car.engine.power?.hp) {
-        specsText += `Power: ${car.engine.power.hp} HP`;
-        if (car.engine.power.kW) specsText += ` (${car.engine.power.kW} kW)`;
-        specsText += "\n";
+
+      // Essential specs only
+      if (car.mileage?.value) {
+        carSpecs.push(`${car.mileage.value}${car.mileage.unit || "mi"}`);
       }
-    }
-    if (car.transmission?.type) {
-      specsText += `Transmission: ${car.transmission.type}`;
-      if (car.transmission.speeds)
-        specsText += ` (${car.transmission.speeds}-speed)`;
-      specsText += "\n";
-    }
-    if (car.mileage) {
-      specsText += `Mileage: ${car.mileage.value} ${car.mileage.unit || "mi"}\n`;
-    }
-    if (!useMinimalCarData && car.description) {
-      specsText += `Description: ${car.description}\n`;
-    }
-  } else {
-    // Multiple cars format
-    specsText += `Cars (${cars.length}):\n`;
-    cars.forEach((car: any, index: number) => {
-      specsText += `${index + 1}. ${car.year} ${car.make} ${car.model}`;
-      if (car.color) specsText += ` (${car.color})`;
-      if (car.engine?.type) specsText += ` - ${car.engine.type}`;
-      if (car.transmission?.type) specsText += ` - ${car.transmission.type}`;
-      specsText += "\n";
+
+      if (car.engine?.power?.hp) {
+        carSpecs.push(`${car.engine.power.hp}hp`);
+      }
+
+      if (car.transmission?.type) {
+        carSpecs.push(`${car.transmission.type}`);
+      }
+
+      if (carSpecs.length > 0) {
+        projectSpecs.push(`${index + 1}. ${carSpecs.join(" ")}`);
+      }
     });
   }
 
-  return specsText;
+  return projectSpecs.join("\n");
 }
 
 function formatEventSpecifications(eventDetails: any): string {
@@ -119,18 +138,21 @@ export async function POST(request: NextRequest) {
       useMinimalCarData = false,
     } = await request.json();
 
-    console.log("=== STREAMING PROJECT CAPTION REQUEST ===");
-    console.log("Project ID:", projectId);
-    console.log("Model:", aiModel);
-    console.log("Car Details Count:", carDetails?.count || 0);
-    console.log("Event Details Count:", eventDetails?.count || 0);
-    console.log("Template:", template);
-    console.log("Custom LLM Text:", !!customLLMText);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== STREAMING PROJECT CAPTION REQUEST ===");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Project ID:", projectId);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Model:", aiModel);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car Details Count:", carDetails?.count || 0);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Event Details Count:", eventDetails?.count || 0);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Template:", template);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Custom LLM Text:", !!customLLMText);
 
     // Validate required parameters
-    if (!platform || !carDetails || !aiModel) {
+    if (!platform || !aiModel) {
       return NextResponse.json(
-        { error: "Missing required parameters" },
+        {
+          error:
+            "Missing required parameters: platform and aiModel are required",
+        },
         { status: 400 }
       );
     }
@@ -287,18 +309,18 @@ export async function POST(request: NextRequest) {
       userPrompt = userPromptParts.join("\n");
     }
 
-    console.log("=== STREAMING PROMPT DETAILS ===");
-    console.log("System Prompt Length:", systemPrompt.length);
-    console.log("User Prompt Length:", userPrompt.length);
-    console.log("Specs Text Preview:", specsText.substring(0, 200) + "...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== STREAMING PROMPT DETAILS ===");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("System Prompt Length:", systemPrompt.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("User Prompt Length:", userPrompt.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Specs Text Preview:", specsText.substring(0, 200) + "...");
     if (eventSpecsText) {
       console.log(
         "Events Text Preview:",
         eventSpecsText.substring(0, 200) + "..."
       );
     }
-    console.log("Template:", template);
-    console.log("Length Guidelines Applied:", length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Template:", template);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Length Guidelines Applied:", length);
 
     // Generate streaming response
     const streamingResponse = await generateTextStream({

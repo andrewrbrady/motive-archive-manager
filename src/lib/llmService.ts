@@ -241,9 +241,9 @@ async function handleOpenAIStreamRequest(
   params: ProviderParams
 ): Promise<StreamingResponse> {
   try {
-    console.log("🎬 Starting OpenAI stream for model:", model.id);
-    console.log("📏 Prompt length:", prompt.length);
-    console.log("🎛️ Max tokens:", params.maxTokens);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎬 Starting OpenAI stream for model:", model.id);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📏 Prompt length:", prompt.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎛️ Max tokens:", params.maxTokens);
 
     const stream = await openai.chat.completions.create({
       model: model.id,
@@ -267,7 +267,7 @@ async function handleOpenAIStreamRequest(
         let totalContent = "";
 
         try {
-          console.log("📡 OpenAI stream started, processing chunks...");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📡 OpenAI stream started, processing chunks...");
 
           for await (const chunk of stream) {
             chunkCount++;
@@ -331,9 +331,9 @@ async function handleAnthropicStreamRequest(
   params: ProviderParams
 ): Promise<StreamingResponse> {
   try {
-    console.log("🎬 Starting Anthropic stream for model:", model.id);
-    console.log("📏 Prompt length:", prompt.length);
-    console.log("🎛️ Max tokens:", params.maxTokens);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎬 Starting Anthropic stream for model:", model.id);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📏 Prompt length:", prompt.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎛️ Max tokens:", params.maxTokens);
 
     const stream = await anthropic.messages.create({
       model: model.id,
@@ -351,7 +351,7 @@ async function handleAnthropicStreamRequest(
         let totalContent = "";
 
         try {
-          console.log("📡 Anthropic stream started, processing chunks...");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📡 Anthropic stream started, processing chunks...");
 
           for await (const chunk of stream) {
             chunkCount++;
@@ -371,7 +371,7 @@ async function handleAnthropicStreamRequest(
                 );
               }
             } else if (chunk.type === "message_stop") {
-              console.log("🏁 Anthropic stream finished: message_stop");
+              // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🏁 Anthropic stream finished: message_stop");
               break;
             }
           }
