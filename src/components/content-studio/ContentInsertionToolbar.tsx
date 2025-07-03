@@ -12,8 +12,11 @@ import {
   Save,
   Loader2,
   FileText,
+  Archive,
 } from "lucide-react";
 import { ImageGalleryPopup } from "./ImageGalleryPopup";
+import { BlockGroupsManager } from "./BlockGroupsManager";
+import { ContentBlock } from "./types";
 
 interface ContentInsertionToolbarProps {
   activeBlockId: string | null;
@@ -33,6 +36,10 @@ interface ContentInsertionToolbarProps {
   isSaving?: boolean;
   canSave?: boolean;
   isUpdate?: boolean;
+  // Block groups props
+  currentBlocks?: ContentBlock[];
+  onBlocksChange?: (blocks: ContentBlock[]) => void;
+  carId?: string;
 }
 
 /**
@@ -58,6 +65,9 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
     isSaving = false,
     canSave = false,
     isUpdate = false,
+    currentBlocks = [],
+    onBlocksChange,
+    carId,
   }) {
     // Show image gallery button only if we have the necessary props and images
     const showImageGallery =
@@ -106,6 +116,26 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
 
                 {/* Quick Insert - Most Common Actions */}
                 <div className="flex items-center gap-2">
+                  {/* Block Groups Manager */}
+                  {onBlocksChange && (
+                    <BlockGroupsManager
+                      currentBlocks={currentBlocks}
+                      activeBlockId={activeBlockId}
+                      onBlocksChange={onBlocksChange}
+                      projectId={projectId}
+                      carId={carId}
+                    >
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="hover:bg-muted/20"
+                        title="Block Groups"
+                      >
+                        <Archive className="h-4 w-4" />
+                      </Button>
+                    </BlockGroupsManager>
+                  )}
+
                   {/* Image Gallery Popup Button */}
                   {showImageGallery && (
                     <ImageGalleryPopup
@@ -193,6 +223,26 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                       )}
                       {isUpdate ? "Update" : "Save"}
                     </Button>
+                  )}
+
+                  {/* Block Groups Manager */}
+                  {onBlocksChange && (
+                    <BlockGroupsManager
+                      currentBlocks={currentBlocks}
+                      activeBlockId={activeBlockId}
+                      onBlocksChange={onBlocksChange}
+                      projectId={projectId}
+                      carId={carId}
+                    >
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+                      >
+                        <Archive className="h-4 w-4 mr-2" />
+                        Block Groups
+                      </Button>
+                    </BlockGroupsManager>
                   )}
 
                   {/* Image Gallery Button */}

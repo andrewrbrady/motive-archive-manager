@@ -671,6 +671,9 @@ export function BlockComposer({
         isSaving={isSaving}
         canSave={!!compositionName.trim()}
         isUpdate={!!loadedComposition}
+        currentBlocks={blocks}
+        onBlocksChange={onBlocksChange}
+        carId={selectedCopies[0]?.carId}
       />
     </div>
   );
