@@ -445,7 +445,7 @@ export function BlockComposer({
                 onClick={() =>
                   exportToHTML(
                     blocks,
-                    template,
+                    template?.id || null,
                     compositionName,
                     "web",
                     selectedCopies[0]?.projectId,
@@ -463,7 +463,7 @@ export function BlockComposer({
                 onClick={() =>
                   exportToHTML(
                     blocks,
-                    template,
+                    template?.id || null,
                     compositionName,
                     "email",
                     selectedCopies[0]?.projectId,
@@ -486,7 +486,7 @@ export function BlockComposer({
                 onClick={() =>
                   copyHTMLToClipboard(
                     blocks,
-                    template,
+                    template?.id || null,
                     compositionName,
                     "web",
                     selectedCopies[0]?.projectId,
@@ -504,7 +504,7 @@ export function BlockComposer({
                 onClick={() =>
                   copyHTMLToClipboard(
                     blocks,
-                    template,
+                    template?.id || null,
                     compositionName,
                     "email",
                     selectedCopies[0]?.projectId,
