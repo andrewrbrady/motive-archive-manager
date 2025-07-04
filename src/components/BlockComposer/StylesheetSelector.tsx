@@ -26,6 +26,7 @@ import {
   StylesheetMetadata,
   CreateStylesheetRequest,
 } from "@/types/stylesheet";
+import { useToast } from "@/components/ui/use-toast";
 
 interface StylesheetSelectorProps {
   selectedStylesheetId?: string;
@@ -38,6 +39,7 @@ export function StylesheetSelector({
   onStylesheetChange,
   className,
 }: StylesheetSelectorProps) {
+  const { toast } = useToast();
   const [stylesheets, setStylesheets] = useState<StylesheetMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -61,35 +63,77 @@ export function StylesheetSelector({
     try {
       setLoading(true);
       const response = await fetch("/api/stylesheets");
+
       if (response.ok) {
         const data = await response.json();
         setStylesheets(data.stylesheets);
+        console.log("Loaded stylesheets:", data.stylesheets.length);
+      } else {
+        console.error("Failed to fetch stylesheets:", response.status);
+        toast({
+          title: "Loading Error",
+          description: "Failed to load available stylesheets.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Error fetching stylesheets:", error);
+      toast({
+        title: "Loading Error",
+        description: "Unable to connect to the stylesheet service.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleUploadStylesheet = async () => {
-    if (!newStylesheet.name || !newStylesheet.cssContent) {
+    if (!newStylesheet.name.trim()) {
+      toast({
+        title: "Name Required",
+        description: "Please enter a name for the stylesheet.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newStylesheet.cssContent.trim()) {
+      toast({
+        title: "CSS Content Required",
+        description: "Please paste your CSS content.",
+        variant: "destructive",
+      });
       return;
     }
 
     try {
       setUploading(true);
+      console.log("Uploading stylesheet:", {
+        name: newStylesheet.name,
+        cssLength: newStylesheet.cssContent.length,
+      });
+
       const response = await fetch("/api/stylesheets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newStylesheet),
       });
 
+      console.log("Upload response status:", response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log("Upload successful, response:", data);
+
         await fetchStylesheets();
         onStylesheetChange(data.stylesheet.id);
         setUploadDialogOpen(false);
+
+        toast({
+          title: "Stylesheet Uploaded",
+          description: `"${newStylesheet.name}" has been successfully uploaded and applied.`,
+        });
 
         // Reset form
         setNewStylesheet({
@@ -100,9 +144,33 @@ export function StylesheetSelector({
           version: "1.0.0",
           tags: [],
         });
+      } else {
+        // Handle error response
+        let errorMessage = `Upload failed with status ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch (parseError) {
+          console.error("Error parsing error response:", parseError);
+        }
+
+        console.error("Upload failed:", errorMessage);
+        toast({
+          title: "Upload Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Error uploading stylesheet:", error);
+      toast({
+        title: "Upload Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred while uploading the stylesheet.",
+        variant: "destructive",
+      });
     } finally {
       setUploading(false);
     }
@@ -180,6 +248,7 @@ export function StylesheetSelector({
                     setNewStylesheet({ ...newStylesheet, name: e.target.value })
                   }
                   placeholder="Client Name Newsletter Styles"
+                  disabled={uploading}
                 />
               </div>
               <div>
@@ -194,6 +263,7 @@ export function StylesheetSelector({
                     })
                   }
                   placeholder="client-abc-123"
+                  disabled={uploading}
                 />
               </div>
             </div>
@@ -210,6 +280,7 @@ export function StylesheetSelector({
                   })
                 }
                 placeholder="Newsletter styles for XYZ Company"
+                disabled={uploading}
               />
             </div>
 
@@ -226,7 +297,13 @@ export function StylesheetSelector({
                 }
                 placeholder="Paste your CSS here..."
                 className="min-h-48 font-mono text-sm"
+                disabled={uploading}
               />
+              {newStylesheet.cssContent && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  {newStylesheet.cssContent.length.toLocaleString()} characters
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2">
