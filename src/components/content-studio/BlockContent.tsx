@@ -20,6 +20,7 @@ import {
   TextBlock,
   HeadingBlock,
   ImageBlock,
+  VideoBlock,
   DividerBlock,
   FrontmatterBlock,
 } from "./types";
@@ -106,6 +107,18 @@ const areBlockContentPropsEqual = (
         JSON.stringify(prevImage.email) === JSON.stringify(nextImage.email)
       );
     }
+    case "video": {
+      const prevVideo = prevBlock as VideoBlock;
+      const nextVideo = nextBlock as VideoBlock;
+      return (
+        prevVideo.url === nextVideo.url &&
+        prevVideo.title === nextVideo.title &&
+        prevVideo.platform === nextVideo.platform &&
+        prevVideo.embedId === nextVideo.embedId &&
+        prevVideo.aspectRatio === nextVideo.aspectRatio &&
+        prevVideo.alignment === nextVideo.alignment
+      );
+    }
     case "divider": {
       const prevDivider = prevBlock as DividerBlock;
       const nextDivider = nextBlock as DividerBlock;
@@ -146,6 +159,10 @@ const BlockContent = React.memo<BlockContentProps>(function BlockContent({
     case "image":
       return (
         <ImageBlockContent block={block as ImageBlock} onUpdate={onUpdate} />
+      );
+    case "video":
+      return (
+        <VideoBlockContent block={block as VideoBlock} onUpdate={onUpdate} />
       );
     case "divider":
       return (
@@ -1142,6 +1159,278 @@ const ImageBlockContent = React.memo<ImageBlockContentProps>(
                 </div>
               )}
             </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+);
+
+/**
+ * VideoBlockContent - Memoized video block editor
+ * Handles YouTube and Vimeo URLs with automatic platform detection and embed ID extraction
+ */
+interface VideoBlockContentProps {
+  block: VideoBlock;
+  onUpdate: (updates: Partial<ContentBlock>) => void;
+}
+
+const VideoBlockContent = React.memo<VideoBlockContentProps>(
+  function VideoBlockContent({ block, onUpdate }) {
+    const [isCollapsed, setIsCollapsed] = useState(true);
+    const [urlInput, setUrlInput] = useState(block.url || "");
+
+    // Helper function to extract video ID and platform from URL
+    const parseVideoUrl = (
+      url: string
+    ): { platform: "youtube" | "vimeo"; embedId: string } | null => {
+      // YouTube URL patterns
+      const youtubePatterns = [
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
+        /youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]{11})/,
+      ];
+
+      // Vimeo URL patterns
+      const vimeoPatterns = [
+        /vimeo\.com\/([0-9]+)/,
+        /vimeo\.com\/video\/([0-9]+)/,
+      ];
+
+      // Check YouTube patterns
+      for (const pattern of youtubePatterns) {
+        const match = url.match(pattern);
+        if (match) {
+          return { platform: "youtube", embedId: match[1] };
+        }
+      }
+
+      // Check Vimeo patterns
+      for (const pattern of vimeoPatterns) {
+        const match = url.match(pattern);
+        if (match) {
+          return { platform: "vimeo", embedId: match[1] };
+        }
+      }
+
+      return null;
+    };
+
+    // Handle URL input changes
+    const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newUrl = e.target.value;
+      setUrlInput(newUrl);
+
+      if (newUrl.trim()) {
+        const parsed = parseVideoUrl(newUrl);
+        if (parsed) {
+          onUpdate({
+            url: newUrl,
+            platform: parsed.platform,
+            embedId: parsed.embedId,
+          } as Partial<VideoBlock>);
+        } else {
+          onUpdate({ url: newUrl } as Partial<VideoBlock>);
+        }
+      } else {
+        onUpdate({ url: "" } as Partial<VideoBlock>);
+      }
+    };
+
+    // Handle aspect ratio changes
+    const handleAspectRatioChange = (aspectRatio: "16:9" | "4:3" | "1:1") => {
+      onUpdate({ aspectRatio } as Partial<VideoBlock>);
+    };
+
+    // Handle alignment changes
+    const handleAlignmentChange = (alignment: "left" | "center" | "right") => {
+      onUpdate({ alignment } as Partial<VideoBlock>);
+    };
+
+    // Handle title changes
+    const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      onUpdate({ title: e.target.value } as Partial<VideoBlock>);
+    };
+
+    // Generate embed URL for preview
+    const getEmbedUrl = () => {
+      if (!block.embedId || !block.platform) return "";
+
+      if (block.platform === "youtube") {
+        return `https://www.youtube.com/embed/${block.embedId}`;
+      } else if (block.platform === "vimeo") {
+        return `https://player.vimeo.com/video/${block.embedId}`;
+      }
+      return "";
+    };
+
+    const embedUrl = getEmbedUrl();
+
+    return (
+      <div className="space-y-3">
+        {/* Video Preview/Input */}
+        <div className="mb-3 relative">
+          {embedUrl ? (
+            <div className="relative">
+              <div
+                className={`relative w-full ${
+                  block.aspectRatio === "16:9"
+                    ? "aspect-video"
+                    : block.aspectRatio === "4:3"
+                      ? "aspect-[4/3]"
+                      : "aspect-square"
+                }`}
+                style={{
+                  textAlign: block.alignment || "center",
+                }}
+              >
+                <iframe
+                  src={embedUrl}
+                  title={block.title || "Video"}
+                  className="w-full h-full rounded-md border border-border/20"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+              {block.title && (
+                <p className="text-sm text-muted-foreground mt-2 text-center">
+                  {block.title}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="p-8 bg-muted/10 rounded-md border border-border/20 border-dashed text-center">
+              <div className="text-muted-foreground">
+                <p className="text-sm mb-2">Enter a YouTube or Vimeo URL</p>
+                <p className="text-xs text-muted-foreground/70">
+                  Supported formats: youtube.com/watch?v=..., youtu.be/...,
+                  vimeo.com/...
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Toggle Button */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute top-2 right-2 h-6 w-6 p-0 hover:bg-muted/20 bg-background/80 backdrop-blur-sm border border-border/20"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+          >
+            {isCollapsed ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronUp className="h-3 w-3" />
+            )}
+          </Button>
+        </div>
+
+        {/* Video URL Input */}
+        <div>
+          <Label
+            htmlFor={`video-url-${block.id}`}
+            className="text-sm font-medium"
+          >
+            Video URL
+          </Label>
+          <Input
+            id={`video-url-${block.id}`}
+            type="url"
+            placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
+            value={urlInput}
+            onChange={handleUrlChange}
+            className="mt-1 bg-background border-border/40 focus:border-border/60"
+          />
+          {block.url && !block.embedId && (
+            <p className="text-xs text-red-600 mt-1">
+              Unable to parse video URL. Please check the format.
+            </p>
+          )}
+          {block.platform && block.embedId && (
+            <p className="text-xs text-green-600 mt-1">
+              ✓ {block.platform === "youtube" ? "YouTube" : "Vimeo"} video
+              detected
+            </p>
+          )}
+        </div>
+
+        {/* Collapsible Video Settings */}
+        {!isCollapsed && (
+          <div className="pt-2 space-y-4">
+            {/* Title Input */}
+            <div>
+              <Label
+                htmlFor={`video-title-${block.id}`}
+                className="text-sm font-medium"
+              >
+                Video Title (Optional)
+              </Label>
+              <Input
+                id={`video-title-${block.id}`}
+                placeholder="Enter video title..."
+                value={block.title || ""}
+                onChange={handleTitleChange}
+                className="mt-1 bg-background border-border/40 focus:border-border/60"
+              />
+            </div>
+
+            {/* Aspect Ratio Selection */}
+            <div>
+              <Label className="text-sm font-medium mb-2 block">
+                Aspect Ratio
+              </Label>
+              <div className="flex gap-2">
+                {(["16:9", "4:3", "1:1"] as const).map((ratio) => (
+                  <Button
+                    key={ratio}
+                    type="button"
+                    variant={
+                      block.aspectRatio === ratio ? "default" : "outline"
+                    }
+                    size="sm"
+                    onClick={() => handleAspectRatioChange(ratio)}
+                    className="flex-1"
+                  >
+                    {ratio}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Alignment Selection */}
+            <div>
+              <Label className="text-sm font-medium mb-2 block">
+                Alignment
+              </Label>
+              <div className="flex gap-2">
+                {(["left", "center", "right"] as const).map((align) => (
+                  <Button
+                    key={align}
+                    type="button"
+                    variant={block.alignment === align ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleAlignmentChange(align)}
+                    className="flex-1 capitalize"
+                  >
+                    {align}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Platform Info */}
+            {block.platform && (
+              <div className="text-xs text-muted-foreground p-2 bg-muted/10 rounded">
+                <p>
+                  <strong>Platform:</strong>{" "}
+                  {block.platform === "youtube" ? "YouTube" : "Vimeo"}
+                </p>
+                <p>
+                  <strong>Video ID:</strong> {block.embedId}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

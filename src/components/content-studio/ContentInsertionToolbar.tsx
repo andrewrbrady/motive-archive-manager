@@ -13,6 +13,7 @@ import {
   Loader2,
   FileText,
   Archive,
+  Video,
 } from "lucide-react";
 import { ImageGalleryPopup } from "./ImageGalleryPopup";
 import { BlockGroupsManager } from "./BlockGroupsManager";
@@ -24,6 +25,7 @@ interface ContentInsertionToolbarProps {
   onToggleExpanded: () => void;
   onAddTextBlock: () => void;
   onAddDividerBlock: () => void;
+  onAddVideoBlock: () => void;
   onAddFrontmatterBlock?: () => void;
   // Image gallery props
   finalImages?: any[];
@@ -55,6 +57,7 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
     onToggleExpanded,
     onAddTextBlock,
     onAddDividerBlock,
+    onAddVideoBlock,
     onAddFrontmatterBlock,
     finalImages = [],
     loadingImages = false,
@@ -169,6 +172,16 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                   )}
 
                   <Button
+                    onClick={onAddVideoBlock}
+                    variant="ghost"
+                    size="sm"
+                    className="hover:bg-muted/20"
+                    title="Add Video Block"
+                  >
+                    <Video className="h-4 w-4" />
+                  </Button>
+
+                  <Button
                     onClick={onAddTextBlock}
                     variant="ghost"
                     size="sm"
@@ -278,6 +291,17 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                       Article Metadata
                     </Button>
                   )}
+
+                  {/* Video Block Button */}
+                  <Button
+                    onClick={onAddVideoBlock}
+                    variant="outline"
+                    size="sm"
+                    className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+                  >
+                    <Video className="h-4 w-4 mr-2" />
+                    Video Block
+                  </Button>
 
                   {/* Text Block Button */}
                   <Button

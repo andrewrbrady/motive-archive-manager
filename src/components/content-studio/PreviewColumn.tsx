@@ -8,6 +8,7 @@ import {
   TextBlock,
   HeadingBlock,
   ImageBlock,
+  VideoBlock,
   ButtonBlock,
   DividerBlock,
   SpacerBlock,
@@ -201,6 +202,8 @@ const PreviewBlock = React.memo<PreviewBlockProps>(function PreviewBlock({
       return <TextBlockPreview block={textBlock} />;
     case "image":
       return <ImageBlockPreview block={block as ImageBlock} />;
+    case "video":
+      return <VideoBlockPreview block={block as VideoBlock} />;
     case "button":
       return <ButtonBlockPreview block={block as ButtonBlock} />;
     case "divider":
@@ -495,6 +498,101 @@ const ImageBlockPreview = React.memo<{ block: ImageBlock }>(
           <div className="bg-muted/20 border-2 border-dashed border-border/40 rounded-lg p-8 text-center text-muted-foreground">
             <div className="text-2xl mb-2">🖼️</div>
             <div>Image URL required</div>
+          </div>
+        )}
+      </div>
+    );
+  }
+);
+
+/**
+ * VideoBlockPreview - Memoized video block renderer
+ * Phase 2A Performance: Added React.memo and memoized video styles
+ */
+const VideoBlockPreview = React.memo<{ block: VideoBlock }>(
+  function VideoBlockPreview({ block }) {
+    // Performance optimization: Memoize video URL processing
+    const hasVideo = useMemo(
+      () => block.url && block.embedId && block.platform,
+      [block.url, block.embedId, block.platform]
+    );
+
+    // Performance optimization: Memoize embed URL generation
+    const embedUrl = useMemo(() => {
+      if (!hasVideo) return "";
+
+      if (block.platform === "youtube") {
+        return `https://www.youtube.com/embed/${block.embedId}`;
+      } else if (block.platform === "vimeo") {
+        return `https://player.vimeo.com/video/${block.embedId}`;
+      }
+      return "";
+    }, [hasVideo, block.platform, block.embedId]);
+
+    // Performance optimization: Memoize video container styles
+    const containerStyles = useMemo(
+      () => ({
+        textAlign: block.alignment || "center",
+      }),
+      [block.alignment]
+    );
+
+    // Performance optimization: Memoize aspect ratio class
+    const aspectRatioClass = useMemo(() => {
+      return block.aspectRatio === "16:9"
+        ? "aspect-video"
+        : block.aspectRatio === "4:3"
+          ? "aspect-[4/3]"
+          : "aspect-square";
+    }, [block.aspectRatio]);
+
+    return (
+      <div className="p-6" style={containerStyles}>
+        {hasVideo && embedUrl ? (
+          <div>
+            <div
+              className={`relative w-full ${aspectRatioClass} max-w-2xl mx-auto`}
+            >
+              <iframe
+                src={embedUrl}
+                title={block.title || "Video"}
+                className="w-full h-full rounded-lg border border-border/20"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                onError={(e) => {
+                  const target = e.target as HTMLIFrameElement;
+                  target.style.display = "none";
+                  const parent = target.parentElement;
+                  if (parent) {
+                    parent.innerHTML = `
+                    <div class="bg-muted/20 border-2 border-dashed border-border/40 rounded-lg p-8 text-center text-muted-foreground">
+                      <div class="text-2xl mb-2">🎥</div>
+                      <div>Video failed to load</div>
+                      <div class="text-xs mt-1">${block.url}</div>
+                    </div>
+                  `;
+                  }
+                }}
+              />
+            </div>
+
+            {block.title && (
+              <p className="text-sm text-muted-foreground mt-2 italic text-center">
+                {block.title}
+              </p>
+            )}
+
+            <div className="text-xs text-muted-foreground mt-1 text-center">
+              {block.platform === "youtube" ? "YouTube" : "Vimeo"} •{" "}
+              {block.aspectRatio}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-muted/20 border-2 border-dashed border-border/40 rounded-lg p-8 text-center text-muted-foreground">
+            <div className="text-2xl mb-2">🎥</div>
+            <div>Video URL required</div>
+            <div className="text-xs mt-1">Add a YouTube or Vimeo URL</div>
           </div>
         )}
       </div>

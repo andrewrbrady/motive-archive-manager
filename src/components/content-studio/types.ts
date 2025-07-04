@@ -8,6 +8,7 @@
 export type ContentBlockType =
   | "text"
   | "image"
+  | "video"
   | "divider"
   | "button"
   | "spacer"
@@ -80,6 +81,18 @@ export interface ImageBlock extends BaseContentBlock {
   };
 }
 
+export interface VideoBlock extends BaseContentBlock {
+  type: "video";
+  url: string;
+  title?: string;
+  platform: "youtube" | "vimeo";
+  embedId: string;
+  aspectRatio: "16:9" | "4:3" | "1:1";
+  width?: string;
+  height?: string;
+  alignment?: "left" | "center" | "right";
+}
+
 export interface DividerBlock extends BaseContentBlock {
   type: "divider";
   thickness?: string;
@@ -134,6 +147,7 @@ export type HeadingBlock = TextBlock & {
 export type ContentBlock =
   | TextBlock
   | ImageBlock
+  | VideoBlock
   | DividerBlock
   | ButtonBlock
   | SpacerBlock

@@ -1,6 +1,12 @@
 import React, { useMemo } from "react";
 import { ImageIcon } from "lucide-react";
-import { ContentBlock, TextBlock, ImageBlock, DividerBlock } from "../types";
+import {
+  ContentBlock,
+  TextBlock,
+  ImageBlock,
+  VideoBlock,
+  DividerBlock,
+} from "../types";
 import { classToInlineStyles } from "@/lib/css-parser";
 
 interface CleanRendererProps {
@@ -209,6 +215,78 @@ const CleanPreviewBlock = React.memo<CleanPreviewBlockProps>(
             />
             {imageBlock.caption && (
               <p className={captionClass}>{imageBlock.caption}</p>
+            )}
+          </div>
+        );
+      }
+
+      case "video": {
+        const videoBlock = block as VideoBlock;
+        if (!videoBlock.url || !videoBlock.embedId) {
+          return (
+            <div className="flex items-center justify-center h-48 bg-muted rounded border-2 border-dashed border-muted-foreground/25">
+              <div className="text-center text-muted-foreground">
+                <ImageIcon className="h-12 w-12 mx-auto mb-2" />
+                <p className="text-sm">Video not configured</p>
+              </div>
+            </div>
+          );
+        }
+
+        // Generate embed URL
+        const getEmbedUrl = () => {
+          if (videoBlock.platform === "youtube") {
+            return `https://www.youtube.com/embed/${videoBlock.embedId}`;
+          } else if (videoBlock.platform === "vimeo") {
+            return `https://player.vimeo.com/video/${videoBlock.embedId}`;
+          }
+          return "";
+        };
+
+        const embedUrl = getEmbedUrl();
+        if (!embedUrl) {
+          return (
+            <div className="flex items-center justify-center h-48 bg-muted rounded border-2 border-dashed border-muted-foreground/25">
+              <div className="text-center text-muted-foreground">
+                <ImageIcon className="h-12 w-12 mx-auto mb-2" />
+                <p className="text-sm">Unsupported video platform</p>
+              </div>
+            </div>
+          );
+        }
+
+        const videoContainerClass = videoBlock.cssClassName
+          ? videoBlock.cssClassName
+          : "mb-4";
+
+        const aspectRatioClass =
+          videoBlock.aspectRatio === "16:9"
+            ? "aspect-video"
+            : videoBlock.aspectRatio === "4:3"
+              ? "aspect-[4/3]"
+              : "aspect-square";
+
+        const alignmentStyle = {
+          textAlign: videoBlock.alignment || "center",
+        };
+
+        return (
+          <div className={videoContainerClass} style={alignmentStyle}>
+            <div className={`relative w-full ${aspectRatioClass}`}>
+              <iframe
+                src={embedUrl}
+                title={videoBlock.title || "Video"}
+                className="w-full h-full rounded"
+                style={customStyles}
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+            {videoBlock.title && (
+              <p className="text-sm text-muted-foreground mt-2 text-center italic">
+                {videoBlock.title}
+              </p>
             )}
           </div>
         );

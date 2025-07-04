@@ -7,6 +7,7 @@ import {
   GripVertical,
   Type,
   ImageIcon,
+  Video,
   Heading,
   Minus,
   FileText,
@@ -16,6 +17,7 @@ import {
   TextBlock,
   HeadingBlock,
   ImageBlock,
+  VideoBlock,
   ButtonBlock,
   DividerBlock,
   SpacerBlock,
@@ -311,6 +313,8 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
           return <Type className="h-3 w-3" />;
         case "image":
           return <ImageIcon className="h-3 w-3" />;
+        case "video":
+          return <Video className="h-3 w-3" />;
         case "divider":
           return <Minus className="h-3 w-3" />;
         case "button":
@@ -522,6 +526,8 @@ const PreviewBlock = React.memo<PreviewBlockProps>(function PreviewBlock({
       return <TextBlockPreview block={textBlock} />;
     case "image":
       return <ImageBlockPreview block={block as ImageBlock} />;
+    case "video":
+      return <VideoBlockPreview block={block as VideoBlock} />;
     case "divider":
       return <DividerBlockPreview block={block as DividerBlock} />;
     case "frontmatter":
@@ -747,6 +753,72 @@ const ImageBlockPreview = React.memo<{ block: ImageBlock }>(
           <div className="bg-muted/20 border-2 border-dashed border-border/40 rounded-lg p-8 text-center text-muted-foreground">
             <div className="text-2xl mb-2">🖼️</div>
             <div>Image URL required</div>
+          </div>
+        )}
+      </div>
+    );
+  }
+);
+
+const VideoBlockPreview = React.memo<{ block: VideoBlock }>(
+  function VideoBlockPreview({ block }) {
+    const hasVideo = useMemo(
+      () => block.url && block.embedId && block.platform,
+      [block.url, block.embedId, block.platform]
+    );
+
+    const embedUrl = useMemo(() => {
+      if (!hasVideo) return "";
+
+      if (block.platform === "youtube") {
+        return `https://www.youtube.com/embed/${block.embedId}`;
+      } else if (block.platform === "vimeo") {
+        return `https://player.vimeo.com/video/${block.embedId}`;
+      }
+      return "";
+    }, [hasVideo, block.platform, block.embedId]);
+
+    const aspectRatioClass = useMemo(() => {
+      return block.aspectRatio === "16:9"
+        ? "aspect-video"
+        : block.aspectRatio === "4:3"
+          ? "aspect-[4/3]"
+          : "aspect-square";
+    }, [block.aspectRatio]);
+
+    return (
+      <div className="p-6" style={{ textAlign: block.alignment || "center" }}>
+        {hasVideo && embedUrl ? (
+          <div>
+            <div
+              className={`relative w-full ${aspectRatioClass} max-w-2xl mx-auto`}
+            >
+              <iframe
+                src={embedUrl}
+                title={block.title || "Video"}
+                className="w-full h-full rounded-lg border border-border/20"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+
+            {block.title && (
+              <p className="text-sm text-muted-foreground mt-2 italic text-center">
+                {block.title}
+              </p>
+            )}
+
+            <div className="text-xs text-muted-foreground mt-1 text-center">
+              {block.platform === "youtube" ? "YouTube" : "Vimeo"} •{" "}
+              {block.aspectRatio}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-muted/20 border-2 border-dashed border-border/40 rounded-lg p-8 text-center text-muted-foreground">
+            <div className="text-2xl mb-2">🎥</div>
+            <div>Video URL required</div>
+            <div className="text-xs mt-1">Add a YouTube or Vimeo URL</div>
           </div>
         )}
       </div>

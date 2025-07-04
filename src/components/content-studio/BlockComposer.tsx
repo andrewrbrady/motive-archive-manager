@@ -137,6 +137,7 @@ export function BlockComposer({
     addTextBlock,
     addHeadingBlock,
     addDividerBlock,
+    addVideoBlock,
   } = useBlockOperations(
     blocks,
     onBlocksChange,
@@ -661,6 +662,7 @@ export function BlockComposer({
         onToggleExpanded={handleToggleInsertToolbar}
         onAddTextBlock={addTextBlock}
         onAddDividerBlock={addDividerBlock}
+        onAddVideoBlock={addVideoBlock}
         onAddFrontmatterBlock={addFrontmatterBlock}
         finalImages={finalImages}
         loadingImages={loadingImages}

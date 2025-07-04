@@ -3,6 +3,7 @@ import {
   ContentBlock,
   TextBlock,
   ImageBlock,
+  VideoBlock,
   DividerBlock,
   FrontmatterBlock,
 } from "../types";
@@ -145,6 +146,51 @@ export function EmailRenderer({
                  alt="${imageBlock.altText || ""}" 
                  style="${emailStyles.image}" />
             ${caption}
+          </div>
+        `;
+      }
+
+      case "video": {
+        const videoBlock = block as VideoBlock;
+        if (!videoBlock.url || !videoBlock.embedId) return "";
+
+        // For emails, we'll use a fallback image or link since videos don't work in most email clients
+        const thumbnailUrl =
+          videoBlock.platform === "youtube"
+            ? `https://img.youtube.com/vi/${videoBlock.embedId}/maxresdefault.jpg`
+            : videoBlock.url; // For Vimeo, we'd need their API to get thumbnail
+
+        const videoLinkText = videoBlock.title || "Watch Video";
+        const platformName =
+          videoBlock.platform === "youtube" ? "YouTube" : "Vimeo";
+
+        return `
+          <div style="margin:20px 0;text-align:center;">
+            <a href="${videoBlock.url}" style="text-decoration:none;">
+              ${
+                videoBlock.platform === "youtube"
+                  ? `
+                <img src="${thumbnailUrl}" 
+                     alt="${videoLinkText}" 
+                     style="${emailStyles.image}border-radius:8px;" />
+              `
+                  : `
+                <div style="background:#f0f0f0;padding:40px;border-radius:8px;border:2px solid #ddd;">
+                  <h3 style="margin:0 0 10px;color:#1a224e;">🎥 ${videoLinkText}</h3>
+                  <p style="margin:0;color:#666;">Click to watch on ${platformName}</p>
+                </div>
+              `
+              }
+            </a>
+            ${
+              videoBlock.title
+                ? `
+              <p style="text-align:center;font-size:14px;color:#666;margin:10px 0 0;">
+                ${videoBlock.title}
+              </p>
+            `
+                : ""
+            }
           </div>
         `;
       }

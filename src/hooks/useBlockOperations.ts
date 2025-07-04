@@ -4,6 +4,7 @@ import {
   ContentBlock,
   TextBlock,
   ImageBlock,
+  VideoBlock,
   DividerBlock,
 } from "@/components/content-studio/types";
 
@@ -243,6 +244,24 @@ export function useBlockOperations(
     insertBlock(newBlock, "Horizontal Rule Added");
   }, [insertBlock]);
 
+  // Add new video block
+  const addVideoBlock = useCallback(() => {
+    const newBlock: VideoBlock = {
+      id: `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type: "video",
+      order: 0, // Will be set by insertBlock
+      url: "",
+      platform: "youtube",
+      embedId: "",
+      aspectRatio: "16:9",
+      alignment: "center",
+      styles: {},
+      metadata: { source: "manual", createdAt: new Date().toISOString() },
+    };
+
+    insertBlock(newBlock, "Video Block Added");
+  }, [insertBlock]);
+
   return {
     addImageFromGallery,
     removeBlock,
@@ -251,6 +270,7 @@ export function useBlockOperations(
     addTextBlock,
     addHeadingBlock,
     addDividerBlock,
+    addVideoBlock,
     getInsertPosition,
     insertBlock,
   };
