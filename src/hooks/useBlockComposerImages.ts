@@ -17,15 +17,24 @@ export interface EnrichedImage {
  * Custom hook for handling image gallery operations in BlockComposer
  * Extracted from BlockComposer.tsx to reduce file size and improve maintainability
  */
-export function useBlockComposerImages(selectedCopies: SelectedCopy[]) {
-  // Determine context for image gallery
-  const carId = selectedCopies[0]?.carId;
-  const projectId = selectedCopies[0]?.projectId;
+export function useBlockComposerImages(
+  selectedCopies: SelectedCopy[],
+  carId?: string,
+  projectId?: string
+) {
+  // Determine context for image gallery - prioritize passed params, fallback to selectedCopies
+  const effectiveCarId = carId || selectedCopies[0]?.carId;
+  const effectiveProjectId = projectId || selectedCopies[0]?.projectId;
 
   // For projects: fetch linked galleries first, then extract images from them
   // For cars: fetch images directly from the car
-  const galleriesUrl = projectId ? `projects/${projectId}/galleries` : null;
-  const carImagesUrl = carId && !projectId ? `cars/${carId}/images` : null;
+  const galleriesUrl = effectiveProjectId
+    ? `projects/${effectiveProjectId}/galleries`
+    : null;
+  const carImagesUrl =
+    effectiveCarId && !effectiveProjectId
+      ? `cars/${effectiveCarId}/images`
+      : null;
 
   const {
     data: galleriesData,
@@ -132,20 +141,22 @@ export function useBlockComposerImages(selectedCopies: SelectedCopy[]) {
 
   // Final images list: use project galleries or car images - OPTIMIZED with proper dependencies
   const finalImages = useMemo((): EnrichedImage[] => {
-    return projectId ? enrichedGalleryImages : carImages;
-  }, [projectId, enrichedGalleryImages, carImages]);
+    return effectiveProjectId ? enrichedGalleryImages : carImages;
+  }, [effectiveProjectId, enrichedGalleryImages, carImages]);
 
   // Loading state for images
   const loadingImages =
     loadingGalleries || loadingImageData || loadingCarImages;
 
   // Refetch function
-  const refetchImages = projectId ? refetchGalleries : refetchCarImages;
+  const refetchImages = effectiveProjectId
+    ? refetchGalleries
+    : refetchCarImages;
 
   // Statistics
   const imageStats = useMemo(() => {
     const totalImages = finalImages.length;
-    const galleryCount = projectId
+    const galleryCount = effectiveProjectId
       ? galleriesData?.galleries?.length || 0
       : carImagesData
         ? 1
@@ -156,15 +167,15 @@ export function useBlockComposerImages(selectedCopies: SelectedCopy[]) {
       galleryCount,
       hasImages: totalImages > 0,
       isEmpty: totalImages === 0,
-      isProject: Boolean(projectId),
-      isCar: Boolean(carId && !projectId),
+      isProject: Boolean(effectiveProjectId),
+      isCar: Boolean(effectiveCarId && !effectiveProjectId),
     };
   }, [
     finalImages.length,
-    projectId,
+    effectiveProjectId,
     galleriesData?.galleries?.length,
     carImagesData,
-    carId,
+    effectiveCarId,
   ]);
 
   return {
@@ -186,8 +197,8 @@ export function useBlockComposerImages(selectedCopies: SelectedCopy[]) {
 
     // Metadata
     imageStats,
-    projectId,
-    carId,
+    projectId: effectiveProjectId,
+    carId: effectiveCarId,
 
     // Raw data (for debugging/advanced use)
     galleriesData,

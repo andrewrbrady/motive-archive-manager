@@ -187,8 +187,11 @@ export function BlockComposer({
   const { exportWithOptions, exportToMDX, hasEmailFeatures } =
     useContentExport();
 
-  const { finalImages, loadingImages, refetchImages } =
-    useBlockComposerImages(selectedCopies);
+  const { finalImages, loadingImages, refetchImages } = useBlockComposerImages(
+    selectedCopies,
+    effectiveCarId,
+    effectiveProjectId
+  );
 
   // Load stylesheet data for CSS editor
   // HOT-RELOAD OPTIMIZATION: Use useMemo to prevent unnecessary re-renders when stylesheet data changes
