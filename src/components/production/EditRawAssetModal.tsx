@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { useAPI } from "@/hooks/useAPI";
 import { toast } from "react-hot-toast";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface EditRawAssetModalProps {
   isOpen: boolean;
@@ -54,25 +55,30 @@ const formatCarId = (id: string): string => {
 
 // Helper function to check if a car has proper metadata
 const hasProperCarData = (car: any): boolean => {
-  return !!(car && (car.make || car.model || car.year));
+  if (!car) return false;
+
+  // Check if it has any real car data (not fallback format)
+  const hasMake =
+    car.make && typeof car.make === "string" && !car.make.startsWith("Car ");
+  const hasModel =
+    car.model && typeof car.model === "string" && car.model.length > 0;
+  const hasYear = car.year && typeof car.year === "number";
+
+  return hasMake || hasModel || hasYear;
 };
 
 // Helper function to fetch a single car by ID - used as a last resort
-const fetchSingleCar = async (carId: string): Promise<any> => {
+const fetchSingleCar = async (carId: string, api: any): Promise<any> => {
   try {
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Attempting direct fetch for car with ID: ${carId}`);
-    const response = await fetch(
-      `/api/cars/${carId}?fields=_id,year,make,model,color,manufacturing`
-    );
-
-    if (!response.ok) {
-      console.warn(
-        `Failed to fetch car with ID ${carId}: ${response.statusText}`
-      );
+    if (!api) {
+      console.warn(`API client not available for car ID ${carId}`);
       return null;
     }
 
-    const data = await response.json();
+    const data = await api.get(
+      `/cars/${carId}?fields=_id,year,make,model,color,manufacturing`
+    );
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Direct fetch for car ${carId} successful:`, data);
 
     // Get the car data from the response
@@ -116,6 +122,12 @@ export default function EditRawAssetModal({
   asset,
 }: EditRawAssetModalProps) {
   const api = useAPI();
+  const {
+    isAuthenticated,
+    loading: authLoading,
+    hasValidToken,
+  } = useFirebaseAuth();
+
   // Keep track of the initial asset to avoid resetting form data when the component rerenders
   const [initialAssetId, setInitialAssetId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<RawAssetData>>({
@@ -138,6 +150,34 @@ export default function EditRawAssetModal({
   const driveSearchRef = useRef<HTMLDivElement>(null);
   const [isLoadingSelectedDrives, setIsLoadingSelectedDrives] = useState(false);
 
+  // Debug authentication state
+  useEffect(() => {
+    console.log("🔐 EditRawAssetModal auth state:", {
+      isOpen,
+      api: !!api,
+      isAuthenticated,
+      authLoading,
+      hasValidToken,
+      timestamp: new Date().toISOString(),
+    });
+  }, [isOpen, api, isAuthenticated, authLoading, hasValidToken]);
+
+  // Debug car cache state
+  useEffect(() => {
+    console.log("🚗 EditRawAssetModal car cache state:", {
+      cacheSize: Object.keys(carCache).length,
+      cacheKeys: Object.keys(carCache),
+      cacheData: carCache,
+    });
+  }, [carCache]);
+
+  // Manual cache clear for testing
+  const clearCarCache = () => {
+    console.log("🚗 Manual cache clear triggered");
+    setCarCache({});
+    setSelectedCars([]);
+  };
+
   // Reset form data when modal is closed
   useEffect(() => {
     if (!isOpen) {
@@ -152,8 +192,21 @@ export default function EditRawAssetModal({
       setError(null);
       setInitialAssetId(null);
       setHasModifiedForm(false);
+    } else {
+      // Clear car cache when modal opens to force fresh data
+      console.log("🚗 EditRawAssetModal: Clearing car cache on modal open");
+      setCarCache({});
     }
   }, [isOpen]);
+
+  // Add debugging for modal state changes
+  useEffect(() => {
+    console.log("EditRawAssetModal state change:", {
+      isOpen,
+      assetId: asset?._id,
+      timestamp: new Date().toISOString(),
+    });
+  }, [isOpen, asset?._id]);
 
   // Fetch hard drives
   useEffect(() => {
@@ -246,17 +299,25 @@ export default function EditRawAssetModal({
       // Fetch car details for selected cars
       const fetchSelectedCars = async () => {
         try {
+          console.log("🚗 fetchSelectedCars: Starting with carIds:", carIds);
+
           // Ensure carIds are strings
           const carIdsAsStrings = carIds.map((id) =>
             typeof id === "string" ? id : (id as any).toString()
           );
 
+          console.log(
+            "🚗 fetchSelectedCars: carIdsAsStrings:",
+            carIdsAsStrings
+          );
+
           if (carIdsAsStrings.length === 0) {
+            console.log(
+              "🚗 fetchSelectedCars: No car IDs, setting empty array"
+            );
             setSelectedCars([]);
             return;
           }
-
-          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car IDs to fetch:", carIdsAsStrings);
 
           // Check which cars we already have in the cache
           const cachedCars: any[] = [];
@@ -266,43 +327,54 @@ export default function EditRawAssetModal({
             // Use proper id comparison
             const cachedCar = findCarInCache(carCache, id);
 
+            console.log(`🚗 fetchSelectedCars: Checking cache for car ${id}:`, {
+              found: !!cachedCar,
+              carData: cachedCar,
+              hasProperData: cachedCar ? hasProperCarData(cachedCar) : false,
+              make: cachedCar?.make,
+              model: cachedCar?.model,
+              year: cachedCar?.year,
+            });
+
             // Only use cached car if it has proper data
             if (cachedCar && hasProperCarData(cachedCar)) {
               console.log(
-                `Using cached car with proper data: ${cachedCar.make} ${cachedCar.model}`
+                `🚗 fetchSelectedCars: Using cached car with proper data: ${cachedCar.make} ${cachedCar.model}`
               );
               cachedCars.push(cachedCar);
             } else {
               // Car not in cache or has incomplete data - fetch it again
               console.log(
-                `Car ${id} not in cache or has incomplete data - will fetch`
+                `🚗 fetchSelectedCars: Car ${id} not in cache or has incomplete data - will fetch`
               );
               missingCarIds.push(id);
             }
           });
 
           console.log(
-            `Using ${cachedCars.length} cached cars, fetching ${missingCarIds.length} new cars`
+            `🚗 fetchSelectedCars: Using ${cachedCars.length} cached cars, fetching ${missingCarIds.length} new cars`
           );
 
           // If all cars are cached, use them directly
           if (missingCarIds.length === 0) {
-            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("All cars found in cache:", cachedCars);
+            console.log(
+              "🚗 fetchSelectedCars: All cars found in cache:",
+              cachedCars
+            );
             setSelectedCars(cachedCars);
             return;
           }
 
-          // Fetch only the missing cars
-          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching cars for IDs:", missingCarIds);
-
-          const response = await fetch(
-            `/api/cars?ids=${missingCarIds.join(
-              ","
-            )}&fields=_id,year,make,model,color,exteriorColor,manufacturing`
+          // Fetch only the missing cars using authenticated API
+          console.log(
+            "🚗 fetchSelectedCars: Fetching cars for IDs:",
+            missingCarIds
           );
 
-          if (!response.ok) {
-            console.error(`Failed to fetch cars: ${response.statusText}`);
+          if (!api) {
+            console.error(
+              "🚗 fetchSelectedCars: API client not available - user not authenticated"
+            );
             // Fallback to just IDs for the missing cars
             const fallbackMissingCars = missingCarIds.map((id) => ({
               _id: id,
@@ -314,15 +386,41 @@ export default function EditRawAssetModal({
             }));
 
             // Combine with cached cars
+            console.log(
+              "🚗 fetchSelectedCars: Setting fallback due to missing API client"
+            );
             setSelectedCars([...cachedCars, ...fallbackMissingCars]);
             return;
           }
 
-          const data = await response.json();
-          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetched car data:", data);
+          const data = (await api.get(
+            `/cars?ids=${missingCarIds.join(
+              ","
+            )}&fields=_id,year,make,model,color,exteriorColor,manufacturing`
+          )) as { cars?: any[] };
+
+          console.log("🚗 fetchSelectedCars: API response received:", data);
+          console.log("🚗 fetchSelectedCars: API response type:", typeof data);
+          console.log(
+            "🚗 fetchSelectedCars: API response keys:",
+            Object.keys(data || {})
+          );
+          console.log("🚗 fetchSelectedCars: data.cars:", data?.cars);
+          console.log(
+            "🚗 fetchSelectedCars: Array.isArray(data):",
+            Array.isArray(data)
+          );
+          console.log(
+            "🚗 fetchSelectedCars: Array.isArray(data.cars):",
+            Array.isArray(data?.cars)
+          );
 
           if (data && data.cars && Array.isArray(data.cars)) {
-            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Raw car data from API:", data.cars);
+            console.log(
+              "🚗 fetchSelectedCars: Processing API response with",
+              data.cars.length,
+              "cars"
+            );
 
             // Process the newly fetched cars
             const newlyFetchedCars = data.cars
@@ -338,6 +436,37 @@ export default function EditRawAssetModal({
                 color: car.exteriorColor || car.color || "",
                 manufacturing: car.manufacturing || {},
               }));
+
+            console.log(
+              "🚗 fetchSelectedCars: Processed newly fetched cars:",
+              newlyFetchedCars
+            );
+          } else if (Array.isArray(data)) {
+            console.log(
+              "🚗 fetchSelectedCars: Processing API response - cars returned directly as array with",
+              data.length,
+              "cars"
+            );
+
+            // Process the newly fetched cars - data is the array directly
+            const newlyFetchedCars = data
+              .filter((car: any) => {
+                // Ensure we only include cars that match our missing IDs
+                return missingCarIds.includes(car._id.toString());
+              })
+              .map((car: any) => ({
+                _id: car._id,
+                make: car.make || "",
+                model: car.model || "",
+                year: car.year || null,
+                color: car.exteriorColor || car.color || "",
+                manufacturing: car.manufacturing || {},
+              }));
+
+            console.log(
+              "🚗 fetchSelectedCars: Processed newly fetched cars:",
+              newlyFetchedCars
+            );
 
             // Update the car cache with newly fetched cars
             const newCacheEntries: Record<string, any> = {};
@@ -358,7 +487,7 @@ export default function EditRawAssetModal({
             // Combine cached and newly fetched cars
             const allCars = [...cachedCars, ...newlyFetchedCars];
             console.log(
-              "Combined cars (cached + newly fetched):",
+              "🚗 fetchSelectedCars: Combined cars (cached + newly fetched):",
               allCars.map((car) => ({
                 id: car._id,
                 make: car.make,
@@ -371,7 +500,7 @@ export default function EditRawAssetModal({
               const foundCar = allCars.find((car) => car._id.toString() === id);
               if (!foundCar || !hasProperCarData(foundCar)) {
                 console.log(
-                  `No car with proper data found for ID: ${id}, will try individual fetch`
+                  `🚗 fetchSelectedCars: No car with proper data found for ID: ${id}, will try individual fetch`
                 );
                 // We'll fetch these individually after setting initial state
                 return {
@@ -386,7 +515,10 @@ export default function EditRawAssetModal({
               return foundCar;
             });
 
-            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Final processed cars:", orderedCars);
+            console.log(
+              "🚗 fetchSelectedCars: Final ordered cars:",
+              orderedCars
+            );
             setSelectedCars(orderedCars);
 
             // For cars without proper data, try individual fetches
@@ -395,7 +527,7 @@ export default function EditRawAssetModal({
             );
             if (carsNeedingFetch.length > 0) {
               console.log(
-                `Found ${carsNeedingFetch.length} cars needing individual fetches`
+                `🚗 fetchSelectedCars: Found ${carsNeedingFetch.length} cars needing individual fetches`
               );
               // Attempt individual fetches after setting initial state
               setTimeout(async () => {
@@ -403,10 +535,13 @@ export default function EditRawAssetModal({
                 let hasUpdates = false;
 
                 for (const car of carsNeedingFetch) {
-                  const fetchedCar = await fetchSingleCar(car._id.toString());
+                  const fetchedCar = await fetchSingleCar(
+                    car._id.toString(),
+                    api
+                  );
                   if (fetchedCar && hasProperCarData(fetchedCar)) {
                     console.log(
-                      `Successfully fetched individual car: ${fetchedCar.make} ${fetchedCar.model}`
+                      `🚗 fetchSelectedCars: Successfully fetched individual car: ${fetchedCar.make} ${fetchedCar.model}`
                     );
                     // Update the car in our array
                     const idx = updatedCars.findIndex(
@@ -428,7 +563,7 @@ export default function EditRawAssetModal({
                 // Only update if we actually got better data
                 if (hasUpdates) {
                   console.log(
-                    "Updating cars with individually fetched data:",
+                    "🚗 fetchSelectedCars: Updating cars with individually fetched data:",
                     updatedCars
                   );
                   setSelectedCars(updatedCars);
@@ -436,6 +571,9 @@ export default function EditRawAssetModal({
               }, 100);
             }
           } else {
+            console.warn(
+              "🚗 fetchSelectedCars: Unexpected API response format, using fallback"
+            );
             // Fallback to just IDs if response format is unexpected
             const fallbackCars = carIdsAsStrings.map((id) => ({
               _id: id,
@@ -446,13 +584,16 @@ export default function EditRawAssetModal({
               manufacturing: {},
             }));
             console.log(
-              "Setting fallback car data (unexpected response format):",
+              "🚗 fetchSelectedCars: Setting fallback car data (unexpected response format):",
               fallbackCars
             );
             setSelectedCars(fallbackCars);
           }
         } catch (error) {
-          console.error("Error fetching selected cars:", error);
+          console.error(
+            "🚗 fetchSelectedCars: Error fetching selected cars:",
+            error
+          );
           // Fallback to just IDs if fetch fails
           const carIdsAsStrings = carIds.map((id) =>
             typeof id === "string" ? id : (id as any).toString()
@@ -465,7 +606,10 @@ export default function EditRawAssetModal({
             color: "",
             manufacturing: {},
           }));
-          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Setting fallback car data after error:", fallbackCars);
+          console.log(
+            "🚗 fetchSelectedCars: Setting fallback car data after error:",
+            fallbackCars
+          );
           setSelectedCars(fallbackCars);
         }
       };
@@ -674,6 +818,11 @@ export default function EditRawAssetModal({
   }, []);
 
   if (!isOpen) return null;
+
+  console.log(
+    "EditRawAssetModal rendering with isOpen=true, asset:",
+    asset?._id
+  );
 
   return (
     <div className="fixed inset-0 bg-[hsl(var(--background))/95] backdrop-blur-sm flex items-center justify-center z-50 overflow-y-auto py-8">

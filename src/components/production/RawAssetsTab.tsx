@@ -178,6 +178,7 @@ const AssetRow = memo(
                     );
                   }
                   // Fall back to the DriveLabel component if we don't have the data
+                  // This will handle fetching the drive name from the LabelsContext
                   return (
                     <DriveLabel
                       key={`${asset._id}-drive-${index}`}
@@ -580,12 +581,20 @@ export default function RawAssetsTab() {
     const selectedAssetId = getParam("asset");
     const isEdit = getParam("edit") === "true";
 
+    console.log("RawAssetsTab URL params effect:", {
+      selectedAssetId,
+      isEdit,
+      isEditModalOpen,
+      isDetailsModalOpen,
+      assetsLength: assets.length,
+    });
+
     // Skip processing if no asset ID is specified or if we're explicitly
     // closing the modal (when both asset and isEdit are missing/false)
     if (!selectedAssetId) {
       // If no asset selected in URL and modal is open, close it
       if (isEditModalOpen && !isEdit) {
-        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Closing edit modal due to URL parameter changes");
+        console.log("Closing edit modal due to URL parameter changes");
         setIsEditModalOpen(false);
       }
       return;
@@ -608,7 +617,7 @@ export default function RawAssetsTab() {
           // Only set the asset data if the edit modal is not already open
           // This prevents overwriting the current edit with stale data
           if (!isEditModalOpen) {
-            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Opening edit modal for asset:", asset._id);
+            console.log("Opening edit modal for asset:", asset._id);
             const rawAssetData: RawAssetData = {
               _id: asset._id as unknown as ObjectId,
               date: asset.date,
@@ -620,6 +629,9 @@ export default function RawAssetsTab() {
             };
             setSelectedAssetForDetails(rawAssetData);
             setIsEditModalOpen(true);
+            console.log(
+              "Edit modal state set to true, selectedAssetForDetails set"
+            );
           }
         } else if (!isDetailsModalOpen) {
           // Only set the details if the details modal is not already open
@@ -761,6 +773,7 @@ export default function RawAssetsTab() {
   // Handle edit button click
   const handleEdit = useCallback(
     (asset: RawAsset) => {
+      console.log("RawAssetsTab handleEdit called for asset:", asset._id);
       updateParams({ asset: asset._id, edit: "true" });
     },
     [updateParams]
@@ -930,15 +943,15 @@ export default function RawAssetsTab() {
       try {
         const result = await api.post<any>("/raw", newAsset);
 
-        if (!result.ok) {
-          throw new Error("Failed to add asset");
-        }
+        // The api.post method returns the response data directly, not a Response object
+        // So we don't need to check result.ok - if we get here, it was successful
+        console.log("Asset added successfully:", result);
 
         // Close the modal and refresh the list
         handleCloseAddAsset();
         fetchAssets();
 
-        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Asset added successfully");
+        toast.success("Asset added successfully");
       } catch (error) {
         console.error("Error adding asset:", error);
         toast.error("Failed to add asset");

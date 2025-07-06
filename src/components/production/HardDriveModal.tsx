@@ -67,7 +67,7 @@ export default function HardDriveModal({
     type: "HDD",
     interface: "USB",
     status: "Available",
-    locationId: "none",
+    locationId: "",
     notes: "",
     rawAssets: [],
   });
@@ -94,7 +94,15 @@ export default function HardDriveModal({
       setFormData({
         ...drive,
         _id: undefined, // Don't include _id in form data
-        locationId: drive.locationId || "none",
+        label: drive.label || "",
+        systemName: drive.systemName || "",
+        type: drive.type || "HDD",
+        interface: drive.interface || "USB",
+        status: drive.status || "Available",
+        locationId: drive.locationId || "",
+        notes: drive.notes || "",
+        capacity: drive.capacity || { total: 0, used: 0, available: 0 },
+        rawAssets: drive.rawAssets || [],
       });
     } else {
       // Reset form when adding new drive
@@ -109,7 +117,7 @@ export default function HardDriveModal({
         type: "HDD",
         interface: "USB",
         status: "Available",
-        locationId: "none",
+        locationId: "",
         notes: "",
         rawAssets: [],
       });
@@ -454,7 +462,7 @@ export default function HardDriveModal({
               <label className="block text-sm font-medium mb-1">Label*</label>
               <input
                 type="text"
-                value={formData.label}
+                value={formData.label || ""}
                 onChange={(e) =>
                   setFormData({ ...formData, label: e.target.value })
                 }
@@ -470,7 +478,7 @@ export default function HardDriveModal({
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={formData.systemName}
+                  value={formData.systemName || ""}
                   onChange={(e) =>
                     setFormData({ ...formData, systemName: e.target.value })
                   }
@@ -527,7 +535,7 @@ export default function HardDriveModal({
               <div>
                 <label className="block text-sm font-medium mb-1">Type*</label>
                 <select
-                  value={formData.type}
+                  value={formData.type || "HDD"}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
@@ -548,7 +556,7 @@ export default function HardDriveModal({
                   Interface*
                 </label>
                 <select
-                  value={formData.interface}
+                  value={formData.interface || "USB"}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
@@ -576,7 +584,7 @@ export default function HardDriveModal({
                   Status*
                 </label>
                 <select
-                  value={formData.status}
+                  value={formData.status || "Available"}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
@@ -755,7 +763,7 @@ export default function HardDriveModal({
           <label className="block text-sm font-medium mb-1">Label*</label>
           <input
             type="text"
-            value={formData.label}
+            value={formData.label || ""}
             onChange={(e) =>
               setFormData({ ...formData, label: e.target.value })
             }
@@ -769,7 +777,7 @@ export default function HardDriveModal({
           <div className="flex gap-2">
             <input
               type="text"
-              value={formData.systemName}
+              value={formData.systemName || ""}
               onChange={(e) =>
                 setFormData({ ...formData, systemName: e.target.value })
               }
@@ -826,7 +834,7 @@ export default function HardDriveModal({
           <div>
             <label className="block text-sm font-medium mb-1">Type*</label>
             <select
-              value={formData.type}
+              value={formData.type || "HDD"}
               onChange={(e) =>
                 setFormData({
                   ...formData,
@@ -845,7 +853,7 @@ export default function HardDriveModal({
           <div>
             <label className="block text-sm font-medium mb-1">Interface*</label>
             <select
-              value={formData.interface}
+              value={formData.interface || "USB"}
               onChange={(e) =>
                 setFormData({
                   ...formData,
@@ -871,7 +879,7 @@ export default function HardDriveModal({
           <div>
             <label className="block text-sm font-medium mb-1">Status*</label>
             <select
-              value={formData.status}
+              value={formData.status || "Available"}
               onChange={(e) =>
                 setFormData({
                   ...formData,

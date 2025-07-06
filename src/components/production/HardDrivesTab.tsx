@@ -42,7 +42,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useAPI } from "@/hooks/useAPI";
+import { useAPI, useAPIStatus } from "@/hooks/useAPI";
 
 interface RawAssetDetail {
   _id: string;
@@ -75,6 +75,26 @@ const LIMIT_OPTIONS = [10, 25, 50, 100];
 
 export default function HardDrivesTab() {
   const api = useAPI();
+  const {
+    isReady,
+    isLoading,
+    isAuthenticated,
+    hasValidToken,
+    error: authError,
+  } = useAPIStatus();
+
+  // Debug logging to understand the authentication state
+  useEffect(() => {
+    console.log("🔍 HardDrivesTab Debug - Authentication State:", {
+      api: !!api,
+      isReady,
+      isLoading,
+      isAuthenticated,
+      hasValidToken,
+      authError: authError,
+    });
+  }, [api, isReady, isLoading, isAuthenticated, hasValidToken, authError]);
+
   const pathname = usePathname();
   const { getParam, updateParams } = useUrlParams();
   const searchParams = useSearchParams();
@@ -149,10 +169,10 @@ export default function HardDrivesTab() {
 
   // Fetch locations when component mounts
   useEffect(() => {
-    if (api) {
+    if (isReady && api) {
       fetchLocations();
     }
-  }, [api]);
+  }, [api, isReady]);
 
   // Validate current page when total pages changes
   useEffect(() => {
@@ -199,7 +219,13 @@ export default function HardDrivesTab() {
   // Simplified fetchDrives function using useAPI pattern
   const fetchDrives = async (isRetry = false) => {
     if (!api) {
-      console.error("API client not available");
+      console.error("API client not available - Authentication state:", {
+        isReady,
+        isLoading,
+        isAuthenticated,
+        hasValidToken,
+        authError,
+      });
       return;
     }
 
@@ -343,8 +369,11 @@ export default function HardDrivesTab() {
   };
 
   useEffect(() => {
-    fetchDrives();
-  }, [currentPage, itemsPerPage, searchTerm, selectedLocation]);
+    // Only fetch drives if authentication is ready and API client is available
+    if (isReady && api) {
+      fetchDrives();
+    }
+  }, [currentPage, itemsPerPage, searchTerm, selectedLocation, isReady, api]);
 
   // Synchronize component state with URL parameters
   useEffect(() => {
@@ -792,6 +821,36 @@ export default function HardDrivesTab() {
       );
     }
   }, [getParam, updateParams]);
+
+  // Show loading state while authentication is initializing
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Authenticating...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if authentication failed
+  if (!isAuthenticated) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <p className="text-destructive mb-2">Authentication Required</p>
+            <p className="text-muted-foreground">
+              Please sign in to access this page.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
