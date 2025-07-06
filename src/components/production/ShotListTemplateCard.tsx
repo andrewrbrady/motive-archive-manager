@@ -60,7 +60,7 @@ export default function ShotListTemplateCard({
     setLoading(true);
 
     try {
-      await api.delete(`shot-list-templates/${template._id}`);
+      await api.delete(`shot-templates/${template._id}`);
 
       toast.success("Shot list template deleted successfully");
 

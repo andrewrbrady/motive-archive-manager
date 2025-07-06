@@ -334,6 +334,8 @@ export function ContentStudioTab({
             template={activeTemplate || undefined}
             onTemplateChange={handleTemplateChange}
             loadedComposition={loadedComposition}
+            carId={carId}
+            projectId={projectId}
           />
         </TabsContent>
 

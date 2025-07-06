@@ -232,6 +232,8 @@ export interface BlockComposerProps {
   template?: ContentTemplate;
   onTemplateChange?: (template: ContentTemplate) => void;
   loadedComposition?: any; // For editing existing compositions
+  carId?: string; // For compositions not created from selected copies
+  projectId?: string; // For compositions not created from selected copies
 }
 
 // API response types (reusing existing patterns)

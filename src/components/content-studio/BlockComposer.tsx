@@ -110,6 +110,8 @@ export function BlockComposer({
   template,
   onTemplateChange,
   loadedComposition,
+  carId,
+  projectId,
 }: BlockComposerProps) {
   const { toast } = useToast();
 
@@ -143,6 +145,10 @@ export function BlockComposer({
   const [cssContent, setCSSContent] = useState<string>("");
   const [isSavingCSS, setIsSavingCSS] = useState(false);
 
+  // Determine effective carId and projectId - prioritize selectedCopies, fallback to props
+  const effectiveCarId = selectedCopies[0]?.carId || carId;
+  const effectiveProjectId = selectedCopies[0]?.projectId || projectId;
+
   // Custom hooks for extracted functionality
   const {
     frontmatter,
@@ -174,8 +180,8 @@ export function BlockComposer({
     onBlocksChange,
     activeBlockId,
     setActiveBlockId,
-    selectedCopies[0]?.projectId,
-    selectedCopies[0]?.carId
+    effectiveProjectId,
+    effectiveCarId
   );
 
   const { exportWithOptions, exportToMDX, hasEmailFeatures } =
@@ -407,8 +413,8 @@ export function BlockComposer({
           selectedStylesheetId,
           frontmatter,
           emailContainerConfig,
-          projectId: selectedCopies[0]?.projectId,
-          carId: selectedCopies[0]?.carId,
+          projectId: effectiveProjectId,
+          carId: effectiveCarId,
           selectedCopies,
           createdAt: loadedComposition?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -449,6 +455,8 @@ export function BlockComposer({
     loadedComposition,
     toast,
     api,
+    effectiveProjectId,
+    effectiveCarId,
   ]);
 
   // Save CSS content to selected stylesheet
@@ -805,7 +813,7 @@ export function BlockComposer({
           onAddHtmlBlock={addHtmlBlock} // Pass to toolbar
           finalImages={finalImages}
           loadingImages={loadingImages}
-          projectId={selectedCopies[0]?.projectId}
+          projectId={effectiveProjectId}
           onRefreshImages={refetchImages}
           onAddImage={addImageFromGallery}
           onSave={saveComposition}
@@ -814,7 +822,7 @@ export function BlockComposer({
           isUpdate={!!loadedComposition}
           currentBlocks={blocks}
           onBlocksChange={onBlocksChange}
-          carId={selectedCopies[0]?.carId}
+          carId={effectiveCarId}
         />
       )}
 
@@ -826,8 +834,8 @@ export function BlockComposer({
         compositionName={compositionName}
         selectedStylesheetId={selectedStylesheetId}
         template={template?.id || null}
-        projectId={selectedCopies[0]?.projectId}
-        carId={selectedCopies[0]?.carId}
+        projectId={effectiveProjectId}
+        carId={effectiveCarId}
         hasEmailFeatures={hasEmailFeatures(blocks)}
         onExport={async (options: ExportOptions) => {
           await exportWithOptions(
@@ -835,8 +843,8 @@ export function BlockComposer({
             template?.id || null,
             compositionName,
             options,
-            selectedCopies[0]?.projectId,
-            selectedCopies[0]?.carId,
+            effectiveProjectId,
+            effectiveCarId,
             selectedStylesheetId
           );
         }}

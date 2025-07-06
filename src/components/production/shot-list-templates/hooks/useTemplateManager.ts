@@ -24,10 +24,8 @@ export function useTemplateManager(shouldCreateTemplate = false) {
 
     try {
       setIsLoading(true);
-      const data = await api.get<{ templates: Template[] }>(
-        "shot-list-templates"
-      );
-      setTemplates(data.templates || []);
+      const data = await api.get<Template[]>("shot-templates");
+      setTemplates(data || []);
     } catch (error) {
       console.error("Error fetching templates:", error);
       toast.error("Failed to load templates");
@@ -76,12 +74,12 @@ export function useTemplateManager(shouldCreateTemplate = false) {
       try {
         const isUpdate = !!editingTemplate;
         const endpoint = isUpdate
-          ? `shot-list-templates/${editingTemplate.id}`
-          : "shot-list-templates";
+          ? `shot-templates/${editingTemplate.id}`
+          : "shot-templates";
 
         const result = isUpdate
-          ? await api.put<{ template: Template }>(endpoint, data)
-          : await api.post<{ template: Template }>(endpoint, data);
+          ? await api.put<Template>(endpoint, data)
+          : await api.post<Template>(endpoint, data);
 
         toast.success(
           `Template ${isUpdate ? "updated" : "created"} successfully`
@@ -95,8 +93,8 @@ export function useTemplateManager(shouldCreateTemplate = false) {
         setEditingTemplate(null);
 
         // Select the new/updated template
-        if (result.template) {
-          setSelectedTemplate(result.template);
+        if (result) {
+          setSelectedTemplate(result);
         }
       } catch (error) {
         console.error("Error saving template:", error);
@@ -115,7 +113,7 @@ export function useTemplateManager(shouldCreateTemplate = false) {
       }
 
       try {
-        await api.delete(`shot-list-templates/${templateId}`);
+        await api.delete(`shot-templates/${templateId}`);
 
         toast.success("Template deleted successfully");
 

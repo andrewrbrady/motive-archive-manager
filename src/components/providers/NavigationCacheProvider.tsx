@@ -26,9 +26,9 @@ export function NavigationCacheProvider({
     "/cars",
     "/galleries",
     "/projects",
-    "/contacts",
+    "/production",
+    "/images",
     "/events",
-    "/market",
   ];
 
   // Secondary routes preloaded based on current context
@@ -37,9 +37,9 @@ export function NavigationCacheProvider({
     "/cars": ["/cars", "/galleries", "/projects"],
     "/galleries": ["/cars", "/projects", "/images"],
     "/projects": ["/cars", "/events", "/deliverables"],
-    "/contacts": ["/projects", "/events"],
-    "/events": ["/projects", "/contacts", "/schedule"],
-    "/market": ["/auctions", "/cars"],
+    "/production": ["/projects", "/events"],
+    "/images": ["/galleries", "/cars", "/projects"],
+    "/events": ["/projects", "/production", "/schedule"],
   };
 
   /**

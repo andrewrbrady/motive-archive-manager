@@ -43,9 +43,9 @@ export default function Navbar({ className }: NavbarProps) {
     { name: "Cars", href: "/cars" },
     { name: "Galleries", href: "/galleries" },
     { name: "Projects", href: "/projects" },
-    { name: "Contacts", href: "/contacts" },
+    { name: "Production", href: "/production" },
+    { name: "Images", href: "/images" },
     { name: "Events", href: "/events" },
-    { name: "Market", href: "/market" },
   ];
 
   const handleLinkClick = () => {

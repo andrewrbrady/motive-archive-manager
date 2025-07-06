@@ -60,7 +60,7 @@ export default function CreateShotListTemplateDialog({
 
     try {
       const response = await api.post<CreateShotListTemplateResponse>(
-        "shot-list-templates",
+        "shot-templates",
         {
           name,
           description,
