@@ -15,6 +15,7 @@ import {
   ColumnsBlock,
 } from "./types";
 import { EmailHeaderState } from "./EmailHeaderConfig";
+import { formatContent } from "@/lib/content-formatter";
 
 interface PreviewColumnProps {
   blocks: ContentBlock[];
@@ -247,43 +248,23 @@ const TextBlockPreview = React.memo<{ block: TextBlock }>(
 
     // Performance optimization: Memoize rich content formatting (always enabled)
     const formattedContent = useMemo(() => {
-      if (!block.richFormatting?.formattedContent) {
-        return content;
-      }
+      // Use richFormatting.formattedContent if available, otherwise use regular content
+      const sourceContent = block.richFormatting?.formattedContent || content;
 
-      let html = block.richFormatting.formattedContent;
-
-      // Convert **bold** to <strong>bold</strong>
-      html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-
-      // Convert [text](url) to <a href="url">text</a>
-      html = html.replace(
-        /\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline">$1</a>'
-      );
-
-      // Convert line breaks to <br>
-      html = html.replace(/\n/g, "<br>");
-
-      return html;
+      // Use smart content formatting that preserves HTML tags
+      return formatContent(sourceContent, {
+        preserveHtml: true,
+        emailMode: false,
+        stylesheetData: null, // PreviewColumn doesn't use stylesheet data
+      });
     }, [block.richFormatting?.formattedContent, content]);
-
-    const hasRichContent = block.richFormatting?.formattedContent;
 
     return (
       <div className="p-6" style={textStyles}>
-        {hasRichContent ? (
-          <div
-            className={`whitespace-pre-wrap ${!block.content ? "text-muted-foreground italic" : "text-foreground"}`}
-            dangerouslySetInnerHTML={{ __html: formattedContent }}
-          />
-        ) : (
-          <div
-            className={`whitespace-pre-wrap ${!block.content ? "text-muted-foreground italic" : "text-foreground"}`}
-          >
-            {content}
-          </div>
-        )}
+        <div
+          className={`whitespace-pre-wrap ${!block.content ? "text-muted-foreground italic" : "text-foreground"}`}
+          dangerouslySetInnerHTML={{ __html: formattedContent }}
+        />
       </div>
     );
   }
@@ -394,41 +375,26 @@ const HeadingBlockPreview = React.memo<{ block: TextBlock }>(
 
     // Performance optimization: Memoize rich content formatting (always enabled)
     const formattedContent = useMemo(() => {
-      if (!block.richFormatting?.formattedContent) {
-        return content;
-      }
+      // Use richFormatting.formattedContent if available, otherwise use regular content
+      const sourceContent = block.richFormatting?.formattedContent || content;
 
-      let html = block.richFormatting.formattedContent;
-
-      // Convert **bold** to <strong>bold</strong>
-      html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-
-      // Convert [text](url) to <a href="url">text</a>
-      html = html.replace(
-        /\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline">$1</a>'
-      );
-
-      return html;
+      // Use smart content formatting that preserves HTML tags (no line breaks for headings)
+      return formatContent(sourceContent, {
+        preserveHtml: true,
+        emailMode: false,
+        stylesheetData: null, // PreviewColumn doesn't use stylesheet data
+      });
     }, [block.richFormatting?.formattedContent, content]);
-
-    const hasRichContent = block.richFormatting?.formattedContent;
 
     return (
       <div className="px-6" style={containerStyles}>
-        {React.createElement(
-          block.element || "h2",
-          {
-            style: elementStyles,
-            className: !block.content
-              ? "text-muted-foreground italic"
-              : "text-foreground",
-            ...(hasRichContent
-              ? { dangerouslySetInnerHTML: { __html: formattedContent } }
-              : {}),
-          },
-          hasRichContent ? undefined : content
-        )}
+        {React.createElement(block.element || "h2", {
+          style: elementStyles,
+          className: !block.content
+            ? "text-muted-foreground italic"
+            : "text-foreground",
+          dangerouslySetInnerHTML: { __html: formattedContent },
+        })}
       </div>
     );
   }

@@ -4,6 +4,70 @@ import { verifyFirebaseToken } from "@/lib/firebase-auth-middleware";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Check authentication
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      return authResult;
+    }
+
+    // Connect to database
+    const db = await getDatabase();
+    if (!db) {
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
+
+    // Get user ID from the verified token
+    const authHeader = request.headers.get("authorization");
+    const token = authHeader?.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token!);
+
+    if (!tokenData) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
+
+    const userId =
+      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
+
+    // Validate composition ID
+    const resolvedParams = await params;
+    if (!ObjectId.isValid(resolvedParams.id)) {
+      return NextResponse.json(
+        { error: "Invalid composition ID" },
+        { status: 400 }
+      );
+    }
+
+    // Find the composition (only if user owns it)
+    const composition = await db.collection("content_compositions").findOne({
+      _id: new ObjectId(resolvedParams.id),
+      "metadata.createdBy": userId,
+    });
+
+    if (!composition) {
+      return NextResponse.json(
+        { error: "Composition not found or access denied" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(composition);
+  } catch (error) {
+    console.error("Error fetching composition:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

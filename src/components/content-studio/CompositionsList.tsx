@@ -20,11 +20,12 @@ import {
 } from "lucide-react";
 import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { api } from "@/lib/api-client";
+import { LoadedComposition } from "./types";
 
 interface CompositionsListProps {
   carId?: string;
   projectId?: string;
-  onLoadComposition: (composition: any) => void;
+  onLoadComposition: (composition: LoadedComposition) => void;
 }
 
 export function CompositionsList({
@@ -47,7 +48,7 @@ export function CompositionsList({
     error,
     refetch,
   } = useAPIQuery<{
-    compositions: any[];
+    compositions: LoadedComposition[];
     pagination: {
       page: number;
       limit: number;
@@ -85,10 +86,13 @@ export function CompositionsList({
     }
   };
 
-  const handleDuplicate = async (composition: any) => {
+  const handleDuplicate = async (composition: LoadedComposition) => {
     try {
+      // Create a new composition without the _id field
+      const { _id, ...compositionWithoutId } = composition;
+
       const duplicatedComposition = {
-        ...composition,
+        ...compositionWithoutId,
         name: `${composition.name} (Copy)`,
         metadata: {
           ...composition.metadata,
@@ -96,9 +100,6 @@ export function CompositionsList({
           updatedAt: new Date(),
         },
       };
-
-      // Remove the _id field since it will be auto-generated
-      delete duplicatedComposition._id;
 
       await api.post("/content-studio/compositions", duplicatedComposition);
       toast({
@@ -127,7 +128,7 @@ export function CompositionsList({
     });
   };
 
-  const getBlockSummary = (blocks: any[]) => {
+  const getBlockSummary = (blocks: LoadedComposition["blocks"]) => {
     if (!blocks || blocks.length === 0) return "No blocks";
 
     const blockTypes = blocks.reduce((acc: any, block) => {

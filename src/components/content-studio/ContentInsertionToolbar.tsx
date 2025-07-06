@@ -14,6 +14,7 @@ import {
   FileText,
   Archive,
   Video,
+  Code,
 } from "lucide-react";
 import { ImageGalleryPopup } from "./ImageGalleryPopup";
 import { BlockGroupsManager } from "./BlockGroupsManager";
@@ -27,6 +28,8 @@ interface ContentInsertionToolbarProps {
   onAddDividerBlock: () => void;
   onAddVideoBlock: () => void;
   onAddFrontmatterBlock?: () => void;
+  onAddListBlock?: () => void;
+  onAddHtmlBlock?: () => void;
   // Image gallery props
   finalImages?: any[];
   loadingImages?: boolean;
@@ -59,6 +62,8 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
     onAddDividerBlock,
     onAddVideoBlock,
     onAddFrontmatterBlock,
+    onAddListBlock,
+    onAddHtmlBlock,
     finalImages = [],
     loadingImages = false,
     projectId,
@@ -168,6 +173,33 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                       title="Add Article Metadata"
                     >
                       <FileText className="h-4 w-4" />
+                    </Button>
+                  )}
+
+                  {/* List Block Button */}
+                  {onAddListBlock && (
+                    <Button
+                      onClick={onAddListBlock}
+                      variant="ghost"
+                      size="sm"
+                      className="hover:bg-muted/20"
+                      title="Add List Block"
+                    >
+                      <PlusCircle className="h-4 w-4" />
+                      List
+                    </Button>
+                  )}
+
+                  {/* HTML Block Button */}
+                  {onAddHtmlBlock && (
+                    <Button
+                      onClick={onAddHtmlBlock}
+                      variant="ghost"
+                      size="sm"
+                      className="hover:bg-muted/20"
+                      title="Add HTML Block"
+                    >
+                      <Code className="h-4 w-4" />
                     </Button>
                   )}
 
@@ -289,6 +321,32 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                     >
                       <FileText className="h-4 w-4 mr-2" />
                       Article Metadata
+                    </Button>
+                  )}
+
+                  {/* List Block Button */}
+                  {onAddListBlock && (
+                    <Button
+                      onClick={onAddListBlock}
+                      variant="outline"
+                      size="sm"
+                      className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+                    >
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      List Block
+                    </Button>
+                  )}
+
+                  {/* HTML Block Button */}
+                  {onAddHtmlBlock && (
+                    <Button
+                      onClick={onAddHtmlBlock}
+                      variant="outline"
+                      size="sm"
+                      className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+                    >
+                      <Code className="h-4 w-4 mr-2" />
+                      HTML Block
                     </Button>
                   )}
 

@@ -6,160 +6,181 @@ import {
   CreateStylesheetRequest,
   StylesheetListResponse,
 } from "@/types/stylesheet";
+import { getDatabase } from "@/lib/mongodb";
+import { Stylesheet } from "@/models/Stylesheet";
+import { dbConnect } from "@/lib/mongodb";
 
-// In-memory storage for development (replace with database in production)
-const stylesheets: ClientStylesheet[] = [
-  // Demo stylesheet with sample CSS
-  {
-    id: "demo-stylesheet-1",
-    name: "Demo Newsletter Styles",
-    clientId: "demo-client",
-    clientName: "Demo Client",
-    cssContent: `
-      .container { background-color: #ffffff; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-      .header { text-align: center; background-color: #1A234E; padding: 40px 20px; color: white; border-radius: 8px; }
-      .intro-text { font-size: 22px; color: #1a1a1a; text-align: center; margin: 40px 0; line-height: 1.4; font-weight: 600; padding: 20px; }
-      .curatorial-quote { font-size: 22px; color: #1a1a1a; text-align: center; margin: 0; font-style: italic; line-height: 1.5; font-weight: 500; }
-      .services-title { color: #1a1a1a; font-size: 42px; font-weight: 900; text-align: center; margin: 60px 0 50px 0; letter-spacing: 3px; text-transform: uppercase; }
-      .cta-button { display: inline-block; background-color: #000; color: #fff; text-decoration: none; padding: 18px 40px; border-radius: 50px; font-weight: 700; font-size: 16px; text-align: center; margin: 20px 0; letter-spacing: 1px; }
-      .newsletter-title { color: #1a1a1a; font-size: 24px; font-weight: 700; margin: 0 0 20px 0; text-align: center; }
-      .footer { text-align: center; margin-top: 40px; padding-top: 30px; border-top: 1px solid #e0e0e0; color: #666; font-size: 14px; }
-    `,
-    parsedCSS: {
-      classes: [
-        {
-          name: "container",
-          selector: ".container",
-          properties: {
-            "background-color": "#ffffff",
-            padding: "40px",
-            "border-radius": "8px",
-            "box-shadow": "0 2px 10px rgba(0,0,0,0.1)",
-          },
-          description: "container, background styling, spacing, borders",
-          category: "layout",
+// Demo stylesheet data - will be seeded to database if no default exists
+const demoStylesheetData: ClientStylesheet = {
+  id: "demo-stylesheet-1",
+  name: "Demo Newsletter Styles",
+  clientId: "demo-client",
+  clientName: "Demo Client",
+  cssContent: `
+    .container { background-color: #ffffff; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .header { text-align: center; background-color: #1A234E; padding: 40px 20px; color: white; border-radius: 8px; }
+    .intro-text { font-size: 22px; color: #1a1a1a; text-align: center; margin: 40px 0; line-height: 1.4; font-weight: 600; padding: 20px; }
+    .curatorial-quote { font-size: 22px; color: #1a1a1a; text-align: center; margin: 0; font-style: italic; line-height: 1.5; font-weight: 500; }
+    .services-title { color: #1a1a1a; font-size: 42px; font-weight: 900; text-align: center; margin: 60px 0 50px 0; letter-spacing: 3px; text-transform: uppercase; }
+    .cta-button { display: inline-block; background-color: #000; color: #fff; text-decoration: none; padding: 18px 40px; border-radius: 50px; font-weight: 700; font-size: 16px; text-align: center; margin: 20px 0; letter-spacing: 1px; }
+    .newsletter-title { color: #1a1a1a; font-size: 24px; font-weight: 700; margin: 0 0 20px 0; text-align: center; }
+    .footer { text-align: center; margin-top: 40px; padding-top: 30px; border-top: 1px solid #e0e0e0; color: #666; font-size: 14px; }
+  `,
+  parsedCSS: {
+    classes: [
+      {
+        name: "container",
+        selector: ".container",
+        properties: {
+          "background-color": "#ffffff",
+          padding: "40px",
+          "border-radius": "8px",
+          "box-shadow": "0 2px 10px rgba(0,0,0,0.1)",
         },
-        {
-          name: "header",
-          selector: ".header",
-          properties: {
-            "text-align": "center",
-            "background-color": "#1A234E",
-            padding: "40px 20px",
-            color: "white",
-            "border-radius": "8px",
-          },
-          description:
-            "header, text alignment, background styling, text color, spacing, borders",
-          category: "structure",
+        description: "container, background styling, spacing, borders",
+        category: "layout",
+      },
+      {
+        name: "header",
+        selector: ".header",
+        properties: {
+          "text-align": "center",
+          "background-color": "#1A234E",
+          padding: "40px 20px",
+          color: "white",
+          "border-radius": "8px",
         },
-        {
-          name: "intro-text",
-          selector: ".intro-text",
-          properties: {
-            "font-size": "22px",
-            color: "#1a1a1a",
-            "text-align": "center",
-            margin: "40px 0",
-            "line-height": "1.4",
-            "font-weight": "600",
-            padding: "20px",
-          },
-          description: "text content, typography, text alignment, spacing",
-          category: "typography",
+        description:
+          "header, text alignment, background styling, text color, spacing, borders",
+        category: "structure",
+      },
+      {
+        name: "intro-text",
+        selector: ".intro-text",
+        properties: {
+          "font-size": "22px",
+          color: "#1a1a1a",
+          "text-align": "center",
+          margin: "40px 0",
+          "line-height": "1.4",
+          "font-weight": "600",
+          padding: "20px",
         },
-        {
-          name: "curatorial-quote",
-          selector: ".curatorial-quote",
-          properties: {
-            "font-size": "22px",
-            color: "#1a1a1a",
-            "text-align": "center",
-            margin: "0",
-            "font-style": "italic",
-            "line-height": "1.5",
-            "font-weight": "500",
-          },
-          description: "text content, typography, text alignment",
-          category: "typography",
+        description: "text content, typography, text alignment, spacing",
+        category: "typography",
+      },
+      {
+        name: "curatorial-quote",
+        selector: ".curatorial-quote",
+        properties: {
+          "font-size": "22px",
+          color: "#1a1a1a",
+          "text-align": "center",
+          margin: "0",
+          "font-style": "italic",
+          "line-height": "1.5",
+          "font-weight": "500",
         },
-        {
-          name: "services-title",
-          selector: ".services-title",
-          properties: {
-            color: "#1a1a1a",
-            "font-size": "42px",
-            "font-weight": "900",
-            "text-align": "center",
-            margin: "60px 0 50px 0",
-            "letter-spacing": "3px",
-            "text-transform": "uppercase",
-          },
-          description: "heading, typography, text alignment, spacing",
-          category: "typography",
+        description: "text content, typography, text alignment",
+        category: "typography",
+      },
+      {
+        name: "services-title",
+        selector: ".services-title",
+        properties: {
+          color: "#1a1a1a",
+          "font-size": "42px",
+          "font-weight": "900",
+          "text-align": "center",
+          margin: "60px 0 50px 0",
+          "letter-spacing": "3px",
+          "text-transform": "uppercase",
         },
-        {
-          name: "cta-button",
-          selector: ".cta-button",
-          properties: {
-            display: "inline-block",
-            "background-color": "#000",
-            color: "#fff",
-            "text-decoration": "none",
-            padding: "18px 40px",
-            "border-radius": "50px",
-            "font-weight": "700",
-            "font-size": "16px",
-            "text-align": "center",
-            margin: "20px 0",
-            "letter-spacing": "1px",
-          },
-          description:
-            "button, layout, background styling, text color, spacing, borders, typography, text alignment",
-          category: "buttons",
+        description: "heading, typography, text alignment, spacing",
+        category: "typography",
+      },
+      {
+        name: "cta-button",
+        selector: ".cta-button",
+        properties: {
+          display: "inline-block",
+          "background-color": "#000",
+          color: "#fff",
+          "text-decoration": "none",
+          padding: "18px 40px",
+          "border-radius": "50px",
+          "font-weight": "700",
+          "font-size": "16px",
+          "text-align": "center",
+          margin: "20px 0",
+          "letter-spacing": "1px",
         },
-        {
-          name: "newsletter-title",
-          selector: ".newsletter-title",
-          properties: {
-            color: "#1a1a1a",
-            "font-size": "24px",
-            "font-weight": "700",
-            margin: "0 0 20px 0",
-            "text-align": "center",
-          },
-          description: "heading, typography, text alignment, spacing",
-          category: "typography",
+        description:
+          "button, layout, background styling, text color, spacing, borders, typography, text alignment",
+        category: "buttons",
+      },
+      {
+        name: "newsletter-title",
+        selector: ".newsletter-title",
+        properties: {
+          color: "#1a1a1a",
+          "font-size": "24px",
+          "font-weight": "700",
+          margin: "0 0 20px 0",
+          "text-align": "center",
         },
-        {
-          name: "footer",
-          selector: ".footer",
-          properties: {
-            "text-align": "center",
-            "margin-top": "40px",
-            "padding-top": "30px",
-            "border-top": "1px solid #e0e0e0",
-            color: "#666",
-            "font-size": "14px",
-          },
-          description:
-            "footer, text alignment, spacing, borders, text color, typography",
-          category: "structure",
+        description: "heading, typography, text alignment, spacing",
+        category: "typography",
+      },
+      {
+        name: "footer",
+        selector: ".footer",
+        properties: {
+          "text-align": "center",
+          "margin-top": "40px",
+          "padding-top": "30px",
+          "border-top": "1px solid #e0e0e0",
+          color: "#666",
+          "font-size": "14px",
         },
-      ],
-      variables: {},
-      globalStyles: {},
-    },
-    isDefault: true,
-    isActive: true,
-    uploadedAt: new Date(),
-    updatedAt: new Date(),
-    uploadedBy: "system",
-    description: "Sample newsletter styles for demonstration",
-    version: "1.0.0",
-    tags: ["demo", "newsletter", "sample"],
+        description:
+          "footer, text alignment, spacing, borders, text color, typography",
+        category: "structure",
+      },
+    ],
+    variables: {},
+    globalStyles: {},
   },
-];
+  isDefault: true,
+  isActive: true,
+  uploadedAt: new Date(),
+  updatedAt: new Date(),
+  uploadedBy: "system",
+  description: "Sample newsletter styles for demonstration",
+  version: "1.0.0",
+  tags: ["demo", "newsletter", "sample"],
+};
+
+/**
+ * Ensure demo stylesheet exists in database
+ */
+async function ensureDemoStylesheet() {
+  try {
+    await dbConnect();
+
+    // Check if demo stylesheet already exists
+    const existingDemo = await Stylesheet.findOne({ id: "demo-stylesheet-1" });
+
+    if (!existingDemo) {
+      console.log("Creating demo stylesheet in database...");
+      await Stylesheet.create(demoStylesheetData);
+      console.log("Demo stylesheet created successfully");
+    }
+  } catch (error) {
+    console.error("Error ensuring demo stylesheet:", error);
+    // Don't throw - let the API continue even if demo creation fails
+  }
+}
 
 /**
  * GET /api/stylesheets
@@ -167,26 +188,32 @@ const stylesheets: ClientStylesheet[] = [
  */
 export async function GET(request: NextRequest) {
   try {
+    await ensureDemoStylesheet();
+
     const searchParams = request.nextUrl.searchParams;
     const clientId = searchParams.get("clientId");
     const includeInactive = searchParams.get("includeInactive") === "true";
 
-    let filteredStylesheets = stylesheets;
+    await dbConnect();
+
+    // Build query
+    const query: any = {};
 
     // Filter by client if specified
     if (clientId) {
-      filteredStylesheets = stylesheets.filter((s) => s.clientId === clientId);
+      query.clientId = clientId;
     }
 
     // Filter out inactive stylesheets unless requested
     if (!includeInactive) {
-      filteredStylesheets = filteredStylesheets.filter(
-        (s) => s.isActive !== false
-      );
+      query.isActive = { $ne: false };
     }
 
+    // Fetch stylesheets from database
+    const dbStylesheets = await Stylesheet.find(query).sort({ uploadedAt: -1 });
+
     // Convert to metadata format
-    const metadata = filteredStylesheets.map((stylesheet) => ({
+    const metadata = dbStylesheets.map((stylesheet) => ({
       id: stylesheet.id,
       name: stylesheet.name,
       clientId: stylesheet.clientId,
@@ -234,11 +261,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    await dbConnect();
+
     // Parse the CSS content
     const parsedCSS = parseCSS(body.cssContent);
 
     // Create the stylesheet record
-    const stylesheet: ClientStylesheet = {
+    const stylesheetData: Partial<ClientStylesheet> = {
       id: generateId(),
       name: body.name,
       clientId: body.clientId,
@@ -257,10 +286,31 @@ export async function POST(request: NextRequest) {
       tags: body.tags || [],
     };
 
-    // Store the stylesheet
-    stylesheets.push(stylesheet);
+    // Save to database
+    const savedStylesheet = await Stylesheet.create(stylesheetData);
 
-    return NextResponse.json({ stylesheet }, { status: 201 });
+    // Convert to ClientStylesheet format for response
+    const responseStylesheet: ClientStylesheet = {
+      id: savedStylesheet.id,
+      name: savedStylesheet.name,
+      clientId: savedStylesheet.clientId,
+      clientName: savedStylesheet.clientName,
+      cssContent: savedStylesheet.cssContent,
+      parsedCSS: savedStylesheet.parsedCSS,
+      isDefault: savedStylesheet.isDefault,
+      isActive: savedStylesheet.isActive,
+      uploadedAt: savedStylesheet.uploadedAt,
+      updatedAt: savedStylesheet.updatedAt,
+      uploadedBy: savedStylesheet.uploadedBy,
+      description: savedStylesheet.description,
+      version: savedStylesheet.version,
+      tags: savedStylesheet.tags,
+    };
+
+    return NextResponse.json(
+      { stylesheet: responseStylesheet },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Error creating stylesheet:", error);
     return NextResponse.json(

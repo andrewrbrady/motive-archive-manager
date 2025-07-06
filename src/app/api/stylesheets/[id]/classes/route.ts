@@ -71,10 +71,41 @@ export async function GET(
 
 /**
  * Helper function to find stylesheet by ID
- * In production, this would be a database query
+ * Uses the same Mongoose model approach as other stylesheet endpoints
  */
 async function findStylesheetById(id: string) {
-  // Return demo stylesheet if requesting the demo ID
+  // Import here to avoid circular dependencies
+  const { dbConnect } = await import("@/lib/mongodb");
+  const { Stylesheet } = await import("@/models/Stylesheet");
+
+  try {
+    await dbConnect();
+
+    // Try to fetch using Mongoose model (prioritize custom id field)
+    let stylesheet: any = await Stylesheet.findOne({ id: id }).lean();
+
+    // If not found by custom id, try by MongoDB _id
+    if (!stylesheet) {
+      stylesheet = await Stylesheet.findOne({ _id: id }).lean();
+    }
+
+    if (stylesheet) {
+      return {
+        id: stylesheet.id || stylesheet._id.toString(),
+        name: stylesheet.name,
+        clientId: stylesheet.clientId,
+        clientName: stylesheet.clientName,
+        cssContent: stylesheet.cssContent,
+        parsedCSS: stylesheet.parsedCSS,
+        createdAt: stylesheet.createdAt,
+        updatedAt: stylesheet.updatedAt,
+      };
+    }
+  } catch (error) {
+    console.error("Database error:", error);
+  }
+
+  // Fallback to demo stylesheet if requesting the demo ID or if database fails
   if (id === "demo-stylesheet-1") {
     return {
       id: "demo-stylesheet-1",

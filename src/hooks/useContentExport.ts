@@ -1,16 +1,72 @@
 import { useCallback } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { ContentBlock } from "@/components/content-studio/types";
-import { ContentExporter } from "@/lib/content-export";
+import { ContentExporter, ExportOptions } from "@/lib/content-export";
 
 /**
  * Custom hook for handling content export operations in BlockComposer
- * Extracted from BlockComposer.tsx to reduce file size and improve maintainability
+ * Updated to support the new export modal system with platform-specific options
  */
 export function useContentExport() {
   const { toast } = useToast();
 
-  // Export to HTML and download
+  // Export using the new options interface
+  const exportWithOptions = useCallback(
+    async (
+      blocks: ContentBlock[],
+      template: string | null,
+      compositionName: string,
+      options: ExportOptions,
+      projectId?: string,
+      carId?: string,
+      selectedStylesheetId?: string | null
+    ) => {
+      try {
+        await ContentExporter.exportWithOptions(
+          blocks,
+          template,
+          compositionName,
+          options,
+          projectId,
+          carId,
+          selectedStylesheetId
+        );
+
+        // Show success toast
+        const platformText = options.emailPlatform
+          ? ` (${options.emailPlatform.charAt(0).toUpperCase() + options.emailPlatform.slice(1)})`
+          : "";
+
+        // For copy operations, we need to provide appropriate feedback
+        // since clipboard operations might fall back to download
+        if (options.action === "copy") {
+          toast({
+            title: "Content Exported",
+            description: `${options.format.charAt(0).toUpperCase() + options.format.slice(1)} content copied to clipboard or downloaded${platformText}`,
+          });
+        } else {
+          toast({
+            title: "Export Successful",
+            description: `${options.format.charAt(0).toUpperCase() + options.format.slice(1)} content downloaded${platformText}`,
+          });
+        }
+      } catch (error) {
+        console.error("Export failed:", error);
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "An error occurred while exporting. Please try again.";
+        toast({
+          title: "Export Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
+    },
+    [toast]
+  );
+
+  // Legacy export functions for backward compatibility
   const exportToHTML = useCallback(
     async (
       blocks: ContentBlock[],
@@ -18,40 +74,31 @@ export function useContentExport() {
       compositionName: string,
       format: "web" | "email" = "web",
       projectId?: string,
-      carId?: string
+      carId?: string,
+      selectedStylesheetId?: string | null
     ) => {
       try {
-        // Validate blocks before export
-        const validation = ContentExporter.validateBlocksForExport(blocks);
-        if (!validation.isValid) {
-          toast({
-            title: "Export Validation Failed",
-            description: `Issues found: ${validation.errors.join(", ")}`,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        await ContentExporter.downloadHTML(
+        const html = await ContentExporter.exportToHTML(
           blocks,
           template,
           compositionName,
           format,
           projectId,
-          carId
+          carId,
+          selectedStylesheetId
         );
 
+        ContentExporter.downloadHTMLFile(html, `${compositionName}-${format}`);
+
         toast({
-          title: `${format === "email" ? "Email" : "Web"} HTML Exported`,
-          description: `Your composition has been exported as ${
-            format === "email" ? "Mailchimp-compatible email" : "web"
-          } HTML.`,
+          title: "Export Complete",
+          description: `${format.charAt(0).toUpperCase() + format.slice(1)} HTML file downloaded successfully.`,
         });
       } catch (error) {
-        console.error("Failed to export HTML:", error);
+        console.error("Export failed:", error);
         toast({
           title: "Export Failed",
-          description: `Failed to export your composition as ${format} HTML.`,
+          description: "An error occurred while exporting. Please try again.",
           variant: "destructive",
         });
       }
@@ -59,7 +106,6 @@ export function useContentExport() {
     [toast]
   );
 
-  // Copy HTML to clipboard
   const copyHTMLToClipboard = useCallback(
     async (
       blocks: ContentBlock[],
@@ -67,40 +113,35 @@ export function useContentExport() {
       compositionName: string,
       format: "web" | "email" = "web",
       projectId?: string,
-      carId?: string
+      carId?: string,
+      selectedStylesheetId?: string | null
     ) => {
       try {
-        // Validate blocks before export
-        const validation = ContentExporter.validateBlocksForExport(blocks);
-        if (!validation.isValid) {
-          toast({
-            title: "Copy Validation Failed",
-            description: `Issues found: ${validation.errors.join(", ")}`,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        await ContentExporter.copyHTMLToClipboard(
+        const html = await ContentExporter.exportToHTML(
           blocks,
           template,
           compositionName,
           format,
           projectId,
-          carId
+          carId,
+          selectedStylesheetId
         );
 
+        await ContentExporter.copyToClipboard(html);
+
         toast({
-          title: `${format === "email" ? "Email" : "Web"} HTML Copied`,
-          description: `${
-            format === "email" ? "Mailchimp-compatible email" : "Web"
-          } HTML has been copied to your clipboard.`,
+          title: "Content Exported",
+          description: `${format.charAt(0).toUpperCase() + format.slice(1)} HTML copied to clipboard or downloaded.`,
         });
       } catch (error) {
-        console.error("Failed to copy HTML:", error);
+        console.error("Copy failed:", error);
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "An error occurred while copying. Please try again.";
         toast({
           title: "Copy Failed",
-          description: `Failed to copy ${format} HTML to clipboard.`,
+          description: errorMessage,
           variant: "destructive",
         });
       }
@@ -108,32 +149,20 @@ export function useContentExport() {
     [toast]
   );
 
-  // Export to MDX and download
   const exportToMDX = useCallback(
-    (blocks: ContentBlock[], compositionName: string) => {
+    async (blocks: ContentBlock[], compositionName: string) => {
       try {
-        // Validate blocks before export
-        const validation = ContentExporter.validateBlocksForExport(blocks);
-        if (!validation.isValid) {
-          toast({
-            title: "MDX Export Validation Failed",
-            description: `Issues found: ${validation.errors.join(", ")}`,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        ContentExporter.downloadMDX(blocks, compositionName);
-
+        await ContentExporter.exportToMDX(blocks, compositionName);
         toast({
-          title: "MDX Exported",
-          description: "Your composition has been exported as an MDX file.",
+          title: "MDX Export Complete",
+          description: "MDX file downloaded successfully.",
         });
       } catch (error) {
-        console.error("Failed to export MDX:", error);
+        console.error("MDX export failed:", error);
         toast({
-          title: "Export Failed",
-          description: "Failed to export your composition as MDX.",
+          title: "MDX Export Failed",
+          description:
+            "An error occurred while exporting MDX. Please try again.",
           variant: "destructive",
         });
       }
@@ -141,75 +170,15 @@ export function useContentExport() {
     [toast]
   );
 
-  // Get MDX content as string (for preview or other uses)
-  const getMDXContent = useCallback(
-    (blocks: ContentBlock[], compositionName: string): string | null => {
-      try {
-        const validation = ContentExporter.validateBlocksForExport(blocks);
-        if (!validation.isValid) {
-          console.warn("Validation issues:", validation.errors);
-          return null;
-        }
-
-        return ContentExporter.exportToMDX(blocks, compositionName);
-      } catch (error) {
-        console.error("Failed to generate MDX content:", error);
-        return null;
-      }
-    },
-    []
-  );
-
-  // Get HTML content as string (for preview or other uses)
-  const getHTMLContent = useCallback(
-    async (
-      blocks: ContentBlock[],
-      template: string | null,
-      compositionName: string,
-      format: "web" | "email" = "web",
-      projectId?: string,
-      carId?: string
-    ): Promise<string | null> => {
-      try {
-        const validation = ContentExporter.validateBlocksForExport(blocks);
-        if (!validation.isValid) {
-          console.warn("Validation issues:", validation.errors);
-          return null;
-        }
-
-        return await ContentExporter.exportToHTML(
-          blocks,
-          template,
-          compositionName,
-          format,
-          projectId,
-          carId
-        );
-      } catch (error) {
-        console.error("Failed to generate HTML content:", error);
-        return null;
-      }
-    },
-    []
-  );
-
-  // Check if blocks have email-specific features
   const hasEmailFeatures = useCallback((blocks: ContentBlock[]): boolean => {
-    return blocks.some((block) => {
-      if (block.type === "image") {
-        const imageBlock = block as any;
-        return imageBlock.email?.isFullWidth;
-      }
-      return false;
-    });
+    return ContentExporter.hasEmailFeatures(blocks);
   }, []);
 
   return {
+    exportWithOptions,
     exportToHTML,
     copyHTMLToClipboard,
     exportToMDX,
-    getMDXContent,
-    getHTMLContent,
     hasEmailFeatures,
   };
 }

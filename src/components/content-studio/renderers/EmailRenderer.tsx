@@ -6,6 +6,7 @@ import {
   VideoBlock,
   DividerBlock,
   FrontmatterBlock,
+  HTMLBlock,
 } from "../types";
 
 interface EmailRendererProps {
@@ -30,6 +31,11 @@ interface EmailRendererProps {
  *
  * This component takes content blocks and converts them into email-compatible HTML
  * with inline styles for maximum email client compatibility.
+ *
+ * HOT-RELOAD OPTIMIZATION:
+ * - Returns object with html and preview properties
+ * - Uses inline styles so CSS updates don't affect this renderer
+ * - Preview component uses React.memo internally for optimization
  */
 export function EmailRenderer({
   blocks,
@@ -94,6 +100,45 @@ export function EmailRenderer({
   // Helper function to convert blocks to email HTML
   const renderEmailBlock = (block: ContentBlock): string => {
     switch (block.type) {
+      case "html": {
+        const htmlBlock = block as HTMLBlock;
+        const content = htmlBlock.content || "";
+
+        // For email rendering, we'll wrap the HTML content in a container
+        // with some basic email-safe styling
+        return `
+          <div style="margin: 20px 0; font-family: inherit; line-height: inherit;">
+            ${content}
+          </div>
+        `;
+      }
+
+      case "list": {
+        const listBlock = block as import("../types").ListBlock;
+        const items = listBlock.items || [];
+
+        if (items.length === 0) return "";
+
+        const listStyle = `
+          margin: 20px 0;
+          padding-left: 40px;
+          list-style-type: disc;
+          color: #666;
+          font-size: 16px;
+          line-height: 1.6;
+        `;
+
+        const itemStyle = `
+          margin-bottom: 10px;
+        `;
+
+        return `
+          <ul style="${listStyle}">
+            ${items.map((item) => `<li style="${itemStyle}">${item}</li>`).join("")}
+          </ul>
+        `;
+      }
+
       case "text": {
         const textBlock = block as TextBlock;
         const content = textBlock.content || "";
@@ -298,7 +343,7 @@ export function EmailRenderer({
   return {
     html: generateEmailHTML(),
     preview: (
-      <div className="email-preview bg-gray-100 p-4 rounded-lg">
+      <div className="content-studio-preview content-blocks-area email-preview bg-gray-100 p-4 rounded-lg">
         <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
           {/* Email content rendered as React components for preview */}
           <div className="p-6 space-y-4">

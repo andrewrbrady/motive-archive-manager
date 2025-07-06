@@ -13,7 +13,9 @@ export type ContentBlockType =
   | "button"
   | "spacer"
   | "columns"
-  | "frontmatter";
+  | "frontmatter"
+  | "list"
+  | "html";
 
 // Base interface for all content blocks
 export interface BaseContentBlock {
@@ -138,6 +140,18 @@ export interface FrontmatterBlock extends BaseContentBlock {
   };
 }
 
+export interface ListBlock extends BaseContentBlock {
+  type: "list";
+  items: string[];
+  style: "ul"; // Only unordered for now
+}
+
+export interface HTMLBlock extends BaseContentBlock {
+  type: "html";
+  content: string;
+  description?: string; // Optional description for the HTML block
+}
+
 // Backward compatibility - HeadingBlock is now just a TextBlock with heading element
 export type HeadingBlock = TextBlock & {
   element: "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
@@ -152,7 +166,9 @@ export type ContentBlock =
   | ButtonBlock
   | SpacerBlock
   | ColumnsBlock
-  | FrontmatterBlock;
+  | FrontmatterBlock
+  | ListBlock
+  | HTMLBlock; // Added HTMLBlock
 
 // Template structure
 export interface ContentTemplate {
@@ -242,4 +258,16 @@ export interface ContentStudioState {
   blocks: ContentBlock[];
   isLoading: boolean;
   error: string | null;
+}
+
+// Loaded composition interface for content studio
+export interface LoadedComposition {
+  _id: string;
+  name: string;
+  blocks: ContentBlock[];
+  metadata?: {
+    selectedCopies?: SelectedCopy[];
+    [key: string]: any;
+  };
+  [key: string]: any;
 }

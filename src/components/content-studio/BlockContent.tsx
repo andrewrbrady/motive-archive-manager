@@ -23,6 +23,8 @@ import {
   VideoBlock,
   DividerBlock,
   FrontmatterBlock,
+  ListBlock, // Import ListBlock
+  HTMLBlock, // Import HTMLBlock
 } from "./types";
 
 /**
@@ -47,89 +49,82 @@ const areBlockContentPropsEqual = (
   prevProps: BlockContentProps,
   nextProps: BlockContentProps
 ) => {
-  // Quick reference check for functions (they should be stable)
-  if (
-    prevProps.onUpdate !== nextProps.onUpdate ||
-    prevProps.onBlocksChange !== nextProps.onBlocksChange
-  ) {
-    return false;
-  }
+  if (prevProps.block.type !== nextProps.block.type) return false;
 
-  // Compare blocks array length only for performance
-  if (prevProps.blocks.length !== nextProps.blocks.length) {
-    return false;
-  }
-
-  // Deep compare the specific block that this component is editing
-  const prevBlock = prevProps.block;
-  const nextBlock = nextProps.block;
-
-  // Quick primitive checks first
-  if (
-    prevBlock.id !== nextBlock.id ||
-    prevBlock.type !== nextBlock.type ||
-    prevBlock.order !== nextBlock.order
-  ) {
-    return false;
-  }
-
-  // Check content property only for blocks that have it
-  if (prevBlock.type === "text" && nextBlock.type === "text") {
-    const prevContentBlock = prevBlock as TextBlock;
-    const nextContentBlock = nextBlock as TextBlock;
-    if (prevContentBlock.content !== nextContentBlock.content) {
-      return false;
-    }
-  }
-
-  // Compare type-specific properties efficiently
-  switch (prevBlock.type) {
+  switch (prevProps.block.type) {
     case "text": {
-      const prevText = prevBlock as TextBlock;
-      const nextText = nextBlock as TextBlock;
+      const prevText = prevProps.block as TextBlock;
+      const nextText = nextProps.block as TextBlock;
       return (
+        prevText.content === nextText.content &&
         prevText.element === nextText.element &&
-        JSON.stringify(prevText.richFormatting) ===
-          JSON.stringify(nextText.richFormatting)
+        JSON.stringify(prevText.styles) === JSON.stringify(nextText.styles)
       );
     }
     case "image": {
-      const prevImage = prevBlock as ImageBlock;
-      const nextImage = nextBlock as ImageBlock;
+      const prevImage = prevProps.block as ImageBlock;
+      const nextImage = nextProps.block as ImageBlock;
       return (
         prevImage.imageUrl === nextImage.imageUrl &&
         prevImage.altText === nextImage.altText &&
         prevImage.width === nextImage.width &&
-        prevImage.height === nextImage.height &&
-        prevImage.caption === nextImage.caption &&
-        prevImage.linkUrl === nextImage.linkUrl &&
-        prevImage.linkTarget === nextImage.linkTarget &&
-        JSON.stringify(prevImage.email) === JSON.stringify(nextImage.email)
+        prevImage.alignment === nextImage.alignment &&
+        JSON.stringify(prevImage.styles) === JSON.stringify(nextImage.styles)
       );
     }
     case "video": {
-      const prevVideo = prevBlock as VideoBlock;
-      const nextVideo = nextBlock as VideoBlock;
+      const prevVideo = prevProps.block as VideoBlock;
+      const nextVideo = nextProps.block as VideoBlock;
       return (
         prevVideo.url === nextVideo.url &&
-        prevVideo.title === nextVideo.title &&
         prevVideo.platform === nextVideo.platform &&
         prevVideo.embedId === nextVideo.embedId &&
         prevVideo.aspectRatio === nextVideo.aspectRatio &&
-        prevVideo.alignment === nextVideo.alignment
+        prevVideo.alignment === nextVideo.alignment &&
+        JSON.stringify(prevVideo.styles) === JSON.stringify(nextVideo.styles)
       );
     }
     case "divider": {
-      const prevDivider = prevBlock as DividerBlock;
-      const nextDivider = nextBlock as DividerBlock;
+      const prevDivider = prevProps.block as DividerBlock;
+      const nextDivider = nextProps.block as DividerBlock;
       return (
         prevDivider.thickness === nextDivider.thickness &&
         prevDivider.color === nextDivider.color &&
-        prevDivider.margin === nextDivider.margin
+        prevDivider.margin === nextDivider.margin &&
+        JSON.stringify(prevDivider.styles) ===
+          JSON.stringify(nextDivider.styles)
+      );
+    }
+    case "frontmatter": {
+      const prevFrontmatter = prevProps.block as FrontmatterBlock;
+      const nextFrontmatter = nextProps.block as FrontmatterBlock;
+      return (
+        JSON.stringify(prevFrontmatter.data) ===
+          JSON.stringify(nextFrontmatter.data) &&
+        JSON.stringify(prevFrontmatter.styles) ===
+          JSON.stringify(nextFrontmatter.styles)
+      );
+    }
+    case "list": {
+      const prevList = prevProps.block as ListBlock;
+      const nextList = nextProps.block as ListBlock;
+      return (
+        prevList.style === nextList.style &&
+        JSON.stringify(prevList.items) === JSON.stringify(nextList.items) &&
+        JSON.stringify(prevList.styles) === JSON.stringify(nextList.styles)
+      );
+    }
+    case "html": {
+      const prevHtml = prevProps.block as HTMLBlock;
+      const nextHtml = nextProps.block as HTMLBlock;
+      return (
+        prevHtml.content === nextHtml.content &&
+        prevHtml.description === nextHtml.description &&
+        JSON.stringify(prevHtml.styles) === JSON.stringify(nextHtml.styles)
       );
     }
     default:
-      return true;
+      return false;
   }
 };
 
@@ -178,6 +173,14 @@ const BlockContent = React.memo<BlockContentProps>(function BlockContent({
           onUpdate={onUpdate}
         />
       );
+    case "list":
+      return (
+        <ListBlockContent block={block as ListBlock} onUpdate={onUpdate} />
+      );
+    case "html":
+      return (
+        <HTMLBlockContent block={block as HTMLBlock} onUpdate={onUpdate} />
+      );
     default:
       return <DefaultBlockContent block={block} />;
   }
@@ -190,7 +193,7 @@ const BlockContent = React.memo<BlockContentProps>(function BlockContent({
 const FormattedTextPreview = React.memo<{ content: string }>(
   function FormattedTextPreview({ content }) {
     const formattedHTML = useMemo(() => {
-      let html = content;
+      let html = content || "";
 
       // Convert **bold** to <strong>bold</strong>
       html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
@@ -1815,6 +1818,214 @@ const DefaultBlockContent = React.memo<DefaultBlockContentProps>(
     return (
       <div className="text-sm text-muted-foreground bg-muted/10 rounded-md p-3 border border-border/20">
         {block.type} blocks are managed automatically
+      </div>
+    );
+  }
+);
+
+/**
+ * ListBlockContent: Basic UI for editing unordered list items
+ */
+interface ListBlockContentProps {
+  block: ListBlock;
+  onUpdate: (updates: Partial<ListBlock>) => void;
+}
+const ListBlockContent = React.memo<ListBlockContentProps>(
+  function ListBlockContent({ block, onUpdate }) {
+    // This is now a fully controlled component. It derives its state directly from props.
+    const items = block.items || [];
+
+    const handleItemChange = (idx: number, value: string) => {
+      // Create a new array with the updated item and call onUpdate immediately.
+      const newItems = [...items];
+      newItems[idx] = value;
+      onUpdate({ items: newItems });
+    };
+
+    const handleAddItem = () => {
+      // Add a new item and update immediately.
+      const newItems = [...items, "New list item"];
+      onUpdate({ items: newItems });
+    };
+
+    const handleRemoveItem = (idx: number) => {
+      // Remove an item and update immediately.
+      const newItems = items.filter((_, i) => i !== idx);
+      onUpdate({ items: newItems });
+    };
+
+    const handleMoveItem = (idx: number, dir: -1 | 1) => {
+      // Move an item and update immediately.
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= items.length) return;
+      const newItems = [...items];
+      const [moved] = newItems.splice(idx, 1);
+      newItems.splice(newIdx, 0, moved);
+      onUpdate({ items: newItems });
+    };
+
+    return (
+      <div className="space-y-3">
+        <div className="text-sm font-medium text-muted-foreground mb-2">
+          Unordered List Items
+        </div>
+        <ul className="space-y-2">
+          {items.map((item, idx) => (
+            <li key={idx} className="flex items-center gap-2">
+              <Input
+                value={item}
+                onChange={(e) => handleItemChange(idx, e.target.value)}
+                className="flex-1"
+                placeholder={`List item ${idx + 1}`}
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => handleMoveItem(idx, -1)}
+                disabled={idx === 0}
+                title="Move up"
+              >
+                ↑
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => handleMoveItem(idx, 1)}
+                disabled={idx === items.length - 1}
+                title="Move down"
+              >
+                ↓
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="destructive"
+                onClick={() => handleRemoveItem(idx)}
+                title="Remove"
+              >
+                ×
+              </Button>
+            </li>
+          ))}
+        </ul>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleAddItem}
+          className="mt-2"
+        >
+          Add Item
+        </Button>
+        {/* TODO: Stage 2 - Implement preview/export rendering for list blocks */}
+        <div className="text-xs text-blue-700 mt-4">
+          TODO: List block preview/export logic will be implemented in Stage 2.
+        </div>
+      </div>
+    );
+  }
+);
+
+/**
+ * HTMLBlockContent - Memoized HTML block editor
+ * Phase 2A Performance: Extracted for consistent memoization
+ */
+interface HTMLBlockContentProps {
+  block: HTMLBlock;
+  onUpdate: (updates: Partial<ContentBlock>) => void;
+}
+
+const HTMLBlockContent = React.memo<HTMLBlockContentProps>(
+  function HTMLBlockContent({ block, onUpdate }) {
+    const [isCollapsed, setIsCollapsed] = useState(true);
+    const [htmlContent, setHtmlContent] = useState(block.content || "");
+    const [htmlDescription, setHtmlDescription] = useState(
+      block.description || ""
+    );
+
+    // Sync content and description state with block data when it changes
+    React.useEffect(() => {
+      setHtmlContent(block.content || "");
+      setHtmlDescription(block.description || "");
+    }, [block.content, block.description]);
+
+    const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setHtmlContent(e.target.value);
+      onUpdate({ content: e.target.value } as Partial<HTMLBlock>);
+    };
+
+    const handleDescriptionChange = (
+      e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+      setHtmlDescription(e.target.value);
+      onUpdate({ description: e.target.value } as Partial<HTMLBlock>);
+    };
+
+    return (
+      <div className="space-y-3">
+        {/* HTML Preview/Input */}
+        <div className="mb-3 relative">
+          <div
+            className="p-3 bg-muted/10 rounded-md border border-border/20"
+            dangerouslySetInnerHTML={{ __html: htmlContent }}
+          />
+
+          {/* Toggle Button */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute top-2 right-2 h-6 w-6 p-0 hover:bg-muted/20 bg-background/80 backdrop-blur-sm border border-border/20"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+          >
+            {isCollapsed ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronUp className="h-3 w-3" />
+            )}
+          </Button>
+        </div>
+
+        {/* Collapsible HTML Settings */}
+        {!isCollapsed && (
+          <div className="pt-2">
+            {/* Content Input */}
+            <div>
+              <Label
+                htmlFor={`html-content-${block.id}`}
+                className="text-sm font-medium"
+              >
+                HTML Content
+              </Label>
+              <textarea
+                id={`html-content-${block.id}`}
+                className="w-full p-2 border border-border/40 rounded-md bg-transparent focus:border-border/60 focus:ring-1 focus:ring-ring transition-colors"
+                rows={10}
+                value={htmlContent}
+                onChange={handleContentChange}
+                placeholder="Enter your HTML content here..."
+              />
+            </div>
+
+            {/* Description Input */}
+            <div>
+              <Label
+                htmlFor={`html-description-${block.id}`}
+                className="text-sm font-medium"
+              >
+                Description (Optional)
+              </Label>
+              <Input
+                id={`html-description-${block.id}`}
+                placeholder="Brief description for this HTML block"
+                value={htmlDescription}
+                onChange={handleDescriptionChange}
+                className="mt-1"
+              />
+            </div>
+          </div>
+        )}
       </div>
     );
   }

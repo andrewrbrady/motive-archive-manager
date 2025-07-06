@@ -12,6 +12,7 @@ interface ProjectPageProps {
   }>;
   searchParams: Promise<{
     tab?: string;
+    composition?: string;
   }>;
 }
 

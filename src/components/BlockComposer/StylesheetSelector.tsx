@@ -21,12 +21,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Palette, Settings, Plus } from "lucide-react";
+import { Upload, Palette, Settings, Plus, Edit, Trash2 } from "lucide-react";
 import {
   StylesheetMetadata,
   CreateStylesheetRequest,
 } from "@/types/stylesheet";
 import { useToast } from "@/components/ui/use-toast";
+import { StylesheetEditDialog } from "./StylesheetEditDialog";
+import { StylesheetDeleteDialog } from "./StylesheetDeleteDialog";
+import { invalidateStylesheetCache } from "@/hooks/useStylesheetData";
 
 interface StylesheetSelectorProps {
   selectedStylesheetId?: string;
@@ -44,6 +47,12 @@ export function StylesheetSelector({
   const [loading, setLoading] = useState(true);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // Edit and delete dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedStylesheetForAction, setSelectedStylesheetForAction] =
+    useState<StylesheetMetadata | null>(null);
 
   // Form state for uploading new stylesheet
   const [newStylesheet, setNewStylesheet] = useState<CreateStylesheetRequest>({
@@ -126,6 +135,9 @@ export function StylesheetSelector({
         const data = await response.json();
         console.log("Upload successful, response:", data);
 
+        // Invalidate cache to trigger preview updates
+        invalidateStylesheetCache();
+
         await fetchStylesheets();
         onStylesheetChange(data.stylesheet.id);
         setUploadDialogOpen(false);
@@ -180,6 +192,33 @@ export function StylesheetSelector({
     (s) => s.id === selectedStylesheetId
   );
 
+  // Handle edit and delete actions
+  const handleEditStylesheet = (stylesheet: StylesheetMetadata) => {
+    setSelectedStylesheetForAction(stylesheet);
+    setEditDialogOpen(true);
+  };
+
+  const handleDeleteStylesheet = (stylesheet: StylesheetMetadata) => {
+    setSelectedStylesheetForAction(stylesheet);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDialogSuccess = () => {
+    // Invalidate cache to trigger preview updates
+    invalidateStylesheetCache();
+    fetchStylesheets(); // Refresh the stylesheet list
+  };
+
+  const handleCloseEditDialog = () => {
+    setEditDialogOpen(false);
+    setSelectedStylesheetForAction(null);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setSelectedStylesheetForAction(null);
+  };
+
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <div className="flex items-center gap-2">
@@ -214,10 +253,32 @@ export function StylesheetSelector({
       </Select>
 
       {selectedStylesheet && (
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <span>{selectedStylesheet.classCount} classes</span>
-          <span>•</span>
-          <span>{selectedStylesheet.categoryCount} categories</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span>{selectedStylesheet.classCount} classes</span>
+            <span>•</span>
+            <span>{selectedStylesheet.categoryCount} categories</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleEditStylesheet(selectedStylesheet)}
+              className="h-6 w-6 p-0 hover:bg-muted/50"
+              title="Edit stylesheet"
+            >
+              <Edit className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDeleteStylesheet(selectedStylesheet)}
+              className="h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive"
+              title="Delete stylesheet"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -336,6 +397,26 @@ export function StylesheetSelector({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Dialog */}
+      {selectedStylesheetForAction && (
+        <StylesheetEditDialog
+          isOpen={editDialogOpen}
+          onClose={handleCloseEditDialog}
+          stylesheet={selectedStylesheetForAction}
+          onSuccess={handleDialogSuccess}
+        />
+      )}
+
+      {/* Delete Dialog */}
+      {selectedStylesheetForAction && (
+        <StylesheetDeleteDialog
+          isOpen={deleteDialogOpen}
+          onClose={handleCloseDeleteDialog}
+          stylesheet={selectedStylesheetForAction}
+          onSuccess={handleDialogSuccess}
+        />
+      )}
     </div>
   );
 }

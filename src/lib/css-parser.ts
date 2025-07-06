@@ -259,3 +259,127 @@ export function classToInlineStyles(cssClass: CSSClass): React.CSSProperties {
 
   return styles;
 }
+
+/**
+ * Process CSS content for email compatibility (same as email export)
+ * Removes only the most problematic patterns while preserving legitimate CSS
+ */
+export function processStylesheetForEmail(cssContent: string): string {
+  if (!cssContent) return "";
+
+  // Remove .content-studio-preview scoping
+  let processedCSS = cssContent.replace(/\.content-studio-preview\s+/g, "");
+
+  // Remove only specific properties that don't work in email (safer approach)
+  processedCSS = processedCSS.replace(/^\s*transform\s*:[^;]+;/gm, "");
+  processedCSS = processedCSS.replace(/^\s*animation\s*:[^;]+;/gm, "");
+  processedCSS = processedCSS.replace(/^\s*transition\s*:[^;]+;/gm, "");
+
+  return processedCSS;
+}
+
+/**
+ * Process CSS specifically for SendGrid (same as email export)
+ * Minimal processing to avoid corruption while removing only truly problematic patterns
+ */
+export function processEmailCSSForSendGrid(cssContent: string): string {
+  if (!cssContent) return "";
+
+  // Use the basic email processing first
+  let processedCSS = processStylesheetForEmail(cssContent);
+
+  // Remove only the most dangerous patterns with very specific regex
+  // Use anchored patterns to avoid matching CSS properties
+  processedCSS = processedCSS.replace(/^@import\s+[^;]+;/gm, ""); // Remove @import statements
+  processedCSS = processedCSS.replace(/^@font-face\s*\{[^}]*\}/gm, ""); // Remove @font-face blocks
+
+  // Remove ID selectors only when they're at the start of a line (not hex colors)
+  processedCSS = processedCSS.replace(
+    /^#[a-zA-Z][a-zA-Z0-9_-]*\s*\{[^}]*\}/gm,
+    ""
+  );
+
+  // Remove attribute selectors only when they're complete selector blocks
+  processedCSS = processedCSS.replace(
+    /^\[[\w-]+[\^$*~|]?=?[^]]*\]\s*\{[^}]*\}/gm,
+    ""
+  );
+
+  return processedCSS;
+}
+
+/**
+ * Process CSS classes for email preview to match email export
+ */
+export function processClassForEmailPreview(
+  cssClass: CSSClass,
+  emailPlatform: string = "generic"
+): CSSClass {
+  if (!cssClass) return cssClass;
+
+  const processedProperties: { [key: string]: string } = {};
+
+  // Process each property based on email platform
+  for (const [property, value] of Object.entries(cssClass.properties)) {
+    // Skip properties that don't work in email
+    if (
+      property === "transform" ||
+      property === "animation" ||
+      property === "transition"
+    ) {
+      continue;
+    }
+
+    // For SendGrid, be more restrictive
+    if (emailPlatform === "sendgrid") {
+      // Skip complex properties that SendGrid doesn't handle well
+      if (property.includes("@") || property.includes("var(")) {
+        continue;
+      }
+    }
+
+    // Keep valid properties
+    processedProperties[property] = value;
+  }
+
+  return {
+    ...cssClass,
+    properties: processedProperties,
+  };
+}
+
+/**
+ * Convert CSS class to inline styles for email preview with processing
+ */
+export function classToEmailInlineStyles(
+  cssClass: CSSClass,
+  emailPlatform: string = "generic"
+): React.CSSProperties {
+  const processedClass = processClassForEmailPreview(cssClass, emailPlatform);
+  return classToInlineStyles(processedClass);
+}
+
+/**
+ * Parse CSS content specifically for email preview
+ */
+export function parseEmailCSS(
+  cssContent: string,
+  emailPlatform: string = "generic"
+): ParsedCSS {
+  // Process the CSS content first
+  const processedCSS =
+    emailPlatform === "sendgrid"
+      ? processEmailCSSForSendGrid(cssContent)
+      : processStylesheetForEmail(cssContent);
+
+  // Parse the processed CSS
+  const parsedCSS = parseCSS(processedCSS);
+
+  // Return the parsed CSS with processed classes
+  return {
+    ...parsedCSS,
+    classes: parsedCSS.classes.map((cls) =>
+      processClassForEmailPreview(cls, emailPlatform)
+    ),
+  };
+}

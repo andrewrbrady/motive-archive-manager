@@ -6,13 +6,27 @@ import {
   ImageBlock,
   VideoBlock,
   DividerBlock,
+  HTMLBlock,
 } from "../types";
-import { classToInlineStyles } from "@/lib/css-parser";
+import {
+  classToInlineStyles,
+  classToEmailInlineStyles,
+} from "@/lib/css-parser";
+import {
+  useStylesheetData,
+  getCSSClassFromStylesheet,
+} from "@/hooks/useStylesheetData";
+import {
+  formatContent,
+  getElementStylesFromStylesheet,
+  hasHtmlContent,
+} from "@/lib/content-formatter";
 
 interface CleanRendererProps {
   blocks: ContentBlock[];
   selectedStylesheetId?: string | null;
   previewMode?: "clean" | "email";
+  emailPlatform?: string;
 }
 
 /**
@@ -20,35 +34,66 @@ interface CleanRendererProps {
  *
  * Extracted from BlockComposer.tsx CleanPreview component for modularity.
  * Handles both clean preview and email layout modes.
+ * Updated for CSS preview reactivity - now properly reacts to stylesheet changes.
  */
 export const CleanRenderer = React.memo<CleanRendererProps>(
   function CleanRenderer({
     blocks,
     selectedStylesheetId,
     previewMode = "clean",
+    emailPlatform = "generic",
   }) {
-    const sortedBlocks = [...blocks].sort((a, b) => a.order - b.order);
+    // Load stylesheet data reactively
+    const { stylesheetData, loading: stylesheetLoading } = useStylesheetData(
+      selectedStylesheetId || null
+    );
+
+    // DEBUG: CleanRenderer successfully loading stylesheet data
+
+    const sortedBlocks = useMemo(
+      () => [...blocks].sort((a, b) => a.order - b.order),
+      [blocks]
+    );
+
+    // Don't render if we're loading stylesheet data OR if we have a stylesheet ID but no data
+    if (selectedStylesheetId && (stylesheetLoading || !stylesheetData)) {
+      console.log("🎯 CleanRenderer: Waiting for stylesheet data...");
+      return (
+        <div className="content-studio-preview content-blocks-area min-h-full bg-background">
+          <div className="flex items-center justify-center p-6">
+            <div className="text-muted-foreground">Loading stylesheet...</div>
+          </div>
+        </div>
+      );
+    }
 
     // Email Preview Mode - Separate header images from content blocks
     if (previewMode === "email") {
-      const headerImages: ImageBlock[] = [];
-      const contentBlocks: ContentBlock[] = [];
+      const { headerImages, contentBlocks } = useMemo(() => {
+        const header: ImageBlock[] = [];
+        const content: ContentBlock[] = [];
 
-      let foundNonHeaderBlock = false;
-      for (const block of sortedBlocks) {
-        const isFullWidthImage =
-          block.type === "image" && (block as ImageBlock).email?.isFullWidth;
+        let foundNonHeaderBlock = false;
+        for (const block of sortedBlocks) {
+          const isFullWidthImage =
+            block.type === "image" && (block as ImageBlock).email?.isFullWidth;
 
-        if (isFullWidthImage && !foundNonHeaderBlock) {
-          headerImages.push(block as ImageBlock);
-        } else {
-          foundNonHeaderBlock = true;
-          contentBlocks.push(block);
+          if (isFullWidthImage && !foundNonHeaderBlock) {
+            header.push(block as ImageBlock);
+          } else {
+            foundNonHeaderBlock = true;
+            content.push(block);
+          }
         }
-      }
+
+        return {
+          headerImages: header,
+          contentBlocks: content,
+        };
+      }, [sortedBlocks]);
 
       return (
-        <div className="min-h-full bg-background">
+        <div className="content-studio-preview content-blocks-area min-h-full bg-background">
           {/* Full-width header images */}
           {headerImages.map((block) => (
             <div
@@ -58,7 +103,12 @@ export const CleanRenderer = React.memo<CleanRendererProps>(
                 backgroundColor: block.email?.backgroundColor || "#111111",
               }}
             >
-              <CleanPreviewBlock block={block} previewMode={previewMode} />
+              <CleanPreviewBlock
+                block={block}
+                stylesheetData={stylesheetData}
+                previewMode={previewMode}
+                emailPlatform={emailPlatform}
+              />
             </div>
           ))}
 
@@ -70,7 +120,9 @@ export const CleanRenderer = React.memo<CleanRendererProps>(
               <CleanPreviewBlock
                 key={block.id}
                 block={block}
+                stylesheetData={stylesheetData}
                 previewMode={previewMode}
+                emailPlatform={emailPlatform}
               />
             ))}
           </div>
@@ -78,14 +130,15 @@ export const CleanRenderer = React.memo<CleanRendererProps>(
       );
     }
 
-    // Clean Preview Mode (default)
+    // Regular Clean Preview Mode
     return (
-      <div className="min-h-full bg-background">
+      <div className="content-studio-preview content-blocks-area min-h-full bg-background">
         <div className="space-y-4 p-6">
           {sortedBlocks.map((block) => (
             <CleanPreviewBlock
               key={block.id}
               block={block}
+              stylesheetData={stylesheetData}
               previewMode={previewMode}
             />
           ))}
@@ -97,42 +150,125 @@ export const CleanRenderer = React.memo<CleanRendererProps>(
 
 /**
  * CleanPreviewBlock - Renders individual blocks in clean preview or email mode
+ * Updated for CSS preview reactivity - now uses stylesheetData for proper updates
  */
 interface CleanPreviewBlockProps {
   block: ContentBlock;
+  stylesheetData: any; // StylesheetData from useStylesheetData
   previewMode?: "clean" | "email";
+  emailPlatform?: string;
 }
 
 const CleanPreviewBlock = React.memo<CleanPreviewBlockProps>(
-  function CleanPreviewBlock({ block, previewMode = "clean" }) {
+  function CleanPreviewBlock({
+    block,
+    stylesheetData,
+    previewMode = "clean",
+    emailPlatform = "generic",
+  }) {
+    // CleanPreviewBlock now properly receives stylesheet data
     const customStyles = useMemo(() => {
-      if (block.cssClass) {
-        return classToInlineStyles(block.cssClass);
+      // Get updated CSS class data from current stylesheet
+      const currentCSSClass = getCSSClassFromStylesheet(
+        stylesheetData,
+        block.cssClassName
+      );
+
+      if (currentCSSClass) {
+        // Use processed CSS for email mode
+        return previewMode === "email"
+          ? classToEmailInlineStyles(currentCSSClass, emailPlatform)
+          : classToInlineStyles(currentCSSClass);
       }
       return {};
-    }, [block.cssClass]);
+    }, [stylesheetData, block.cssClassName, previewMode, emailPlatform]);
 
     switch (block.type) {
+      case "html": {
+        const htmlBlock = block as HTMLBlock;
+        const content = htmlBlock.content || "<p>No HTML content provided</p>";
+
+        return (
+          <div
+            className={`html-block ${htmlBlock.cssClassName || ""}`}
+            style={customStyles}
+            dangerouslySetInnerHTML={{ __html: content }}
+            data-block-type="html"
+            data-block-id={htmlBlock.id}
+          />
+        );
+      }
+
+      case "list": {
+        const listBlock = block as import("../types").ListBlock;
+        const items = listBlock.items || [];
+
+        if (items.length === 0) {
+          return (
+            <div className="text-muted-foreground italic">Empty list block</div>
+          );
+        }
+
+        return (
+          <ul
+            className={`list-disc pl-6 space-y-2 ${listBlock.cssClassName || ""}`}
+            style={customStyles}
+          >
+            {items.map((item, idx) => (
+              <li key={idx} className="text-foreground">
+                {item}
+              </li>
+            ))}
+          </ul>
+        );
+      }
+
       case "text": {
         const textBlock = block as TextBlock;
         const content = textBlock.content || "Your text will appear here...";
 
-        const formattedContent = useMemo(() => {
-          if (!textBlock.richFormatting?.formattedContent) {
-            return content;
-          }
-
-          let html = textBlock.richFormatting.formattedContent;
-          html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-          html = html.replace(
-            /\[([^\]]+)\]\(([^)]+)\)/g,
-            '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline">$1</a>'
-          );
-          html = html.replace(/\n/g, "<br>");
-          return html;
+        // Determine if content contains HTML tags
+        const contentHasHtml = useMemo(() => {
+          const sourceContent =
+            textBlock.richFormatting?.formattedContent || content;
+          return hasHtmlContent(sourceContent);
         }, [textBlock.richFormatting?.formattedContent, content]);
 
-        const hasRichContent = textBlock.richFormatting?.formattedContent;
+        const formattedContent = useMemo(() => {
+          // Use richFormatting.formattedContent if available, otherwise use regular content
+          const sourceContent =
+            textBlock.richFormatting?.formattedContent || content;
+
+          console.log("🔍 CleanRenderer Debug:");
+          console.log("- Source content:", sourceContent);
+          console.log("- Content has HTML:", contentHasHtml);
+          console.log("- Stylesheet data available:", !!stylesheetData);
+          if (stylesheetData) {
+            console.log(
+              "- Global styles:",
+              stylesheetData.parsedCSS?.globalStyles
+            );
+          }
+
+          // Use smart content formatting that preserves HTML tags and applies styles
+          const formatted = formatContent(sourceContent, {
+            preserveHtml: true,
+            emailMode: previewMode === "email",
+            emailPlatform: emailPlatform,
+            stylesheetData: stylesheetData,
+          });
+
+          console.log("- Formatted content:", formatted);
+          return formatted;
+        }, [
+          textBlock.richFormatting?.formattedContent,
+          content,
+          previewMode,
+          emailPlatform,
+          stylesheetData,
+          contentHasHtml,
+        ]);
+
         const textClass = !textBlock.content
           ? "text-muted-foreground italic"
           : "text-foreground";
@@ -158,82 +294,150 @@ const CleanPreviewBlock = React.memo<CleanPreviewBlockProps>(
           }
         };
 
-        const elementType = textBlock.element || "p"; // Fallback to "p" if element is undefined
+        const elementType = textBlock.element || "p";
         const defaultClasses = getElementClasses(elementType);
-        const finalClassName = textBlock.cssClassName
-          ? `${textBlock.cssClassName} ${textClass}`
-          : `${defaultClasses} ${textClass}`;
 
-        // For headings, don't add line breaks; for paragraphs, add them
-        const processedContent =
-          elementType === "p"
-            ? formattedContent
-            : formattedContent.replace(/<br>/g, " ");
+        // FIXED: Handle HTML content vs plain text content differently
+        if (contentHasHtml) {
+          // Content contains HTML tags - formatContent already applied styles to those tags
+          // Use a generic wrapper div to avoid nested elements
+          const finalClassName = textBlock.cssClassName
+            ? `${textBlock.cssClassName} ${textClass}`
+            : textClass;
 
-        return React.createElement(
-          textBlock.element || "p", // Fallback to "p" if element is undefined
-          {
+          // For headings, don't add line breaks; for paragraphs, add them
+          const processedContent =
+            elementType === "p"
+              ? formattedContent
+              : formattedContent.replace(/<br>/g, " ");
+
+          console.log("- Using DIV wrapper for HTML content");
+          console.log("- Final className:", finalClassName);
+          console.log("- Custom styles:", customStyles);
+
+          return (
+            <div
+              className={finalClassName}
+              style={customStyles}
+              dangerouslySetInnerHTML={{ __html: processedContent }}
+            />
+          );
+        } else {
+          // Content is plain text - apply global element styles to wrapper element
+          const finalClassName = textBlock.cssClassName
+            ? `${textBlock.cssClassName} ${textClass}`
+            : `${defaultClasses} ${textClass}`;
+
+          // Get global element styles from stylesheet
+          const globalElementStyles = useMemo(() => {
+            const styles = getElementStylesFromStylesheet(
+              elementType,
+              stylesheetData,
+              previewMode === "email"
+            );
+            console.log(`- Global element styles for ${elementType}:`, styles);
+            return styles;
+          }, [elementType, stylesheetData, previewMode]);
+
+          // Combine CSS class styles with global element styles
+          const combinedStyles = useMemo(() => {
+            const combined = { ...globalElementStyles, ...customStyles };
+            console.log("- Combined styles:", combined);
+            return combined;
+          }, [globalElementStyles, customStyles]);
+
+          // For headings, don't add line breaks; for paragraphs, add them
+          const processedContent =
+            elementType === "p"
+              ? formattedContent
+              : formattedContent.replace(/<br>/g, " ");
+
+          console.log(
+            `- Using ${elementType.toUpperCase()} wrapper for plain text`
+          );
+          console.log("- Final className:", finalClassName);
+
+          return React.createElement(elementType, {
             className: finalClassName,
-            style: customStyles,
-            ...(hasRichContent
-              ? { dangerouslySetInnerHTML: { __html: processedContent } }
-              : {}),
-          },
-          hasRichContent ? undefined : content
-        );
+            style: combinedStyles,
+            dangerouslySetInnerHTML: { __html: processedContent },
+          });
+        }
       }
 
       case "image": {
         const imageBlock = block as ImageBlock;
-        if (!imageBlock.imageUrl) {
+        const hasImage =
+          imageBlock.imageUrl && imageBlock.imageUrl.trim() !== "";
+        const isFullWidthEmail = imageBlock.email?.isFullWidth;
+
+        if (!hasImage) {
           return (
-            <div className="flex items-center justify-center h-48 bg-muted rounded border-2 border-dashed border-muted-foreground/25">
+            <div className="flex items-center justify-center h-32 bg-muted/20 border-2 border-dashed border-border/40 rounded-lg">
               <div className="text-center text-muted-foreground">
-                <ImageIcon className="h-12 w-12 mx-auto mb-2" />
-                <p className="text-sm">No image selected</p>
+                <ImageIcon className="h-8 w-8 mx-auto mb-2" />
+                <p>No image selected</p>
               </div>
             </div>
           );
         }
 
-        const imageContainerClass = imageBlock.cssClassName
-          ? imageBlock.cssClassName
-          : "mb-4";
+        // Get global img styles from stylesheet (this is the key fix for images!)
+        const globalImgStyles = useMemo(() => {
+          return getElementStylesFromStylesheet(
+            "img",
+            stylesheetData,
+            previewMode === "email"
+          );
+        }, [stylesheetData, previewMode]);
 
-        const imageClass = "w-full h-auto rounded";
+        const imageStyle = {
+          width: imageBlock.width || "100%",
+          height: imageBlock.height || "auto",
+          objectFit: "cover" as const,
+          ...globalImgStyles,
+          ...customStyles,
+        };
 
-        const captionClass =
-          "text-sm text-muted-foreground mt-2 text-center italic";
-
-        return (
-          <div className={imageContainerClass}>
+        if (isFullWidthEmail) {
+          return (
             <img
               src={imageBlock.imageUrl}
-              alt={imageBlock.altText || "Content image"}
-              style={customStyles}
-              className={imageClass}
+              alt={imageBlock.altText || "Full-width image"}
+              style={imageStyle}
+              className={`w-full block ${imageBlock.cssClassName || ""}`}
             />
-            {imageBlock.caption && (
-              <p className={captionClass}>{imageBlock.caption}</p>
-            )}
+          );
+        }
+
+        return (
+          <div className="text-center">
+            <img
+              src={imageBlock.imageUrl}
+              alt={imageBlock.altText || "Image"}
+              style={imageStyle}
+              className={`inline-block max-w-full h-auto ${imageBlock.cssClassName || ""}`}
+            />
           </div>
         );
       }
 
       case "video": {
         const videoBlock = block as VideoBlock;
-        if (!videoBlock.url || !videoBlock.embedId) {
+        const hasVideo =
+          videoBlock.url && videoBlock.embedId && videoBlock.platform;
+
+        if (!hasVideo) {
           return (
-            <div className="flex items-center justify-center h-48 bg-muted rounded border-2 border-dashed border-muted-foreground/25">
+            <div className="flex items-center justify-center h-32 bg-muted/20 border-2 border-dashed border-border/40 rounded-lg">
               <div className="text-center text-muted-foreground">
-                <ImageIcon className="h-12 w-12 mx-auto mb-2" />
-                <p className="text-sm">Video not configured</p>
+                <div className="text-2xl mb-2">🎥</div>
+                <p>No video URL provided</p>
               </div>
             </div>
           );
         }
 
-        // Generate embed URL
         const getEmbedUrl = () => {
           if (videoBlock.platform === "youtube") {
             return `https://www.youtube.com/embed/${videoBlock.embedId}`;
@@ -243,22 +447,6 @@ const CleanPreviewBlock = React.memo<CleanPreviewBlockProps>(
           return "";
         };
 
-        const embedUrl = getEmbedUrl();
-        if (!embedUrl) {
-          return (
-            <div className="flex items-center justify-center h-48 bg-muted rounded border-2 border-dashed border-muted-foreground/25">
-              <div className="text-center text-muted-foreground">
-                <ImageIcon className="h-12 w-12 mx-auto mb-2" />
-                <p className="text-sm">Unsupported video platform</p>
-              </div>
-            </div>
-          );
-        }
-
-        const videoContainerClass = videoBlock.cssClassName
-          ? videoBlock.cssClassName
-          : "mb-4";
-
         const aspectRatioClass =
           videoBlock.aspectRatio === "16:9"
             ? "aspect-video"
@@ -266,50 +454,31 @@ const CleanPreviewBlock = React.memo<CleanPreviewBlockProps>(
               ? "aspect-[4/3]"
               : "aspect-square";
 
-        const alignmentStyle = {
-          textAlign: videoBlock.alignment || "center",
-        };
-
         return (
-          <div className={videoContainerClass} style={alignmentStyle}>
-            <div className={`relative w-full ${aspectRatioClass}`}>
+          <div className="text-center">
+            <div className={`${aspectRatioClass} max-w-full mx-auto`}>
               <iframe
-                src={embedUrl}
-                title={videoBlock.title || "Video"}
-                className="w-full h-full rounded"
+                src={getEmbedUrl()}
+                className="w-full h-full rounded-lg"
                 style={customStyles}
                 frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />
             </div>
-            {videoBlock.title && (
-              <p className="text-sm text-muted-foreground mt-2 text-center italic">
-                {videoBlock.title}
-              </p>
-            )}
           </div>
         );
       }
 
       case "divider": {
         const dividerBlock = block as DividerBlock;
-        return (
-          <div
-            className={
-              dividerBlock.cssClassName
-                ? dividerBlock.cssClassName
-                : "my-8 border-t border-border"
-            }
-            style={customStyles}
-          />
-        );
-      }
+        const dividerStyle = {
+          height: dividerBlock.thickness || "1px",
+          backgroundColor: dividerBlock.color || "#e5e7eb",
+          margin: dividerBlock.margin || "20px 0",
+          ...customStyles,
+        };
 
-      case "frontmatter": {
-        // Frontmatter blocks are handled separately in news article mode
-        // and should not be rendered in the content flow
-        return null;
+        return <hr className="border-0" style={dividerStyle} />;
       }
 
       default:

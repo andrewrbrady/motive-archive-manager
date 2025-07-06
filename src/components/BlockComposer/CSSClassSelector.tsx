@@ -65,7 +65,22 @@ export function CSSClassSelector({
       );
       if (response.ok) {
         const data: ClassSearchResponse = await response.json();
-        setClasses(data.classes);
+
+        // Deduplicate classes by name to prevent React key conflicts and UI confusion
+        const uniqueClasses = data.classes.reduce(
+          (acc: CSSClass[], currentClass: CSSClass) => {
+            const existingClass = acc.find(
+              (cls) => cls.name === currentClass.name
+            );
+            if (!existingClass) {
+              acc.push(currentClass);
+            }
+            return acc;
+          },
+          []
+        );
+
+        setClasses(uniqueClasses);
         setCategories(data.categories);
       }
     } catch (error) {
@@ -194,8 +209,8 @@ export function CSSClassSelector({
                   </Button>
                 </div>
 
-                {classes.map((cssClass) => (
-                  <div key={cssClass.name} className="mb-1">
+                {classes.map((cssClass, index) => (
+                  <div key={`${cssClass.name}-${index}`} className="mb-1">
                     <Button
                       variant={
                         selectedClassName === cssClass.name

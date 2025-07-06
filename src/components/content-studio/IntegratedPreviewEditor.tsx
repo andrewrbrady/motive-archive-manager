@@ -11,6 +11,8 @@ import {
   Heading,
   Minus,
   FileText,
+  List,
+  Code,
 } from "lucide-react";
 import {
   ContentBlock,
@@ -24,16 +26,29 @@ import {
   ColumnsBlock,
   FrontmatterBlock,
   ContentBlockType,
+  ListBlock,
+  HTMLBlock,
 } from "./types";
 import { EmailHeaderState } from "./EmailHeaderConfig";
 import { BlockContent } from "./BlockContent";
 import { CSSClassSelector } from "../BlockComposer/CSSClassSelector";
-import { CSSClass, classToInlineStyles } from "@/lib/css-parser";
+import {
+  CSSClass,
+  classToInlineStyles,
+  classToEmailInlineStyles,
+} from "@/lib/css-parser";
+import {
+  useStylesheetData,
+  getCSSClassFromStylesheet,
+} from "@/hooks/useStylesheetData";
+import { formatContent } from "@/lib/content-formatter";
 
 interface IntegratedPreviewEditorProps {
   blocks: ContentBlock[];
   emailHeader?: EmailHeaderState;
   selectedStylesheetId?: string | null;
+  previewMode?: "clean" | "email";
+  emailPlatform?: string;
   // Editing functionality
   activeBlockId: string | null;
   draggedBlockId: string | null;
@@ -63,6 +78,8 @@ export const IntegratedPreviewEditor = React.memo<IntegratedPreviewEditorProps>(
     blocks,
     emailHeader,
     selectedStylesheetId,
+    previewMode = "clean",
+    emailPlatform = "generic",
     activeBlockId,
     draggedBlockId,
     draggedOverIndex,
@@ -77,6 +94,9 @@ export const IntegratedPreviewEditor = React.memo<IntegratedPreviewEditorProps>(
     onConvertTextToFrontmatter,
     detectFrontmatterInTextBlock,
   }) {
+    // Load stylesheet data reactively
+    const { stylesheetData } = useStylesheetData(selectedStylesheetId || null);
+
     // Performance optimization: Memoize block count and sorting
     const blockCount = useMemo(() => blocks.length, [blocks]);
     const sortedBlocks = useMemo(
@@ -227,7 +247,7 @@ export const IntegratedPreviewEditor = React.memo<IntegratedPreviewEditorProps>(
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-0">
+                  <div className="content-studio-preview content-blocks-area space-y-0">
                     {getDisplayBlocks().map((block, index) => (
                       <EditablePreviewBlock
                         key={block.id}
@@ -237,7 +257,9 @@ export const IntegratedPreviewEditor = React.memo<IntegratedPreviewEditorProps>(
                         total={blocks.length}
                         isActive={activeBlockId === block.id}
                         isDragging={draggedBlockId === block.id}
-                        selectedStylesheetId={selectedStylesheetId}
+                        stylesheetData={stylesheetData}
+                        previewMode={previewMode}
+                        emailPlatform={emailPlatform}
                         onSetActive={onSetActive}
                         onUpdate={(updates) => onUpdateBlock(block.id, updates)}
                         onRemove={() => onRemoveBlock(block.id)}
@@ -273,7 +295,9 @@ interface EditablePreviewBlockProps {
   total: number;
   isActive: boolean;
   isDragging: boolean;
-  selectedStylesheetId?: string | null;
+  stylesheetData: any; // StylesheetData from useStylesheetData
+  previewMode?: "clean" | "email";
+  emailPlatform?: string;
   onSetActive: (blockId: string | null) => void;
   onUpdate: (updates: Partial<ContentBlock>) => void;
   onRemove: () => void;
@@ -295,7 +319,9 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
     total,
     isActive,
     isDragging,
-    selectedStylesheetId,
+    stylesheetData,
+    previewMode = "clean",
+    emailPlatform = "generic",
     onSetActive,
     onUpdate,
     onRemove,
@@ -325,6 +351,10 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
           return <Type className="h-3 w-3" />;
         case "frontmatter":
           return <FileText className="h-3 w-3" />;
+        case "list":
+          return <List className="h-3 w-3" />;
+        case "html":
+          return <Code className="h-3 w-3" />;
         default:
           return <Type className="h-3 w-3" />;
       }
@@ -460,13 +490,13 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
                   </div>
 
                   {/* CSS Class Selector */}
-                  {selectedStylesheetId && (
+                  {stylesheetData && (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">
                         Style:
                       </span>
                       <CSSClassSelector
-                        stylesheetId={selectedStylesheetId}
+                        stylesheetId={stylesheetData.id}
                         selectedClassName={(block as any).cssClassName}
                         onClassSelect={(cssClass) => {
                           onUpdate({
@@ -490,7 +520,12 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
             ) : (
               // Show preview when not active
               <div className="relative">
-                <PreviewBlock block={block} />
+                <PreviewBlock
+                  block={block}
+                  stylesheetData={stylesheetData}
+                  previewMode={previewMode}
+                  emailPlatform={emailPlatform}
+                />
                 {/* Click overlay hint */}
                 <div className="absolute inset-0 bg-transparent flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                   <div className="bg-black/70 text-white text-xs px-2 py-1 rounded">
@@ -511,19 +546,139 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
  */
 interface PreviewBlockProps {
   block: ContentBlock;
+  stylesheetData: any; // StylesheetData from useStylesheetData
+  previewMode?: "clean" | "email";
+  emailPlatform?: string;
 }
+
+// Add ListBlockPreview component before PreviewBlock
+const ListBlockPreview = React.memo<{
+  block: ListBlock;
+  stylesheetData: any;
+}>(function ListBlockPreview({ block, stylesheetData }) {
+  const items = block.items || [];
+
+  // Apply CSS class styles if available
+  const customStyles = useMemo(() => {
+    const currentCSSClass = getCSSClassFromStylesheet(
+      stylesheetData,
+      block.cssClassName
+    );
+    if (currentCSSClass) {
+      return classToInlineStyles(currentCSSClass);
+    }
+    return {};
+  }, [stylesheetData, block.cssClassName]);
+
+  if (items.length === 0) {
+    return (
+      <div className="text-muted-foreground italic p-6">Empty list block</div>
+    );
+  }
+
+  return (
+    <div className="p-6">
+      <ul
+        className={`list-disc pl-6 space-y-2 ${block.cssClassName || ""}`}
+        style={customStyles}
+      >
+        {items.map((item, idx) => (
+          <li key={idx} className="text-foreground">
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+});
+
+// Add HTMLBlockPreview component before PreviewBlock
+const HTMLBlockPreview = React.memo<{
+  block: HTMLBlock;
+  stylesheetData: any;
+  previewMode?: "clean" | "email";
+  emailPlatform?: string;
+}>(function HTMLBlockPreview({
+  block,
+  stylesheetData,
+  previewMode = "clean",
+  emailPlatform = "generic",
+}) {
+  const content = block.content || "<p>No HTML content provided</p>";
+
+  // Apply CSS class styles if available
+  const customStyles = useMemo(() => {
+    const currentCSSClass = getCSSClassFromStylesheet(
+      stylesheetData,
+      block.cssClassName
+    );
+    if (currentCSSClass) {
+      return previewMode === "email"
+        ? classToEmailInlineStyles(currentCSSClass, emailPlatform)
+        : classToInlineStyles(currentCSSClass);
+    }
+    return {};
+  }, [stylesheetData, block.cssClassName, previewMode, emailPlatform]);
+
+  return (
+    <div
+      className={block.cssClassName ? "" : "p-6"}
+      data-block-type="html"
+      data-block-id={block.id}
+    >
+      <div
+        className={`html-block ${block.cssClassName || ""}`}
+        style={customStyles}
+        dangerouslySetInnerHTML={{ __html: content }}
+      />
+    </div>
+  );
+});
 
 const PreviewBlock = React.memo<PreviewBlockProps>(function PreviewBlock({
   block,
+  stylesheetData,
+  previewMode = "clean",
+  emailPlatform = "generic",
 }) {
   switch (block.type) {
+    case "html":
+      return (
+        <HTMLBlockPreview
+          block={block as HTMLBlock}
+          stylesheetData={stylesheetData}
+          previewMode={previewMode}
+          emailPlatform={emailPlatform}
+        />
+      );
     case "text":
       // Check if this is a heading text block
       const textBlock = block as TextBlock;
       if (textBlock.element && textBlock.element.startsWith("h")) {
-        return <HeadingBlockPreview block={textBlock} />;
+        return (
+          <HeadingBlockPreview
+            block={textBlock}
+            stylesheetData={stylesheetData}
+            previewMode={previewMode}
+            emailPlatform={emailPlatform}
+          />
+        );
       }
-      return <TextBlockPreview block={textBlock} />;
+      return (
+        <TextBlockPreview
+          block={textBlock}
+          stylesheetData={stylesheetData}
+          previewMode={previewMode}
+          emailPlatform={emailPlatform}
+        />
+      );
+    case "list":
+      return (
+        <ListBlockPreview
+          block={block as ListBlock}
+          stylesheetData={stylesheetData}
+        />
+      );
     case "image":
       return <ImageBlockPreview block={block as ImageBlock} />;
     case "video":
@@ -546,143 +701,171 @@ const PreviewBlock = React.memo<PreviewBlockProps>(function PreviewBlock({
 });
 
 // Simplified preview components
-const TextBlockPreview = React.memo<{ block: TextBlock }>(
-  function TextBlockPreview({ block }) {
-    const content = block.content || "Your text will appear here...";
+const TextBlockPreview = React.memo<{
+  block: TextBlock;
+  stylesheetData: any; // StylesheetData from useStylesheetData
+  previewMode?: "clean" | "email";
+  emailPlatform?: string;
+}>(function TextBlockPreview({
+  block,
+  stylesheetData,
+  previewMode = "clean",
+  emailPlatform = "generic",
+}) {
+  const content = block.content || "Your text will appear here...";
 
-    const formattedContent = useMemo(() => {
-      if (!block.richFormatting?.formattedContent) {
-        return content;
-      }
+  const formattedContent = useMemo(() => {
+    // Use richFormatting.formattedContent if available, otherwise use regular content
+    const sourceContent = block.richFormatting?.formattedContent || content;
 
-      let html = block.richFormatting.formattedContent;
-      html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-      html = html.replace(
-        /\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline">$1</a>'
-      );
-      html = html.replace(/\n/g, "<br>");
-      return html;
-    }, [block.richFormatting?.formattedContent, content]);
+    // Use smart content formatting that preserves HTML tags
+    return formatContent(sourceContent, {
+      preserveHtml: true,
+      emailMode: previewMode === "email",
+      emailPlatform: emailPlatform,
+      stylesheetData: stylesheetData,
+    });
+  }, [
+    block.richFormatting?.formattedContent,
+    content,
+    previewMode,
+    emailPlatform,
+    stylesheetData,
+  ]);
 
-    const hasRichContent = block.richFormatting?.formattedContent;
+  // Always apply formatting if there's any content
+  const hasFormattableContent = !!(
+    block.richFormatting?.formattedContent || content
+  );
 
-    // Apply CSS class styles if available
-    const customStyles = useMemo(() => {
-      if (block.cssClass) {
-        return classToInlineStyles(block.cssClass);
-      }
-      return {};
-    }, [block.cssClass]);
-
-    const containerClass = block.cssClassName
-      ? block.cssClassName
-      : "p-6 text-base leading-relaxed";
-    const textClass = !block.content
-      ? "text-muted-foreground italic"
-      : "text-foreground";
-
-    return (
-      <div className={block.cssClassName ? "" : "p-6"}>
-        {hasRichContent ? (
-          <div
-            className={
-              block.cssClassName
-                ? `${block.cssClassName} whitespace-pre-wrap ${textClass}`
-                : `whitespace-pre-wrap ${textClass}`
-            }
-            style={customStyles}
-            dangerouslySetInnerHTML={{ __html: formattedContent }}
-          />
-        ) : (
-          <div
-            className={
-              block.cssClassName
-                ? `${block.cssClassName} whitespace-pre-wrap ${textClass}`
-                : `whitespace-pre-wrap ${textClass}`
-            }
-            style={customStyles}
-          >
-            {content}
-          </div>
-        )}
-      </div>
+  // Apply CSS class styles if available
+  const customStyles = useMemo(() => {
+    // Get updated CSS class data from current stylesheet
+    const currentCSSClass = getCSSClassFromStylesheet(
+      stylesheetData,
+      block.cssClassName
     );
-  }
-);
 
-const HeadingBlockPreview = React.memo<{ block: TextBlock }>(
-  function HeadingBlockPreview({ block }) {
-    const content = block.content || "Your heading will appear here...";
+    if (currentCSSClass) {
+      return previewMode === "email"
+        ? classToEmailInlineStyles(currentCSSClass, emailPlatform)
+        : classToInlineStyles(currentCSSClass);
+    }
+    return {};
+  }, [stylesheetData, block.cssClassName, previewMode, emailPlatform]);
 
-    const formattedContent = useMemo(() => {
-      if (!block.richFormatting?.formattedContent) {
-        return content;
-      }
+  const containerClass = block.cssClassName
+    ? block.cssClassName
+    : "p-6 text-base leading-relaxed";
+  const textClass = !block.content
+    ? "text-muted-foreground italic"
+    : "text-foreground";
 
-      let html = block.richFormatting.formattedContent;
-      html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-      html = html.replace(
-        /\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline">$1</a>'
-      );
-      return html;
-    }, [block.richFormatting?.formattedContent, content]);
+  return (
+    <div
+      className={block.cssClassName ? "" : "p-6"}
+      data-block-type="text"
+      data-block-id={block.id}
+    >
+      <div
+        className={
+          block.cssClassName
+            ? `${block.cssClassName} whitespace-pre-wrap ${textClass}`
+            : `whitespace-pre-wrap ${textClass}`
+        }
+        style={customStyles}
+        dangerouslySetInnerHTML={{ __html: formattedContent }}
+        data-css-class={block.cssClassName || "none"}
+      />
+    </div>
+  );
+});
 
-    const hasRichContent = block.richFormatting?.formattedContent;
+const HeadingBlockPreview = React.memo<{
+  block: TextBlock;
+  stylesheetData: any; // StylesheetData from useStylesheetData
+  previewMode?: "clean" | "email";
+  emailPlatform?: string;
+}>(function HeadingBlockPreview({
+  block,
+  stylesheetData,
+  previewMode = "clean",
+  emailPlatform = "generic",
+}) {
+  const content = block.content || "Your heading will appear here...";
 
-    const getHeadingClasses = (element: string) => {
-      switch (element) {
-        case "h1":
-          return "text-3xl font-bold mb-4 mt-6";
-        case "h2":
-          return "text-2xl font-bold mb-3 mt-5";
-        case "h3":
-          return "text-xl font-bold mb-2 mt-4";
-        case "h4":
-          return "text-lg font-bold mb-2 mt-3";
-        case "h5":
-          return "text-base font-bold mb-1 mt-2";
-        case "h6":
-          return "text-sm font-bold mb-1 mt-2";
-        default:
-          return "text-xl font-bold mb-2 mt-4";
-      }
-    };
+  const formattedContent = useMemo(() => {
+    // Use richFormatting.formattedContent if available, otherwise use regular content
+    const sourceContent = block.richFormatting?.formattedContent || content;
 
-    // Apply CSS class styles if available
-    const customStyles = useMemo(() => {
-      if (block.cssClass) {
-        return classToInlineStyles(block.cssClass);
-      }
-      return {};
-    }, [block.cssClass]);
+    // Use smart content formatting that preserves HTML tags
+    return formatContent(sourceContent, {
+      preserveHtml: true,
+      emailMode: previewMode === "email",
+      emailPlatform: emailPlatform,
+      stylesheetData: stylesheetData,
+    });
+  }, [
+    block.richFormatting?.formattedContent,
+    content,
+    previewMode,
+    emailPlatform,
+    stylesheetData,
+  ]);
 
-    const defaultClasses = getHeadingClasses(block.element || "h2");
-    const textClass = !block.content
-      ? "text-muted-foreground italic"
-      : "text-foreground";
-    const finalClassName = block.cssClassName
-      ? `${block.cssClassName} ${textClass}`
-      : `${defaultClasses} ${textClass}`;
+  const getHeadingClasses = (element: string) => {
+    switch (element) {
+      case "h1":
+        return "text-3xl font-bold mb-4 mt-6";
+      case "h2":
+        return "text-2xl font-bold mb-3 mt-5";
+      case "h3":
+        return "text-xl font-bold mb-2 mt-4";
+      case "h4":
+        return "text-lg font-bold mb-2 mt-3";
+      case "h5":
+        return "text-base font-bold mb-1 mt-2";
+      case "h6":
+        return "text-sm font-bold mb-1 mt-2";
+      default:
+        return "text-xl font-bold mb-2 mt-4";
+    }
+  };
 
-    return (
-      <div className={block.cssClassName ? "" : "px-6"}>
-        {React.createElement(
-          block.element || "h2",
-          {
-            className: finalClassName,
-            style: customStyles,
-            ...(hasRichContent
-              ? { dangerouslySetInnerHTML: { __html: formattedContent } }
-              : {}),
-          },
-          hasRichContent ? undefined : content
-        )}
-      </div>
+  // Apply CSS class styles if available
+  const customStyles = useMemo(() => {
+    // Get updated CSS class data from current stylesheet
+    const currentCSSClass = getCSSClassFromStylesheet(
+      stylesheetData,
+      block.cssClassName
     );
-  }
-);
+
+    if (currentCSSClass) {
+      return previewMode === "email"
+        ? classToEmailInlineStyles(currentCSSClass, emailPlatform)
+        : classToInlineStyles(currentCSSClass);
+    }
+    return {};
+  }, [stylesheetData, block.cssClassName, previewMode, emailPlatform]);
+
+  const defaultClasses = getHeadingClasses(block.element || "h2");
+  const textClass = !block.content
+    ? "text-muted-foreground italic"
+    : "text-foreground";
+  const finalClassName = block.cssClassName
+    ? `${block.cssClassName} ${textClass}`
+    : `${defaultClasses} ${textClass}`;
+
+  return (
+    <div className={block.cssClassName ? "" : "px-6"}>
+      {React.createElement(block.element || "h2", {
+        className: finalClassName,
+        style: customStyles,
+        dangerouslySetInnerHTML: { __html: formattedContent },
+      })}
+    </div>
+  );
+});
 
 const ImageBlockPreview = React.memo<{ block: ImageBlock }>(
   function ImageBlockPreview({ block }) {

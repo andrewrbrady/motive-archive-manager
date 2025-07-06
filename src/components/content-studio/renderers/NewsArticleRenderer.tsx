@@ -9,8 +9,11 @@ import {
   VideoBlock,
   DividerBlock,
   FrontmatterBlock,
+  ListBlock,
+  HTMLBlock,
 } from "../types";
 import { classToInlineStyles } from "@/lib/css-parser";
+import { formatContent } from "@/lib/content-formatter";
 
 interface NewsArticleRendererProps {
   blocks: ContentBlock[];
@@ -110,7 +113,7 @@ export const NewsArticleRenderer = React.memo<NewsArticleRendererProps>(
     const callToActionUrl = effectiveFrontmatter?.callToActionUrl || "#";
 
     return (
-      <div className="min-h-full bg-background">
+      <div className="content-studio-preview content-blocks-area min-h-full bg-background">
         <article className="max-w-4xl mx-auto px-6 py-8">
           {/* Debug Info */}
           {process.env.NODE_ENV === "development" && (
@@ -218,26 +221,59 @@ const NewsArticleBlock = React.memo<NewsArticleBlockProps>(
     }, [block.cssClass]);
 
     switch (block.type) {
+      case "html": {
+        const htmlBlock = block as HTMLBlock;
+        const content = htmlBlock.content || "<p>No HTML content provided</p>";
+
+        return (
+          <div
+            className={`html-block mb-6 ${htmlBlock.cssClassName || ""}`}
+            style={customStyles}
+            dangerouslySetInnerHTML={{ __html: content }}
+          />
+        );
+      }
+
+      case "list": {
+        const listBlock = block as ListBlock;
+        const items = listBlock.items || [];
+
+        if (items.length === 0) {
+          return (
+            <div className="text-muted-foreground italic">Empty list block</div>
+          );
+        }
+
+        return (
+          <ul
+            className={`list-disc pl-6 space-y-2 mb-6 ${listBlock.cssClassName || ""}`}
+            style={customStyles}
+          >
+            {items.map((item, idx) => (
+              <li key={idx} className="text-muted-foreground">
+                {item}
+              </li>
+            ))}
+          </ul>
+        );
+      }
+
       case "text": {
         const textBlock = block as TextBlock;
         const content = textBlock.content || "Your text will appear here...";
 
         const formattedContent = useMemo(() => {
-          if (!textBlock.richFormatting?.formattedContent) {
-            return content;
-          }
+          // Use richFormatting.formattedContent if available, otherwise use regular content
+          const sourceContent =
+            textBlock.richFormatting?.formattedContent || content;
 
-          let html = textBlock.richFormatting.formattedContent;
-          html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-          html = html.replace(
-            /\[([^\]]+)\]\(([^)]+)\)/g,
-            '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline">$1</a>'
-          );
-          html = html.replace(/\n/g, "<br>");
-          return html;
+          // Use smart content formatting that preserves HTML tags
+          return formatContent(sourceContent, {
+            preserveHtml: true,
+            emailMode: false,
+            stylesheetData: null, // NewsArticleRenderer doesn't use stylesheet data
+          });
         }, [textBlock.richFormatting?.formattedContent, content]);
-
-        const hasRichContent = textBlock.richFormatting?.formattedContent;
         const textClass = !textBlock.content
           ? "text-muted-foreground italic"
           : "text-foreground";
@@ -275,17 +311,11 @@ const NewsArticleBlock = React.memo<NewsArticleBlockProps>(
             ? formattedContent
             : formattedContent.replace(/<br>/g, " ");
 
-        return React.createElement(
-          textBlock.element || "p",
-          {
-            className: finalClassName,
-            style: customStyles,
-            ...(hasRichContent
-              ? { dangerouslySetInnerHTML: { __html: processedContent } }
-              : {}),
-          },
-          hasRichContent ? undefined : content
-        );
+        return React.createElement(textBlock.element || "p", {
+          className: finalClassName,
+          style: customStyles,
+          dangerouslySetInnerHTML: { __html: processedContent },
+        });
       }
 
       case "image": {

@@ -1,11 +1,15 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Palette, FileText, Sparkles, Info, Archive } from "lucide-react";
+import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 
 import { CopySelector } from "./CopySelector";
 import { BlockComposer } from "./BlockComposer";
@@ -15,6 +19,7 @@ import {
   SelectedCopy,
   ContentBlock,
   ContentTemplate,
+  LoadedComposition,
 } from "./types";
 
 /**
@@ -31,6 +36,10 @@ export function ContentStudioTab({
   projectInfo,
   onUpdate,
 }: ContentStudioTabProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+
   // State management
   const [selectedCopies, setSelectedCopies] = useState<SelectedCopy[]>([]);
   const [blocks, setBlocks] = useState<ContentBlock[]>([]);
@@ -38,12 +47,91 @@ export function ContentStudioTab({
     null
   );
   const [activeTab, setActiveTab] = useState<string>("copy-selection");
-  const [loadedComposition, setLoadedComposition] = useState<any>(null);
+  const [loadedComposition, setLoadedComposition] =
+    useState<LoadedComposition | null>(null);
+  const [isLoadingComposition, setIsLoadingComposition] = useState(false);
 
   // Determine context (car vs project mode)
   const isProjectMode = Boolean(projectId);
   const entityId = projectId || carId;
   const entityInfo = projectInfo || carInfo;
+
+  // Function to update URL with composition ID
+  const updateUrlWithComposition = useCallback(
+    (compositionId: string | null) => {
+      const url = new URL(window.location.href);
+
+      if (compositionId) {
+        url.searchParams.set("composition", compositionId);
+      } else {
+        url.searchParams.delete("composition");
+      }
+
+      // Keep existing tab parameter
+      url.searchParams.set("tab", "content-studio");
+
+      window.history.replaceState({}, "", url.toString());
+    },
+    []
+  );
+
+  // Function to load a composition by ID
+  const loadCompositionById = useCallback(
+    async (compositionId: string) => {
+      setIsLoadingComposition(true);
+      try {
+        const composition = await api.get<LoadedComposition>(
+          `/content-studio/compositions/${compositionId}`
+        );
+
+        // Set the loaded composition for editing
+        setLoadedComposition(composition);
+
+        // Load the composition's blocks
+        setBlocks(composition.blocks || []);
+
+        // Set selected copies from metadata if available
+        if (composition.metadata?.selectedCopies) {
+          setSelectedCopies(composition.metadata.selectedCopies);
+        }
+
+        // Switch to the block composer tab
+        setActiveTab("block-composer");
+
+        // Update URL with composition ID
+        updateUrlWithComposition(compositionId);
+      } catch (error) {
+        console.error("Error loading composition:", error);
+        toast({
+          title: "Error Loading Composition",
+          description:
+            "Failed to load the composition. It may have been deleted.",
+          variant: "destructive",
+        });
+
+        // Clear composition from URL if it failed to load
+        updateUrlWithComposition(null);
+      } finally {
+        setIsLoadingComposition(false);
+      }
+    },
+    [toast, updateUrlWithComposition]
+  );
+
+  // Check URL for composition ID on mount and when search params change
+  useEffect(() => {
+    if (!searchParams) return;
+
+    const compositionId = searchParams.get("composition");
+    if (compositionId && !loadedComposition && !isLoadingComposition) {
+      loadCompositionById(compositionId);
+    }
+  }, [
+    searchParams,
+    loadedComposition,
+    isLoadingComposition,
+    loadCompositionById,
+  ]);
 
   // Handle copy selection from the CopySelector
   const handleCopySelect = useCallback(
@@ -73,26 +161,39 @@ export function ContentStudioTab({
   );
 
   // Handle loading a saved composition
-  const handleLoadComposition = useCallback((composition: any) => {
-    // Set the loaded composition for editing
-    setLoadedComposition(composition);
+  const handleLoadComposition = useCallback(
+    (composition: LoadedComposition) => {
+      // Set the loaded composition for editing
+      setLoadedComposition(composition);
 
-    // Load the composition's blocks
-    setBlocks(composition.blocks || []);
+      // Load the composition's blocks
+      setBlocks(composition.blocks || []);
 
-    // Set selected copies from metadata if available
-    if (composition.metadata?.selectedCopies) {
-      setSelectedCopies(composition.metadata.selectedCopies);
-    }
+      // Set selected copies from metadata if available
+      if (composition.metadata?.selectedCopies) {
+        setSelectedCopies(composition.metadata.selectedCopies);
+      }
 
-    // Switch to the block composer tab
-    setActiveTab("block-composer");
-  }, []);
+      // Switch to the block composer tab
+      setActiveTab("block-composer");
+
+      // Update URL with composition ID
+      updateUrlWithComposition(composition._id);
+    },
+    [updateUrlWithComposition]
+  );
 
   // Clear loaded composition when starting fresh
   const handleClearComposition = useCallback(() => {
     setLoadedComposition(null);
-  }, []);
+    setBlocks([]);
+    setSelectedCopies([]);
+    setActiveTemplate(null);
+    setActiveTab("copy-selection");
+
+    // Remove composition from URL
+    updateUrlWithComposition(null);
+  }, [updateUrlWithComposition]);
 
   // Reset state when switching contexts
   React.useEffect(() => {
@@ -101,7 +202,10 @@ export function ContentStudioTab({
     setActiveTemplate(null);
     setLoadedComposition(null);
     setActiveTab("copy-selection");
-  }, [carId, projectId]);
+
+    // Clear composition from URL when switching contexts
+    updateUrlWithComposition(null);
+  }, [carId, projectId, updateUrlWithComposition]);
 
   return (
     <div className="space-y-6">
@@ -116,6 +220,11 @@ export function ContentStudioTab({
             <Badge variant="secondary" className="text-xs">
               Phase 1
             </Badge>
+            {loadedComposition && (
+              <Badge variant="outline" className="text-xs bg-primary/10">
+                Editing: {loadedComposition.name}
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             Enhance your copy with multimedia elements for marketing emails and
@@ -123,14 +232,28 @@ export function ContentStudioTab({
           </p>
         </div>
 
-        {/* Context indicator */}
-        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <Info className="h-4 w-4" />
-          <span>
-            {isProjectMode
-              ? `Project: ${entityInfo?.name || "Unknown"}`
-              : `Car: ${entityInfo?.year || ""} ${entityInfo?.make || ""} ${entityInfo?.model || ""}`}
-          </span>
+        {/* Context indicator and actions */}
+        <div className="flex items-center space-x-4">
+          {loadedComposition && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearComposition}
+              className="flex items-center space-x-2"
+            >
+              <FileText className="h-4 w-4" />
+              <span>Start Fresh</span>
+            </Button>
+          )}
+
+          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+            <Info className="h-4 w-4" />
+            <span>
+              {isProjectMode
+                ? `Project: ${entityInfo?.name || "Unknown"}`
+                : `Car: ${entityInfo?.year || ""} ${entityInfo?.make || ""} ${entityInfo?.model || ""}`}
+            </span>
+          </div>
         </div>
       </div>
 

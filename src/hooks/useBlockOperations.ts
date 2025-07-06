@@ -6,6 +6,7 @@ import {
   ImageBlock,
   VideoBlock,
   DividerBlock,
+  HTMLBlock,
 } from "@/components/content-studio/types";
 
 /**
@@ -160,11 +161,10 @@ export function useBlockOperations(
   // Update a specific block
   const updateBlock = useCallback(
     (blockId: string, updates: Partial<ContentBlock>) => {
-      const updatedBlocks = blocks.map((block) =>
-        block.id === blockId
-          ? ({ ...block, ...updates } as ContentBlock)
-          : block
-      );
+      const updatedBlocks = blocks.map((block) => {
+        if (block.id !== blockId) return block;
+        return { ...block, ...updates } as ContentBlock;
+      });
       onBlocksChange(updatedBlocks);
     },
     [blocks, onBlocksChange]
@@ -262,6 +262,34 @@ export function useBlockOperations(
     insertBlock(newBlock, "Video Block Added");
   }, [insertBlock]);
 
+  // Add new list block (unordered list)
+  const addListBlock = useCallback(() => {
+    const newBlock: import("@/components/content-studio/types").ListBlock = {
+      id: `list-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type: "list",
+      order: 0, // Will be set by insertBlock
+      items: ["List item 1", "List item 2"],
+      style: "ul",
+      styles: {},
+      metadata: { source: "manual", createdAt: new Date().toISOString() },
+    };
+    insertBlock(newBlock, "List Block Added");
+  }, [insertBlock]);
+
+  // Add new HTML block
+  const addHtmlBlock = useCallback(() => {
+    const newBlock: HTMLBlock = {
+      id: `html-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type: "html",
+      order: 0, // Will be set by insertBlock
+      content: "<div>\n  <p>Enter your HTML content here...</p>\n</div>",
+      description: "Custom HTML Block",
+      styles: {},
+      metadata: { source: "manual", createdAt: new Date().toISOString() },
+    };
+    insertBlock(newBlock, "HTML Block Added");
+  }, [insertBlock]);
+
   return {
     addImageFromGallery,
     removeBlock,
@@ -271,6 +299,8 @@ export function useBlockOperations(
     addHeadingBlock,
     addDividerBlock,
     addVideoBlock,
+    addListBlock, // Exported
+    addHtmlBlock, // Exported
     getInsertPosition,
     insertBlock,
   };

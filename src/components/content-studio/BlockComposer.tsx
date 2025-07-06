@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,18 +25,33 @@ import {
   Columns2,
   Columns,
   Eye,
+  Code,
+  FileText,
 } from "lucide-react";
 
 import { ContentInsertionToolbar } from "./ContentInsertionToolbar";
 import { IntegratedPreviewEditor } from "./IntegratedPreviewEditor";
 import { StylesheetSelector } from "../BlockComposer/StylesheetSelector";
+import { StylesheetInjector } from "../BlockComposer/StylesheetInjector";
 import { RendererFactory, PreviewMode } from "./renderers/RendererFactory";
+import { ExportModal } from "./ExportModal";
+import { ExportOptions } from "@/lib/content-export";
+import {
+  EmailContainerConfig,
+  EmailContainerConfig as EmailContainerConfigComponent,
+  defaultEmailContainerConfig,
+} from "./EmailContainerConfig";
+import { CSSEditor } from "./CSSEditor";
 
 // Custom hooks
 import { useFrontmatterOperations } from "@/hooks/useFrontmatterOperations";
 import { useBlockOperations } from "@/hooks/useBlockOperations";
 import { useContentExport } from "@/hooks/useContentExport";
 import { useBlockComposerImages } from "@/hooks/useBlockComposerImages";
+import {
+  useStylesheetData,
+  invalidateStylesheetCache,
+} from "@/hooks/useStylesheetData";
 
 import { api } from "@/lib/api-client";
 import { BlockComposerProps, ContentBlock, TextBlock } from "./types";
@@ -108,11 +123,25 @@ export function BlockComposer({
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("clean");
+  const [editorMode, setEditorMode] = useState<"blocks" | "css">("blocks");
 
   // Stylesheet management
   const [selectedStylesheetId, setSelectedStylesheetId] = useState<
     string | null
   >(null);
+
+  // Export modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+
+  // Email container configuration
+  const [emailContainerConfig, setEmailContainerConfig] =
+    useState<EmailContainerConfig>(defaultEmailContainerConfig);
+  const [showEmailContainerConfig, setShowEmailContainerConfig] =
+    useState(false);
+
+  // CSS Editor state
+  const [cssContent, setCSSContent] = useState<string>("");
+  const [isSavingCSS, setIsSavingCSS] = useState(false);
 
   // Custom hooks for extracted functionality
   const {
@@ -138,6 +167,8 @@ export function BlockComposer({
     addHeadingBlock,
     addDividerBlock,
     addVideoBlock,
+    addListBlock, // Added
+    addHtmlBlock, // Added
   } = useBlockOperations(
     blocks,
     onBlocksChange,
@@ -147,11 +178,42 @@ export function BlockComposer({
     selectedCopies[0]?.carId
   );
 
-  const { exportToHTML, copyHTMLToClipboard, exportToMDX, hasEmailFeatures } =
+  const { exportWithOptions, exportToMDX, hasEmailFeatures } =
     useContentExport();
 
   const { finalImages, loadingImages, refetchImages } =
     useBlockComposerImages(selectedCopies);
+
+  // Load stylesheet data for CSS editor
+  // HOT-RELOAD OPTIMIZATION: Use useMemo to prevent unnecessary re-renders when stylesheet data changes
+  const { stylesheetData, loading: stylesheetLoading } =
+    useStylesheetData(selectedStylesheetId);
+
+  // Memoize stylesheet data to prevent unnecessary re-renders of preview components
+  const memoizedStylesheetData = useMemo(
+    () => stylesheetData,
+    [stylesheetData?.id, stylesheetData?.name]
+  );
+
+  // Memoize preview props to prevent unnecessary re-renders
+  const previewProps = useMemo(
+    () => ({
+      mode: previewMode,
+      blocks,
+      selectedStylesheetId,
+      compositionName,
+      frontmatter,
+      emailContainerConfig,
+    }),
+    [
+      previewMode,
+      blocks,
+      selectedStylesheetId,
+      compositionName,
+      frontmatter,
+      emailContainerConfig,
+    ]
+  );
 
   // Initialize composition name when loading existing composition
   React.useEffect(() => {
@@ -170,6 +232,14 @@ export function BlockComposer({
         setFrontmatter({
           ...frontmatter,
           ...loadedComposition.metadata.frontmatter,
+        });
+      }
+
+      // Load email container config if it exists in metadata
+      if (loadedComposition.metadata?.emailContainerConfig) {
+        setEmailContainerConfig({
+          ...defaultEmailContainerConfig,
+          ...loadedComposition.metadata.emailContainerConfig,
         });
       }
     }
@@ -194,6 +264,15 @@ export function BlockComposer({
       onBlocksChange(migratedBlocks);
     }
   }, [blocks, onBlocksChange]);
+
+  // Load CSS content when switching to CSS mode or when stylesheet changes
+  React.useEffect(() => {
+    if (editorMode === "css" && stylesheetData) {
+      setCSSContent(
+        stylesheetData.cssContent || "/* No CSS content available */"
+      );
+    }
+  }, [editorMode, stylesheetData]);
 
   // Automatically import selected copy into blocks (split by paragraphs with ## header detection)
   useEffect(() => {
@@ -327,6 +406,7 @@ export function BlockComposer({
         metadata: {
           selectedStylesheetId,
           frontmatter,
+          emailContainerConfig,
           projectId: selectedCopies[0]?.projectId,
           carId: selectedCopies[0]?.carId,
           selectedCopies,
@@ -364,19 +444,76 @@ export function BlockComposer({
     template,
     selectedStylesheetId,
     frontmatter,
+    emailContainerConfig,
     selectedCopies,
     loadedComposition,
     toast,
     api,
   ]);
 
+  // Save CSS content to selected stylesheet
+  const saveCSSContent = useCallback(async () => {
+    if (!selectedStylesheetId) {
+      toast({
+        title: "No Stylesheet Selected",
+        description: "Please select a stylesheet to save CSS content.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if CSS content is empty and provide a default comment
+    const contentToSave = cssContent.trim() || "/* Empty stylesheet */";
+
+    setIsSavingCSS(true);
+    try {
+      await api.put(`/api/stylesheets/${selectedStylesheetId}`, {
+        cssContent: contentToSave,
+      });
+
+      // HOT-RELOAD OPTIMIZATION: Use CSS content notification instead of full cache invalidation
+      // This preserves component state and prevents unnecessary re-renders
+      const { notifyCSSContentChange } = await import(
+        "@/hooks/useStylesheetData"
+      );
+      notifyCSSContentChange(selectedStylesheetId, contentToSave);
+
+      // Update local CSS content state to match what was saved
+      if (contentToSave !== cssContent) {
+        setCSSContent(contentToSave);
+      }
+
+      toast({
+        title: "CSS Saved",
+        description: "Your CSS changes have been saved successfully.",
+      });
+    } catch (error) {
+      console.error("Failed to save CSS:", error);
+      toast({
+        title: "Save Failed",
+        description: "Failed to save CSS content. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingCSS(false);
+    }
+  }, [selectedStylesheetId, cssContent, toast, api]);
+
   // Callback functions for extracted components
   const handleToggleInsertToolbar = useCallback(() => {
     setIsInsertToolbarExpanded(!isInsertToolbarExpanded);
   }, [isInsertToolbarExpanded]);
 
+  // Editor mode toggle handler
+  const handleEditorModeToggle = useCallback((mode: "blocks" | "css") => {
+    setEditorMode(mode);
+  }, []);
+
   return (
     <div className="flex-1 space-y-6 pb-6">
+      {/* CSS Stylesheet Injector */}
+      <StylesheetInjector selectedStylesheetId={selectedStylesheetId} />
+
       {/* Header Controls - Full Width */}
       <Card className="bg-transparent border border-border/40">
         <CardHeader className="pb-3">
@@ -408,23 +545,37 @@ export function BlockComposer({
                 className="w-auto"
               />
 
+              {/* Preview Button - Disabled in CSS mode since preview is always shown */}
               <Button
                 onClick={() => setShowPreview(!showPreview)}
-                variant={showPreview ? "default" : "outline"}
+                variant={
+                  showPreview || editorMode === "css" ? "default" : "outline"
+                }
                 size="sm"
                 className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
-                title={showPreview ? "Hide preview" : "Show preview"}
+                title={
+                  editorMode === "css"
+                    ? "Preview is always shown in CSS mode"
+                    : showPreview
+                      ? "Hide preview"
+                      : "Show preview"
+                }
+                disabled={editorMode === "css"}
               >
-                {showPreview ? (
+                {showPreview || editorMode === "css" ? (
                   <Columns className="h-4 w-4 mr-2" />
                 ) : (
                   <Columns2 className="h-4 w-4 mr-2" />
                 )}
-                {showPreview ? "Single View" : "Preview"}
+                {editorMode === "css"
+                  ? "CSS Preview"
+                  : showPreview
+                    ? "Single View"
+                    : "Preview"}
               </Button>
 
-              {/* Preview Mode Selector */}
-              {showPreview && (
+              {/* Preview Mode Selector - Always show in CSS mode or when preview is enabled */}
+              {(showPreview || editorMode === "css") && (
                 <Select
                   value={previewMode}
                   onValueChange={(value: "clean" | "news-article" | "email") =>
@@ -443,81 +594,13 @@ export function BlockComposer({
                 </Select>
               )}
               <Button
-                onClick={() =>
-                  exportToHTML(
-                    blocks,
-                    template?.id || null,
-                    compositionName,
-                    "web",
-                    selectedCopies[0]?.projectId,
-                    selectedCopies[0]?.carId
-                  )
-                }
+                onClick={() => setShowExportModal(true)}
                 variant="outline"
                 size="sm"
                 className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
               >
                 <Download className="h-4 w-4 mr-2" />
-                Export Web HTML
-              </Button>
-              <Button
-                onClick={() =>
-                  exportToHTML(
-                    blocks,
-                    template?.id || null,
-                    compositionName,
-                    "email",
-                    selectedCopies[0]?.projectId,
-                    selectedCopies[0]?.carId
-                  )
-                }
-                variant="outline"
-                size="sm"
-                className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export Email HTML
-                {hasEmailFeatures(blocks) && (
-                  <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
-                    Fluid
-                  </span>
-                )}
-              </Button>
-              <Button
-                onClick={() =>
-                  copyHTMLToClipboard(
-                    blocks,
-                    template?.id || null,
-                    compositionName,
-                    "web",
-                    selectedCopies[0]?.projectId,
-                    selectedCopies[0]?.carId
-                  )
-                }
-                variant="outline"
-                size="sm"
-                className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                Copy Web HTML
-              </Button>
-              <Button
-                onClick={() =>
-                  copyHTMLToClipboard(
-                    blocks,
-                    template?.id || null,
-                    compositionName,
-                    "email",
-                    selectedCopies[0]?.projectId,
-                    selectedCopies[0]?.carId
-                  )
-                }
-                variant="outline"
-                size="sm"
-                className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                Copy Email HTML
+                Export
                 {hasEmailFeatures(blocks) && (
                   <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1 py-0.5 rounded">
                     Fluid
@@ -533,6 +616,28 @@ export function BlockComposer({
                 <Download className="h-4 w-4 mr-2" />
                 Export MDX
               </Button>
+              {/* Editor Mode Toggle - Always Visible */}
+              <div className="flex items-center bg-muted/20 rounded-md p-1">
+                <Button
+                  onClick={() => handleEditorModeToggle("blocks")}
+                  variant={editorMode === "blocks" ? "default" : "ghost"}
+                  size="sm"
+                  className="h-8 px-3 text-xs"
+                >
+                  <FileText className="h-3 w-3 mr-1" />
+                  Blocks
+                </Button>
+                <Button
+                  onClick={() => handleEditorModeToggle("css")}
+                  variant={editorMode === "css" ? "default" : "ghost"}
+                  size="sm"
+                  className="h-8 px-3 text-xs"
+                >
+                  <Code className="h-3 w-3 mr-1" />
+                  CSS
+                </Button>
+              </div>
+
               <Button
                 onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
                 variant="ghost"
@@ -592,7 +697,7 @@ export function BlockComposer({
 
             {/* Block Count Badge */}
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-transparent">
+              <Badge variant="outline" className="bg-transparent text-xs">
                 {blocks.length} block{blocks.length !== 1 ? "s" : ""}
               </Badge>
             </div>
@@ -600,82 +705,141 @@ export function BlockComposer({
         )}
       </Card>
 
-      {/* Content Editor - Single or Two Column Layout */}
-      {showPreview ? (
-        <div className="grid grid-cols-2 gap-6 h-[calc(100vh-300px)]">
-          {/* Preview Column - Left */}
-          <div className="overflow-y-auto border border-border/40 rounded-lg bg-background">
-            <RendererFactory
-              mode={previewMode}
-              blocks={blocks}
-              selectedStylesheetId={selectedStylesheetId}
-              compositionName={compositionName}
-              frontmatter={frontmatter}
-            />
-          </div>
-
-          {/* Editor Column - Right */}
-          <div className="overflow-y-auto">
-            <IntegratedPreviewEditor
-              blocks={blocks}
-              selectedStylesheetId={selectedStylesheetId}
-              activeBlockId={activeBlockId}
-              draggedBlockId={draggedBlockId}
-              draggedOverIndex={draggedOverIndex}
-              onSetActive={setActiveBlockId}
-              onUpdateBlock={updateBlock}
-              onRemoveBlock={removeBlock}
-              onMoveBlock={moveBlock}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onDragOver={handleDragOver}
-              onBlocksChange={onBlocksChange}
-              onConvertTextToFrontmatter={convertTextToFrontmatterBlock}
-              detectFrontmatterInTextBlock={detectFrontmatterInTextBlock}
-            />
-          </div>
-        </div>
-      ) : (
-        <IntegratedPreviewEditor
-          blocks={blocks}
-          selectedStylesheetId={selectedStylesheetId}
-          activeBlockId={activeBlockId}
-          draggedBlockId={draggedBlockId}
-          draggedOverIndex={draggedOverIndex}
-          onSetActive={setActiveBlockId}
-          onUpdateBlock={updateBlock}
-          onRemoveBlock={removeBlock}
-          onMoveBlock={moveBlock}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onDragOver={handleDragOver}
-          onBlocksChange={onBlocksChange}
-          onConvertTextToFrontmatter={convertTextToFrontmatterBlock}
-          detectFrontmatterInTextBlock={detectFrontmatterInTextBlock}
+      {/* Email Container Configuration - Show only in email preview mode */}
+      {previewMode === "email" && (
+        <EmailContainerConfigComponent
+          config={emailContainerConfig}
+          onConfigChange={setEmailContainerConfig}
+          isOpen={showEmailContainerConfig}
+          onToggle={() =>
+            setShowEmailContainerConfig(!showEmailContainerConfig)
+          }
         />
       )}
 
-      {/* Content Insertion Toolbar */}
-      <ContentInsertionToolbar
-        activeBlockId={activeBlockId}
-        isInsertToolbarExpanded={isInsertToolbarExpanded}
-        onToggleExpanded={handleToggleInsertToolbar}
-        onAddTextBlock={addTextBlock}
-        onAddDividerBlock={addDividerBlock}
-        onAddVideoBlock={addVideoBlock}
-        onAddFrontmatterBlock={addFrontmatterBlock}
-        finalImages={finalImages}
-        loadingImages={loadingImages}
+      {/* Content Editor - Conditional Rendering Based on Editor Mode */}
+      {editorMode === "blocks" ? (
+        // Block Editor Mode - Single or Two Column Layout
+        showPreview ? (
+          <div className="grid grid-cols-2 gap-6 h-[calc(100vh-300px)]">
+            {/* Preview Column - Left */}
+            <div className="overflow-y-auto border border-border/40 rounded-lg bg-background">
+              <RendererFactory {...previewProps} />
+            </div>
+
+            {/* Editor Column - Right */}
+            <div className="overflow-y-auto">
+              <IntegratedPreviewEditor
+                blocks={blocks}
+                selectedStylesheetId={selectedStylesheetId}
+                previewMode={previewMode === "email" ? "email" : "clean"}
+                emailPlatform="generic"
+                activeBlockId={activeBlockId}
+                draggedBlockId={draggedBlockId}
+                draggedOverIndex={draggedOverIndex}
+                onSetActive={setActiveBlockId}
+                onUpdateBlock={updateBlock}
+                onRemoveBlock={removeBlock}
+                onMoveBlock={moveBlock}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragOver={handleDragOver}
+                onBlocksChange={onBlocksChange}
+                onConvertTextToFrontmatter={convertTextToFrontmatterBlock}
+                detectFrontmatterInTextBlock={detectFrontmatterInTextBlock}
+              />
+            </div>
+          </div>
+        ) : (
+          <IntegratedPreviewEditor
+            blocks={blocks}
+            selectedStylesheetId={selectedStylesheetId}
+            activeBlockId={activeBlockId}
+            draggedBlockId={draggedBlockId}
+            draggedOverIndex={draggedOverIndex}
+            onSetActive={setActiveBlockId}
+            onUpdateBlock={updateBlock}
+            onRemoveBlock={removeBlock}
+            onMoveBlock={moveBlock}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDragOver={handleDragOver}
+            onBlocksChange={onBlocksChange}
+            onConvertTextToFrontmatter={convertTextToFrontmatterBlock}
+            detectFrontmatterInTextBlock={detectFrontmatterInTextBlock}
+          />
+        )
+      ) : (
+        // CSS Editor Mode - Always show preview with CSS editor
+        <div className="grid grid-cols-2 gap-6 h-[calc(100vh-300px)]">
+          {/* Preview Column - Left */}
+          <div className="overflow-y-auto border border-border/40 rounded-lg bg-background">
+            <RendererFactory {...previewProps} />
+          </div>
+
+          {/* CSS Editor Column - Right */}
+          <div className="overflow-y-auto">
+            <CSSEditor
+              cssContent={cssContent}
+              onCSSChange={setCSSContent}
+              selectedStylesheetId={selectedStylesheetId}
+              onSave={saveCSSContent}
+              isSaving={isSavingCSS}
+              className="h-full"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Content Insertion Toolbar - Only show in blocks mode */}
+      {editorMode === "blocks" && (
+        <ContentInsertionToolbar
+          activeBlockId={activeBlockId}
+          isInsertToolbarExpanded={isInsertToolbarExpanded}
+          onToggleExpanded={handleToggleInsertToolbar}
+          onAddTextBlock={addTextBlock}
+          onAddDividerBlock={addDividerBlock}
+          onAddVideoBlock={addVideoBlock}
+          onAddFrontmatterBlock={addFrontmatterBlock}
+          onAddListBlock={addListBlock} // Pass to toolbar
+          onAddHtmlBlock={addHtmlBlock} // Pass to toolbar
+          finalImages={finalImages}
+          loadingImages={loadingImages}
+          projectId={selectedCopies[0]?.projectId}
+          onRefreshImages={refetchImages}
+          onAddImage={addImageFromGallery}
+          onSave={saveComposition}
+          isSaving={isSaving}
+          canSave={!!compositionName.trim()}
+          isUpdate={!!loadedComposition}
+          currentBlocks={blocks}
+          onBlocksChange={onBlocksChange}
+          carId={selectedCopies[0]?.carId}
+        />
+      )}
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        blocks={blocks}
+        compositionName={compositionName}
+        selectedStylesheetId={selectedStylesheetId}
+        template={template?.id || null}
         projectId={selectedCopies[0]?.projectId}
-        onRefreshImages={refetchImages}
-        onAddImage={addImageFromGallery}
-        onSave={saveComposition}
-        isSaving={isSaving}
-        canSave={!!compositionName.trim()}
-        isUpdate={!!loadedComposition}
-        currentBlocks={blocks}
-        onBlocksChange={onBlocksChange}
         carId={selectedCopies[0]?.carId}
+        hasEmailFeatures={hasEmailFeatures(blocks)}
+        onExport={async (options: ExportOptions) => {
+          await exportWithOptions(
+            blocks,
+            template?.id || null,
+            compositionName,
+            options,
+            selectedCopies[0]?.projectId,
+            selectedCopies[0]?.carId,
+            selectedStylesheetId
+          );
+        }}
       />
     </div>
   );
