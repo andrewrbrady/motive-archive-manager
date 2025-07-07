@@ -20,6 +20,8 @@ import {
   formatContent,
   getElementStylesFromStylesheet,
   hasHtmlContent,
+  stripInlineStyles,
+  applyStylesheetAsInlineStyles,
 } from "@/lib/content-formatter";
 
 interface CleanRendererProps {
@@ -69,7 +71,7 @@ export const CleanRenderer = React.memo<CleanRendererProps>(
     if (selectedStylesheetId && (stylesheetLoading || !stylesheetData)) {
       console.log("🎯 CleanRenderer: Waiting for stylesheet data...");
       return (
-        <div className="content-studio-preview content-blocks-area min-h-full bg-background">
+        <div className="content-studio-preview content-blocks-area clean-preview min-h-full bg-background">
           <div className="flex items-center justify-center p-6">
             <div className="text-muted-foreground">Loading stylesheet...</div>
           </div>
@@ -103,7 +105,7 @@ export const CleanRenderer = React.memo<CleanRendererProps>(
       }, [sortedBlocks]);
 
       return (
-        <div className="content-studio-preview content-blocks-area min-h-full bg-background">
+        <div className="content-studio-preview content-blocks-area clean-preview min-h-full bg-background">
           {/* Full-width header images */}
           {headerImages.map((block) => (
             <div
@@ -142,7 +144,7 @@ export const CleanRenderer = React.memo<CleanRendererProps>(
 
     // Regular Clean Preview Mode
     return (
-      <div className="content-studio-preview content-blocks-area min-h-full bg-background">
+      <div className="content-studio-preview content-blocks-area clean-preview min-h-full bg-background">
         <div className="space-y-4 p-6">
           {sortedBlocks.map((block) => (
             <CleanPreviewBlock
@@ -196,7 +198,19 @@ const CleanPreviewBlock = React.memo<CleanPreviewBlockProps>(
     switch (block.type) {
       case "html": {
         const htmlBlock = block as HTMLBlock;
-        const content = htmlBlock.content || "<p>No HTML content provided</p>";
+        const rawContent =
+          htmlBlock.content || "<p>No HTML content provided</p>";
+
+        // CRITICAL FIX: Strip inline styles and rely on CSS injection for all modes
+        const content = useMemo(() => {
+          const strippedContent = stripInlineStyles(rawContent);
+          console.log(
+            "🧹 CleanRenderer - Stripped inline styles (using CSS injection):"
+          );
+          console.log("- Original:", rawContent.substring(0, 200) + "...");
+          console.log("- Stripped:", strippedContent.substring(0, 200) + "...");
+          return strippedContent;
+        }, [rawContent]);
 
         return (
           <div

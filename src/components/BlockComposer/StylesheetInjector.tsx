@@ -68,7 +68,7 @@ const scopeCSS = (css: string): string => {
         return "";
       }
 
-      // Only scope CSS classes and be extremely specific about where they apply
+      // Handle CSS classes
       if (trimmedSelector.startsWith(".")) {
         // ENHANCED: Boost specificity for important properties and add !important
         const enhancedDeclarations = declarations
@@ -107,7 +107,188 @@ const scopeCSS = (css: string): string => {
         return `${targetedSelectors.join(", ")} { ${enhancedDeclarations} }`;
       }
 
-      // Skip any other selector types (element selectors, etc.) to be safe
+      // CRITICAL FIX: Handle mixed descendant selectors like .content img, .cta-section a, etc.
+      // These are class selectors with element descendants (more comprehensive pattern)
+      const isMixedDescendantSelector =
+        /^\.[\w-]+(\s+[a-zA-Z][a-zA-Z0-9]*)+$/.test(trimmedSelector) ||
+        /^\.[\w-]+\s+\.[\w-]+\s+[a-zA-Z][a-zA-Z0-9]*$/.test(trimmedSelector);
+
+      if (isMixedDescendantSelector) {
+        // Handle selectors like ".content img", ".cta-section a", etc.
+        const enhancedDeclarations = declarations
+          .trim()
+          .split(";")
+          .map((prop: string) => {
+            const trimmedProp = prop.trim();
+            if (!trimmedProp) return "";
+            if (trimmedProp.includes("!important")) {
+              return trimmedProp;
+            }
+            return `${trimmedProp} !important`;
+          })
+          .filter(Boolean)
+          .join("; ");
+
+        // Create scoped selectors for mixed descendant selectors
+        const scopedSelectors = [
+          // ULTRA HIGH SPECIFICITY - Target within preview containers with multiple class combinations
+          `.content-studio-preview.content-studio-preview ${trimmedSelector}`,
+          `.email-preview.email-preview ${trimmedSelector}`,
+          `.clean-preview.clean-preview ${trimmedSelector}`,
+          `.accurate-email-preview.accurate-email-preview ${trimmedSelector}`,
+          // EMAIL PLATFORM SPECIFICITY - Target specific email preview types (CRITICAL FIX)
+          `.sendgrid-preview.sendgrid-preview ${trimmedSelector}`,
+          `.mailchimp-preview.mailchimp-preview ${trimmedSelector}`,
+          `.generic-preview.generic-preview ${trimmedSelector}`,
+          // COMBINED EMAIL PREVIEW TARGETING - Target the actual DOM structure
+          `.content-studio-preview.email-preview.sendgrid-preview ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.mailchimp-preview ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.generic-preview ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.accurate-email-preview ${trimmedSelector}`,
+          // HIGH SPECIFICITY - HTML block targeting
+          `.html-block.html-block ${trimmedSelector}`,
+          `.content-studio-preview .html-block ${trimmedSelector}`,
+          `.email-preview .html-block ${trimmedSelector}`,
+          `.clean-preview .html-block ${trimmedSelector}`,
+          `.accurate-email-preview .html-block ${trimmedSelector}`,
+          `.sendgrid-preview .html-block ${trimmedSelector}`,
+          `.mailchimp-preview .html-block ${trimmedSelector}`,
+          `.generic-preview .html-block ${trimmedSelector}`,
+          // COMBINED EMAIL PREVIEW + HTML BLOCK TARGETING
+          `.content-studio-preview.email-preview.sendgrid-preview .html-block ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.mailchimp-preview .html-block ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.generic-preview .html-block ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.accurate-email-preview .html-block ${trimmedSelector}`,
+          // MEDIUM SPECIFICITY - Block type targeting
+          `[data-block-type="html"] ${trimmedSelector}`,
+          `[data-block-type="text"] ${trimmedSelector}`,
+          `[data-block-type="list"] ${trimmedSelector}`,
+          // EMAIL CONTAINER TARGETING
+          `.email-container ${trimmedSelector}`,
+          `.content-studio-preview .email-container ${trimmedSelector}`,
+          `.email-preview .email-container ${trimmedSelector}`,
+          `.clean-preview .email-container ${trimmedSelector}`,
+          `.accurate-email-preview .email-container ${trimmedSelector}`,
+          `.sendgrid-preview .email-container ${trimmedSelector}`,
+          `.mailchimp-preview .email-container ${trimmedSelector}`,
+          `.generic-preview .email-container ${trimmedSelector}`,
+          // COMBINED EMAIL PREVIEW + EMAIL CONTAINER TARGETING
+          `.content-studio-preview.email-preview.sendgrid-preview .email-container ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.mailchimp-preview .email-container ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.generic-preview .email-container ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.accurate-email-preview .email-container ${trimmedSelector}`,
+        ];
+
+        console.log(
+          `✅ CSS Injection: Processing mixed descendant selector ${trimmedSelector} with FULL precedence`
+        );
+        return `${scopedSelectors.join(", ")} { ${enhancedDeclarations} }`;
+      }
+
+      // CRITICAL FIX: Handle global element styles (p, h1, h2, h3, img, ul, li, etc.)
+      // These need to be scoped to preview containers to avoid affecting the entire page
+      const isElementSelector = /^[a-zA-Z][a-zA-Z0-9]*$/.test(trimmedSelector);
+      const isCommaList = trimmedSelector.includes(",");
+      const hasSpaceSelectors =
+        /\s/.test(trimmedSelector) && !trimmedSelector.includes("@");
+
+      if (isElementSelector || isCommaList || hasSpaceSelectors) {
+        // Parse comma-separated selectors and space-separated selectors
+        const elementSelectors = trimmedSelector
+          .split(",")
+          .map((s: string) => s.trim());
+        const validElementSelectors = elementSelectors.filter(
+          (selector: string) => {
+            // Process simple element selectors and basic descendant selectors like "ul li"
+            const isSimpleElement = /^[a-zA-Z][a-zA-Z0-9]*$/.test(selector);
+            const isDescendantSelector =
+              /^[a-zA-Z][a-zA-Z0-9]*\s+[a-zA-Z][a-zA-Z0-9]*$/.test(selector);
+
+            // Check if it's not a dangerous selector
+            const firstElement = selector.split(/[\s:>+~]/)[0];
+            const isDangerous = dangerousSelectors.includes(firstElement);
+
+            return (isSimpleElement || isDescendantSelector) && !isDangerous;
+          }
+        );
+
+        if (validElementSelectors.length === 0) {
+          return "";
+        }
+
+        // CRITICAL: Make ALL CSS properties !important to ensure precedence
+        const enhancedDeclarations = declarations
+          .trim()
+          // Split by semicolon and process each property
+          .split(";")
+          .map((prop: string) => {
+            const trimmedProp = prop.trim();
+            if (!trimmedProp) return "";
+
+            // If already has !important, keep it as is
+            if (trimmedProp.includes("!important")) {
+              return trimmedProp;
+            }
+
+            // Add !important to every property
+            return `${trimmedProp} !important`;
+          })
+          .filter(Boolean)
+          .join("; ");
+
+        // Create scoped selectors for each element with MAXIMUM SPECIFICITY
+        const scopedSelectors = validElementSelectors.flatMap(
+          (elementSelector: string) => [
+            // ULTRA HIGH SPECIFICITY - Target elements within content studio previews
+            `.content-studio-preview.content-studio-preview ${elementSelector}`,
+            `.email-preview.email-preview ${elementSelector}`,
+            `.clean-preview.clean-preview ${elementSelector}`,
+            `.accurate-email-preview.accurate-email-preview ${elementSelector}`,
+            // EMAIL PLATFORM SPECIFICITY - Target specific email preview types
+            `.sendgrid-preview.sendgrid-preview ${elementSelector}`,
+            `.mailchimp-preview.mailchimp-preview ${elementSelector}`,
+            `.generic-preview.generic-preview ${elementSelector}`,
+            // COMBINED EMAIL PREVIEW TARGETING - Target the actual DOM structure (CRITICAL FIX)
+            `.content-studio-preview.email-preview.sendgrid-preview ${elementSelector}`,
+            `.content-studio-preview.email-preview.mailchimp-preview ${elementSelector}`,
+            `.content-studio-preview.email-preview.generic-preview ${elementSelector}`,
+            `.content-studio-preview.email-preview.accurate-email-preview ${elementSelector}`,
+            // HIGH SPECIFICITY - Multiple class targeting
+            `.content-studio-preview .email-container ${elementSelector}`,
+            `.email-preview .email-container ${elementSelector}`,
+            `.clean-preview .email-container ${elementSelector}`,
+            `.accurate-email-preview .email-container ${elementSelector}`,
+            `.sendgrid-preview .email-container ${elementSelector}`,
+            `.mailchimp-preview .email-container ${elementSelector}`,
+            `.generic-preview .email-container ${elementSelector}`,
+            // COMBINED EMAIL PREVIEW + EMAIL CONTAINER TARGETING
+            `.content-studio-preview.email-preview.sendgrid-preview .email-container ${elementSelector}`,
+            `.content-studio-preview.email-preview.mailchimp-preview .email-container ${elementSelector}`,
+            `.content-studio-preview.email-preview.generic-preview .email-container ${elementSelector}`,
+            `.content-studio-preview.email-preview.accurate-email-preview .email-container ${elementSelector}`,
+            // MEDIUM SPECIFICITY - Block type targeting
+            `[data-block-type="text"] ${elementSelector}`,
+            `[data-block-type="html"] ${elementSelector}`,
+            `[data-block-type="list"] ${elementSelector}`,
+            // ADDITIONAL SPECIFICITY - HTML block targeting
+            `.html-block.html-block ${elementSelector}`,
+            `.content-studio-preview .html-block ${elementSelector}`,
+            `.email-preview .html-block ${elementSelector}`,
+            `.clean-preview .html-block ${elementSelector}`,
+            `.accurate-email-preview .html-block ${elementSelector}`,
+            `.sendgrid-preview .html-block ${elementSelector}`,
+            `.mailchimp-preview .html-block ${elementSelector}`,
+            `.generic-preview .html-block ${elementSelector}`,
+          ]
+        );
+
+        console.log(
+          `✅ CSS Injection: Processing element selector(s) ${validElementSelectors.join(", ")} with FULL precedence`
+        );
+        return `${scopedSelectors.join(", ")} { ${enhancedDeclarations} }`;
+      }
+
+      // Skip any other selector types to be safe
       return "";
     }
   );
@@ -158,7 +339,7 @@ const createHTMLContentCSS = (css: string): string => {
         return "";
       }
 
-      // Only process CSS classes and scope them specifically to HTML block content
+      // Handle CSS classes
       if (trimmedSelector.startsWith(".")) {
         // ENHANCED: Boost specificity for important properties and add !important
         const enhancedDeclarations = declarations
@@ -197,6 +378,170 @@ const createHTMLContentCSS = (css: string): string => {
           `✅ HTML CSS Injection: Processing ${trimmedSelector} for HTML content`
         );
         return `${htmlContentSelectors.join(", ")} { ${enhancedDeclarations} }`;
+      }
+
+      // CRITICAL FIX: Handle mixed descendant selectors like .content img, .cta-section a, etc. for HTML content
+      // These are class selectors with element descendants (more comprehensive pattern)
+      const isMixedDescendantSelector =
+        /^\.[\w-]+(\s+[a-zA-Z][a-zA-Z0-9]*)+$/.test(trimmedSelector) ||
+        /^\.[\w-]+\s+\.[\w-]+\s+[a-zA-Z][a-zA-Z0-9]*$/.test(trimmedSelector);
+
+      if (isMixedDescendantSelector) {
+        // Handle selectors like ".content img", ".cta-section a", etc.
+        const enhancedDeclarations = declarations
+          .trim()
+          .split(";")
+          .map((prop: string) => {
+            const trimmedProp = prop.trim();
+            if (!trimmedProp) return "";
+            if (trimmedProp.includes("!important")) {
+              return trimmedProp;
+            }
+            return `${trimmedProp} !important`;
+          })
+          .filter(Boolean)
+          .join("; ");
+
+        // Create scoped selectors for mixed descendant selectors in HTML content
+        const scopedSelectors = [
+          // ULTRA HIGH SPECIFICITY - HTML block targeting
+          `.html-block.html-block ${trimmedSelector}`,
+          // HIGH SPECIFICITY - Preview container + HTML block
+          `.content-studio-preview .html-block.html-block ${trimmedSelector}`,
+          `.email-preview .html-block.html-block ${trimmedSelector}`,
+          `.clean-preview .html-block.html-block ${trimmedSelector}`,
+          `.accurate-email-preview .html-block.html-block ${trimmedSelector}`,
+          // EMAIL PLATFORM SPECIFICITY - Target specific email preview types
+          `.sendgrid-preview .html-block.html-block ${trimmedSelector}`,
+          `.mailchimp-preview .html-block.html-block ${trimmedSelector}`,
+          `.generic-preview .html-block.html-block ${trimmedSelector}`,
+          // COMBINED EMAIL PREVIEW + HTML BLOCK TARGETING (CRITICAL FIX)
+          `.content-studio-preview.email-preview.sendgrid-preview .html-block ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.mailchimp-preview .html-block ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.generic-preview .html-block ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.accurate-email-preview .html-block ${trimmedSelector}`,
+          // MEDIUM SPECIFICITY - Data block type targeting
+          `[data-block-type="html"][data-block-type="html"] ${trimmedSelector}`,
+          `[data-block-type="text"][data-block-type="text"] ${trimmedSelector}`,
+          `[data-block-type="list"][data-block-type="list"] ${trimmedSelector}`,
+          // EMAIL CONTAINER TARGETING
+          `.email-container .html-block ${trimmedSelector}`,
+          `.content-studio-preview .email-container ${trimmedSelector}`,
+          `.email-preview .email-container ${trimmedSelector}`,
+          `.clean-preview .email-container ${trimmedSelector}`,
+          `.accurate-email-preview .email-container ${trimmedSelector}`,
+          `.sendgrid-preview .email-container ${trimmedSelector}`,
+          `.mailchimp-preview .email-container ${trimmedSelector}`,
+          `.generic-preview .email-container ${trimmedSelector}`,
+          // COMBINED EMAIL PREVIEW + EMAIL CONTAINER TARGETING
+          `.content-studio-preview.email-preview.sendgrid-preview .email-container ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.mailchimp-preview .email-container ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.generic-preview .email-container ${trimmedSelector}`,
+          `.content-studio-preview.email-preview.accurate-email-preview .email-container ${trimmedSelector}`,
+          // DIRECT HTML BLOCK TARGETING
+          `.html-block ${trimmedSelector}`,
+        ];
+
+        console.log(
+          `✅ HTML CSS Injection: Processing mixed descendant selector ${trimmedSelector} for HTML content with FULL precedence`
+        );
+        return `${scopedSelectors.join(", ")} { ${enhancedDeclarations} }`;
+      }
+
+      // CRITICAL FIX: Handle global element styles for HTML content (ul li, p, h1, etc.)
+      const isElementSelector = /^[a-zA-Z][a-zA-Z0-9]*$/.test(trimmedSelector);
+      const isCommaList = trimmedSelector.includes(",");
+      const hasSpaceSelectors =
+        /\s/.test(trimmedSelector) && !trimmedSelector.includes("@");
+
+      if (isElementSelector || isCommaList || hasSpaceSelectors) {
+        // Parse comma-separated selectors and space-separated selectors
+        const elementSelectors = trimmedSelector
+          .split(",")
+          .map((s: string) => s.trim());
+        const validElementSelectors = elementSelectors.filter(
+          (selector: string) => {
+            // Process simple element selectors and basic descendant selectors like "ul li"
+            const isSimpleElement = /^[a-zA-Z][a-zA-Z0-9]*$/.test(selector);
+            const isDescendantSelector =
+              /^[a-zA-Z][a-zA-Z0-9]*\s+[a-zA-Z][a-zA-Z0-9]*$/.test(selector);
+
+            // Check if it's not a dangerous selector
+            const firstElement = selector.split(/[\s:>+~]/)[0];
+            const isDangerous = dangerousSelectors.includes(selector);
+
+            return (isSimpleElement || isDescendantSelector) && !isDangerous;
+          }
+        );
+
+        if (validElementSelectors.length === 0) {
+          return "";
+        }
+
+        // CRITICAL: Make ALL CSS properties !important to ensure precedence
+        const enhancedDeclarations = declarations
+          .trim()
+          // Split by semicolon and process each property
+          .split(";")
+          .map((prop: string) => {
+            const trimmedProp = prop.trim();
+            if (!trimmedProp) return "";
+
+            // If already has !important, keep it as is
+            if (trimmedProp.includes("!important")) {
+              return trimmedProp;
+            }
+
+            // Add !important to every property
+            return `${trimmedProp} !important`;
+          })
+          .filter(Boolean)
+          .join("; ");
+
+        // Create scoped selectors for HTML content with MAXIMUM SPECIFICITY
+        const scopedSelectors = validElementSelectors.flatMap(
+          (elementSelector: string) => [
+            // ULTRA HIGH SPECIFICITY - HTML block targeting
+            `.html-block.html-block ${elementSelector}`,
+            // HIGH SPECIFICITY - Preview container + HTML block
+            `.content-studio-preview .html-block.html-block ${elementSelector}`,
+            `.email-preview .html-block.html-block ${elementSelector}`,
+            `.clean-preview .html-block.html-block ${elementSelector}`,
+            `.accurate-email-preview .html-block.html-block ${elementSelector}`,
+            // EMAIL PLATFORM SPECIFICITY - Target specific email preview types
+            `.sendgrid-preview .html-block.html-block ${elementSelector}`,
+            `.mailchimp-preview .html-block.html-block ${elementSelector}`,
+            `.generic-preview .html-block.html-block ${elementSelector}`,
+            // COMBINED EMAIL PREVIEW + HTML BLOCK TARGETING (CRITICAL FIX)
+            `.content-studio-preview.email-preview.sendgrid-preview .html-block ${elementSelector}`,
+            `.content-studio-preview.email-preview.mailchimp-preview .html-block ${elementSelector}`,
+            `.content-studio-preview.email-preview.generic-preview .html-block ${elementSelector}`,
+            `.content-studio-preview.email-preview.accurate-email-preview .html-block ${elementSelector}`,
+            // MEDIUM SPECIFICITY - Data block type targeting
+            `[data-block-type="html"][data-block-type="html"] ${elementSelector}`,
+            `[data-block-type="list"][data-block-type="list"] ${elementSelector}`,
+            `[data-block-type="text"][data-block-type="text"] ${elementSelector}`,
+            // ADDITIONAL SPECIFICITY - Email container targeting
+            `.email-container .html-block ${elementSelector}`,
+            `.content-studio-preview .email-container ${elementSelector}`,
+            `.email-preview .email-container ${elementSelector}`,
+            `.clean-preview .email-container ${elementSelector}`,
+            `.accurate-email-preview .email-container ${elementSelector}`,
+            `.sendgrid-preview .email-container ${elementSelector}`,
+            `.mailchimp-preview .email-container ${elementSelector}`,
+            `.generic-preview .email-container ${elementSelector}`,
+            // COMBINED EMAIL PREVIEW + EMAIL CONTAINER TARGETING
+            `.content-studio-preview.email-preview.sendgrid-preview .email-container ${elementSelector}`,
+            `.content-studio-preview.email-preview.mailchimp-preview .email-container ${elementSelector}`,
+            `.content-studio-preview.email-preview.generic-preview .email-container ${elementSelector}`,
+            `.content-studio-preview.email-preview.accurate-email-preview .email-container ${elementSelector}`,
+          ]
+        );
+
+        console.log(
+          `✅ HTML CSS Injection: Processing element selector(s) ${validElementSelectors.join(", ")} for HTML content with FULL precedence`
+        );
+        return `${scopedSelectors.join(", ")} { ${enhancedDeclarations} }`;
       }
 
       return "";

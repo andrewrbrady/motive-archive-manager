@@ -12,6 +12,8 @@ import {
   formatContent,
   getElementStylesFromStylesheet,
   hasHtmlContent,
+  stripInlineStyles,
+  applyStylesheetAsInlineStyles,
 } from "@/lib/content-formatter";
 
 interface AccurateEmailPreviewProps {
@@ -179,7 +181,7 @@ export const AccurateEmailPreview: React.FC<AccurateEmailPreviewProps> = ({
 
   function SendGridPreview() {
     return (
-      <div className="content-studio-preview content-blocks-area email-preview sendgrid-preview">
+      <div className="content-studio-preview content-blocks-area email-preview sendgrid-preview accurate-email-preview">
         <style jsx>{`
           .email-container {
             max-width: ${containerConfig.maxWidth};
@@ -222,7 +224,7 @@ export const AccurateEmailPreview: React.FC<AccurateEmailPreviewProps> = ({
 
   function MailchimpPreview() {
     return (
-      <div className="content-studio-preview content-blocks-area email-preview mailchimp-preview">
+      <div className="content-studio-preview content-blocks-area email-preview mailchimp-preview accurate-email-preview">
         <style jsx>{`
           .email-table {
             width: 100%;
@@ -343,7 +345,7 @@ export const AccurateEmailPreview: React.FC<AccurateEmailPreviewProps> = ({
 
   function GenericPreview() {
     return (
-      <div className="content-studio-preview content-blocks-area email-preview generic-preview">
+      <div className="content-studio-preview content-blocks-area email-preview generic-preview accurate-email-preview">
         <div
           className="email-container"
           style={{
@@ -422,7 +424,19 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
   switch (block.type) {
     case "html": {
       const htmlBlock = block as HTMLBlock;
-      const content = htmlBlock.content || "<p>No HTML content provided</p>";
+      const rawContent = htmlBlock.content || "<p>No HTML content provided</p>";
+
+      // CRITICAL FIX: Strip inline styles and rely on CSS injection + wrapper styling
+      // CSS injection will handle the styling for email preview
+      const content = useMemo(() => {
+        const strippedContent = stripInlineStyles(rawContent);
+        console.log(
+          "🧹 AccurateEmailPreview - Stripped inline styles (using CSS injection):"
+        );
+        console.log("- Original:", rawContent.substring(0, 150) + "...");
+        console.log("- Stripped:", strippedContent.substring(0, 150) + "...");
+        return strippedContent;
+      }, [rawContent]);
 
       return (
         <div
@@ -460,26 +474,41 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
         );
       }
 
+      // CRITICAL FIX: For email preview, apply stylesheet styles as inline styles
+      const ulStyles = useMemo(() => {
+        const baseStyles = {
+          margin: "20px 0",
+          paddingLeft: "40px",
+          listStyleType: "disc",
+        };
+
+        // Get stylesheet styles for ul elements
+        const stylesheetUlStyles = getElementStylesFromStylesheet(
+          "ul",
+          stylesheetData,
+          true // emailMode = true
+        );
+
+        return {
+          ...baseStyles,
+          ...stylesheetUlStyles, // Stylesheet styles override defaults
+          ...customStyles, // User-defined styles always take precedence
+        };
+      }, [stylesheetData, customStyles]);
+
+      const liStyles = useMemo(() => {
+        // Get stylesheet styles for li elements
+        return getElementStylesFromStylesheet(
+          "li",
+          stylesheetData,
+          true // emailMode = true
+        );
+      }, [stylesheetData]);
+
       return (
-        <ul
-          style={{
-            margin: "20px 0",
-            paddingLeft: "40px",
-            listStyleType: "disc",
-            color: "#333",
-            fontSize: "16px",
-            lineHeight: "1.6",
-            ...customStyles,
-          }}
-          className={block.cssClassName || ""}
-        >
+        <ul style={ulStyles} className={block.cssClassName || ""}>
           {items.map((item: string, index: number) => (
-            <li
-              key={index}
-              style={{
-                marginBottom: "10px",
-              }}
-            >
+            <li key={index} style={liStyles}>
               {item}
             </li>
           ))}
@@ -533,46 +562,50 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
         return styles;
       }, [element, stylesheetData]);
 
-      // FIXED: Handle HTML content vs plain text content differently
-      if (contentHasHtml) {
-        // Content contains HTML tags - formatContent already applied styles to those tags
-        // Use a generic div wrapper to avoid nested elements
-        const defaultStyles = {
+      // CRITICAL FIX: Strip inline styles and rely on CSS injection + wrapper styling
+      const processedContent = useMemo(() => {
+        return stripInlineStyles(formattedContent);
+      }, [formattedContent]);
+
+      // Get element styles from stylesheet for the wrapper
+      const elementStyles = useMemo(() => {
+        const baseStyles = {
           color: containerConfig.textColor,
-          margin: "0 0 16px 0",
-          ...customStyles,
         };
 
-        console.log("- Using DIV wrapper for HTML content");
-        console.log("- Custom styles:", customStyles);
+        const stylesheetElementStyles = getElementStylesFromStylesheet(
+          element,
+          stylesheetData,
+          true // emailMode = true
+        );
 
+        return {
+          ...baseStyles,
+          ...stylesheetElementStyles, // Stylesheet styles override defaults
+          ...customStyles, // User-defined styles always take precedence
+        };
+      }, [element, stylesheetData, containerConfig.textColor, customStyles]);
+
+      console.log(
+        `📧 AccurateEmailPreview - ${element.toUpperCase()} with stylesheet styles:`,
+        elementStyles
+      );
+
+      if (contentHasHtml) {
+        // Content contains HTML tags - use div wrapper
         return (
           <div
-            style={defaultStyles}
+            style={elementStyles}
             className={textBlock.cssClassName || ""}
-            dangerouslySetInnerHTML={{ __html: formattedContent }}
+            dangerouslySetInnerHTML={{ __html: processedContent }}
           />
         );
       } else {
-        // Content is plain text - apply global element styles to wrapper element
-        const defaultStyles = {
-          color: containerConfig.textColor,
-          margin: "0 0 16px 0",
-          ...(isHeading && {
-            fontWeight: "bold",
-            lineHeight: "1.3",
-          }),
-          ...globalElementStyles, // Apply global element styles!
-          ...customStyles,
-        };
-
-        console.log(`- Using ${element.toUpperCase()} wrapper for plain text`);
-        console.log("- Combined styles:", defaultStyles);
-
+        // Content is plain text - use appropriate element
         return React.createElement(element, {
-          style: defaultStyles,
+          style: elementStyles,
           className: textBlock.cssClassName || "",
-          dangerouslySetInnerHTML: { __html: formattedContent },
+          dangerouslySetInnerHTML: { __html: processedContent },
         });
       }
     }
@@ -597,14 +630,16 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
         );
       }, [stylesheetData]);
 
+      // Let CSS injection handle ALL image styling
       const imageStyles = {
-        maxWidth: "100%",
-        height: "auto",
-        display: "block",
-        margin: "0 auto",
-        borderRadius: "4px",
-        ...globalImgStyles, // Apply global img styles!
-        ...customStyles,
+        // Only apply minimal fallback styles if no stylesheet data exists
+        ...((!stylesheetData ||
+          !stylesheetData.parsedCSS?.globalStyles?.img) && {
+          maxWidth: "100%",
+          height: "auto",
+          display: "block",
+        }),
+        ...customStyles, // User-defined styles always take precedence
       };
 
       return (

@@ -41,7 +41,11 @@ import {
   useStylesheetData,
   getCSSClassFromStylesheet,
 } from "@/hooks/useStylesheetData";
-import { formatContent } from "@/lib/content-formatter";
+import {
+  formatContent,
+  stripInlineStyles,
+  applyStylesheetAsInlineStyles,
+} from "@/lib/content-formatter";
 
 interface IntegratedPreviewEditorProps {
   blocks: ContentBlock[];
@@ -604,7 +608,18 @@ const HTMLBlockPreview = React.memo<{
   previewMode = "clean",
   emailPlatform = "generic",
 }) {
-  const content = block.content || "<p>No HTML content provided</p>";
+  const rawContent = block.content || "<p>No HTML content provided</p>";
+
+  // CRITICAL FIX: Strip inline styles and rely on CSS injection for all modes
+  const content = useMemo(() => {
+    const strippedContent = stripInlineStyles(rawContent);
+    console.log(
+      "🧹 HTMLBlockPreview - Stripped inline styles (using CSS injection):"
+    );
+    console.log("- Original:", rawContent.substring(0, 200) + "...");
+    console.log("- Stripped:", strippedContent.substring(0, 200) + "...");
+    return strippedContent;
+  }, [rawContent]);
 
   // Apply CSS class styles if available
   const customStyles = useMemo(() => {

@@ -13,7 +13,7 @@ import {
   HTMLBlock,
 } from "../types";
 import { classToInlineStyles } from "@/lib/css-parser";
-import { formatContent } from "@/lib/content-formatter";
+import { formatContent, stripInlineStyles } from "@/lib/content-formatter";
 
 interface NewsArticleRendererProps {
   blocks: ContentBlock[];
@@ -232,7 +232,19 @@ const NewsArticleBlock = React.memo<NewsArticleBlockProps>(
     switch (block.type) {
       case "html": {
         const htmlBlock = block as HTMLBlock;
-        const content = htmlBlock.content || "<p>No HTML content provided</p>";
+        const rawContent =
+          htmlBlock.content || "<p>No HTML content provided</p>";
+
+        // CRITICAL FIX: Strip inline styles and rely on CSS injection
+        const content = useMemo(() => {
+          const strippedContent = stripInlineStyles(rawContent);
+          console.log(
+            "🧹 NewsArticleRenderer - Stripped inline styles (using CSS injection):"
+          );
+          console.log("- Original:", rawContent.substring(0, 200) + "...");
+          console.log("- Stripped:", strippedContent.substring(0, 200) + "...");
+          return strippedContent;
+        }, [rawContent]);
 
         return (
           <div

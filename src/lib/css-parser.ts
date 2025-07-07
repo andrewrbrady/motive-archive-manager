@@ -71,9 +71,16 @@ export function parseCSS(cssContent: string): ParsedCSS {
         category: categorizeClass(className, parsedProperties),
       });
     } else if (!selector.includes(".") && !selector.includes("#")) {
-      // Element selector (body, h1, p, etc.)
-      const elementName = selector.split(/[\s:>+~]/)[0];
-      globalStyles[elementName] = JSON.stringify(parsedProperties);
+      // Element selector (body, h1, p, etc.) - handle comma-separated selectors
+      const elementSelectors = selector.split(",").map((s) => s.trim());
+
+      elementSelectors.forEach((elementSelector) => {
+        // Only process simple element selectors (no spaces, pseudo-classes, etc.)
+        const elementName = elementSelector.split(/[\s:>+~]/)[0];
+        if (/^[a-zA-Z][a-zA-Z0-9]*$/.test(elementName)) {
+          globalStyles[elementName] = JSON.stringify(parsedProperties);
+        }
+      });
     }
   }
 

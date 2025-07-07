@@ -97,6 +97,7 @@ function formatMixedContent(
 
 /**
  * Applies CSS styles to HTML tags based on stylesheet data
+ * CRITICAL: This function should NOT add inline styles as they override CSS injection
  */
 function applyHtmlTagStyles(
   htmlTag: string,
@@ -104,7 +105,12 @@ function applyHtmlTagStyles(
 ): string {
   const { stylesheetData, emailMode = false } = options;
 
-  // Debug logging removed
+  // CRITICAL FIX: Don't apply inline styles to HTML tags in preview mode
+  // Let CSS injection handle all styling for maximum accuracy
+  // Only apply inline styles in actual email export mode
+  if (!emailMode) {
+    return htmlTag;
+  }
 
   if (
     !stylesheetData ||
@@ -342,6 +348,35 @@ export function validateHtmlStructure(content: string): {
     isValid: errors.length === 0,
     errors,
   };
+}
+
+/**
+ * Strips inline styles from HTML content for preview purposes
+ * This allows CSS injection to take full control of styling
+ */
+export function stripInlineStyles(htmlContent: string): string {
+  if (!htmlContent) return htmlContent;
+
+  // Remove style attributes from HTML tags
+  // This regex matches style="..." attributes and removes them
+  return htmlContent.replace(/\s+style\s*=\s*["'][^"']*["']/gi, "");
+}
+
+/**
+ * DISABLED: This function was causing HTML corruption
+ * For now, we'll rely on CSS injection and wrapper element styling
+ * TODO: Implement a safer version if needed
+ */
+export function applyStylesheetAsInlineStyles(
+  htmlContent: string,
+  stylesheetData: any
+): string {
+  // TEMPORARILY DISABLED due to HTML corruption issues
+  // Return content unchanged for now
+  console.log(
+    "⚠️ applyStylesheetAsInlineStyles temporarily disabled - using CSS injection instead"
+  );
+  return htmlContent;
 }
 
 /**

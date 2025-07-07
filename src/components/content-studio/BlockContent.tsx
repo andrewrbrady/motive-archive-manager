@@ -15,6 +15,7 @@ import {
   ChevronUp,
   FileText,
 } from "lucide-react";
+import { stripInlineStyles } from "@/lib/content-formatter";
 import {
   ContentBlock,
   TextBlock,
@@ -1968,7 +1969,9 @@ const HTMLBlockContent = React.memo<HTMLBlockContentProps>(
         <div className="mb-3 relative">
           <div
             className="p-3 bg-muted/10 rounded-md border border-border/20"
-            dangerouslySetInnerHTML={{ __html: htmlContent }}
+            dangerouslySetInnerHTML={{
+              __html: stripInlineStyles(htmlContent),
+            }}
           />
 
           {/* Toggle Button */}
