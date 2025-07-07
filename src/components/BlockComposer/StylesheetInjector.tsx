@@ -225,6 +225,7 @@ export function StylesheetInjector({
     stylesheetName: string
   ) => {
     if (!styleElementRef.current) {
+      console.log(`⚠️ Style element ref not found for ${stylesheetName}`);
       return false; // Element doesn't exist, need to create it
     }
 
@@ -259,6 +260,7 @@ ${htmlContentCSS}
         `⚡ CSS Hot-Reload: Updated ${stylesheetName} without DOM manipulation`
       );
       console.log(`   - Preserved component state and prevented re-renders`);
+      console.log(`   - CSS content length: ${cssContent.length} characters`);
       return true;
     } catch (error) {
       console.error(`Failed to hot-reload CSS for ${stylesheetName}:`, error);
@@ -368,6 +370,12 @@ ${htmlContentCSS}
       console.log(
         `🔄 Hot-reloading updated CSS for stylesheet: ${stylesheetData.name}`
       );
+      console.log(
+        `   - CSS content length: ${stylesheetData.cssContent.length}`
+      );
+      console.log(
+        `   - Stylesheet data timestamp: ${(stylesheetData as any)._lastUpdated || "no timestamp"}`
+      );
 
       // Try to update existing element first (hot-reload)
       const hotReloadSuccess = updateStyleElementContent(
@@ -382,7 +390,35 @@ ${htmlContentCSS}
         createStyleElement(stylesheetData);
       }
     }
-  }, [stylesheetData?.cssContent, selectedStylesheetId, injectedStylesheetId]);
+  }, [
+    stylesheetData?.cssContent,
+    stylesheetData,
+    selectedStylesheetId,
+    injectedStylesheetId,
+  ]);
+
+  // CRITICAL FIX: Add a separate effect to handle CSS content changes from the editor
+  // This ensures that CSS changes from the editor are immediately reflected in the preview
+  useEffect(() => {
+    if (
+      stylesheetData?.cssContent &&
+      selectedStylesheetId &&
+      selectedStylesheetId === injectedStylesheetId &&
+      styleElementRef.current
+    ) {
+      // Force update the style element content whenever CSS content changes
+      const success = updateStyleElementContent(
+        stylesheetData.cssContent,
+        stylesheetData.name
+      );
+
+      if (!success) {
+        console.log(`⚠️ Force CSS update failed, recreating style element`);
+        removeStyleElement(selectedStylesheetId);
+        createStyleElement(stylesheetData);
+      }
+    }
+  }, [stylesheetData?.cssContent]);
 
   // Cleanup on unmount
   useEffect(() => {

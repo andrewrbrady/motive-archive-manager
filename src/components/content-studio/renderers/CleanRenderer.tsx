@@ -27,6 +27,7 @@ interface CleanRendererProps {
   selectedStylesheetId?: string | null;
   previewMode?: "clean" | "email";
   emailPlatform?: string;
+  stylesheetData?: any; // StylesheetData from useStylesheetData hook
 }
 
 /**
@@ -42,13 +43,22 @@ export const CleanRenderer = React.memo<CleanRendererProps>(
     selectedStylesheetId,
     previewMode = "clean",
     emailPlatform = "generic",
+    stylesheetData: propStylesheetData,
   }) {
-    // Load stylesheet data reactively
-    const { stylesheetData, loading: stylesheetLoading } = useStylesheetData(
-      selectedStylesheetId || null
-    );
+    // Load stylesheet data reactively (fallback if not provided as prop)
+    const { stylesheetData: hookStylesheetData, loading: stylesheetLoading } =
+      useStylesheetData(selectedStylesheetId || null);
+
+    // Use prop stylesheet data if available, otherwise use hook data
+    const stylesheetData = propStylesheetData || hookStylesheetData;
 
     // DEBUG: CleanRenderer successfully loading stylesheet data
+    console.log("🎯 CleanRenderer - Stylesheet data:", {
+      stylesheetId: selectedStylesheetId,
+      hasData: !!stylesheetData,
+      cssContentLength: stylesheetData?.cssContent?.length || 0,
+      loading: stylesheetLoading,
+    });
 
     const sortedBlocks = useMemo(
       () => [...blocks].sort((a, b) => a.order - b.order),

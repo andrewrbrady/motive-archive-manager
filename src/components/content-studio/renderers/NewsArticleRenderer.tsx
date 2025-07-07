@@ -31,6 +31,7 @@ interface NewsArticleRendererProps {
     gallery: Array<{ id: string; src: string; alt: string }>;
   };
   selectedStylesheetId?: string | null;
+  stylesheetData?: any; // StylesheetData from useStylesheetData hook
 }
 
 /**
@@ -45,7 +46,15 @@ export const NewsArticleRenderer = React.memo<NewsArticleRendererProps>(
     compositionName,
     frontmatter,
     selectedStylesheetId,
+    stylesheetData,
   }) {
+    // DEBUG: Log stylesheet data reception in NewsArticleRenderer
+    console.log(`🎯 NewsArticleRenderer - Received stylesheet data:`, {
+      hasStylesheetData: !!stylesheetData,
+      stylesheetId: selectedStylesheetId,
+      cssContentLength: stylesheetData?.cssContent?.length || 0,
+      timestamp: (stylesheetData as any)?._lastUpdated || "no timestamp",
+    });
     const sortedBlocks = [...blocks].sort((a, b) => a.order - b.order);
 
     // Function to extract frontmatter from frontmatter blocks

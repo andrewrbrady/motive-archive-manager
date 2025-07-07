@@ -18,6 +18,7 @@ interface AccurateEmailPreviewProps {
   blocks: ContentBlock[];
   containerConfig: EmailContainerConfig;
   selectedStylesheetId?: string | null;
+  stylesheetData?: any; // StylesheetData from useStylesheetData hook
 }
 
 /**
@@ -28,11 +29,14 @@ export const AccurateEmailPreview: React.FC<AccurateEmailPreviewProps> = ({
   blocks,
   containerConfig,
   selectedStylesheetId,
+  stylesheetData: propStylesheetData,
 }) => {
-  // Load stylesheet data reactively
-  const { stylesheetData, loading: stylesheetLoading } = useStylesheetData(
-    selectedStylesheetId || null
-  );
+  // Load stylesheet data reactively (fallback if not provided as prop)
+  const { stylesheetData: hookStylesheetData, loading: stylesheetLoading } =
+    useStylesheetData(selectedStylesheetId || null);
+
+  // Use prop stylesheet data if available, otherwise use hook data
+  const stylesheetData = propStylesheetData || hookStylesheetData;
 
   // MUST be before early return to maintain hook order
   const { headerImages, contentBlocks } = useMemo(() => {

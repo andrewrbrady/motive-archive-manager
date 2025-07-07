@@ -154,10 +154,33 @@ export function CSSEditor({
 
       // Add custom :w command to save CSS
       if (vimModeRef.current && onSave) {
-        // Define custom :w command
+        // Define custom :w command with proper content capture
         monacoVim.VimMode.Vim.defineEx("write", "w", () => {
           console.log("⚡ VIM :w command triggered - saving CSS");
-          handleSave();
+
+          // CRITICAL FIX: Capture current editor content before saving
+          if (editor && !isDisposed && onSave) {
+            const currentContent = editor.getValue();
+            console.log(
+              "💾 VIM Save - Current editor content length:",
+              currentContent.length
+            );
+            console.log(
+              "💾 VIM Save - Content preview:",
+              currentContent.substring(0, 100) + "..."
+            );
+
+            // Update local state with current editor content
+            setLocalContent(currentContent);
+            onCSSChange(currentContent);
+
+            // CRITICAL FIX: Call onSave directly without delay to prevent race condition
+            console.log("💾 VIM Save - Calling onSave directly");
+            onSave();
+          } else {
+            handleSave();
+          }
+
           // Show status message in VIM status bar
           const statusEl = document.getElementById("vim-status");
           if (statusEl) {
@@ -174,7 +197,30 @@ export function CSSEditor({
         // Also define :write for completeness
         monacoVim.VimMode.Vim.defineEx("write", "write", () => {
           console.log("⚡ VIM :write command triggered - saving CSS");
-          handleSave();
+
+          // CRITICAL FIX: Capture current editor content before saving
+          if (editor && !isDisposed && onSave) {
+            const currentContent = editor.getValue();
+            console.log(
+              "💾 VIM Write - Current editor content length:",
+              currentContent.length
+            );
+            console.log(
+              "💾 VIM Write - Content preview:",
+              currentContent.substring(0, 100) + "..."
+            );
+
+            // Update local state with current editor content
+            setLocalContent(currentContent);
+            onCSSChange(currentContent);
+
+            // CRITICAL FIX: Call onSave directly without delay to prevent race condition
+            console.log("💾 VIM Write - Calling onSave directly");
+            onSave();
+          } else {
+            handleSave();
+          }
+
           const statusEl = document.getElementById("vim-status");
           if (statusEl) {
             const originalText = statusEl.textContent;
@@ -245,6 +291,7 @@ export function CSSEditor({
     const newContent = value || "";
     setLocalContent(newContent);
     onCSSChange(newContent);
+    console.log("📝 CSS Editor - Content changed, length:", newContent.length);
   };
 
   // Sync external content changes
@@ -277,7 +324,26 @@ export function CSSEditor({
   }, []);
 
   const handleSave = () => {
-    if (onSave) {
+    // CRITICAL FIX: Ensure we capture the current editor content before saving
+    // This prevents the VIM mode :w command from saving empty content
+    if (editorRef.current && onSave) {
+      const currentContent = editorRef.current.getValue();
+      console.log(
+        "💾 CSS Save - Current editor content length:",
+        currentContent.length
+      );
+
+      // Update local state with current editor content
+      if (currentContent !== localContent) {
+        setLocalContent(currentContent);
+        onCSSChange(currentContent);
+      }
+
+      // Small delay to ensure state updates are processed
+      setTimeout(() => {
+        onSave();
+      }, 10);
+    } else if (onSave) {
       onSave();
     }
   };

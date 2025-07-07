@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -145,6 +151,9 @@ export function BlockComposer({
   const [cssContent, setCSSContent] = useState<string>("");
   const [isSavingCSS, setIsSavingCSS] = useState(false);
 
+  // Ref to store the latest CSS content for VIM mode saves
+  const cssContentRef = useRef<string>("");
+
   // Determine effective carId and projectId - prioritize selectedCopies, fallback to props
   const effectiveCarId = selectedCopies[0]?.carId || carId;
   const effectiveProjectId = selectedCopies[0]?.projectId || projectId;
@@ -199,30 +208,52 @@ export function BlockComposer({
     useStylesheetData(selectedStylesheetId);
 
   // Memoize stylesheet data to prevent unnecessary re-renders of preview components
-  const memoizedStylesheetData = useMemo(
-    () => stylesheetData,
-    [stylesheetData?.id, stylesheetData?.name]
-  );
+  // CRITICAL FIX: Include cssContent and timestamp in dependencies to ensure preview updates when CSS changes
+  const memoizedStylesheetData = useMemo(() => {
+    console.log(`🎯 BlockComposer - Memoizing stylesheet data:`, {
+      stylesheetId: stylesheetData?.id,
+      cssContentLength: stylesheetData?.cssContent?.length || 0,
+      timestamp: (stylesheetData as any)?._lastUpdated || "no timestamp",
+    });
+    return stylesheetData;
+  }, [
+    stylesheetData?.id,
+    stylesheetData?.name,
+    stylesheetData?.cssContent,
+    (stylesheetData as any)?._lastUpdated,
+  ]);
 
   // Memoize preview props to prevent unnecessary re-renders
-  const previewProps = useMemo(
-    () => ({
+  // CRITICAL FIX: Include memoizedStylesheetData in dependencies for CSS hot-reload
+  const previewProps = useMemo(() => {
+    console.log(
+      `🎯 BlockComposer - Creating preview props with stylesheet data:`,
+      {
+        mode: previewMode,
+        hasStylesheetData: !!memoizedStylesheetData,
+        stylesheetId: selectedStylesheetId,
+        cssContentLength: memoizedStylesheetData?.cssContent?.length || 0,
+      }
+    );
+    return {
       mode: previewMode,
       blocks,
       selectedStylesheetId,
       compositionName,
       frontmatter,
       emailContainerConfig,
-    }),
-    [
-      previewMode,
-      blocks,
-      selectedStylesheetId,
-      compositionName,
-      frontmatter,
-      emailContainerConfig,
-    ]
-  );
+      // Pass stylesheet data to preview components
+      stylesheetData: memoizedStylesheetData,
+    };
+  }, [
+    previewMode,
+    blocks,
+    selectedStylesheetId,
+    compositionName,
+    frontmatter,
+    emailContainerConfig,
+    memoizedStylesheetData,
+  ]);
 
   // Initialize composition name when loading existing composition
   React.useEffect(() => {
@@ -277,11 +308,17 @@ export function BlockComposer({
   // Load CSS content when switching to CSS mode or when stylesheet changes
   React.useEffect(() => {
     if (editorMode === "css" && stylesheetData) {
-      setCSSContent(
-        stylesheetData.cssContent || "/* No CSS content available */"
-      );
+      const content =
+        stylesheetData.cssContent || "/* No CSS content available */";
+      setCSSContent(content);
+      cssContentRef.current = content;
     }
   }, [editorMode, stylesheetData]);
+
+  // Update CSS content ref whenever cssContent changes
+  React.useEffect(() => {
+    cssContentRef.current = cssContent;
+  }, [cssContent]);
 
   // Automatically import selected copy into blocks (split by paragraphs with ## header detection)
   useEffect(() => {
@@ -473,8 +510,23 @@ export function BlockComposer({
       return;
     }
 
-    // Check if CSS content is empty and provide a default comment
-    const contentToSave = cssContent.trim() || "/* Empty stylesheet */";
+    // CRITICAL FIX: Use cssContentRef.current to get the most up-to-date content
+    // This ensures VIM mode saves work correctly even if state hasn't updated yet
+    const latestContent = cssContentRef.current || cssContent;
+    const contentToSave = latestContent.trim() || "/* Empty stylesheet */";
+
+    console.log(
+      "💾 BlockComposer Save - CSS content length:",
+      contentToSave.length
+    );
+    console.log(
+      "💾 BlockComposer Save - CSS content preview:",
+      contentToSave.substring(0, 100) + "..."
+    );
+    console.log(
+      "💾 BlockComposer Save - Using ref content:",
+      cssContentRef.current === latestContent
+    );
 
     setIsSavingCSS(true);
     try {
@@ -487,7 +539,12 @@ export function BlockComposer({
       const { notifyCSSContentChange } = await import(
         "@/hooks/useStylesheetData"
       );
-      notifyCSSContentChange(selectedStylesheetId, contentToSave);
+
+      // CRITICAL FIX: Add small delay to ensure database save completes before notification
+      setTimeout(() => {
+        notifyCSSContentChange(selectedStylesheetId, contentToSave);
+        console.log("🔄 CSS content change notification sent");
+      }, 50);
 
       // Update local CSS content state to match what was saved
       if (contentToSave !== cssContent) {
@@ -792,7 +849,14 @@ export function BlockComposer({
           <div className="overflow-y-auto">
             <CSSEditor
               cssContent={cssContent}
-              onCSSChange={setCSSContent}
+              onCSSChange={(content) => {
+                setCSSContent(content);
+                cssContentRef.current = content;
+                console.log(
+                  "📝 BlockComposer - CSS content updated via onCSSChange, length:",
+                  content.length
+                );
+              }}
               selectedStylesheetId={selectedStylesheetId}
               onSave={saveCSSContent}
               isSaving={isSavingCSS}

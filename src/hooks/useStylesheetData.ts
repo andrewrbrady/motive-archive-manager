@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { api } from "@/lib/api-client";
 import { StylesheetResponse } from "@/types/stylesheet";
-import { CSSClass, ParsedCSS } from "@/lib/css-parser";
+import { CSSClass, ParsedCSS, parseCSS } from "@/lib/css-parser";
 
 interface StylesheetData {
   id: string;
@@ -193,18 +193,46 @@ export function useStylesheetData(
           console.log(
             `⚡ CSS Hot-Reload: Updating CSS content for ${selectedStylesheetId}`
           );
+          console.log(
+            `   - Previous content length: ${lastCSSContentRef.current.length}`
+          );
+          console.log(`   - New content length: ${newCSSContent.length}`);
 
           setCSSContent(newCSSContent);
           lastCSSContentRef.current = newCSSContent;
 
-          // Update stylesheet data with new CSS content while preserving other properties
+          // CRITICAL FIX: Force React state update by creating new object reference
+          // This ensures all components depending on stylesheetData receive the update
           setStylesheetData((prevData) => {
             if (!prevData) return prevData;
 
-            return {
+            // CRITICAL FIX: Re-parse CSS content to update parsedCSS and classes
+            const newParsedCSS = parseCSS(newCSSContent);
+            const newClasses = newParsedCSS.classes || [];
+
+            // Create completely new object to trigger React's change detection
+            const newStylesheetData = {
               ...prevData,
               cssContent: newCSSContent,
+              parsedCSS: newParsedCSS,
+              classes: newClasses,
+              // Force object reference change by adding timestamp
+              _lastUpdated: Date.now(),
             };
+
+            console.log(
+              `   - Created new stylesheet data object with timestamp: ${newStylesheetData._lastUpdated}`
+            );
+            console.log(
+              `   - Re-parsed CSS: ${newClasses.length} classes found`
+            );
+            console.log(
+              `   - Sample classes: ${newClasses
+                .slice(0, 3)
+                .map((c) => c.name)
+                .join(", ")}`
+            );
+            return newStylesheetData;
           });
         }
       }

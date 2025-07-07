@@ -29,6 +29,7 @@ interface RendererFactoryProps {
   };
   selectedStylesheetId?: string | null;
   emailContainerConfig?: EmailContainerConfig;
+  stylesheetData?: any; // StylesheetData from useStylesheetData hook
 }
 
 /**
@@ -37,67 +38,61 @@ interface RendererFactoryProps {
  * This factory pattern keeps the main BlockComposer clean by centralizing
  * all preview mode logic and rendering strategies.
  *
- * HOT-RELOAD OPTIMIZATION:
- * - Uses React.memo to prevent unnecessary re-renders
- * - Only re-renders when blocks, mode, or other props actually change
- * - CSS updates are handled by individual renderer components
+ * CRITICAL FIX: Removed React.memo custom comparison to allow CSS hot-reload
+ * - Individual renderer components handle their own optimization via useStylesheetData
+ * - This ensures CSS content changes trigger proper re-renders
+ * - Child components still use React.memo for their own optimization
  */
-export const RendererFactory = React.memo<RendererFactoryProps>(
-  function RendererFactory({
+export function RendererFactory({
+  mode,
+  blocks,
+  compositionName,
+  frontmatter,
+  selectedStylesheetId,
+  emailContainerConfig,
+  stylesheetData,
+}: RendererFactoryProps) {
+  // DEBUG: Log stylesheet data reception in RendererFactory
+  console.log(`🎯 RendererFactory - Received stylesheet data:`, {
     mode,
-    blocks,
-    compositionName,
-    frontmatter,
-    selectedStylesheetId,
-    emailContainerConfig,
-  }) {
-    switch (mode) {
-      case "email":
-        return (
-          <AccurateEmailPreview
-            blocks={blocks}
-            containerConfig={
-              emailContainerConfig || defaultEmailContainerConfig
-            }
-            selectedStylesheetId={selectedStylesheetId}
-          />
-        );
+    hasStylesheetData: !!stylesheetData,
+    stylesheetId: selectedStylesheetId,
+    cssContentLength: stylesheetData?.cssContent?.length || 0,
+    timestamp: (stylesheetData as any)?._lastUpdated || "no timestamp",
+  });
+  switch (mode) {
+    case "email":
+      return (
+        <AccurateEmailPreview
+          blocks={blocks}
+          containerConfig={emailContainerConfig || defaultEmailContainerConfig}
+          selectedStylesheetId={selectedStylesheetId}
+          stylesheetData={stylesheetData}
+        />
+      );
 
-      case "news-article":
-        return (
-          <NewsArticleRenderer
-            blocks={blocks}
-            compositionName={compositionName}
-            frontmatter={frontmatter}
-            selectedStylesheetId={selectedStylesheetId}
-          />
-        );
+    case "news-article":
+      return (
+        <NewsArticleRenderer
+          blocks={blocks}
+          compositionName={compositionName}
+          frontmatter={frontmatter}
+          selectedStylesheetId={selectedStylesheetId}
+          stylesheetData={stylesheetData}
+        />
+      );
 
-      case "clean":
-      default:
-        return (
-          <CleanRenderer
-            blocks={blocks}
-            selectedStylesheetId={selectedStylesheetId}
-          />
-        );
-    }
-  },
-  // Custom comparison function to optimize re-renders
-  (prevProps, nextProps) => {
-    // Only re-render if these specific props change
-    return (
-      prevProps.mode === nextProps.mode &&
-      prevProps.blocks === nextProps.blocks &&
-      prevProps.compositionName === nextProps.compositionName &&
-      prevProps.selectedStylesheetId === nextProps.selectedStylesheetId &&
-      JSON.stringify(prevProps.frontmatter) ===
-        JSON.stringify(nextProps.frontmatter) &&
-      JSON.stringify(prevProps.emailContainerConfig) ===
-        JSON.stringify(nextProps.emailContainerConfig)
-    );
+    case "clean":
+    default:
+      return (
+        <CleanRenderer
+          blocks={blocks}
+          selectedStylesheetId={selectedStylesheetId}
+          stylesheetData={stylesheetData}
+        />
+      );
   }
-);
+}
 
 // Export utility functions for external use
 export { generateEmailHTML } from "./EmailRenderer";
