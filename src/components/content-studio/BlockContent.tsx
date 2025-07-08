@@ -70,6 +70,9 @@ const areBlockContentPropsEqual = (
         prevImage.altText === nextImage.altText &&
         prevImage.width === nextImage.width &&
         prevImage.alignment === nextImage.alignment &&
+        prevImage.caption === nextImage.caption &&
+        prevImage.linkUrl === nextImage.linkUrl &&
+        prevImage.linkTarget === nextImage.linkTarget &&
         JSON.stringify(prevImage.styles) === JSON.stringify(nextImage.styles)
       );
     }

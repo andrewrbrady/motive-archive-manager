@@ -73,6 +73,7 @@ export function GenericImageGallery({
     setFilters,
     setSearchQuery,
     setCurrentPage,
+    navigateToPageWithPosition,
     setMainImage,
     handleNext,
     handlePrev,
@@ -201,6 +202,61 @@ export function GenericImageGallery({
             // Toggle image info
             setShowImageInfo(!showImageInfo);
             break;
+
+          case "c":
+            event.preventDefault();
+            if (!currentImage) return;
+
+            // Double copy detection for highest quality
+            const now = Date.now();
+            const timeSinceLastCopy = now - lastCopyTimeRef.current;
+
+            if (timeSinceLastCopy < 1000) {
+              // Less than 1 second = double press
+              // Clear any existing timeout
+              if (copyTimeoutRef.current) {
+                clearTimeout(copyTimeoutRef.current);
+                copyTimeoutRef.current = null;
+              }
+              // Copy highest quality URL
+              copyImageUrl(true);
+              lastCopyTimeRef.current = 0; // Reset to prevent triple-click issues
+            } else {
+              // Single press - set timeout to copy standard URL
+              lastCopyTimeRef.current = now;
+              copyTimeoutRef.current = setTimeout(() => {
+                copyImageUrl(false);
+                copyTimeoutRef.current = null;
+              }, 300); // Wait 300ms to see if there's a second press
+            }
+            break;
+
+          case "arrowleft":
+            event.preventDefault();
+            // Navigate to previous page while preserving image position
+            if (currentPage > 0) {
+              navigateToPageWithPosition(currentPage - 1);
+            }
+            break;
+
+          case "arrowright":
+            event.preventDefault();
+            // Navigate to next page while preserving image position
+            const totalPages =
+              serverPagination?.totalPages ||
+              Math.ceil(
+                filteredImages.length / (serverPagination?.itemsPerPage || 15)
+              );
+            if (currentPage < totalPages - 1) {
+              navigateToPageWithPosition(currentPage + 1);
+            }
+            break;
+
+          case "e":
+            event.preventDefault();
+            // Toggle edit mode
+            toggleEditMode();
+            break;
         }
         return;
       }
@@ -216,8 +272,20 @@ export function GenericImageGallery({
           handleNext();
           break;
         case "Escape":
+          event.preventDefault();
           if (isModalOpen) {
             setIsModalOpen(false);
+          } else if (isEditMode && selectedImages.size > 0) {
+            // Clear selection in edit mode when Escape is pressed
+            handleSelectNone();
+          }
+          break;
+        case "Delete":
+        case "Backspace":
+          event.preventDefault();
+          // Trigger batch delete when images are selected in edit mode
+          if (isEditMode && selectedImages.size > 0) {
+            handleDeleteSelected();
           }
           break;
       }
@@ -230,8 +298,18 @@ export function GenericImageGallery({
       setIsModalOpen,
       showImageInfo,
       setShowImageInfo,
+      currentImage,
+      copyImageUrl,
+      currentPage,
+      serverPagination,
+      setCurrentPage,
+      navigateToPageWithPosition,
+      toggleEditMode,
       handlePrev,
       handleNext,
+      selectedImages.size,
+      handleSelectNone,
+      handleDeleteSelected,
     ]
   );
 
@@ -277,18 +355,13 @@ export function GenericImageGallery({
   const hasExplicitSearch = hasActiveSearch && searchQuery.trim().length > 0;
   const shouldShowNoResults = hasExplicitFilters || hasExplicitSearch;
 
-  // IMPROVED: Comprehensive loading check to prevent infinite loading states
+  // FIXED: Comprehensive loading check to prevent infinite loading states
   // Show loading when:
-  // 1. Explicitly loading (isLoading) AND initial load is not complete yet
-  // 2. Initial load not complete AND we don't have error state
-  // 3. Authentication error - show loading instead of error until auth is ready
-  // The key fix: Don't rely on entityInfo.imageIds as it might be stale
+  // 1. Explicitly loading (isLoading) - the API call is in progress
+  // 2. Authentication error - show loading instead of error until auth is ready
+  // REMOVED: (isInitialLoad && !error) - this was causing infinite loading
   const isAuthError = error?.message === "Authentication required";
-  if (
-    (isLoading && isInitialLoad) ||
-    (isInitialLoad && !error) ||
-    isAuthError
-  ) {
+  if (isLoading || isAuthError) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="flex flex-col items-center gap-3">
@@ -412,7 +485,7 @@ export function GenericImageGallery({
         )}
 
         {/* Thumbnails - responsive width */}
-        <div className="w-full lg:w-1/3 lg:max-w-[400px] min-w-[280px]">
+        <div className="w-full lg:w-1/3 lg:max-w-[460px] min-w-[280px]">
           <ImageThumbnails
             images={filteredImages}
             currentImage={currentImage || undefined}

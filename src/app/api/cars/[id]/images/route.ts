@@ -54,7 +54,7 @@ interface Image {
 
 interface CarDocument {
   _id: ObjectId;
-  imageIds: string[];
+  imageIds: ObjectId[];
   updatedAt?: string;
   images?: Image[];
 }
@@ -516,9 +516,9 @@ export async function POST(request: Request) {
       imageDoc.cloudflareId
     );
 
-    // Update the car document with the new image ID (use our MongoDB ObjectId)
+    // Update the car document with the new image ID (use ObjectId, not string)
     const updateDoc: UpdateFilter<CarDocument> = {
-      $push: { imageIds: imageObjectId.toString() },
+      $push: { imageIds: imageObjectId },
       $set: { updatedAt: new Date().toISOString() },
     };
 

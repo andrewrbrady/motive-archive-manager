@@ -188,114 +188,49 @@ export async function POST(
       });
     }
 
-    // Handle creating new deliverable (existing logic)
+    // Handle creating new deliverable
     const {
       title,
       description,
       type,
-      dueDate,
-      editDeadline,
-      releaseDate,
-      assignedTo,
-      platform,
+      platform_id,
       duration,
-      aspectRatio,
-      carId,
+      aspect_ratio,
+      edit_deadline,
+      release_date,
+      assigned_to,
+      car_id,
       scheduled,
+      gallery_ids,
+      caption_ids,
     } = body;
 
-    if (!title?.trim()) {
-      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ Validation failed - title is required");
-      return NextResponse.json({ error: "Title is required" }, { status: 400 });
-    }
-
-    // Check permissions (manager or owner can add deliverables)
-    const member = project.members.find((m: any) => m.userId === userId);
-    const isOwner = project.ownerId === userId;
-    const canManage =
-      isOwner || (member && ["owner", "manager"].includes(member.role));
-
-    console.log("🔐 Permission check:", {
-      userId: userId,
-      isOwner,
-      memberRole: member?.role || "not a member",
-      canManage,
+    // Create new deliverable
+    const deliverable = new Deliverable({
+      title,
+      description,
+      type,
+      platform_id,
+      duration,
+      aspect_ratio,
+      edit_deadline,
+      release_date,
+      firebase_uid: assigned_to || userId,
+      editor: assigned_to || userId,
+      car_id,
+      scheduled,
+      gallery_ids,
+      caption_ids,
     });
 
-    if (!canManage) {
-      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ Permission denied - user cannot manage deliverables");
-      return NextResponse.json(
-        { error: "Insufficient permissions" },
-        { status: 403 }
-      );
-    }
-
-    // Determine car_id - use provided carId, respect null values
-    let selectedCarId = carId;
-    // Only auto-assign if carId is undefined (not provided), not if it's explicitly null
-    if (selectedCarId === undefined && project.carIds.length > 0) {
-      selectedCarId = project.carIds[0];
-      console.log(
-        "🚗 Using first car from project (auto-assigned):",
-        selectedCarId
-      );
-    } else if (selectedCarId === null) {
-      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📝 Explicitly creating deliverable without car assignment");
-    }
-
-    // Create new deliverable in the deliverables collection
-    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🏗️ Creating new deliverable in deliverables collection...");
-    const deliverableData: any = {
-      title: title.trim(),
-      description: description?.trim() || "",
-      platform: platform || "Other",
-      type: type || "Video", // Map to existing deliverable types
-      duration: duration || 30,
-      aspect_ratio: aspectRatio || "16:9",
-      firebase_uid: assignedTo || userId,
-      editor: assignedTo
-        ? "Assigned User"
-        : getUserEmailFromToken(tokenData) || "Unknown",
-      status: "not_started",
-      edit_dates: [],
-      edit_deadline: editDeadline
-        ? new Date(editDeadline)
-        : new Date(dueDate || new Date()),
-      release_date: releaseDate
-        ? new Date(releaseDate)
-        : new Date(dueDate || new Date()),
-      tags: [],
-      scheduled: scheduled || false,
-      created_at: new Date(),
-      updated_at: new Date(),
-    };
-
-    // Only add car_id if we have a selectedCarId
-    if (selectedCarId) {
-      deliverableData.car_id = new ObjectId(selectedCarId);
-      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚗 Adding car_id to deliverable:", selectedCarId);
-    } else {
-      console.log(
-        "📝 Creating deliverable without car_id (project-only deliverable)"
-      );
-    }
-
-    console.log(
-      "📦 Deliverable data to create:",
-      JSON.stringify(deliverableData, null, 2)
-    );
-
-    const newDeliverable = new Deliverable(deliverableData);
-    const savedDeliverable = await newDeliverable.save();
-
-    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Deliverable created with ID:", savedDeliverable._id);
+    await deliverable.save();
 
     // Add deliverable ID to project's deliverableIds array
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📌 Adding deliverable ID to project...");
     if (!project.deliverableIds) {
       project.deliverableIds = [];
     }
-    project.deliverableIds.push((savedDeliverable._id as any).toString());
+    project.deliverableIds.push((deliverable._id as any).toString());
     project.updatedAt = new Date();
 
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("💾 Saving project with new deliverable ID...");
@@ -309,18 +244,24 @@ export async function POST(
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎉 Deliverable creation completed successfully");
     return NextResponse.json({
       message: "Deliverable added successfully",
-      deliverable: savedDeliverable.toPublicJSON(),
+      deliverable: deliverable.toPublicJSON(),
     });
-  } catch (error) {
+  } catch (err) {
+    const error = err as any;
     console.error("💥 Error adding deliverable:", error);
     console.error("📊 Error details:", {
-      name: error instanceof Error ? error.name : "Unknown",
-      message: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : "No stack trace",
+      name: error?.name || "Unknown",
+      message: error?.message || "Unknown error",
+      stack: error?.stack || "No stack trace",
     });
 
+    // Improved error handling for Mongoose validation errors
+    if (error && error.name === "ValidationError") {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: error?.message || "Internal server error" },
       { status: 500 }
     );
   }

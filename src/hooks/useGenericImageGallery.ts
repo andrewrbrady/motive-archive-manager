@@ -231,8 +231,27 @@ export function useGenericImageGallery({
   const searchParams = useSearchParams();
   const api = useAPI();
 
-  // URL state management
+  // Add request cancellation and rate limiting
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastRequestTimeRef = useRef<number>(0);
+  const MIN_REQUEST_INTERVAL = 500; // Minimum 500ms between requests
+
+  // URL state management - ensure consistent values to prevent dependency array size changes
   const isEditMode = searchParams?.get("mode") === "edit";
+  const urlPage = searchParams?.get("page") || null;
+  const currentImageId = searchParams?.get("image") || null;
+  const selectLast = searchParams?.get("selectLast") === "true";
+
+  // Debug URL parameters only when they change
+  useEffect(() => {
+    console.log("🔍 [URL PARAMS CHANGED]", {
+      urlPage,
+      currentImageId,
+      selectLast,
+      searchParamsString: searchParams?.toString(),
+    });
+  }, [urlPage, currentImageId, selectLast, searchParams]);
 
   // Core state
   const [images, setImages] = useState<ExtendedImageType[]>([]);
@@ -252,20 +271,74 @@ export function useGenericImageGallery({
   const [totalImagesAvailable, setTotalImagesAvailable] = useState(0);
   const [serverPagination, setServerPagination] = useState<any>(null);
 
-  // Filter and search state
-  const [filters, setFilters] = useState<FilterState>({});
+  // Filter and search state with stable initial reference
+  const [filters, setFilters] = useState<FilterState>(() => ({}));
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  // UI state
+  // Use ref to track filters to avoid circular dependencies
+  const filtersRef = useRef<FilterState>({});
+
+  // Update ref when filters change
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
+
+  // UI state - Initialize currentPage from URL properly
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(() => {
+    // Initialize from URL page parameter, convert from 1-based to 0-based
+    const pageFromUrl = urlPage ? parseInt(urlPage, 10) - 1 : 0;
+    return Math.max(0, pageFromUrl); // Ensure it's not negative
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [showImageInfo, setShowImageInfo] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Simplified page synchronization - only update state from URL, never update URL from state
+  useEffect(() => {
+    const pageFromUrl = urlPage ? parseInt(urlPage, 10) - 1 : 0;
+    const normalizedPage = Math.max(0, pageFromUrl);
+
+    // Only update state if URL has changed, avoid circular updates
+    if (normalizedPage !== currentPage && urlPage !== null) {
+      console.log("🔄 [PAGE SYNC] URL changed, updating currentPage:", {
+        urlPage,
+        normalizedPage,
+        currentPage,
+      });
+      setCurrentPage(normalizedPage);
+    }
+  }, [urlPage]); // Removed currentPage from dependencies to prevent loops
+
+  // Cleanup function to cancel pending requests
+  const cancelPendingRequests = useCallback(() => {
+    if (abortControllerRef.current) {
+      try {
+        abortControllerRef.current.abort("Request cancelled for new request");
+        abortControllerRef.current = null;
+      } catch (error) {
+        console.warn("Error aborting request:", error);
+      }
+    }
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+      fetchTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Give a small delay before cancelling to allow current requests to complete
+      setTimeout(() => {
+        cancelPendingRequests();
+      }, 100);
+    };
+  }, [cancelPendingRequests]);
 
   // Generate API endpoint based on entity type
   const getApiEndpoint = useCallback(() => {
@@ -285,7 +358,7 @@ export function useGenericImageGallery({
       const params = new URLSearchParams();
 
       params.set("page", page.toString());
-      params.set("limit", "50");
+      params.set("limit", "15"); // Changed from 50 to 15 to match ITEMS_PER_PAGE
       if (includeCount) params.set("includeCount", "true");
 
       // Add filters
@@ -305,79 +378,208 @@ export function useGenericImageGallery({
     []
   );
 
-  // Fetch images
+  // Debounced fetch function with request cancellation
+  const debouncedFetchImages = useCallback(
+    (
+      page: number = 1,
+      currentFilters: FilterState = {},
+      search: string = "",
+      skipCache = false,
+      immediate = false
+    ) => {
+      const doFetch = async () => {
+        if (!api || !entityId) {
+          console.log("❌ [DO FETCH] Missing api or entityId:", {
+            api: !!api,
+            entityId,
+          });
+          return;
+        }
+
+        // Rate limiting check
+        const now = Date.now();
+        const timeSinceLastRequest = now - lastRequestTimeRef.current;
+
+        if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+          console.log(
+            `🚫 [RATE LIMIT] Delaying request by ${MIN_REQUEST_INTERVAL - timeSinceLastRequest}ms`
+          );
+          setTimeout(doFetch, MIN_REQUEST_INTERVAL - timeSinceLastRequest);
+          return;
+        }
+        lastRequestTimeRef.current = now;
+
+        // Only cancel if there's an active request
+        if (
+          abortControllerRef.current &&
+          !abortControllerRef.current.signal.aborted
+        ) {
+          // Cancel the previous request since we're starting a new one
+          cancelPendingRequests();
+        }
+
+        // Create new abort controller for this request
+        let controller: AbortController;
+        let signal: AbortSignal;
+
+        try {
+          controller = new AbortController();
+          signal = controller.signal;
+          abortControllerRef.current = controller;
+        } catch (error) {
+          console.warn(
+            "Failed to create AbortController, proceeding without cancellation:",
+            error
+          );
+          // Create a dummy signal that's never aborted
+          signal = new AbortController().signal;
+        }
+
+        const queryString = buildQueryParams(
+          page,
+          currentFilters,
+          search,
+          true
+        );
+        const apiUrl = `${getApiEndpoint()}?${queryString}`;
+
+        try {
+          setIsLoading(true);
+          setError(null);
+
+          // Check if signal is already aborted before making request
+          if (signal.aborted) {
+            console.log(
+              "🚫 [GENERIC IMAGE GALLERY] Signal already aborted, skipping request"
+            );
+            setIsLoading(false);
+            return;
+          }
+
+          console.log(
+            `🔍 [GENERIC IMAGE GALLERY] Fetching ${entityType} images:`,
+            apiUrl
+          );
+
+          const response = await api.get(apiUrl, signal ? { signal } : {});
+
+          // Check if request was cancelled
+          if (signal.aborted) {
+            console.log("🚫 [GENERIC IMAGE GALLERY] Request was cancelled");
+            setIsLoading(false);
+            return;
+          }
+
+          const data = response as {
+            images: ExtendedImageType[];
+            pagination?: any;
+            filters?: any;
+          };
+
+          console.log(
+            `✅ [GENERIC IMAGE GALLERY] Fetched ${data.images?.length || 0} ${entityType} images`
+          );
+
+          // Update state
+          setImages(data.images || []);
+          setTotalImagesAvailable(data.pagination?.totalImages || 0);
+          setServerPagination(data.pagination);
+
+          // Let URL-based image selection handle image selection
+          // This simplifies the logic and eliminates race conditions
+          console.log(
+            "🔍 [NAVIGATION] Images loaded, URL-based selection will handle current image"
+          );
+
+          console.log(
+            "✅ [GENERIC IMAGE GALLERY] Setting isLoading: false, isInitialLoad: false"
+          );
+          setIsLoading(false);
+          setIsInitialLoad(false);
+        } catch (error: any) {
+          // Don't show error if request was cancelled
+          if (
+            error.name === "AbortError" ||
+            signal.aborted ||
+            error.message?.includes("signal is aborted")
+          ) {
+            console.log(
+              "🚫 [GENERIC IMAGE GALLERY] Request was cancelled:",
+              error.message || "Unknown reason"
+            );
+            setIsLoading(false);
+            setIsInitialLoad(false);
+            return;
+          }
+
+          console.error(
+            `❌ [GENERIC IMAGE GALLERY] Error fetching ${entityType} images:`,
+            error
+          );
+
+          // Show user-friendly error message for rate limiting
+          if (error.message?.includes("Rate limit exceeded")) {
+            toast({
+              title: "Loading Too Fast",
+              description: "Please wait a moment before navigating again.",
+              variant: "destructive",
+              duration: 3000,
+            });
+          } else if (error.message?.includes("signal is aborted")) {
+            // Don't show error for aborted signals - this is expected behavior
+            console.log(
+              "🚫 [GENERIC IMAGE GALLERY] Request aborted, likely due to component cleanup or new request"
+            );
+            setIsLoading(false);
+            setIsInitialLoad(false);
+            return;
+          }
+
+          setError(error);
+          console.log(
+            "❌ [GENERIC IMAGE GALLERY] Setting isLoading: false, isInitialLoad: false (error case)"
+          );
+          setIsLoading(false);
+          setIsInitialLoad(false);
+        }
+      };
+
+      if (immediate) {
+        // For immediate requests, cancel any pending debounced requests but allow current request to complete
+
+        if (fetchTimeoutRef.current) {
+          clearTimeout(fetchTimeoutRef.current);
+          fetchTimeoutRef.current = null;
+        }
+        doFetch();
+      } else {
+        // Debounce non-immediate requests
+
+        fetchTimeoutRef.current = setTimeout(doFetch, 300);
+      }
+    },
+    [
+      api,
+      entityId,
+      entityType,
+      buildQueryParams,
+      getApiEndpoint,
+      cancelPendingRequests,
+      toast,
+    ]
+  );
+
+  // Legacy fetchImages function for compatibility
   const fetchImages = useCallback(
-    async (
+    (
       page: number = 1,
       currentFilters: FilterState = {},
       search: string = "",
       skipCache = false
     ) => {
-      if (!api || !entityId) return;
-
-      const queryString = buildQueryParams(page, currentFilters, search, true);
-      const apiUrl = `${getApiEndpoint()}?${queryString}`;
-
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        console.log(
-          `🔍 [GENERIC IMAGE GALLERY] Fetching ${entityType} images:`,
-          apiUrl
-        );
-        console.log(
-          `🔍 [GENERIC IMAGE GALLERY] Entity ID: ${entityId}, Entity Type: ${entityType}`
-        );
-        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🔍 [GENERIC IMAGE GALLERY] Filters:`, currentFilters);
-        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🔍 [GENERIC IMAGE GALLERY] Search:`, search);
-
-        const response = await api.get(apiUrl);
-
-        const data = response as {
-          images: ExtendedImageType[];
-          pagination?: any;
-          filters?: any;
-        };
-
-        console.log(
-          `✅ [GENERIC IMAGE GALLERY] Fetched ${data.images?.length || 0} ${entityType} images`
-        );
-        console.log(`✅ [GENERIC IMAGE GALLERY] Response data:`, {
-          imagesCount: data.images?.length || 0,
-          totalImages: data.pagination?.totalImages || 0,
-          hasImages: !!(data.images && data.images.length > 0),
-        });
-
-        // Update state
-        setImages(data.images || []);
-        setTotalImagesAvailable(data.pagination?.totalImages || 0);
-        setServerPagination(data.pagination);
-
-        console.log(
-          `✅ [GENERIC IMAGE GALLERY] State updated - images array length: ${(data.images || []).length}`
-        );
-
-        setIsLoading(false);
-        setIsInitialLoad(false);
-      } catch (error: any) {
-        console.error(
-          `❌ [GENERIC IMAGE GALLERY] Error fetching ${entityType} images:`,
-          error
-        );
-        console.error(`❌ [GENERIC IMAGE GALLERY] Error details:`, {
-          entityId,
-          entityType,
-          apiUrl,
-          errorMessage: error.message,
-          errorStack: error.stack,
-        });
-        setError(error);
-        setIsLoading(false);
-        setIsInitialLoad(false);
-      }
+      debouncedFetchImages(page, currentFilters, search, skipCache, false);
     },
-    [api, entityId, entityType, buildQueryParams, getApiEndpoint]
+    [debouncedFetchImages]
   );
 
   // Apply filters to images
@@ -420,11 +622,43 @@ export function useGenericImageGallery({
     []
   );
 
-  // Update filtered images when images or filters change
-  useEffect(() => {
-    const filtered = applyFilters(images, filters, debouncedSearchQuery);
-    setFilteredImages(filtered);
+  // Simplified image selection logic - no complex URL-based memoization
+  const selectCurrentImageFromFiltered = useCallback(() => {
+    console.log("🔍 [SIMPLE SELECTION]", {
+      currentImageId,
+      filteredImagesLength: filteredImages.length,
+      firstImageId: filteredImages[0]?._id,
+      lastImageId: filteredImages[filteredImages.length - 1]?._id,
+    });
 
+    // If we have no images, return null
+    if (filteredImages.length === 0) {
+      console.log("🔄 [SIMPLE] No images available");
+      return null;
+    }
+
+    // If a specific image ID is in the URL, try to find it
+    if (currentImageId) {
+      const foundImage = filteredImages.find(
+        (img) => img._id === currentImageId
+      );
+      if (foundImage) {
+        console.log("🔄 [SIMPLE] Found specific image:", foundImage._id);
+        return foundImage;
+      }
+      console.log(
+        "🔄 [SIMPLE] Specific image not found in current page, falling back to first"
+      );
+    }
+
+    // Default to first image
+    const firstImage = filteredImages[0];
+    console.log("🔄 [SIMPLE] Defaulting to first image:", firstImage._id);
+    return firstImage;
+  }, [filteredImages, currentImageId]);
+
+  // Memoize filter options to prevent unnecessary re-renders
+  const memoizedFilterOptions = useMemo(() => {
     // Update filter options based on all images (not just filtered)
     // Map singular category names to plural property names expected by FilterOptions interface
     const categoryMap: Record<string, keyof FilterOptions> = {
@@ -454,46 +688,350 @@ export function useGenericImageGallery({
       newFilterOptions[optionKey] = Array.from(values).sort();
     });
 
-    setFilterOptions(newFilterOptions);
+    return newFilterOptions;
+  }, [images]); // Only depend on images, not filters
 
-    // Update current image if it's not in filtered results
-    if (currentImage && !filtered.find((img) => img._id === currentImage._id)) {
-      setCurrentImage(filtered[0] || null);
-    } else if (!currentImage && filtered.length > 0) {
-      setCurrentImage(filtered[0]);
-    }
-  }, [images, filters, debouncedSearchQuery, currentImage, applyFilters]);
-
-  // Fetch images when entity or filters change
+  // Update filtered images when images or filters change
   useEffect(() => {
-    if (entityId) {
-      fetchImages(1, filters, debouncedSearchQuery);
-    }
-  }, [entityId, filters, debouncedSearchQuery, fetchImages]);
+    const filtered = applyFilters(images, filters, debouncedSearchQuery);
+    setFilteredImages(filtered);
+  }, [images, filters, debouncedSearchQuery]);
 
-  // Navigation functions
+  // Update filter options only when they actually change
+  useEffect(() => {
+    setFilterOptions(memoizedFilterOptions);
+  }, [memoizedFilterOptions]);
+
+  // Use ref to track current image to avoid circular dependencies
+  const currentImageRef = useRef<ExtendedImageType | null>(null);
+
+  // Update ref when currentImage changes
+  useEffect(() => {
+    currentImageRef.current = currentImage;
+  }, [currentImage]);
+
+  // Simplified image sync effect - ONLY set state, NEVER update URL
+  useEffect(() => {
+    if (filteredImages.length === 0) return;
+
+    // Priority 1: If we have a currentImageId from URL, try to find and set that image
+    if (currentImageId) {
+      const urlImage = filteredImages.find((img) => img._id === currentImageId);
+      if (urlImage && urlImage._id !== currentImageRef.current?._id) {
+        console.log("🔄 [IMAGE SYNC] Setting image from URL:", currentImageId);
+        setCurrentImage(urlImage);
+        return;
+      }
+    }
+
+    // Priority 2: If selectLast flag is set, select the last image (but don't update URL here)
+    if (selectLast && filteredImages.length > 0) {
+      const lastImage = filteredImages[filteredImages.length - 1];
+      if (lastImage._id !== currentImageRef.current?._id) {
+        console.log("🔄 [IMAGE SYNC] Selecting last image:", lastImage._id);
+        setCurrentImage(lastImage);
+        return;
+      }
+    }
+
+    // Priority 3: If no current image, select the first one (but don't update URL here)
+    if (!currentImageRef.current && filteredImages.length > 0) {
+      const firstImage = filteredImages[0];
+      console.log("🔄 [IMAGE SYNC] Setting first image:", firstImage._id);
+      setCurrentImage(firstImage);
+    }
+  }, [filteredImages, currentImageId, selectLast]);
+
+  // Simplified atomic navigation function
+  const navigateToImage = useCallback(
+    (targetImageId: string, targetPage?: number) => {
+      console.log("🔄 [NAVIGATE] Atomic navigation to:", {
+        targetImageId,
+        targetPage,
+      });
+
+      // Find and set the target image immediately
+      const targetImage = filteredImages.find(
+        (img) => img._id === targetImageId
+      );
+      if (targetImage) {
+        setCurrentImage(targetImage);
+      }
+
+      // Update URL directly without triggering loops
+      const params = new URLSearchParams(window.location.search);
+      if (targetPage !== undefined) {
+        params.set("page", (targetPage + 1).toString());
+      }
+      params.set("image", targetImageId);
+      params.delete("selectLast");
+      router.replace(`?${params.toString()}`);
+    },
+    [router, filteredImages]
+  );
+
+  // Simplified navigation functions
   const handleNext = useCallback(() => {
     if (!currentImage || filteredImages.length === 0) return;
+
     const currentIndex = filteredImages.findIndex(
       (img) => img._id === currentImage._id
     );
-    const nextIndex = (currentIndex + 1) % filteredImages.length;
-    setCurrentImage(filteredImages[nextIndex]);
-  }, [currentImage, filteredImages]);
+
+    console.log(
+      "🔄 [NEXT] Current index:",
+      currentIndex,
+      "of",
+      filteredImages.length
+    );
+
+    // Check if we're at the last image of the current page
+    if (currentIndex === filteredImages.length - 1) {
+      // Check if there's a next page available
+      const totalPages =
+        serverPagination?.totalPages || Math.ceil(filteredImages.length / 15);
+
+      if (currentPage < totalPages - 1) {
+        // Move to next page - URL update will trigger fetch
+        const nextPage = currentPage + 1;
+        console.log("🔄 [NEXT] Moving to next page:", nextPage);
+
+        const params = new URLSearchParams(window.location.search);
+        params.set("page", (nextPage + 1).toString());
+        params.delete("selectLast");
+        router.push(`?${params.toString()}`);
+        return;
+      } else {
+        // No next page available, wrap to first image of current page
+        const firstImage = filteredImages[0];
+        navigateToImage(firstImage._id);
+        return;
+      }
+    }
+
+    // Navigate to next image on current page
+    const nextImage = filteredImages[currentIndex + 1];
+    navigateToImage(nextImage._id);
+  }, [
+    currentImage,
+    filteredImages,
+    currentPage,
+    serverPagination,
+    router,
+    navigateToImage,
+  ]);
 
   const handlePrev = useCallback(() => {
     if (!currentImage || filteredImages.length === 0) return;
+
     const currentIndex = filteredImages.findIndex(
       (img) => img._id === currentImage._id
     );
-    const prevIndex =
-      (currentIndex - 1 + filteredImages.length) % filteredImages.length;
-    setCurrentImage(filteredImages[prevIndex]);
-  }, [currentImage, filteredImages]);
 
-  const setMainImage = useCallback((image: ExtendedImageType) => {
-    setCurrentImage(image);
-  }, []);
+    console.log(
+      "🔄 [PREV] Current index:",
+      currentIndex,
+      "of",
+      filteredImages.length
+    );
+
+    // Check if we're at the first image of the current page
+    if (currentIndex === 0) {
+      // Check if there's a previous page available
+      if (currentPage > 0) {
+        const prevPage = currentPage - 1;
+        console.log("🔄 [PREV] Moving to previous page:", prevPage);
+
+        const params = new URLSearchParams(window.location.search);
+        params.set("page", (prevPage + 1).toString());
+        params.set("selectLast", "true");
+        router.push(`?${params.toString()}`);
+        return;
+      } else {
+        // No previous page available, wrap to last image of current page
+        const lastImage = filteredImages[filteredImages.length - 1];
+        navigateToImage(lastImage._id);
+        return;
+      }
+    }
+
+    // Navigate to previous image on current page
+    const prevImage = filteredImages[currentIndex - 1];
+    navigateToImage(prevImage._id);
+  }, [currentImage, filteredImages, currentPage, router, navigateToImage]);
+
+  // Single consolidated effect for all image fetching to eliminate race conditions
+  const lastFetchParamsRef = useRef<string>("");
+  const isInitialLoadRef = useRef(true);
+
+  useEffect(() => {
+    console.log("🔄 [EFFECT] Consolidated fetch effect triggered", {
+      entityId,
+      currentPage,
+      filters,
+      debouncedSearchQuery,
+      isLoading,
+      isInitialLoad,
+      hasApi: !!api,
+    });
+
+    if (!entityId || !api) {
+      console.log("🚫 [EFFECT] Skipping fetch - missing requirements:", {
+        hasEntityId: !!entityId,
+        hasApi: !!api,
+      });
+      return;
+    }
+
+    // Create a unique key for current fetch parameters
+    const fetchKey = `${entityId}-${currentPage}-${JSON.stringify(filters)}-${debouncedSearchQuery}`;
+
+    // Avoid duplicate fetches
+    if (fetchKey === lastFetchParamsRef.current) {
+      console.log("🚫 [FETCH] Skipping duplicate fetch:", fetchKey);
+      // Reset loading state if we're skipping a duplicate fetch
+      if (isLoading) {
+        console.log(
+          "🔄 [FETCH] Resetting loading state for skipped duplicate fetch"
+        );
+        setIsLoading(false);
+        setIsInitialLoad(false);
+      }
+      return;
+    }
+
+    lastFetchParamsRef.current = fetchKey;
+
+    console.log("🔄 [FETCH] Consolidated fetch:", {
+      entityId,
+      page: currentPage + 1,
+      filters,
+      search: debouncedSearchQuery,
+      isInitialLoad: isInitialLoadRef.current,
+    });
+
+    // Use immediate fetch for entity/filter changes, debounced for page changes
+    const isEntityOrFilterChange =
+      JSON.stringify(filters) !== JSON.stringify({}) ||
+      debouncedSearchQuery !== "" ||
+      isInitialLoadRef.current;
+
+    debouncedFetchImages(
+      currentPage + 1,
+      filters,
+      debouncedSearchQuery,
+      false,
+      isEntityOrFilterChange // immediate for entity/filter changes
+    );
+
+    // Mark initial load as complete after first fetch
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+    }
+  }, [
+    entityId,
+    currentPage,
+    filters,
+    debouncedSearchQuery,
+    debouncedFetchImages,
+    api,
+  ]);
+
+  // Reset initial load flag when entity changes
+  useEffect(() => {
+    isInitialLoadRef.current = true;
+  }, [entityId]);
+
+  // Emergency reset: if we have images but are still loading, reset loading state
+  useEffect(() => {
+    if (isLoading && images.length > 0) {
+      console.log(
+        "🚨 [EMERGENCY] Found images but still loading, resetting state"
+      );
+      setIsLoading(false);
+      setIsInitialLoad(false);
+    }
+  }, [isLoading, images.length]);
+
+  // Reset loading state when API becomes available but we haven't fetched yet
+  useEffect(() => {
+    if (!api && isLoading) {
+      console.log("🔄 [API WAIT] API not ready, keeping loading state");
+    } else if (api && isLoading && images.length === 0 && isInitialLoad) {
+      console.log("🚀 [API READY] API is ready, fetch should trigger soon");
+    }
+  }, [api, isLoading, images.length, isInitialLoad]);
+
+  // Safety mechanism: Reset loading state if stuck for too long
+  useEffect(() => {
+    if (!isLoading) return;
+
+    const timeout = setTimeout(() => {
+      console.log(
+        "⚠️ [SAFETY] Loading state stuck for 10 seconds, forcing reset"
+      );
+      setIsLoading(false);
+      setIsInitialLoad(false);
+    }, 10000); // 10 second timeout
+
+    return () => clearTimeout(timeout);
+  }, [isLoading]);
+
+  // Auto-select first image when no image is specified in URL and we have images
+  useEffect(() => {
+    if (
+      filteredImages.length > 0 &&
+      !currentImageId && // No specific image in URL
+      !isLoading &&
+      !currentImageRef.current // No current image set
+    ) {
+      console.log(
+        "🔄 [AUTO SELECT] No image in URL, updating URL to first image"
+      );
+      const params = new URLSearchParams(window.location.search);
+      params.set("image", filteredImages[0]._id);
+      router.replace(`?${params.toString()}`);
+    }
+  }, [filteredImages, currentImageId, isLoading, router]);
+
+  const setMainImage = useCallback(
+    (image: ExtendedImageType) => {
+      navigateToImage(image._id);
+    },
+    [navigateToImage]
+  );
+
+  // Simplified page change handler
+  const setCurrentPageHandler = useCallback(
+    (page: number) => {
+      const params = new URLSearchParams(window.location.search);
+      params.set("page", (page + 1).toString());
+      router.push(`?${params.toString()}`);
+    },
+    [router]
+  );
+
+  // Page navigation handler that preserves image position (for Shift+Arrow keys)
+  const navigateToPageWithPosition = useCallback(
+    (page: number) => {
+      console.log(
+        "🔄 [PAGE NAV] Navigating to page with position preservation:",
+        {
+          fromPage: currentPage,
+          toPage: page,
+          currentImage: currentImage?._id,
+        }
+      );
+
+      const params = new URLSearchParams(window.location.search);
+      params.set("page", (page + 1).toString());
+      if (currentImage?._id) {
+        params.set("image", currentImage._id);
+      }
+      router.push(`?${params.toString()}`);
+    },
+    [router, currentPage, currentImage]
+  );
 
   // Selection functions
   const toggleImageSelection = useCallback((imageId: string) => {
@@ -522,9 +1060,9 @@ export function useGenericImageGallery({
 
   // CRUD operations
   const handleUploadComplete = useCallback(() => {
-    fetchImages(1, filters, debouncedSearchQuery, true);
+    fetchImages(currentPage + 1, filters, debouncedSearchQuery, true); // Convert 0-based to 1-based for API
     setIsUploadDialogOpen(false);
-  }, [filters, debouncedSearchQuery, fetchImages]);
+  }, [filters, debouncedSearchQuery, fetchImages, currentPage]); // Added currentPage dependency
 
   const handleDeleteSelected = useCallback(async () => {
     if (!api || selectedImages.size === 0) return;
@@ -541,7 +1079,7 @@ export function useGenericImageGallery({
       });
 
       setSelectedImages(new Set());
-      fetchImages(1, filters, debouncedSearchQuery, true);
+      fetchImages(currentPage + 1, filters, debouncedSearchQuery, true); // Convert 0-based to 1-based for API
     } catch (error: any) {
       console.error("Error deleting images:", error);
       toast({
@@ -560,6 +1098,7 @@ export function useGenericImageGallery({
     filters,
     debouncedSearchQuery,
     fetchImages,
+    currentPage, // Added currentPage dependency
   ]);
 
   const handleDeleteSingle = useCallback(
@@ -574,7 +1113,7 @@ export function useGenericImageGallery({
           description: "Successfully deleted image",
         });
 
-        fetchImages(1, filters, debouncedSearchQuery, true);
+        fetchImages(currentPage + 1, filters, debouncedSearchQuery, true); // Convert 0-based to 1-based for API
       } catch (error: any) {
         console.error("Error deleting image:", error);
         toast({
@@ -584,7 +1123,15 @@ export function useGenericImageGallery({
         });
       }
     },
-    [api, getApiEndpoint, toast, filters, debouncedSearchQuery, fetchImages]
+    [
+      api,
+      getApiEndpoint,
+      toast,
+      filters,
+      debouncedSearchQuery,
+      fetchImages,
+      currentPage,
+    ] // Added currentPage dependency
   );
 
   const reanalyzeImage = useCallback(async (imageId: string) => {
@@ -609,7 +1156,7 @@ export function useGenericImageGallery({
           description: "Successfully set primary image",
         });
 
-        fetchImages(1, filters, debouncedSearchQuery, true);
+        fetchImages(currentPage + 1, filters, debouncedSearchQuery, true); // Convert 0-based to 1-based for API
       } catch (error: any) {
         console.error("Error setting primary image:", error);
         toast({
@@ -627,6 +1174,7 @@ export function useGenericImageGallery({
       filters,
       debouncedSearchQuery,
       fetchImages,
+      currentPage, // Added currentPage dependency
     ]
   );
 
@@ -662,7 +1210,8 @@ export function useGenericImageGallery({
     // Actions
     setFilters,
     setSearchQuery,
-    setCurrentPage,
+    setCurrentPage: setCurrentPageHandler,
+    navigateToPageWithPosition,
     setMainImage,
     handleNext,
     handlePrev,

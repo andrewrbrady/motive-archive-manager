@@ -591,7 +591,7 @@ export async function POST(request: NextRequest) {
           throw new Error("Failed to insert images into database");
         }
 
-        // Update car document with image IDs (only for car mode)
+        // Update car document with image IDs (only for car mode) - store as ObjectIds
         if (isCarMode && carId) {
           const imageIds = successfulDocs.map((doc) => doc._id);
           const updateResult = await collections.cars.updateOne(

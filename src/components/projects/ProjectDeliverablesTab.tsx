@@ -40,6 +40,7 @@ import ResizableDeliverablesTable from "@/components/deliverables/deliverables-t
 import DeliverableCard from "@/components/deliverables/deliverables-tab/components/DeliverableCard";
 import DeliverableModal from "@/components/deliverables/deliverables-tab/components/DeliverableModal";
 import { Deliverable } from "@/types/deliverable";
+import { DeliverableType } from "@/types/deliverable";
 
 interface MemberDetails {
   name: string;
@@ -79,31 +80,18 @@ export function ProjectDeliverablesTab({
   const [deliverableForm, setDeliverableForm] = useState({
     title: "",
     description: "",
-    type: "Video" as
-      | "Video"
-      | "Photo Gallery"
-      | "Mixed Gallery"
-      | "Video Gallery"
-      | "Still"
-      | "Graphic"
-      | "feature"
-      | "promo"
-      | "review"
-      | "walkthrough"
-      | "highlights"
-      | "Marketing Email"
-      | "Blog"
-      | "other",
+    type: "Video" as DeliverableType,
     platforms: [] as { label: string; value: string }[],
     duration: 30,
     aspectRatio: "16:9",
     editDeadline: "",
     releaseDate: "",
     assignedTo: "unassigned",
-    carId: "", // Explicitly no car selected by default
+    carId: "",
     scheduled: false,
     gallery_ids: [] as string[],
     caption_ids: [] as string[],
+    mediaTypeId: "", // Add mediaTypeId field
   });
 
   const [isAddingDeliverable, setIsAddingDeliverable] = useState(false);
@@ -409,26 +397,27 @@ export function ProjectDeliverablesTab({
         title: deliverableForm.title,
         description: deliverableForm.description,
         type: deliverableForm.type,
-        platforms: deliverableForm.platforms.map((p) => p.value),
+        platform_id: deliverableForm.platforms[0]?.value,
         duration: deliverableForm.duration,
-        aspectRatio: deliverableForm.aspectRatio,
-        editDeadline: deliverableForm.editDeadline
+        aspect_ratio: deliverableForm.aspectRatio,
+        edit_deadline: deliverableForm.editDeadline
           ? new Date(deliverableForm.editDeadline).toISOString()
           : undefined,
-        releaseDate: deliverableForm.releaseDate
+        release_date: deliverableForm.releaseDate
           ? new Date(deliverableForm.releaseDate).toISOString()
           : undefined,
-        assignedTo:
+        assigned_to:
           deliverableForm.assignedTo === "unassigned"
             ? undefined
             : deliverableForm.assignedTo,
-        carId:
+        car_id:
           deliverableForm.carId && deliverableForm.carId.trim() !== ""
             ? deliverableForm.carId
             : null,
         scheduled: deliverableForm.scheduled,
         gallery_ids: deliverableForm.gallery_ids,
         caption_ids: deliverableForm.caption_ids,
+        mediaTypeId: deliverableForm.mediaTypeId || undefined,
       };
 
       console.log("🚀 SENDING REQUEST:", {
@@ -468,6 +457,7 @@ export function ProjectDeliverablesTab({
         scheduled: false,
         gallery_ids: [],
         caption_ids: [],
+        mediaTypeId: "",
       });
       setIsAddDeliverableOpen(false);
 
@@ -517,6 +507,7 @@ export function ProjectDeliverablesTab({
       scheduled: deliverable.scheduled || false,
       gallery_ids: deliverable.gallery_ids || [],
       caption_ids: deliverable.caption_ids || [],
+      mediaTypeId: deliverable.mediaTypeId || "",
     });
     setEditingDeliverable(deliverable);
     setIsEditDeliverableOpen(true);
@@ -617,6 +608,7 @@ export function ProjectDeliverablesTab({
         scheduled: false,
         gallery_ids: [],
         caption_ids: [],
+        mediaTypeId: "",
       });
       setEditingDeliverable(null);
       setIsEditDeliverableOpen(false);
@@ -1764,6 +1756,7 @@ export function ProjectDeliverablesTab({
                         scheduled: false,
                         gallery_ids: [],
                         caption_ids: [],
+                        mediaTypeId: "",
                       });
                       setIsAddDeliverableOpen(false);
                     }}
@@ -2197,6 +2190,7 @@ export function ProjectDeliverablesTab({
                         scheduled: false,
                         gallery_ids: [],
                         caption_ids: [],
+                        mediaTypeId: "",
                       });
                       setEditingDeliverable(null);
                       setIsEditDeliverableOpen(false);

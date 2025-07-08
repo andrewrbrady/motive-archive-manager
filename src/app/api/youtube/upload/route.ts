@@ -599,7 +599,8 @@ export async function POST(req: NextRequest) {
 }
 
 // Helper function to check if deliverable is a video type
-function isVideoDeliverable(type: string): boolean {
+function isVideoDeliverable(type: string | undefined): boolean {
+  if (!type) return false;
   const videoTypes = [
     "Video",
     "Video Gallery",

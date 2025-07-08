@@ -14,6 +14,8 @@ import {
   MoreVertical,
   CheckSquare,
   Square,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageInfoPanel } from "./ImageInfoPanel";
@@ -75,10 +77,10 @@ interface ImageThumbnailsProps {
   };
 }
 
-const ITEMS_PER_PAGE = 15;
-const VIRTUAL_ITEM_HEIGHT = 105 + 8; // Thumbnail height + gap
-const VIRTUAL_ITEMS_PER_ROW = 3;
-const OVERSCAN = 3; // Render 3 extra rows above and below visible area
+const ITEMS_PER_PAGE = 15; // 3 columns x 5 rows = 15 items per page
+const VIRTUAL_ITEM_HEIGHT = 120 + 8; // Increased thumbnail height + gap for better visibility
+const VIRTUAL_ITEMS_PER_ROW = 3; // 3 columns for 3x5 grid
+const OVERSCAN = 2; // Render 2 extra rows above and below visible area
 
 // Helper function to build enhanced Cloudflare URL for thumbnails
 const getEnhancedImageUrl = (
@@ -400,7 +402,7 @@ export function ImageThumbnails({
   // Removed shouldTriggerEarlyLoad callback - logic moved inline to prevent infinite loops
 
   // Effect to trigger early loading with debouncing - DISABLED to prevent infinite loops
-  // COMMENTED OUT: This effect was causing infinite loops by continuously triggering onLoadMore
+  // COMMENTED OUT: This effect was causing infinite API calls
   // The intersection observer and manual load more buttons provide sufficient loading mechanisms
   /*
   useEffect(() => {
@@ -547,8 +549,8 @@ export function ImageThumbnails({
   ) {
     return (
       <div className="w-full h-full flex flex-col">
-        <div className="bg-background rounded-lg p-4 flex flex-col flex-1 min-h-0">
-          <div className="flex items-center justify-center h-64">
+        <div className="bg-background rounded-lg flex flex-col flex-1 min-h-0">
+          <div className="flex items-center justify-center h-64 px-3 pt-3">
             <div className="flex flex-col items-center gap-3">
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               <p className="text-sm text-muted-foreground">Loading images...</p>
@@ -571,9 +573,9 @@ export function ImageThumbnails({
         />
       )}
 
-      <div className="bg-background rounded-lg p-4 flex flex-col flex-1 min-h-0">
+      <div className="bg-background rounded-lg flex flex-col flex-1 min-h-0">
         {/* Page Information Header */}
-        <div className="flex justify-between items-center mb-3 text-sm text-muted-foreground">
+        <div className="flex justify-between items-center mb-2 text-sm text-muted-foreground px-3 pt-3">
           <div className="flex items-center gap-3">
             <span>
               Page {displayPagination.currentPageDisplay} of{" "}
@@ -646,12 +648,12 @@ export function ImageThumbnails({
 
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto"
+          className="flex-1 overflow-y-auto px-3"
           onScroll={handleScroll}
         >
           {paginatedImages.length <= 20 ? (
-            // Regular grid for small sets
-            <div className="grid grid-cols-3 gap-2">
+            // Regular 3x5 grid for small sets (15 items per page)
+            <div className="grid grid-cols-3 gap-2 auto-rows-fr">
               {paginatedImages.map(
                 (image: ExtendedImageType, index: number) => {
                   const imageId = image.id || image._id;
@@ -663,20 +665,21 @@ export function ImageThumbnails({
                   const isAboveFold = currentPage === 0 && index < 6;
 
                   return (
-                    <ThumbnailItem
-                      key={image._id || image.id}
-                      image={image}
-                      isCurrentImage={isCurrentImage}
-                      isSelectedInEditMode={isSelectedInEditMode}
-                      isAboveFold={isAboveFold}
-                      isEditMode={isEditMode}
-                      selectedImages={selectedImages}
-                      onImageSelect={onImageSelect}
-                      onToggleSelection={onToggleSelection}
-                      onDeleteSingle={onDeleteSingle}
-                      onSetPrimary={onSetPrimary}
-                      onReanalyze={onReanalyze}
-                    />
+                    <div key={image._id || image.id} className="aspect-[4/3]">
+                      <ThumbnailItem
+                        image={image}
+                        isCurrentImage={isCurrentImage}
+                        isSelectedInEditMode={isSelectedInEditMode}
+                        isAboveFold={isAboveFold}
+                        isEditMode={isEditMode}
+                        selectedImages={selectedImages}
+                        onImageSelect={onImageSelect}
+                        onToggleSelection={onToggleSelection}
+                        onDeleteSingle={onDeleteSingle}
+                        onSetPrimary={onSetPrimary}
+                        onReanalyze={onReanalyze}
+                      />
+                    </div>
                   );
                 }
               )}
@@ -742,6 +745,42 @@ export function ImageThumbnails({
           {/* Load more trigger for intersection observer */}
           <div ref={bottomLoadTriggerRef} className="h-1" />
         </div>
+
+        {/* Pagination Controls */}
+        {displayPagination.totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-3 pt-3 px-3 pb-3 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(Math.max(0, currentPage - 1))}
+              disabled={currentPage === 0}
+              className="flex items-center gap-1"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Previous
+            </Button>
+
+            <span className="text-sm text-muted-foreground px-4">
+              Page {displayPagination.currentPageDisplay} of{" "}
+              {displayPagination.totalPages}
+            </span>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                onPageChange(
+                  Math.min(displayPagination.totalPages - 1, currentPage + 1)
+                )
+              }
+              disabled={currentPage >= displayPagination.totalPages - 1}
+              className="flex items-center gap-1"
+            >
+              Next
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -824,81 +863,54 @@ const ThumbnailItem = React.memo<{
       <>
         <div
           className={cn(
-            "relative rounded-md overflow-hidden cursor-pointer group transition-all duration-300 ease-out transform",
+            "relative rounded-md overflow-hidden cursor-pointer group",
             isCurrentImage
-              ? "!border-2 !border-white ring-2 ring-white/20 !opacity-100 scale-105 shadow-lg"
+              ? "border-2 border-white ring-2 ring-white/20 opacity-100 shadow-lg"
               : isSelectedInEditMode
-                ? "!border-2 !border-blue-500 !opacity-100 scale-102 shadow-md ring-1 ring-blue-300/30"
-                : "!border-0 !opacity-60 hover:!opacity-100 hover:scale-102 hover:shadow-md"
+                ? "border-2 border-blue-500 opacity-100 shadow-md ring-1 ring-blue-300/30"
+                : "border-0 opacity-60 hover:opacity-100 hover:shadow-md"
           )}
-          style={{
-            border: isCurrentImage
-              ? "2px solid white"
-              : isSelectedInEditMode
-                ? "2px solid #3b82f6"
-                : "none",
-            opacity: isCurrentImage || isSelectedInEditMode ? 1 : 0.6,
-            transform: isCurrentImage
-              ? "scale(1.05)"
-              : isSelectedInEditMode
-                ? "scale(1.02)"
-                : "scale(1)",
-          }}
-          onMouseEnter={(e) => {
-            if (!isCurrentImage && !isSelectedInEditMode) {
-              e.currentTarget.style.opacity = "1";
-              e.currentTarget.style.transform = "scale(1.02)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!isCurrentImage && !isSelectedInEditMode) {
-              e.currentTarget.style.opacity = "0.6";
-              e.currentTarget.style.transform = "scale(1)";
-            }
-          }}
           onClick={() => onImageSelect(imageId)}
         >
           <div className="relative overflow-hidden">
             <CloudflareImage
               src={enhancedThumbnailUrl}
               alt={image.metadata?.description || "Thumbnail"}
-              width={140}
-              height={105}
-              className="object-cover transition-transform duration-500 group-hover:scale-110 w-full h-auto"
-              sizes="140px"
+              width={160}
+              height={120}
+              className="object-cover w-full h-full"
+              sizes="160px"
               variant="thumbnail"
               isAboveFold={isAboveFold}
               useIntersectionLazyLoad={!isAboveFold}
             />
 
             {/* Subtle gradient overlay for better readability */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100" />
           </div>
 
           {/* Enhanced selection overlay for edit mode */}
           {isEditMode && (
             <div
               className={cn(
-                "absolute inset-0 flex items-center justify-center transition-all duration-300 ease-out",
+                "absolute inset-0 flex items-center justify-center",
                 selectedImages.has(imageId)
-                  ? "opacity-100 bg-blue-500/40 backdrop-blur-sm scale-100"
-                  : "opacity-0 bg-black/0 group-hover:opacity-100 group-hover:bg-black/30 scale-95 group-hover:scale-100"
+                  ? "opacity-100 bg-blue-500/40 backdrop-blur-sm"
+                  : "opacity-0 bg-black/0 group-hover:opacity-100 group-hover:bg-black/30"
               )}
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleSelection(imageId);
               }}
             >
-              <div
+              <CheckCircle
                 className={cn(
-                  "transition-all duration-300 ease-out",
+                  "w-6 h-6",
                   selectedImages.has(imageId)
-                    ? "scale-100 text-white drop-shadow-lg"
-                    : "scale-75 group-hover:scale-90 text-white/80"
+                    ? "text-white drop-shadow-lg"
+                    : "text-white/80"
                 )}
-              >
-                <CheckCircle className="w-6 h-6" />
-              </div>
+              />
             </div>
           )}
 

@@ -624,37 +624,178 @@ export async function POST(request: NextRequest) {
       prompt +=
         "\n\nStyle Guide for Descriptions:\n" +
         IMAGE_ANALYSIS_CONFIG.styleGuide;
+    }
 
-      if (vehicleInfo && vehicleInfo.make && vehicleInfo.model) {
-        let vehicleContext = `\n\nVehicle Information:`;
-        vehicleContext += `\n- Make: ${vehicleInfo.make}`;
-        vehicleContext += `\n- Model: ${vehicleInfo.model}`;
+    // ALWAYS add vehicle context when available, regardless of prompt type
+    if (vehicleInfo && vehicleInfo.make && vehicleInfo.model) {
+      let vehicleContext = `\n\nVehicle Information:`;
+      vehicleContext += `\n- Make: ${vehicleInfo.make}`;
+      vehicleContext += `\n- Model: ${vehicleInfo.model}`;
 
-        if (vehicleInfo.year) {
-          vehicleContext += `\n- Year: ${vehicleInfo.year}`;
-        }
-
-        if (vehicleInfo.engine?.type) {
-          vehicleContext += `\n- Engine: ${vehicleInfo.engine.type}`;
-        }
-
-        if (vehicleInfo.condition) {
-          vehicleContext += `\n- Condition: ${vehicleInfo.condition}`;
-        }
-
-        if (vehicleInfo.color) {
-          vehicleContext += `\n- Color: ${vehicleInfo.color}`;
-        }
-
-        if (vehicleInfo.additionalContext) {
-          vehicleContext += `\n\nAdditional context: ${vehicleInfo.additionalContext}`;
-        }
-
-        prompt +=
-          vehicleContext +
-          "\n\nPlease analyze the image with this vehicle information in mind and ensure the description accurately reflects these details.\n\n";
+      if (vehicleInfo.year) {
+        vehicleContext += `\n- Year: ${vehicleInfo.year}`;
       }
 
+      if (vehicleInfo.vin) {
+        vehicleContext += `\n- VIN: ${vehicleInfo.vin}`;
+      }
+
+      if (vehicleInfo.color) {
+        vehicleContext += `\n- Exterior Color: ${vehicleInfo.color}`;
+      }
+
+      if (vehicleInfo.interior_color) {
+        vehicleContext += `\n- Interior Color: ${vehicleInfo.interior_color}`;
+      }
+
+      if (vehicleInfo.condition) {
+        vehicleContext += `\n- Condition: ${vehicleInfo.condition}`;
+      }
+
+      if (vehicleInfo.type) {
+        vehicleContext += `\n- Vehicle Type: ${vehicleInfo.type}`;
+      }
+
+      // Engine specifications
+      if (vehicleInfo.engine) {
+        let engineInfo = "";
+        if (vehicleInfo.engine.type) {
+          engineInfo += `Type: ${vehicleInfo.engine.type}`;
+        }
+        if (vehicleInfo.engine.displacement) {
+          engineInfo += `${engineInfo ? ", " : ""}Displacement: ${vehicleInfo.engine.displacement.value}${vehicleInfo.engine.displacement.unit || "L"}`;
+        }
+        if (vehicleInfo.engine.power) {
+          engineInfo += `${engineInfo ? ", " : ""}Power: ${vehicleInfo.engine.power.hp}hp`;
+          if (vehicleInfo.engine.power.kW) {
+            engineInfo += ` (${vehicleInfo.engine.power.kW}kW)`;
+          }
+        }
+        if (vehicleInfo.engine.torque) {
+          engineInfo += `${engineInfo ? ", " : ""}Torque: ${vehicleInfo.engine.torque["lb-ft"]}lb-ft`;
+          if (vehicleInfo.engine.torque.Nm) {
+            engineInfo += ` (${vehicleInfo.engine.torque.Nm}Nm)`;
+          }
+        }
+        if (vehicleInfo.engine.cylinders) {
+          engineInfo += `${engineInfo ? ", " : ""}Cylinders: ${vehicleInfo.engine.cylinders}`;
+        }
+        if (vehicleInfo.engine.fuelType) {
+          engineInfo += `${engineInfo ? ", " : ""}Fuel: ${vehicleInfo.engine.fuelType}`;
+        }
+        if (engineInfo) {
+          vehicleContext += `\n- Engine: ${engineInfo}`;
+        }
+      }
+
+      // Transmission
+      if (vehicleInfo.transmission) {
+        let transmissionInfo = vehicleInfo.transmission.type;
+        if (vehicleInfo.transmission.speeds) {
+          transmissionInfo += ` (${vehicleInfo.transmission.speeds}-speed)`;
+        }
+        vehicleContext += `\n- Transmission: ${transmissionInfo}`;
+      }
+
+      // Mileage
+      if (vehicleInfo.mileage) {
+        vehicleContext += `\n- Mileage: ${vehicleInfo.mileage.value.toLocaleString()} ${vehicleInfo.mileage.unit || "miles"}`;
+      }
+
+      // Manufacturing details
+      if (vehicleInfo.manufacturing) {
+        let manufacturingInfo = "";
+        if (vehicleInfo.manufacturing.series) {
+          manufacturingInfo += `Series: ${vehicleInfo.manufacturing.series}`;
+        }
+        if (vehicleInfo.manufacturing.trim) {
+          manufacturingInfo += `${manufacturingInfo ? ", " : ""}Trim: ${vehicleInfo.manufacturing.trim}`;
+        }
+        if (vehicleInfo.manufacturing.bodyClass) {
+          manufacturingInfo += `${manufacturingInfo ? ", " : ""}Body Class: ${vehicleInfo.manufacturing.bodyClass}`;
+        }
+        if (manufacturingInfo) {
+          vehicleContext += `\n- Manufacturing: ${manufacturingInfo}`;
+        }
+      }
+
+      // Performance specs
+      if (vehicleInfo.performance) {
+        let performanceInfo = "";
+        if (vehicleInfo.performance["0_to_60_mph"]) {
+          performanceInfo += `0-60mph: ${vehicleInfo.performance["0_to_60_mph"].value}${vehicleInfo.performance["0_to_60_mph"].unit}`;
+        }
+        if (vehicleInfo.performance.top_speed) {
+          performanceInfo += `${performanceInfo ? ", " : ""}Top Speed: ${vehicleInfo.performance.top_speed.value}${vehicleInfo.performance.top_speed.unit}`;
+        }
+        if (performanceInfo) {
+          vehicleContext += `\n- Performance: ${performanceInfo}`;
+        }
+      }
+
+      // Interior features
+      if (vehicleInfo.interior_features) {
+        let interiorInfo = "";
+        if (vehicleInfo.interior_features.seats) {
+          interiorInfo += `${vehicleInfo.interior_features.seats} seats`;
+        }
+        if (vehicleInfo.interior_features.upholstery) {
+          interiorInfo += `${interiorInfo ? ", " : ""}${vehicleInfo.interior_features.upholstery} upholstery`;
+        }
+        if (
+          vehicleInfo.interior_features.features &&
+          vehicleInfo.interior_features.features.length > 0
+        ) {
+          interiorInfo += `${interiorInfo ? ", " : ""}Features: ${vehicleInfo.interior_features.features.join(", ")}`;
+        }
+        if (interiorInfo) {
+          vehicleContext += `\n- Interior: ${interiorInfo}`;
+        }
+      }
+
+      // Dimensions
+      if (vehicleInfo.dimensions) {
+        let dimensionsInfo = "";
+        if (vehicleInfo.dimensions.length) {
+          dimensionsInfo += `Length: ${vehicleInfo.dimensions.length.value}${vehicleInfo.dimensions.length.unit}`;
+        }
+        if (vehicleInfo.dimensions.width) {
+          dimensionsInfo += `${dimensionsInfo ? ", " : ""}Width: ${vehicleInfo.dimensions.width.value}${vehicleInfo.dimensions.width.unit}`;
+        }
+        if (vehicleInfo.dimensions.height) {
+          dimensionsInfo += `${dimensionsInfo ? ", " : ""}Height: ${vehicleInfo.dimensions.height.value}${vehicleInfo.dimensions.height.unit}`;
+        }
+        if (vehicleInfo.dimensions.weight) {
+          dimensionsInfo += `${dimensionsInfo ? ", " : ""}Weight: ${vehicleInfo.dimensions.weight.value}${vehicleInfo.dimensions.weight.unit}`;
+        }
+        if (dimensionsInfo) {
+          vehicleContext += `\n- Dimensions: ${dimensionsInfo}`;
+        }
+      }
+
+      if (vehicleInfo.location) {
+        vehicleContext += `\n- Location: ${vehicleInfo.location}`;
+      }
+
+      if (vehicleInfo.status) {
+        vehicleContext += `\n- Status: ${vehicleInfo.status}`;
+      }
+
+      if (vehicleInfo.description) {
+        vehicleContext += `\n- Description: ${vehicleInfo.description}`;
+      }
+
+      if (vehicleInfo.additionalContext) {
+        vehicleContext += `\n\nAdditional context: ${vehicleInfo.additionalContext}`;
+      }
+
+      prompt +=
+        vehicleContext +
+        "\n\nPlease analyze the image with this vehicle information in mind and ensure the description accurately reflects these details.\n\n";
+    }
+
+    // Add default analysis instructions only for default prompt
+    if (!promptId) {
       prompt +=
         "Provide:\n- angle (front, front 3/4, side, rear 3/4, rear, overhead, under)\n- view (exterior, interior)\n- movement (static, motion)\n- tod (sunrise, day, sunset, night)\n- side (driver, passenger, rear, overhead)\n- description (brief description of what's shown in the image, focusing on visible features)";
     }

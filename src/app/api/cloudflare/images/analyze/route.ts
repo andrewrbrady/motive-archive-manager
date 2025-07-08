@@ -14,14 +14,13 @@ interface Image {
   metadata: any;
   carId: ObjectId | null;
   projectId: ObjectId | null;
-  locationId?: ObjectId;
   createdAt: string;
   updatedAt: string;
 }
 
 interface Car {
   _id: ObjectId;
-  imageIds: string[];
+  imageIds: ObjectId[];
   updatedAt: string;
   make: string;
   model: string;
@@ -34,13 +33,13 @@ interface Car {
 
 interface Gallery {
   _id: ObjectId;
-  imageIds: string[];
+  imageIds: ObjectId[];
   updatedAt: string;
 }
 
 interface Project {
   _id: ObjectId;
-  imageIds: string[];
+  imageIds: ObjectId[];
   updatedAt: string;
 }
 
@@ -64,7 +63,7 @@ export async function POST(request: NextRequest) {
     const vehicleInfo = formData.get("vehicleInfo") as string;
     const customMetadata = formData.get("metadata") as string;
 
-    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🔍 Analyzing image: ${fileName}`);
+    console.log(`🔍 Analyzing image: ${fileName}`);
 
     if (!cloudflareId || !imageUrl || !fileName) {
       return NextResponse.json(
@@ -128,22 +127,7 @@ export async function POST(request: NextRequest) {
     // Perform AI analysis for car uploads or when explicitly requested
     if (shouldAnalyze && finalModelId) {
       try {
-        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Starting AI analysis for ${fileName} (car: ${carId})`);
-
-        // Extract imageContext from metadata if present
-        let parsedCustomMetadata = {};
-        let imageContext = "";
-        if (customMetadata) {
-          try {
-            parsedCustomMetadata = JSON.parse(customMetadata);
-            imageContext = (parsedCustomMetadata as any)?.imageContext || "";
-          } catch (error) {
-            console.error(
-              "Failed to parse custom metadata for context:",
-              error
-            );
-          }
-        }
+        console.log(`Starting AI analysis for ${fileName} (car: ${carId})`);
 
         // Call OpenAI analyze endpoint directly with proper auth header
         const analysisResponse = await fetch(
@@ -159,7 +143,6 @@ export async function POST(request: NextRequest) {
               vehicleInfo: vehicleInfo ? JSON.parse(vehicleInfo) : undefined,
               promptId: finalPromptId,
               modelId: finalModelId,
-              imageContext: imageContext || undefined,
             }),
           }
         );
@@ -167,7 +150,7 @@ export async function POST(request: NextRequest) {
         if (analysisResponse.ok) {
           const result = await analysisResponse.json();
           analysisResult = result.analysis;
-          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`AI analysis completed for ${fileName}:`, analysisResult);
+          console.log(`AI analysis completed for ${fileName}:`, analysisResult);
         } else {
           const errorText = await analysisResponse.text();
           console.error(
@@ -188,49 +171,26 @@ export async function POST(request: NextRequest) {
     let metadata = {};
     let extractedProjectId: string | null = null;
 
-    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🔍 DEBUG: Metadata processing for ${fileName}`);
-    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`  - analysisResult exists: ${!!analysisResult}`);
-    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`  - customMetadata exists: ${!!customMetadata}`);
-    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`  - customMetadata value: ${customMetadata}`);
-
-    // FIRST: Extract projectId and locationId from custom metadata if present
-    let originalMetadata = {};
-    let extractedLocationId: string | null = null;
-    if (customMetadata) {
+    if (analysisResult) {
+      metadata = analysisResult;
+    } else if (customMetadata) {
       try {
         const parsedMetadata = JSON.parse(customMetadata);
-        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`  - parsedMetadata:`, parsedMetadata);
 
-        // Extract projectId and locationId from metadata if present
+        // Extract projectId from metadata if present
         if (parsedMetadata.projectId) {
           extractedProjectId = parsedMetadata.projectId;
-          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`📋 Extracted projectId: ${extractedProjectId}`);
-        }
+          console.log(`📋 Extracted projectId: ${extractedProjectId}`);
 
-        if (parsedMetadata.locationId) {
-          extractedLocationId = parsedMetadata.locationId;
-          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`📍 Extracted locationId: ${extractedLocationId}`);
+          // Remove projectId from metadata since it will be a top-level field
+          const { projectId, ...cleanMetadata } = parsedMetadata;
+          metadata = cleanMetadata;
+        } else {
+          metadata = parsedMetadata;
         }
-
-        // Remove projectId and locationId from metadata since they will be top-level fields
-        const { projectId, locationId, ...cleanMetadata } = parsedMetadata;
-        originalMetadata = cleanMetadata;
       } catch (error) {
         console.error(`Failed to parse custom metadata:`, error);
-        console.error(`  - Raw customMetadata: ${customMetadata}`);
       }
-    }
-
-    // SECOND: Merge analysis results with original metadata (preserving both)
-    if (analysisResult) {
-      metadata = {
-        ...originalMetadata, // Keep original metadata (category, context, etc.)
-        ...analysisResult, // Add AI analysis results
-      };
-      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ Merged analysis results with original metadata`);
-    } else {
-      metadata = originalMetadata;
-      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`📁 Using original metadata only (no analysis)`);
     }
 
     // Create image document
@@ -241,9 +201,6 @@ export async function POST(request: NextRequest) {
       metadata,
       carId: carId ? new ObjectId(carId) : null,
       projectId: extractedProjectId ? new ObjectId(extractedProjectId) : null,
-      ...(extractedLocationId && {
-        locationId: new ObjectId(extractedLocationId),
-      }),
       createdAt: now,
       updatedAt: now,
     };
@@ -252,15 +209,15 @@ export async function POST(request: NextRequest) {
     const imageResult = await collections.images.insertOne(imageDoc as Image);
     const imageId = imageResult.insertedId;
 
-    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ Image inserted with ID: ${imageId}`);
+    console.log(`✅ Image inserted with ID: ${imageId}`);
 
     // Update car, project, or gallery if applicable
     if (carId) {
-      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚗 Associating image ${imageId} with car ${carId}`);
+      console.log(`🚗 Associating image ${imageId} with car ${carId}`);
       await collections.cars.updateOne(
         { _id: new ObjectId(carId) },
         {
-          $push: { imageIds: imageId.toString() },
+          $push: { imageIds: imageId },
           $set: { updatedAt: now },
         }
       );
@@ -273,7 +230,7 @@ export async function POST(request: NextRequest) {
         const projectUpdateResult = await collections.projects.updateOne(
           { _id: new ObjectId(extractedProjectId) },
           {
-            $push: { imageIds: imageId.toString() },
+            $push: { imageIds: imageId },
             $set: { updatedAt: now },
           }
         );
@@ -281,7 +238,7 @@ export async function POST(request: NextRequest) {
         if (projectUpdateResult.matchedCount === 0) {
           console.error(`❌ Project ${extractedProjectId} not found!`);
         } else {
-          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ Associated image with project ${extractedProjectId}`);
+          console.log(`✅ Associated image with project ${extractedProjectId}`);
         }
       } catch (error) {
         console.error(
@@ -290,12 +247,12 @@ export async function POST(request: NextRequest) {
         );
       }
     } else {
-      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`📁 Adding image ${imageId} to general gallery`);
-      // Add to general gallery
+      console.log(`📁 Adding image ${imageId} to general gallery`);
+      // Add to general gallery (store as ObjectId, not string)
       await collections.galleries.updateOne(
         {},
         {
-          $push: { imageIds: imageId.toString() },
+          $push: { imageIds: imageId },
           $set: { updatedAt: now },
         },
         { upsert: true }

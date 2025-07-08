@@ -53,7 +53,7 @@ interface Image {
 
 interface ProjectDocument {
   _id: ObjectId;
-  imageIds: string[];
+  imageIds: ObjectId[];
   updatedAt?: string;
   images?: Image[];
 }
@@ -501,11 +501,11 @@ export async function POST(request: Request) {
 
         const result = await db.collection("images").insertOne(imageDoc);
 
-        // Add to project's imageIds
+        // Add to project's imageIds (store as ObjectId, not string)
         await db.collection("projects").updateOne(
           { _id: projectObjectId },
           {
-            $addToSet: { imageIds: result.insertedId.toString() },
+            $addToSet: { imageIds: result.insertedId },
             $set: { updatedAt: new Date().toISOString() },
           }
         );
