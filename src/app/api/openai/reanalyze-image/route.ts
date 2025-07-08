@@ -41,18 +41,30 @@ export async function POST(request: NextRequest) {
           make: car.make,
           model: car.model,
           year: car.year,
+          vin: car.vin,
           color: car.color,
-          engine: car.engine,
+          interior_color: car.interior_color,
           condition: car.condition,
+          type: car.type,
+          engine: car.engine,
+          transmission: car.transmission,
+          mileage: car.mileage,
+          manufacturing: car.manufacturing,
+          performance: car.performance,
+          interior_features: car.interior_features,
+          dimensions: car.dimensions,
+          location: car.location,
+          status: car.status,
+          description: car.description,
           additionalContext: car.description,
         };
       }
     }
 
-    console.log(`Re-analyzing image: ${image.cloudflareId}`);
-    console.log("Current metadata:", JSON.stringify(image.metadata, null, 2));
-    console.log("Using prompt ID:", promptId || "default");
-    console.log("Using model ID:", modelId || "default");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Re-analyzing image: ${image.cloudflareId}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Current metadata:", JSON.stringify(image.metadata, null, 2));
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Using prompt ID:", promptId || "default");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Using model ID:", modelId || "default");
 
     // Prepare request body for analysis
     const analysisRequestBody: any = {
@@ -122,7 +134,7 @@ export async function POST(request: NextRequest) {
       throw new Error("Failed to update image metadata");
     }
 
-    console.log("Successfully re-analyzed image with enhanced validation");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Successfully re-analyzed image with enhanced validation");
 
     return NextResponse.json({
       success: true,

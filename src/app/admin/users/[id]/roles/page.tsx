@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "sonner";
+import { useAPI } from "@/hooks/useAPI";
 
 interface UserRolesData {
   uid: string;
@@ -22,6 +23,8 @@ interface UserRolesData {
 
 export default function UserRolesPage() {
   const params = useParams();
+  const router = useRouter();
+  const api = useAPI();
   const id = params?.id?.toString();
 
   if (!id) {
@@ -33,6 +36,7 @@ export default function UserRolesPage() {
 
 function UserRolesContent({ userId }: { userId: string }) {
   const router = useRouter();
+  const api = useAPI();
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -42,6 +46,7 @@ function UserRolesContent({ userId }: { userId: string }) {
     creativeRoles: string[];
     status: string;
   } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Available roles and creative roles
   const availableRoles = ["user", "editor", "admin"];
@@ -67,30 +72,22 @@ function UserRolesContent({ userId }: { userId: string }) {
   // Load user data
   useEffect(() => {
     async function fetchUserRoles() {
+      if (!api) {
+        return;
+      }
+
       try {
         setIsLoading(true);
         setIsError(false);
-        // Fetch directly from the main user API endpoint
-        const response = await fetch(`/api/users/${userId}`);
 
-        if (!response.ok) {
-          if (response.status === 404) {
-            toast.error("User not found");
-            router.push("/admin?tab=users");
-            return;
-          }
-
-          const errorData = await response
-            .json()
-            .catch(() => ({ error: "Unknown error" }));
-          toast.error(
-            errorData.error || `Failed to fetch user: ${response.statusText}`
-          );
-          setIsError(true);
-          return;
-        }
-
-        const data = await response.json();
+        const data = (await api.get(`users/${userId}`)) as {
+          uid: string;
+          email: string;
+          name: string;
+          status: string;
+          roles: string[];
+          creativeRoles: string[];
+        };
         setUserData({
           uid: data.uid,
           email: data.email,
@@ -105,8 +102,16 @@ function UserRolesContent({ userId }: { userId: string }) {
           creativeRoles: data.creativeRoles || [],
           status: data.status || "active",
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching user roles:", error);
+        if (
+          error.message?.includes("404") ||
+          error.message?.includes("not found")
+        ) {
+          toast.error("User not found");
+          router.push("/admin?tab=users");
+          return;
+        }
         toast.error("Failed to load user roles. Please try again later.");
         setIsError(true);
       } finally {
@@ -115,7 +120,7 @@ function UserRolesContent({ userId }: { userId: string }) {
     }
 
     fetchUserRoles();
-  }, [userId, router]);
+  }, [userId, router, api]);
 
   // Handle role selection
   const handleRoleChange = (role: string, checked: boolean) => {
@@ -169,36 +174,24 @@ function UserRolesContent({ userId }: { userId: string }) {
 
   // Save changes
   const handleSave = async () => {
-    if (!formData || !userData) return;
+    if (!formData || !userData || !api) return;
 
     try {
       setIsSaving(true);
 
-      // Use the main user API endpoint with updateType: "roles"
-      const response = await fetch(`/api/users/${userId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          updateType: "roles",
-          roles: formData.roles,
-          creativeRoles: formData.creativeRoles,
-          status: formData.status,
-        }),
-      });
+      const result = (await api.put(`users/${userId}`, {
+        updateType: "roles",
+        roles: formData.roles,
+        creativeRoles: formData.creativeRoles,
+        status: formData.status,
+      })) as {
+        user: {
+          roles: string[];
+          creativeRoles: string[];
+          status: string;
+        };
+      };
 
-      if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({ error: "Unknown error" }));
-        throw new Error(
-          errorData.error ||
-            `Failed to update user roles: ${response.statusText}`
-        );
-      }
-
-      const result = await response.json();
       toast.success("User roles updated successfully");
 
       // Refresh user data
@@ -210,22 +203,33 @@ function UserRolesContent({ userId }: { userId: string }) {
       });
 
       // Attempt to refresh the session to sync the role changes
-      try {
-        await fetch("/api/auth/refresh-session");
-      } catch (refreshError) {
-        console.error(
-          "Error refreshing session after role update:",
-          refreshError
-        );
-        // Don't fail the update if this fails
-      }
-    } catch (error) {
+      await refreshSession();
+    } catch (error: any) {
       console.error("Error updating user roles:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update user roles"
-      );
+      toast.error(error.message || "Failed to update user roles");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const refreshSession = async () => {
+    if (!api) {
+      toast.error("Authentication required");
+      return;
+    }
+
+    setRefreshing(true);
+    try {
+      await api.post("auth/refresh-session");
+      toast.success("Session refreshed successfully");
+
+      // Optionally reload the page to reflect changes
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Error refreshing session:", error);
+      toast.error(error.message || "Failed to refresh session");
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -263,6 +267,19 @@ function UserRolesContent({ userId }: { userId: string }) {
         >
           Back to Users
         </Button>
+      </div>
+    );
+  }
+
+  if (!api) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold mb-4">Authentication Required</h1>
+          <p className="text-muted-foreground">
+            Please log in to manage user roles
+          </p>
+        </div>
       </div>
     );
   }

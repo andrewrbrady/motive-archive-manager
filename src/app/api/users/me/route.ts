@@ -32,7 +32,7 @@ async function getUserProfile(
     const authHeader = request.headers.get("authorization") || "";
     const token = authHeader.split("Bearer ")[1];
 
-    console.log("getUserProfile: Starting token verification");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("getUserProfile: Starting token verification");
     const tokenData = await verifyFirebaseToken(token);
 
     if (!tokenData) {
@@ -61,14 +61,14 @@ async function getUserProfile(
 
     // Get user from Firebase Auth for additional info
     const authUser = await adminAuth.getUser(firebaseAuthUid);
-    console.log("getUserProfile: Firebase Auth user found");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("getUserProfile: Firebase Auth user found");
 
     // First try to get user data from Firestore by Firebase Auth UID
     let userDoc = await adminDb.collection("users").doc(firebaseAuthUid).get();
     let userData = userDoc.exists ? userDoc.data() : null;
     let canonicalUserId = firebaseAuthUid;
 
-    console.log("getUserProfile: Firestore document exists:", userDoc.exists);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("getUserProfile: Firestore document exists:", userDoc.exists);
 
     // If not found by Firebase Auth UID, search by email to find existing document
     if (!userData && authUser.email) {
@@ -118,7 +118,7 @@ async function getUserProfile(
 
       await adminDb.collection("users").doc(firebaseAuthUid).set(userData);
       canonicalUserId = firebaseAuthUid;
-      console.log("getUserProfile: New user document created");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("getUserProfile: New user document created");
     }
 
     // Combine data from Firestore and Auth
@@ -140,7 +140,7 @@ async function getUserProfile(
       lastSignInTime: authUser.metadata.lastSignInTime || null,
     };
 
-    console.log("getUserProfile: Successfully returning user profile");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("getUserProfile: Successfully returning user profile");
     return NextResponse.json(userProfile);
   } catch (error: any) {
     console.error("getUserProfile: Error fetching user profile:", error);

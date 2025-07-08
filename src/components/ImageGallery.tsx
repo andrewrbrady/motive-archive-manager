@@ -433,8 +433,8 @@ export function ImageGallery({
   }, [onRemoveImage, selectedImages]);
 
   const handleDeleteAll = async () => {
-    // [REMOVED] // [REMOVED] console.log("=========== DELETE ALL BUTTON CLICKED ===========");
-    // [REMOVED] // [REMOVED] console.log("[DEBUG ImageGallery] Starting handleDeleteAll function");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=========== DELETE ALL BUTTON CLICKED ===========");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[DEBUG ImageGallery] Starting handleDeleteAll function");
     setShowDeleteAllConfirm(false);
     const indices = Array.from({ length: images.length }, (_, i) => i);
 
@@ -494,7 +494,7 @@ export function ImageGallery({
         currentStep: `Successfully deleted ${indices.length} images`,
       });
 
-      // [REMOVED] // [REMOVED] console.log("[DEBUG ImageGallery] Batch deletion completed successfully");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[DEBUG ImageGallery] Batch deletion completed successfully");
 
       // Remove the automatic page reload to allow the API request to complete
       // Instead, let the API response trigger any necessary UI updates
@@ -506,7 +506,7 @@ export function ImageGallery({
       // For now, commenting out the automatic reload that was causing issues
       /*
       setTimeout(() => {
-        // [REMOVED] // [REMOVED] console.log("[DEBUG ImageGallery] Reloading page after delete all");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[DEBUG ImageGallery] Reloading page after delete all");
         window.location.reload();
       }, 1000);
       */
@@ -684,9 +684,9 @@ export function ImageGallery({
   React.useEffect(() => {
     // Log the primary image ID value when it changes
     if (primaryImageId) {
-      // [REMOVED] // [REMOVED] console.log("[ImageGallery] Current primaryImageId:", primaryImageId);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[ImageGallery] Current primaryImageId:", primaryImageId);
     } else {
-      // [REMOVED] // [REMOVED] console.log("[ImageGallery] No primaryImageId set");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[ImageGallery] No primaryImageId set");
     }
   }, [primaryImageId]);
 
@@ -839,7 +839,7 @@ export function ImageGallery({
       )}
 
       <div className={getGridClasses()}>
-        {galleryImages.map((image) => (
+        {galleryImages.map((image, index) => (
           <div key={image.id} className="relative group cursor-pointer">
             <CloudflareImage
               src={image.url}
@@ -849,6 +849,7 @@ export function ImageGallery({
               className="rounded-md"
               onClick={() => handleImageClick(image)}
               variant="gallery"
+              priority={index < 4}
             />
             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
               <Button
@@ -929,15 +930,36 @@ export function ImageGallery({
           </div>
 
           {selectedImage?.metadata && (
-            <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+            <div className="mt-4 space-y-2 text-sm">
               {Object.entries(selectedImage.metadata)
                 .filter(([key]) => key !== "isPrimary")
-                .map(([key, value]) => (
-                  <div key={key} className="flex">
-                    <span className="font-medium capitalize mr-2">{key}:</span>
-                    <span>{String(value)}</span>
-                  </div>
-                ))}
+                .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+                .map(([key, value]) => {
+                  const formatKey = (k: string) =>
+                    k
+                      .replace(/([A-Z])/g, " $1")
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (l) => l.toUpperCase())
+                      .trim();
+
+                  const formatValue = (v: any) => {
+                    if (v === null || v === undefined) return "—";
+                    if (typeof v === "boolean") return v ? "Yes" : "No";
+                    if (typeof v === "object") return JSON.stringify(v);
+                    return String(v);
+                  };
+
+                  return (
+                    <div key={key} className="flex flex-col space-y-1">
+                      <span className="font-medium text-muted-foreground text-xs">
+                        {formatKey(key)}:
+                      </span>
+                      <span className="bg-muted/50 p-2 rounded text-xs font-mono break-all">
+                        {formatValue(value)}
+                      </span>
+                    </div>
+                  );
+                })}
             </div>
           )}
         </DialogContent>
@@ -1008,8 +1030,9 @@ export function ImageGalleryWithData({
   }));
 
   // Find primary image
-  const primaryImageId = images.find((img: any) => img.metadata?.isPrimary)?.id || 
-                        images.find((img: any) => img.metadata?.isPrimary)?._id;
+  const primaryImageId =
+    images.find((img: any) => img.metadata?.isPrimary)?.id ||
+    images.find((img: any) => img.metadata?.isPrimary)?._id;
 
   const handleRemoveImage = async (
     indices: number[],

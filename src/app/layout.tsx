@@ -2,11 +2,12 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/toaster";
-import Providers from "./providers";
+import { Providers } from "./providers";
 import { cn } from "@/lib/utils";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { NavigationCacheProvider } from "@/components/providers/NavigationCacheProvider";
+import { NavigationPerformanceMonitor } from "@/components/performance/NavigationPerformanceMonitor";
 import { Suspense, lazy } from "react";
 
 // ✅ Lazy load heavy components to reduce layout bundle
@@ -61,7 +62,28 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      {/* ✅ REMOVED: Monaco Editor script - only load when needed */}
+      <head>
+        {/* ✅ Prevent dark mode flash with inline script in head */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const theme = localStorage.getItem('theme') || 'dark';
+                  if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
+                } catch (e) {
+                  // Fallback to dark mode if localStorage fails
+                  document.documentElement.classList.add('dark');
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       <body
         className={cn(
           inter.className,
@@ -83,6 +105,7 @@ export default function RootLayout({
             </Suspense>
 
             <Toaster />
+            <NavigationPerformanceMonitor />
           </NavigationCacheProvider>
         </Providers>
         {/* ✅ Only load analytics in production */}

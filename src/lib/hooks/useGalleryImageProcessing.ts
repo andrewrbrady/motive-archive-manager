@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { toast } from "@/components/ui/use-toast";
+import { useAPI } from "@/hooks/useAPI";
 
 interface ProcessImageParams {
   galleryId: string;
   imageId: string;
-  processingType: "canvas-extension" | "image-matte";
+  processingType: "canvas-extension" | "image-matte" | "image-crop";
   parameters: any;
 }
 
@@ -43,34 +44,34 @@ interface ReplaceImageResult {
 export function useGalleryImageProcessing() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isReplacing, setIsReplacing] = useState(false);
+  const api = useAPI();
 
   const previewProcessImage = async (
     params: ProcessImageParams
   ): Promise<PreviewProcessImageResult | null> => {
+    if (!api) {
+      toast({
+        title: "Error",
+        description: "Authentication required",
+        variant: "destructive",
+      });
+      return null;
+    }
+
     setIsProcessing(true);
 
     try {
-      const response = await fetch(
-        `/api/galleries/${params.galleryId}/preview-process-image`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            imageId: params.imageId,
-            processingType: params.processingType,
-            parameters: params.parameters,
-          }),
-        }
+      const endpoint = `galleries/${params.galleryId}/preview-process-image`;
+      const payload = {
+        imageId: params.imageId,
+        processingType: params.processingType,
+        parameters: params.parameters,
+      };
+
+      const result = await api.post<PreviewProcessImageResult>(
+        endpoint,
+        payload
       );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to process image");
-      }
-
-      const result = await response.json();
 
       toast({
         title: "Preview Ready",
@@ -78,14 +79,25 @@ export function useGalleryImageProcessing() {
       });
 
       return result;
-    } catch (error) {
-      console.error("Gallery image processing error:", error);
+    } catch (error: any) {
+      // Extract meaningful error information from API error
+      const errorMessage = error?.message || "Unknown error occurred";
+      const errorStatus = error?.status;
+
+      console.error("Gallery image processing failed:", {
+        message: errorMessage,
+        status: errorStatus,
+        galleryId: params.galleryId,
+        imageId: params.imageId,
+        processingType: params.processingType,
+      });
+
       toast({
-        title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to process image",
+        title: "Processing Failed",
+        description: errorMessage,
         variant: "destructive",
       });
+
       return null;
     } finally {
       setIsProcessing(false);
@@ -95,33 +107,49 @@ export function useGalleryImageProcessing() {
   const replaceImageInGallery = async (
     galleryId: string,
     originalImageId: string,
-    processingType: "canvas-extension" | "image-matte",
+    processingType: "canvas-extension" | "image-matte" | "image-crop",
     parameters: any
   ): Promise<ReplaceImageResult | null> => {
+    if (!api) {
+      toast({
+        title: "Error",
+        description: "Authentication required",
+        variant: "destructive",
+      });
+      return null;
+    }
+
     setIsReplacing(true);
 
+    const payload = {
+      originalImageId,
+      processingType,
+      parameters,
+    };
+
+    console.log(
+      "🚨🚨🚨 useGalleryImageProcessing - CALLING REPLACE API 🚨🚨🚨",
+      {
+        endpoint: `galleries/${galleryId}/replace-image`,
+        payload,
+        galleryId,
+        originalImageId,
+        processingType,
+      }
+    );
+
     try {
-      const response = await fetch(
-        `/api/galleries/${galleryId}/replace-image`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            originalImageId,
-            processingType,
-            parameters,
-          }),
-        }
+      const result = await api.post<ReplaceImageResult>(
+        `galleries/${galleryId}/replace-image`,
+        payload
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to replace image");
-      }
-
-      const result = await response.json();
+      console.log("✅ useGalleryImageProcessing - REPLACE API SUCCESS:", {
+        result,
+        hasProcessedImage: !!result?.processedImage,
+        processedImageId: result?.processedImage?._id,
+        processedImageUrl: result?.processedImage?.url,
+      });
 
       toast({
         title: "Success",
@@ -147,30 +175,26 @@ export function useGalleryImageProcessing() {
   const processImage = async (
     params: ProcessImageParams
   ): Promise<any | null> => {
+    if (!api) {
+      toast({
+        title: "Error",
+        description: "Authentication required",
+        variant: "destructive",
+      });
+      return null;
+    }
+
     setIsProcessing(true);
 
     try {
-      const response = await fetch(
-        `/api/galleries/${params.galleryId}/process-image`,
+      const result = await api.post<any>(
+        `galleries/${params.galleryId}/process-image`,
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            imageId: params.imageId,
-            processingType: params.processingType,
-            parameters: params.parameters,
-          }),
+          imageId: params.imageId,
+          processingType: params.processingType,
+          parameters: params.parameters,
         }
       );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to process image");
-      }
-
-      const result = await response.json();
 
       toast({
         title: "Success",

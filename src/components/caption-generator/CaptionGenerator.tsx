@@ -5,6 +5,8 @@ import { LoadingContainer } from "@/components/ui/loading";
 import { useCaptionData } from "./hooks/useCaptionData";
 import { useFormState } from "./hooks/useFormState";
 import { useGenerationHandlers } from "./hooks/useGenerationHandlers";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 import type { CaptionGeneratorProps, GenerationContext } from "./types";
 
 // Lazy load heavy components for better performance
@@ -35,6 +37,10 @@ export function CaptionGenerator({
   projectId,
   mode = "car",
 }: CaptionGeneratorProps) {
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
+
   // Data management hook
   const captionData = useCaptionData({ carId, projectId, mode });
 
@@ -161,18 +167,8 @@ export function CaptionGenerator({
               savedCaptions={captionData.savedCaptions}
               onUpdateCaption={updateGeneratedCaption}
               onSaveCaption={async (caption: string) => {
-                // Implementation for saving caption
-                const params = new URLSearchParams();
-                if (carId && mode === "car") params.append("carId", carId);
-                if (projectId && mode === "project")
-                  params.append("projectId", projectId);
-
-                const response = await fetch("/api/captions", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
+                try {
+                  const requestData = {
                     caption,
                     platform: formState.platform,
                     context: formState.context,
@@ -180,14 +176,15 @@ export function CaptionGenerator({
                     projectId: mode === "project" ? projectId : undefined,
                     carIds: captionData.selectedCarIds,
                     eventIds: captionData.selectedEventIds,
-                  }),
-                });
+                  };
 
-                if (response.ok) {
+                  await api.post("captions", requestData);
                   await captionData.refetchCaptions();
                   return true;
+                } catch (error) {
+                  toast.error("Failed to save caption");
+                  return false;
                 }
-                return false;
               }}
               loading={captionData.loadingSavedCaptions}
               error={generationState.error}

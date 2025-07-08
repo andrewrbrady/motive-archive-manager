@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "@/hooks/useFirebaseAuth";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 import { Event, EventType } from "@/types/event";
 import {
   Table,
@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format } from "date-fns";
+import { formatEventDateTime } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import Link from "next/link";
 import { PageTitle } from "@/components/ui/PageTitle";
@@ -41,7 +41,7 @@ interface EventWithCar extends Event {
 
 export default function EventsPage() {
   const { data: session, status } = useSession();
-  const { authenticatedFetch } = useAuthenticatedFetch();
+  const api = useAPI();
   const [events, setEvents] = useState<EventWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -58,18 +58,7 @@ export default function EventsPage() {
   };
 
   const formatDate = (dateString: string | undefined | null) => {
-    if (!dateString) return "-";
-    try {
-      const date = new Date(dateString);
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        return "-";
-      }
-      return format(date, "PPp");
-    } catch (error) {
-      console.error("Error formatting date:", dateString, error);
-      return "-";
-    }
+    return formatEventDateTime(dateString);
   };
 
   // Helper function to safely extract car ID
@@ -85,6 +74,11 @@ export default function EventsPage() {
   };
 
   const fetchEvents = async () => {
+    if (!api) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams();
@@ -92,10 +86,9 @@ export default function EventsPage() {
       if (filters.from) queryParams.append("from", filters.from);
       if (filters.to) queryParams.append("to", filters.to);
 
-      const response = await authenticatedFetch(
+      const data = (await api.get(
         `/api/events?${queryParams.toString()}`
-      );
-      const data = await response.json();
+      )) as Event[];
 
       // Fetch car information for each event
       const eventsWithCars = await Promise.all(
@@ -103,14 +96,13 @@ export default function EventsPage() {
           try {
             const carId = event.car_id;
             if (!carId) {
-              console.error("No car_id found for event:", event);
+              // Don't log as error - car_id is optional for events
               return event;
             }
-            const carResponse = await authenticatedFetch(`/api/cars/${carId}`);
-            const car = await carResponse.json();
+            const car = (await api.get(`cars/${carId}`)) as Car;
             return { ...event, car };
           } catch (error) {
-            console.error("Error fetching car:", error);
+            console.error("Error fetching car for event:", event.id, error);
             return event;
           }
         })
@@ -126,11 +118,24 @@ export default function EventsPage() {
   };
 
   useEffect(() => {
-    // Only fetch when authenticated
-    if (status === "authenticated" && session?.user) {
+    // Only fetch when authenticated and API is available
+    if (status === "authenticated" && session?.user && api) {
       fetchEvents();
     }
-  }, [status, session, filters]);
+  }, [status, session, api, filters]);
+
+  // Authentication guard
+  if (!api) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-lg">Loading...</div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   // Show loading while authentication is being handled
   if (status === "loading") {
@@ -237,8 +242,14 @@ export default function EventsPage() {
                         >
                           {`${event.car.year} ${event.car.make} ${event.car.model}`}
                         </Link>
+                      ) : event.project_id ? (
+                        <span className="text-muted-foreground italic">
+                          Project Event
+                        </span>
                       ) : (
-                        "Loading..."
+                        <span className="text-muted-foreground italic">
+                          General Event
+                        </span>
                       )}
                     </TableCell>
                     <TableCell>{formatEventType(event.type)}</TableCell>

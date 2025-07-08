@@ -103,6 +103,7 @@ export async function POST(
         metrics: deliverableData.metrics,
         assets_location: deliverableData.assets_location,
         priority_level: deliverableData.priority_level,
+        scheduled: deliverableData.scheduled || false,
         created_at: new Date(),
         updated_at: new Date(),
       });

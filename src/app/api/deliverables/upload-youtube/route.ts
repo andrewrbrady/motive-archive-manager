@@ -29,8 +29,8 @@ export async function POST(req: NextRequest) {
       process.env.YOUTUBE_CHANNEL_ID || "UCLG_UKlNif6A19Kaact2otA";
     const targetChannelId = channel_id || MOTIVE_ARCHIVE_CHANNEL_ID;
 
-    console.log("Starting YouTube upload for deliverable:", deliverable_id);
-    console.log("Using channel ID:", targetChannelId);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Starting YouTube upload for deliverable:", deliverable_id);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Using channel ID:", targetChannelId);
 
     // Validate deliverable ID
     if (!ObjectId.isValid(deliverable_id)) {
@@ -162,7 +162,8 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function isVideoDeliverable(type: string): boolean {
+function isVideoDeliverable(type: string | undefined): boolean {
+  if (!type) return false;
   const videoTypes = [
     "Video",
     "Video Gallery",

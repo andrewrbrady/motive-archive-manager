@@ -16,7 +16,7 @@ export default function CuratorSection() {
       </div>
       <div className="w-1/2 relative hidden md:block">
         <Image
-          src="https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/4dbb830b-9fdf-4682-5d27-6c0f33cc1a00/public"
+          src="https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/4dbb830b-9fdf-4682-5d27-6c0f33cc1a00/w=1200,q=95"
           alt="Ferrari Detail Shot"
           className="object-cover"
           fill
@@ -28,7 +28,7 @@ export default function CuratorSection() {
       {/* Mobile image - shown below text on smaller screens */}
       <div className="md:hidden w-full mt-8 relative aspect-[4/3]">
         <Image
-          src="https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/4dbb830b-9fdf-4682-5d27-6c0f33cc1a00/public"
+          src="https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/4dbb830b-9fdf-4682-5d27-6c0f33cc1a00/w=800,q=90"
           alt="Ferrari Detail Shot"
           fill
           className="object-cover"

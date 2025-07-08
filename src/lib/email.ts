@@ -19,7 +19,7 @@ console.log("SendGrid API Key check:", {
 
 if (sendgridApiKey) {
   sgMail.setApiKey(sendgridApiKey);
-  console.log("SendGrid API key initialized successfully");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("SendGrid API key initialized successfully");
 } else {
   console.error("SendGrid API key not found in environment variables");
   console.log(

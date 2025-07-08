@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,7 +9,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Upload, Plus } from "lucide-react";
+import { Upload, Plus, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import CarImageUpload from "@/components/ui/CarImageUpload";
 
 interface UploadDialogProps {
@@ -31,8 +32,18 @@ export function UploadDialog({
   showAsEmptyState = false,
   showAsButton = false,
 }: UploadDialogProps) {
-  const handleUploadError = () => {
-    // Error handling is done in CarImageUpload component
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleUploadError = (error: string) => {
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Upload error:", error);
+    setUploadError(error);
+  };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    if (!open) {
+      setUploadError(null); // Clear error when dialog closes
+    }
+    onOpenChange(open);
   };
 
   // Empty state display
@@ -41,31 +52,37 @@ export function UploadDialog({
       <div className="flex flex-col items-center justify-center h-96 gap-4">
         <Upload className="w-12 h-12 text-muted-foreground" />
         <p className="text-lg font-medium">No images yet</p>
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="w-4 h-4 mr-2" />
               Upload Images
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
+          <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Upload Images</DialogTitle>
-              <DialogDescription>
-                Upload images for this car. They will be automatically assigned
-                to {vehicleInfo?.year} {vehicleInfo?.make} {vehicleInfo?.model}.
-              </DialogDescription>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto py-4">
+              {uploadError && (
+                <Alert className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{uploadError}</AlertDescription>
+                </Alert>
+              )}
               <CarImageUpload
                 carId={carId}
                 vehicleInfo={vehicleInfo}
                 onComplete={onComplete}
                 onError={handleUploadError}
+                onCancel={() => handleDialogOpenChange(false)}
               />
             </div>
             <DialogFooter className="flex-shrink-0">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button
+                variant="outline"
+                onClick={() => handleDialogOpenChange(false)}
+              >
                 Cancel
               </Button>
             </DialogFooter>
@@ -78,34 +95,35 @@ export function UploadDialog({
   // Button-only display
   if (showAsButton) {
     return (
-      <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
         <DialogTrigger asChild>
           <Button>
             <Plus className="w-4 h-4 mr-2" />
             Upload Images
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Upload Images</DialogTitle>
-            <DialogDescription>
-              Upload images for this car. They will be automatically assigned to{" "}
-              {vehicleInfo?.year} {vehicleInfo?.make} {vehicleInfo?.model}.
-            </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto py-4">
+            {uploadError && (
+              <Alert className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{uploadError}</AlertDescription>
+              </Alert>
+            )}
             <CarImageUpload
               carId={carId}
               vehicleInfo={vehicleInfo}
-              onComplete={onComplete}
+              onComplete={() => {
+                onComplete();
+                handleDialogOpenChange(false);
+              }}
               onError={handleUploadError}
+              onCancel={() => handleDialogOpenChange(false)}
             />
           </div>
-          <DialogFooter className="flex-shrink-0">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     );
@@ -113,28 +131,29 @@ export function UploadDialog({
 
   // Regular dialog (controlled externally)
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
+    <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Upload Images</DialogTitle>
-          <DialogDescription>
-            Upload images for this car. They will be automatically assigned to{" "}
-            {vehicleInfo?.year} {vehicleInfo?.make} {vehicleInfo?.model}.
-          </DialogDescription>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto py-4">
+          {uploadError && (
+            <Alert className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{uploadError}</AlertDescription>
+            </Alert>
+          )}
           <CarImageUpload
             carId={carId}
             vehicleInfo={vehicleInfo}
-            onComplete={onComplete}
+            onComplete={() => {
+              onComplete();
+              handleDialogOpenChange(false);
+            }}
             onError={handleUploadError}
+            onCancel={() => handleDialogOpenChange(false)}
           />
         </div>
-        <DialogFooter className="flex-shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

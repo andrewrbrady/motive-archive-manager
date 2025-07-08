@@ -12,12 +12,12 @@ interface PlatformSetting {
 
 // GET - Fetch platform settings for admin management
 export async function GET(request: NextRequest) {
-  console.log("🔒 GET /api/admin/platform-settings: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/admin/platform-settings: Starting request");
 
   // Check authentication and admin role
   const authResult = await verifyAuthMiddleware(request, ["admin"]);
   if (authResult) {
-    console.log("❌ GET /api/admin/platform-settings: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ GET /api/admin/platform-settings: Authentication failed");
     return authResult;
   }
 
@@ -53,12 +53,12 @@ export async function GET(request: NextRequest) {
 
 // POST - Save platform settings
 export async function POST(request: NextRequest) {
-  console.log("🔒 POST /api/admin/platform-settings: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 POST /api/admin/platform-settings: Starting request");
 
   // Check authentication and admin role
   const authResult = await verifyAuthMiddleware(request, ["admin"]);
   if (authResult) {
-    console.log("❌ POST /api/admin/platform-settings: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ POST /api/admin/platform-settings: Authentication failed");
     return authResult;
   }
 
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
 
 // DELETE - Delete a specific platform setting
 export async function DELETE(request: NextRequest) {
-  console.log("🔒 DELETE /api/admin/platform-settings: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 DELETE /api/admin/platform-settings: Starting request");
 
   // Check authentication and admin role
   const authResult = await verifyAuthMiddleware(request, ["admin"]);

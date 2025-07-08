@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/tooltip";
 import { debounce } from "lodash";
 import { CarIcon, HardDriveIcon } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 const LIMIT_OPTIONS = [100, 10, 25, 50];
 
@@ -54,7 +56,7 @@ const fetchWithTimeout = async (url: string, options = {}, timeout = 30000) => {
   const controller = new AbortController();
   const { signal } = controller;
 
-  // [REMOVED] // [REMOVED] console.log(`Starting fetch with ${timeout}ms timeout: ${url}`);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Starting fetch with ${timeout}ms timeout: ${url}`);
   const timeoutId = setTimeout(() => {
     console.warn(`Request to ${url} timed out after ${timeout}ms`);
     controller.abort();
@@ -176,6 +178,7 @@ const AssetRow = memo(
                     );
                   }
                   // Fall back to the DriveLabel component if we don't have the data
+                  // This will handle fetching the drive name from the LabelsContext
                   return (
                     <DriveLabel
                       key={`${asset._id}-drive-${index}`}
@@ -221,6 +224,7 @@ export default function RawAssetsTab() {
   const router = useRouter();
   const { getParam, updateParams } = useUrlParams();
   const { fetchCarLabels, fetchDriveLabels } = useLabels();
+  const api = useAPI();
   const [assets, setAssets] = useState<RawAsset[]>([]);
   const [filteredAssets, setFilteredAssets] = useState<RawAsset[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -294,12 +298,12 @@ export default function RawAssetsTab() {
 
       // Queue batch fetches without causing immediate API calls
       if (carIds.size) {
-        // [REMOVED] // [REMOVED] console.log(`Prefetching ${carIds.size} car labels`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Prefetching ${carIds.size} car labels`);
         fetchCarLabels(Array.from(carIds));
       }
 
       if (driveIds.size) {
-        // [REMOVED] // [REMOVED] console.log(`Prefetching ${driveIds.size} hard drive labels`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Prefetching ${driveIds.size} hard drive labels`);
         fetchDriveLabels(Array.from(driveIds));
       }
     },
@@ -329,7 +333,7 @@ export default function RawAssetsTab() {
 
         // Use an increasing timeout based on retry attempts
         const timeout = 30000 + fetchAttempts * 15000; // Increased timeouts: 30s, 45s, 60s
-        // [REMOVED] // [REMOVED] console.log(`Using timeout of ${timeout}ms for this request`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Using timeout of ${timeout}ms for this request`);
 
         // Get the current URL search parameters
         const hardDriveId = getParam("hardDriveId") || "";
@@ -345,7 +349,7 @@ export default function RawAssetsTab() {
           queryUrl += `&hardDriveId=${encodeURIComponent(hardDriveId)}`;
         }
 
-        // [REMOVED] // [REMOVED] console.log("Fetching from URL:", queryUrl);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching from URL:", queryUrl);
 
         // Use the fetchWithTimeout function
         const response = await fetchWithTimeout(queryUrl, {}, timeout);
@@ -360,17 +364,17 @@ export default function RawAssetsTab() {
         console.timeEnd(timerName);
 
         // Log the API response structure to help debug
-        // [REMOVED] // [REMOVED] console.log("Raw Assets API Response structure:", Object.keys(data));
-        // [REMOVED] // [REMOVED] console.log("Raw Assets meta:", data.meta);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Raw Assets API Response structure:", Object.keys(data));
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Raw Assets meta:", data.meta);
 
         // Log debug info if available
         if (data.debug) {
-          // [REMOVED] // [REMOVED] console.log("Raw assets API debug info:", data.debug);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Raw assets API debug info:", data.debug);
         }
 
         // Add better data validation before setting state
         const assetsList = Array.isArray(data.data) ? data.data : [];
-        // [REMOVED] // [REMOVED] console.log(`Received ${assetsList.length} raw assets`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Received ${assetsList.length} raw assets`);
 
         // Add defensive check to ensure each asset has required properties
         const sanitizedAssets = assetsList.map((asset: any) => ({
@@ -449,7 +453,7 @@ export default function RawAssetsTab() {
           setLoading(true);
           const nextAttempt = fetchAttempts + 1;
           setFetchAttempts(nextAttempt);
-          // [REMOVED] // [REMOVED] console.log(`Retry attempt ${nextAttempt} of ${maxRetries}`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Retry attempt ${nextAttempt} of ${maxRetries}`);
 
           // Exponential backoff for retries with jitter for resource errors
           // Add extra backoff time for resource errors
@@ -507,17 +511,10 @@ export default function RawAssetsTab() {
   // Function to fetch a specific asset by ID
   const fetchAssetById = useCallback(
     async (assetId: string) => {
+      if (!api) return;
+
       try {
-        // [REMOVED] // [REMOVED] console.log(`Fetching specific asset by ID: ${assetId}`);
-        const response = await fetch(`/api/raw/${assetId}`);
-
-        if (!response.ok) {
-          throw new Error(
-            `Server error: ${response.status} ${response.statusText}`
-          );
-        }
-
-        const asset = await response.json();
+        const asset = await api.get<any>(`/raw/${assetId}`);
 
         if (!asset || !asset._id) {
           throw new Error(`Asset not found: ${assetId}`);
@@ -549,10 +546,10 @@ export default function RawAssetsTab() {
         // Let the useEffect handle label fetching instead of doing it here
       } catch (error) {
         console.error(`Error fetching asset ${assetId}:`, error);
-        // No need to set global error state for a single asset fetch failure
+        toast.error("Failed to fetch asset details");
       }
     },
-    [getParam] // Only depend on getParam
+    [getParam, api] // Added api to dependencies
   );
 
   // Handle Escape key press for both modals
@@ -584,12 +581,20 @@ export default function RawAssetsTab() {
     const selectedAssetId = getParam("asset");
     const isEdit = getParam("edit") === "true";
 
+    console.log("RawAssetsTab URL params effect:", {
+      selectedAssetId,
+      isEdit,
+      isEditModalOpen,
+      isDetailsModalOpen,
+      assetsLength: assets.length,
+    });
+
     // Skip processing if no asset ID is specified or if we're explicitly
     // closing the modal (when both asset and isEdit are missing/false)
     if (!selectedAssetId) {
       // If no asset selected in URL and modal is open, close it
       if (isEditModalOpen && !isEdit) {
-        // [REMOVED] // [REMOVED] console.log("Closing edit modal due to URL parameter changes");
+        console.log("Closing edit modal due to URL parameter changes");
         setIsEditModalOpen(false);
       }
       return;
@@ -612,7 +617,7 @@ export default function RawAssetsTab() {
           // Only set the asset data if the edit modal is not already open
           // This prevents overwriting the current edit with stale data
           if (!isEditModalOpen) {
-            // [REMOVED] // [REMOVED] console.log("Opening edit modal for asset:", asset._id);
+            console.log("Opening edit modal for asset:", asset._id);
             const rawAssetData: RawAssetData = {
               _id: asset._id as unknown as ObjectId,
               date: asset.date,
@@ -624,6 +629,9 @@ export default function RawAssetsTab() {
             };
             setSelectedAssetForDetails(rawAssetData);
             setIsEditModalOpen(true);
+            console.log(
+              "Edit modal state set to true, selectedAssetForDetails set"
+            );
           }
         } else if (!isDetailsModalOpen) {
           // Only set the details if the details modal is not already open
@@ -639,16 +647,16 @@ export default function RawAssetsTab() {
             updatedAt: asset.updatedAt,
           });
           setIsDetailsModalOpen(true);
-          // [REMOVED] // [REMOVED] console.log("Opening details modal for asset:", asset._id);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Opening details modal for asset:", asset._id);
         }
       } else {
-        // [REMOVED] // [REMOVED] console.log("Asset not found in loaded assets, fetching from API");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Asset not found in loaded assets, fetching from API");
         // Asset not found in currently loaded assets, fetch it directly
         fetchAssetById(selectedAssetId);
       }
     } else {
       // If assets aren't loaded yet, fetch the specific asset
-      // [REMOVED] // [REMOVED] console.log("Assets not loaded yet, fetching specific asset");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Assets not loaded yet, fetching specific asset");
       fetchAssetById(selectedAssetId);
     }
   }, [assets, getParam, isEditModalOpen, isDetailsModalOpen]); // Removed fetchAssetById from dependencies
@@ -765,46 +773,36 @@ export default function RawAssetsTab() {
   // Handle edit button click
   const handleEdit = useCallback(
     (asset: RawAsset) => {
+      console.log("RawAssetsTab handleEdit called for asset:", asset._id);
       updateParams({ asset: asset._id, edit: "true" });
     },
     [updateParams]
   );
 
   // Handle delete button click
-  const handleDeleteAsset = useCallback(async (assetId: string) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this asset? This cannot be undone."
-      )
-    )
-      return;
+  const handleDelete = useCallback(
+    async (assetId: string) => {
+      if (!api) return;
+      if (!window.confirm("Are you sure you want to delete this asset?"))
+        return;
 
-    try {
-      const response = await fetch(`/api/raw/${assetId}`, {
-        method: "DELETE",
-      });
+      try {
+        await api.delete(`/raw/${assetId}`);
 
-      if (!response.ok) {
-        throw new Error(
-          `Failed to delete asset: ${response.status} ${response.statusText}`
-        );
+        // Remove from local state
+        setAssets((prev) => prev.filter((a) => a._id !== assetId));
+        toast.success("Asset deleted successfully");
+      } catch (error) {
+        console.error(`Error deleting asset ${assetId}:`, error);
+        toast.error("Failed to delete asset");
       }
-
-      // Remove from local state
-      setAssets((prev) => prev.filter((a) => a._id !== assetId));
-      // [REMOVED] // [REMOVED] console.log(`Asset ${assetId} deleted successfully`);
-    } catch (error) {
-      console.error(`Error deleting asset ${assetId}:`, error);
-      alert(
-        `Failed to delete asset: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    }
-  }, []);
+    },
+    [api]
+  );
 
   // Handle bulk delete function
   const handleDeleteAll = useCallback(async () => {
+    if (!api) return;
     if (
       !window.confirm(
         "Are you sure you want to delete ALL assets? This cannot be undone!"
@@ -820,30 +818,20 @@ export default function RawAssetsTab() {
 
     try {
       setLoading(true);
-      const response = await fetch("/api/raw/delete-all", {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete all assets");
-      }
+      await api.delete("/raw/delete-all");
 
       // Clear local state
       setAssets([]);
       setTotalPages(1);
       setCurrentPage(1);
-      alert("All assets have been deleted.");
+      toast.success("All assets have been deleted");
     } catch (error) {
       console.error("Error deleting all assets:", error);
-      alert(
-        `Error deleting all assets: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
+      toast.error("Failed to delete all assets");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [api]);
 
   // Handle closing the edit modal
   const handleCloseModal = useCallback(() => {
@@ -854,31 +842,17 @@ export default function RawAssetsTab() {
   // Handle save from edit modal
   const handleSave = useCallback(
     async (updatedAsset: Partial<RawAssetData>) => {
+      if (!api) return;
+
       try {
         if (!updatedAsset._id) {
           throw new Error("Missing asset ID");
         }
 
-        const response = await fetch(`/api/raw/${updatedAsset._id}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(updatedAsset),
-        });
-
-        const result = await response.json();
-        // [REMOVED] // [REMOVED] console.log("Server response:", result); // Debug log
-
-        if (!response.ok) {
-          // Get the error message from the server response if available
-          const errorMessage =
-            result.error ||
-            result.message ||
-            response.statusText ||
-            "Failed to update asset";
-          throw new Error(errorMessage);
-        }
+        const result = await api.put<any>(
+          `/raw/${updatedAsset._id}`,
+          updatedAsset
+        );
 
         // Make sure we have a valid result before proceeding
         if (!result || typeof result !== "object") {
@@ -939,16 +913,15 @@ export default function RawAssetsTab() {
         // Close the modal
         handleCloseModal();
 
-        // [REMOVED] // [REMOVED] console.log("Asset updated successfully:", updatedData);
+        toast.success("Asset updated successfully");
       } catch (error) {
         console.error("Error updating asset:", error);
-        // Show the actual error message from the server
-        alert(
-          error instanceof Error ? error.message : "Unknown error occurred"
+        toast.error(
+          error instanceof Error ? error.message : "Failed to update asset"
         );
       }
     },
-    [handleCloseModal, fetchCarLabels, fetchDriveLabels]
+    [handleCloseModal, fetchCarLabels, fetchDriveLabels, api]
   );
 
   // Handle adding a new asset
@@ -965,35 +938,32 @@ export default function RawAssetsTab() {
   // Handle add asset
   const handleAddAsset = useCallback(
     async (newAsset: RawAssetData) => {
-      try {
-        const response = await fetch("/api/raw", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(newAsset),
-        });
+      if (!api) return;
 
-        if (!response.ok) {
-          throw new Error("Failed to add asset");
-        }
+      try {
+        const result = await api.post<any>("/raw", newAsset);
+
+        // The api.post method returns the response data directly, not a Response object
+        // So we don't need to check result.ok - if we get here, it was successful
+        console.log("Asset added successfully:", result);
 
         // Close the modal and refresh the list
         handleCloseAddAsset();
         fetchAssets();
 
-        // [REMOVED] // [REMOVED] console.log("Asset added successfully");
+        toast.success("Asset added successfully");
       } catch (error) {
         console.error("Error adding asset:", error);
-        alert(
-          `Failed to add asset: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
-        );
+        toast.error("Failed to add asset");
       }
     },
-    [handleCloseAddAsset, fetchAssets]
+    [handleCloseAddAsset, fetchAssets, api]
   );
+
+  // Add authentication check
+  if (!api) {
+    return <LoadingContainer />;
+  }
 
   if (loading) {
     return (
@@ -1214,7 +1184,7 @@ export default function RawAssetsTab() {
                   key={asset._id?.toString() || Math.random().toString()}
                   asset={asset}
                   onEdit={handleEdit}
-                  onDelete={handleDeleteAsset}
+                  onDelete={handleDelete}
                   onClick={handleAssetClick}
                 />
               ))

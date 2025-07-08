@@ -32,7 +32,7 @@ import { Switch } from "@/components/ui/switch";
 import { PlusCircle, Edit, Trash2, Settings } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { SystemPrompt } from "@/app/api/system-prompts/route";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 const SystemPromptsContent: React.FC = () => {
   const [systemPrompts, setSystemPrompts] = useState<SystemPrompt[]>([]);
@@ -49,24 +49,21 @@ const SystemPromptsContent: React.FC = () => {
     isActive: false,
   });
 
-  const { authenticatedFetch, isAuthenticated, hasValidToken } =
-    useAuthenticatedFetch();
+  const api = useAPI();
 
   useEffect(() => {
-    if (isAuthenticated && hasValidToken) {
+    if (api) {
       fetchSystemPrompts();
     }
-  }, [isAuthenticated, hasValidToken]);
+  }, [api]);
 
   const fetchSystemPrompts = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
       setError(null);
-      const response = await authenticatedFetch("/api/system-prompts");
-      if (!response.ok) {
-        throw new Error("Failed to fetch system prompts");
-      }
-      const data = await response.json();
+      const data = (await api.get("/api/system-prompts")) as SystemPrompt[];
       setSystemPrompts(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -113,27 +110,19 @@ const SystemPromptsContent: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!api) return;
+
     setIsSubmitting(true);
 
     try {
-      const url = "/api/system-prompts";
-      const method = editingPrompt ? "PUT" : "POST";
-
       const body = editingPrompt
         ? { id: editingPrompt._id, ...formData }
         : { ...formData };
 
-      const response = await authenticatedFetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to save system prompt");
+      if (editingPrompt) {
+        await api.put("/api/system-prompts", body);
+      } else {
+        await api.post("/api/system-prompts", body);
       }
 
       toast({
@@ -155,22 +144,12 @@ const SystemPromptsContent: React.FC = () => {
   };
 
   const handleDelete = async (prompt: SystemPrompt) => {
-    if (!confirm(`Are you sure you want to delete "${prompt.name}"?`)) {
+    if (!api || !confirm(`Are you sure you want to delete "${prompt.name}"?`)) {
       return;
     }
 
     try {
-      const response = await authenticatedFetch(
-        `/api/system-prompts?id=${prompt._id}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete system prompt");
-      }
+      await api.delete(`/api/system-prompts?id=${prompt._id}`);
 
       toast({
         title: "Success",
@@ -188,30 +167,16 @@ const SystemPromptsContent: React.FC = () => {
   };
 
   const handleToggleActive = async (prompt: SystemPrompt) => {
+    if (!api) return;
+
     try {
-      const response = await authenticatedFetch("/api/system-prompts", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: prompt._id,
-          name: prompt.name,
-          description: prompt.description,
-          prompt: prompt.prompt,
-          type: prompt.type,
-          isActive: !prompt.isActive,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update system prompt");
-      }
-
-      toast({
-        title: "Success",
-        description: `System prompt ${!prompt.isActive ? "activated" : "deactivated"}`,
+      await api.put("/api/system-prompts", {
+        id: prompt._id,
+        name: prompt.name,
+        description: prompt.description,
+        prompt: prompt.prompt,
+        type: prompt.type,
+        isActive: !prompt.isActive,
       });
 
       await fetchSystemPrompts();
@@ -248,16 +213,12 @@ const SystemPromptsContent: React.FC = () => {
     }
   };
 
-  if (isLoading || !isAuthenticated || !hasValidToken) {
+  if (isLoading || !api) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p>
-            {!isAuthenticated || !hasValidToken
-              ? "Authenticating..."
-              : "Loading system prompts..."}
-          </p>
+          <p>{!api ? "Authenticating..." : "Loading system prompts..."}</p>
         </div>
       </div>
     );

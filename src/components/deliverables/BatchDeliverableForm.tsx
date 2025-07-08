@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { BatchTemplate } from "@/types/deliverable";
+import { useAPI } from "@/hooks/useAPI";
 import { addDays, format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
@@ -34,10 +34,33 @@ interface BatchDeliverableFormProps {
   onDeliverableCreated?: () => void;
 }
 
+// Define batch interface locally
+interface DeliverableTemplate {
+  title: string;
+  platform_id?: string;
+  platform?: string; // Legacy field
+  mediaTypeId?: string;
+  type?: string; // Legacy field
+  duration?: number;
+  aspect_ratio: string;
+  daysUntilDeadline: number;
+  daysUntilRelease?: number;
+}
+
+interface BatchTemplate {
+  name: string;
+  templates: DeliverableTemplate[];
+}
+
+interface BatchTemplatesResponse {
+  templates: Record<string, BatchTemplate>;
+}
+
 export default function BatchDeliverableForm({
   carId,
   onDeliverableCreated,
 }: BatchDeliverableFormProps) {
+  const api = useAPI();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<string>("");
   const [startDate, setStartDate] = useState<Date>(new Date());
@@ -45,16 +68,15 @@ export default function BatchDeliverableForm({
   const [templates, setTemplates] = useState<Record<string, BatchTemplate>>({});
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && api) {
       fetchTemplates();
     }
-  }, [isOpen]);
+  }, [isOpen, api]);
 
   const fetchTemplates = async () => {
+    if (!api) return;
     try {
-      const response = await fetch("/api/batch-templates");
-      if (!response.ok) throw new Error("Failed to fetch templates");
-      const data = await response.json();
+      const data = (await api.get("batch-templates")) as BatchTemplatesResponse;
       setTemplates(data.templates);
     } catch (error) {
       console.error("Error fetching templates:", error);
@@ -105,6 +127,8 @@ export default function BatchDeliverableForm({
       return;
     }
 
+    if (!api) return;
+
     setIsSubmitting(true);
 
     try {
@@ -136,13 +160,7 @@ export default function BatchDeliverableForm({
           edit_dates: [],
         };
 
-        return fetch(`/api/cars/${carId}/deliverables`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(deliverableData),
-        });
+        return api.post(`cars/${carId}/deliverables`, deliverableData);
       });
 
       await Promise.all(promises);

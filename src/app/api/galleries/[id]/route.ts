@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 
 // GET gallery by ID
 export async function GET(request: Request) {
@@ -162,7 +162,7 @@ export async function GET(request: Request) {
       images: images.map((img) => ({
         ...img,
         _id: img._id.toString(),
-        url: getFormattedImageUrl(img.url), // Format the URL with /public suffix
+        url: fixCloudflareImageUrl(img.url),
       })),
       // Add debugging info
       _debug: {
@@ -190,7 +190,7 @@ export async function PUT(request: Request) {
     const segments = url.pathname.split("/");
     const id = segments[segments.length - 1];
     const body = await request.json();
-    const { name, description, imageIds, orderedImages } = body;
+    const { name, description, imageIds, orderedImages, primaryImageId } = body;
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -214,6 +214,15 @@ export async function PUT(request: Request) {
       return new ObjectId(id);
     });
 
+    // Handle primaryImageId - use provided value or default to first image
+    let processedPrimaryImageId: ObjectId | undefined;
+    if (primaryImageId && ObjectId.isValid(primaryImageId)) {
+      processedPrimaryImageId = new ObjectId(primaryImageId);
+    } else if (processedImageIds.length > 0) {
+      // Default to first image if no primaryImageId specified
+      processedPrimaryImageId = processedImageIds[0];
+    }
+
     const objectId = new ObjectId(id);
     const db = await getDatabase();
     const galleriesCollection = db.collection("galleries");
@@ -223,6 +232,7 @@ export async function PUT(request: Request) {
         name,
         description,
         imageIds: processedImageIds,
+        primaryImageId: processedPrimaryImageId,
         orderedImages: orderedImages || null,
         updatedAt: new Date().toISOString(),
       },
@@ -243,6 +253,7 @@ export async function PUT(request: Request) {
       ...result,
       _id: result._id.toString(),
       imageIds: result.imageIds.map((id: ObjectId) => id.toString()),
+      primaryImageId: result.primaryImageId?.toString(),
     });
   } catch (error) {
     console.error("Error updating gallery:", error);

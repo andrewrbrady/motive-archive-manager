@@ -15,12 +15,12 @@ import { ObjectId } from "mongodb";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  console.log("🔒 GET /api/projects/templates: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/projects/templates: Starting request");
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
   if (authResult) {
-    console.log("❌ GET /api/projects/templates: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ GET /api/projects/templates: Authentication failed");
     return authResult;
   }
 
@@ -99,12 +99,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log("🔒 POST /api/projects/templates: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 POST /api/projects/templates: Starting request");
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
   if (authResult) {
-    console.log("❌ POST /api/projects/templates: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ POST /api/projects/templates: Authentication failed");
     return authResult;
   }
 

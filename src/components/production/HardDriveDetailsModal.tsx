@@ -33,6 +33,7 @@ import { UrlModal } from "@/components/ui/url-modal";
 import { useUrlParams } from "@/hooks/useUrlParams";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { cn } from "@/lib/utils";
+import { useAPI } from "@/hooks/useAPI";
 
 interface HardDriveDetailsModalProps {
   driveId: string | null;
@@ -81,8 +82,9 @@ export default function HardDriveDetailsModal({
   onClose,
   onDriveUpdate,
 }: HardDriveDetailsModalProps) {
-  // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal rendered with driveId:", driveId);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal rendered with driveId:", driveId);
 
+  const api = useAPI();
   const [drive, setDrive] = useState<HardDrive | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<RawAssetData | null>(null);
   const [driveLabels, setDriveLabels] = useState<Record<string, string>>({});
@@ -111,25 +113,25 @@ export default function HardDriveDetailsModal({
   // Check URL parameters on mount and when they change
   useEffect(() => {
     const driveParam = getParam("drive");
-    // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal - URL drive parameter:", driveParam);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal - URL drive parameter:", driveParam);
 
     if (driveParam) {
-      // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal - Setting isModalOpen to true");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal - Setting isModalOpen to true");
       setIsModalOpen(true);
     } else {
-      // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal - Setting isModalOpen to false");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal - Setting isModalOpen to false");
       setIsModalOpen(false);
     }
   }, [getParam]);
 
   // Log when isModalOpen changes
   useEffect(() => {
-    // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal - isModalOpen changed to:", isModalOpen);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("HardDriveDetailsModal - isModalOpen changed to:", isModalOpen);
   }, [isModalOpen]);
 
   // Handle opening raw asset details
   const handleAssetClick = (asset: RawAsset) => {
-    // [REMOVED] // [REMOVED] console.log("Navigating to raw asset:", asset._id);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Navigating to raw asset:", asset._id);
 
     // First close the current modal to prevent any state conflicts
     if (onClose) {
@@ -157,12 +159,12 @@ export default function HardDriveDetailsModal({
       }
     });
 
-    // [REMOVED] // [REMOVED] console.log("Setting URL directly to:", url.toString());
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Setting URL directly to:", url.toString());
     window.history.pushState({}, "", url.toString());
 
     // Finally update the Next.js router state to keep it in sync
     setTimeout(() => {
-      // [REMOVED] // [REMOVED] console.log("Updating Next.js router for raw asset:", asset._id);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Updating Next.js router for raw asset:", asset._id);
       updateParams(
         {
           tab: "raw-assets",
@@ -182,7 +184,7 @@ export default function HardDriveDetailsModal({
           clearOthers: false, // Keep existing parameters to maintain context
         }
       );
-      // [REMOVED] // [REMOVED] console.log("Next.js router update completed for raw asset");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Next.js router update completed for raw asset");
     }, 100); // Reduced timeout for faster response
   };
 
@@ -198,23 +200,32 @@ export default function HardDriveDetailsModal({
     // Update URL parameters to remove the drive parameter
     updateParams(
       { drive: null },
-      { preserveParams: ["tab", "page", "limit", "search", "location", "view"] }
+      {
+        preserveParams: ["tab", "page", "limit", "search", "location", "view"],
+        clearOthers: false,
+      }
     );
 
+    // Close the modal
     if (onClose) {
       onClose();
     }
   };
 
-  // Fetch drive labels for the selected asset
   const fetchDriveLabels = async (hardDriveIds: string[]) => {
+    if (!api) {
+      console.error("API client not available");
+      return;
+    }
+
     try {
       setIsLoadingLabels(true);
-      const response = await fetch(
-        `/api/hard-drives?ids=${hardDriveIds.join(",")}`
-      );
-      if (!response.ok) throw new Error("Failed to fetch drive labels");
-      const data = await response.json();
+      const data = (await api.get(
+        `hard-drives?ids=${hardDriveIds.join(",")}`
+      )) as {
+        drives?: any[];
+        data?: any[];
+      };
 
       const labels: Record<string, string> = {};
       (data.drives || data.data || []).forEach((drive: any) => {
@@ -230,32 +241,24 @@ export default function HardDriveDetailsModal({
   };
 
   const handleRemoveAsset = async (assetId: string) => {
-    try {
-      const response = await fetch(`/api/hard-drives/${driveId}/raw-assets`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          rawAssetIds: [assetId],
-        }),
-      });
+    if (!api || !driveId) {
+      console.error("API client not available or missing drive ID");
+      return;
+    }
 
-      if (!response.ok) {
-        throw new Error("Failed to remove asset from drive");
-      }
+    try {
+      await api.deleteWithBody(`hard-drives/${driveId}/raw-assets`, {
+        rawAssetIds: [assetId],
+      });
 
       // Mark data as changed
       setDataChanged(true);
 
       // Refresh drive data by refetching
-      if (driveId) {
-        const refreshResponse = await fetch(`/api/hard-drives/${driveId}`);
-        if (!refreshResponse.ok)
-          throw new Error("Failed to refresh drive details");
-        const refreshedData = await refreshResponse.json();
-        setDrive(refreshedData);
-      }
+      const refreshedData = (await api.get(
+        `hard-drives/${driveId}`
+      )) as HardDrive;
+      setDrive(refreshedData);
     } catch (error) {
       console.error("Error removing asset:", error);
     }
@@ -276,13 +279,13 @@ export default function HardDriveDetailsModal({
   // Handle saving edit changes
   const handleSaveEdit = async () => {
     // Implementation of save functionality
-    // [REMOVED] // [REMOVED] console.log("Saving changes:", editFormData);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Saving changes:", editFormData);
   };
 
   // Handle scanning for assets
   const handleScan = async () => {
     // Implementation of scan functionality
-    // [REMOVED] // [REMOVED] console.log("Scanning for assets");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Scanning for assets");
   };
 
   // Get status color based on drive status
@@ -303,11 +306,14 @@ export default function HardDriveDetailsModal({
 
   // Add a function to fetch locations
   const fetchLocations = async () => {
+    if (!api) {
+      console.error("API client not available");
+      return;
+    }
+
     try {
       setIsLoadingLocations(true);
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
+      const data = (await api.get("locations")) as LocationResponse[];
       setLocations(data);
     } catch (error) {
       console.error("Error fetching locations:", error);
@@ -318,8 +324,10 @@ export default function HardDriveDetailsModal({
 
   // Fetch locations when the component mounts or when editing starts
   useEffect(() => {
-    fetchLocations();
-  }, []);
+    if (api) {
+      fetchLocations();
+    }
+  }, [api]);
 
   // Reset dataChanged when driveId changes
   useEffect(() => {
@@ -328,7 +336,7 @@ export default function HardDriveDetailsModal({
 
   // Fetch drive details when driveId changes
   useEffect(() => {
-    // [REMOVED] // [REMOVED] console.log("useEffect triggered with driveId:", driveId);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("useEffect triggered with driveId:", driveId);
 
     // Get the current drive parameter from URL
     const urlDriveParam = getParam("drive");
@@ -340,7 +348,7 @@ export default function HardDriveDetailsModal({
     // Use either the driveId prop or the URL parameter
     const effectiveDriveId = driveId || urlDriveParam;
 
-    if (effectiveDriveId) {
+    if (effectiveDriveId && api) {
       console.log(
         "Calling fetchDriveDetails for effectiveDriveId:",
         effectiveDriveId
@@ -350,13 +358,13 @@ export default function HardDriveDetailsModal({
       if (!drive || drive._id !== effectiveDriveId) {
         fetchDriveDetails();
       } else {
-        // [REMOVED] // [REMOVED] console.log("Already have data for drive:", effectiveDriveId);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Already have data for drive:", effectiveDriveId);
       }
     } else {
-      // [REMOVED] // [REMOVED] console.log("No drive ID available, resetting drive state");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("No drive ID available, resetting drive state");
       setDrive(null);
     }
-  }, [driveId, shouldRefetch, getParam, drive]);
+  }, [driveId, shouldRefetch, getParam, drive, api]);
 
   // Add a useEffect to log when the component renders
   useEffect(() => {
@@ -377,6 +385,11 @@ export default function HardDriveDetailsModal({
 
   // Fetch drive details
   const fetchDriveDetails = async () => {
+    if (!api) {
+      console.error("API client not available");
+      return;
+    }
+
     // Get the current drive parameter from URL
     const urlDriveParam = getParam("drive");
     // Use either the driveId prop or the URL parameter
@@ -391,43 +404,49 @@ export default function HardDriveDetailsModal({
     }
 
     try {
-      // [REMOVED] // [REMOVED] console.log("fetchDriveDetails started for driveId:", effectiveDriveId);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("fetchDriveDetails started for driveId:", effectiveDriveId);
       setError(null);
       setIsLoading(true);
 
-      const response = await fetch(`/api/hard-drives/${effectiveDriveId}`);
-      // [REMOVED] // [REMOVED] console.log("API response status:", response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to fetch drive details");
-      }
-
-      const data = await response.json();
-      // [REMOVED] // [REMOVED] console.log("Drive data received:", data);
+      const data = (await api.get(
+        `hard-drives/${effectiveDriveId}`
+      )) as HardDrive;
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Drive data received:", data);
 
       // Validate that the data has the expected structure
-      if (!data || typeof data !== "object") {
-        throw new Error("Invalid drive data received");
-      }
+      if (data && typeof data === "object") {
+        setDrive(data);
 
-      // Ensure rawAssetDetails is always an array, even if it's null or undefined
-      if (!data.rawAssetDetails) {
-        data.rawAssetDetails = [];
-      }
+        // Fetch drive labels for raw assets
+        if (data.rawAssetDetails && data.rawAssetDetails.length > 0) {
+          const allHardDriveIds = Array.from(
+            new Set(
+              data.rawAssetDetails.flatMap(
+                (asset: RawAsset) => asset.hardDriveIds || []
+              )
+            )
+          ).filter(Boolean);
 
-      setDrive(data);
-      // [REMOVED] // [REMOVED] console.log("Drive state set:", data);
-    } catch (error) {
+          if (allHardDriveIds.length > 0) {
+            fetchDriveLabels(allHardDriveIds);
+          }
+        }
+      } else {
+        throw new Error("Invalid drive data structure received from API");
+      }
+    } catch (error: any) {
       console.error("Error fetching drive details:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to fetch drive details"
-      );
+      setError(error.message || "Failed to fetch drive details");
+      setDrive(null);
     } finally {
       setIsLoading(false);
-      // [REMOVED] // [REMOVED] console.log("fetchDriveDetails completed, isLoading set to false");
     }
   };
+
+  // Early return if API is not available
+  if (!api) {
+    return null;
+  }
 
   console.log(
     "HardDriveDetailsModal rendering with drive:",
@@ -440,7 +459,7 @@ export default function HardDriveDetailsModal({
 
   // Get the current drive parameter directly from the URL
   const currentDriveParam = getParam("drive");
-  // [REMOVED] // [REMOVED] console.log("Current drive parameter from URL:", currentDriveParam);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Current drive parameter from URL:", currentDriveParam);
 
   // Check if the modal should be visible based on the URL parameter or the driveId prop
   const shouldBeVisible = !!currentDriveParam || !!driveId;
@@ -463,7 +482,7 @@ export default function HardDriveDetailsModal({
 
   // Use the driveId prop if available, otherwise use the URL parameter
   const effectiveDriveId = driveId || currentDriveParam;
-  // [REMOVED] // [REMOVED] console.log("Using effective driveId:", effectiveDriveId);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Using effective driveId:", effectiveDriveId);
 
   return (
     <UrlModal

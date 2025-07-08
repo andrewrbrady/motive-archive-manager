@@ -16,13 +16,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    document.documentElement.classList.add("dark");
+
     const storedTheme = localStorage.getItem("theme") as Theme;
-    if (storedTheme) {
+    if (storedTheme && storedTheme !== theme) {
       setTheme(storedTheme);
-    } else {
-      setTheme("dark");
+      if (storedTheme === "light") {
+        document.documentElement.classList.remove("dark");
+      }
     }
+    setMounted(true);
   }, []);
 
   useEffect(() => {

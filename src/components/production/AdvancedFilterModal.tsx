@@ -20,6 +20,8 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 export interface FilterCriteria {
   id: string;
@@ -75,6 +77,7 @@ export default function AdvancedFilterModal({
   const [manufacturers, setManufacturers] = useState<string[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const api = useAPI();
 
   useEffect(() => {
     if (isOpen) {
@@ -82,7 +85,7 @@ export default function AdvancedFilterModal({
       fetchManufacturers();
       fetchTags();
     }
-  }, [isOpen]);
+  }, [isOpen, api]);
 
   useEffect(() => {
     if (initialFilter) {
@@ -92,39 +95,38 @@ export default function AdvancedFilterModal({
   }, [initialFilter]);
 
   const fetchLocations = async () => {
+    if (!api) return;
+
     try {
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
-      setLocations(data);
+      const data = await api.get<any[]>("/locations");
+      setLocations(data.map((location: any) => location.name));
     } catch (error) {
       console.error("Error fetching locations:", error);
+      toast.error("Failed to fetch locations");
     }
   };
 
   const fetchManufacturers = async () => {
+    if (!api) return;
+
     try {
-      const response = await fetch("/api/studio_inventory/manufacturers");
-      if (!response.ok) throw new Error("Failed to fetch manufacturers");
-      const data = await response.json();
+      const data = await api.get<string[]>("/studio_inventory/manufacturers");
       setManufacturers(data);
     } catch (error) {
       console.error("Error fetching manufacturers:", error);
-      // Fallback to empty array
-      setManufacturers([]);
+      toast.error("Failed to fetch manufacturers");
     }
   };
 
   const fetchTags = async () => {
+    if (!api) return;
+
     try {
-      const response = await fetch("/api/studio_inventory/tags");
-      if (!response.ok) throw new Error("Failed to fetch tags");
-      const data = await response.json();
+      const data = await api.get<string[]>("/studio_inventory/tags");
       setAllTags(data);
     } catch (error) {
       console.error("Error fetching tags:", error);
-      // Fallback to empty array
-      setAllTags([]);
+      toast.error("Failed to fetch tags");
     }
   };
 

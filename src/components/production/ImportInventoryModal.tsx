@@ -6,11 +6,19 @@ import Papa from "papaparse";
 import { StudioInventoryItem, InventoryCategory } from "@/types/inventory";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 interface ImportInventoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImport: () => void;
+}
+
+interface ImportInventoryResponse {
+  success: boolean;
+  error?: string;
+  count?: number;
 }
 
 export default function ImportInventoryModal({
@@ -23,6 +31,20 @@ export default function ImportInventoryModal({
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<any[]>([]);
   const [hasPreview, setHasPreview] = useState(false);
+  const api = useAPI();
+
+  // Authentication check
+  if (!api) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-[hsl(var(--background))] rounded-lg shadow-lg w-full max-w-md mx-4 p-6">
+          <div className="flex items-center justify-center">
+            <LoadingSpinner size="lg" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -67,7 +89,7 @@ export default function ImportInventoryModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return;
+    if (!file || !api) return;
 
     setLoading(true);
     setError(null);
@@ -139,22 +161,18 @@ export default function ImportInventoryModal({
         };
       });
 
-      // Send to API
-      const response = await fetch("/api/studio_inventory/batch/import", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ items: inventoryItems }),
-      });
+      // Send to API using authenticated API client
+      const result = await api.post<ImportInventoryResponse>(
+        "studio_inventory/batch/import",
+        {
+          items: inventoryItems,
+        }
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to import data");
-      }
-
-      const result = await response.json();
       if (result.success) {
+        toast.success(
+          `Successfully imported ${result.count || inventoryItems.length} inventory items`
+        );
         onImport();
         onClose();
       } else {
@@ -162,7 +180,10 @@ export default function ImportInventoryModal({
       }
     } catch (err) {
       console.error("Error importing data:", err);
-      setError(err instanceof Error ? err.message : "Failed to import data");
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to import data";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

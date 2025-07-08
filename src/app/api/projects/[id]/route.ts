@@ -19,7 +19,7 @@ async function getProject(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log("🔍 GET /api/projects/[id] - Starting project fetch");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 GET /api/projects/[id] - Starting project fetch");
 
   try {
     // Get the token from the authorization header
@@ -27,7 +27,7 @@ async function getProject(
     const token = authHeader.split("Bearer ")[1];
 
     if (!token) {
-      console.log("❌ getProject: No authorization token provided");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ getProject: No authorization token provided");
       return NextResponse.json(
         {
           error: "Authentication required",
@@ -41,7 +41,7 @@ async function getProject(
     const tokenData = await verifyFirebaseToken(token);
 
     if (!tokenData) {
-      console.log("❌ getProject: Token verification failed");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ getProject: Token verification failed");
       return NextResponse.json(
         {
           error: "Authentication failed",
@@ -59,11 +59,11 @@ async function getProject(
     });
 
     const { id: projectId } = await params;
-    console.log("📋 getProject: Project ID from params:", projectId);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📋 getProject: Project ID from params:", projectId);
 
     // Validate ObjectId
     if (!ObjectId.isValid(projectId)) {
-      console.log("❌ getProject: Invalid project ID format");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ getProject: Invalid project ID format");
       return NextResponse.json(
         {
           error: "Invalid request",
@@ -74,11 +74,11 @@ async function getProject(
       );
     }
 
-    console.log("🔗 getProject: Connecting to database...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔗 getProject: Connecting to database...");
     await connectToDatabase();
-    console.log("✅ getProject: Database connected successfully");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ getProject: Database connected successfully");
 
-    console.log("🔍 getProject: Searching for project...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 getProject: Searching for project...");
     const project = await Project.findOne({
       _id: projectId,
       $or: [{ ownerId: userId }, { "members.userId": userId }],
@@ -110,7 +110,7 @@ async function getProject(
       project: convertProjectForFrontend(project.toObject()) as IProject,
     };
 
-    console.log("📤 getProject: Sending successful response");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📤 getProject: Sending successful response");
     return NextResponse.json(response);
   } catch (error: any) {
     console.error("💥 getProject: Error fetching project:", {
@@ -136,7 +136,7 @@ async function updateProject(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log("🔄 PUT /api/projects/[id] - Starting project update");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 PUT /api/projects/[id] - Starting project update");
 
   try {
     // Get the token from the authorization header
@@ -144,7 +144,7 @@ async function updateProject(
     const token = authHeader.split("Bearer ")[1];
 
     if (!token) {
-      console.log("❌ updateProject: No authorization token provided");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ updateProject: No authorization token provided");
       return NextResponse.json(
         {
           error: "Authentication required",
@@ -158,7 +158,7 @@ async function updateProject(
     const tokenData = await verifyFirebaseToken(token);
 
     if (!tokenData) {
-      console.log("❌ updateProject: Token verification failed");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ updateProject: Token verification failed");
       return NextResponse.json(
         {
           error: "Authentication failed",
@@ -186,7 +186,7 @@ async function updateProject(
 
     // Validate ObjectId
     if (!ObjectId.isValid(projectId)) {
-      console.log("❌ updateProject: Invalid project ID format");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ updateProject: Invalid project ID format");
       return NextResponse.json(
         {
           error: "Invalid request",
@@ -238,7 +238,7 @@ async function updateProject(
       );
     }
 
-    console.log("✅ updateProject: Permission check passed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ updateProject: Permission check passed");
 
     // Build update object
     const updateData: any = {
@@ -264,7 +264,7 @@ async function updateProject(
             (data as any).primaryImageId
           );
         } else {
-          console.log("❌ updateProject: Invalid primaryImageId format");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ updateProject: Invalid primaryImageId format");
           return NextResponse.json(
             {
               error: "Invalid request",
@@ -309,7 +309,7 @@ async function updateProject(
       };
     }
 
-    console.log("🔄 updateProject: Applying updates to database");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 updateProject: Applying updates to database");
     const updatedProject = await Project.findByIdAndUpdate(
       projectId,
       updateData,
@@ -317,7 +317,7 @@ async function updateProject(
     );
 
     if (!updatedProject) {
-      console.log("❌ updateProject: Failed to update project");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ updateProject: Failed to update project");
       return NextResponse.json(
         {
           error: "Update failed",
@@ -328,7 +328,7 @@ async function updateProject(
       );
     }
 
-    console.log("✅ updateProject: Project updated successfully");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ updateProject: Project updated successfully");
     const response: ProjectResponse = {
       project: convertProjectForFrontend(updatedProject.toObject()) as IProject,
     };
@@ -358,7 +358,7 @@ async function deleteProject(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log("🗑️ DELETE /api/projects/[id] - Starting project deletion");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🗑️ DELETE /api/projects/[id] - Starting project deletion");
 
   try {
     // Get the token from the authorization header
@@ -366,7 +366,7 @@ async function deleteProject(
     const token = authHeader.split("Bearer ")[1];
 
     if (!token) {
-      console.log("❌ deleteProject: No authorization token provided");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ deleteProject: No authorization token provided");
       return NextResponse.json(
         {
           error: "Authentication required",
@@ -380,7 +380,7 @@ async function deleteProject(
     const tokenData = await verifyFirebaseToken(token);
 
     if (!tokenData) {
-      console.log("❌ deleteProject: Token verification failed");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ deleteProject: Token verification failed");
       return NextResponse.json(
         {
           error: "Authentication failed",
@@ -402,7 +402,7 @@ async function deleteProject(
 
     // Validate ObjectId
     if (!ObjectId.isValid(projectId)) {
-      console.log("❌ deleteProject: Invalid project ID format");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ deleteProject: Invalid project ID format");
       return NextResponse.json(
         {
           error: "Invalid request",
@@ -434,10 +434,10 @@ async function deleteProject(
       );
     }
 
-    console.log("🗑️ deleteProject: Deleting project from database");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🗑️ deleteProject: Deleting project from database");
     await Project.findByIdAndDelete(projectId);
 
-    console.log("✅ deleteProject: Project deleted successfully");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ deleteProject: Project deleted successfully");
     return NextResponse.json({
       success: true,
       message: "Project deleted successfully",

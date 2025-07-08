@@ -3,7 +3,7 @@ import { adminAuth } from "@/lib/firebase-admin";
 
 export async function GET(request: Request) {
   try {
-    // [REMOVED] // [REMOVED] console.log("Listing all Firebase Auth users");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Listing all Firebase Auth users");
 
     // List batch of users, 1000 at a time.
     const listAllUsers = async (nextPageToken?: string) => {
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
         })),
       }));
 
-      // [REMOVED] // [REMOVED] console.log(`Found ${users.length} users in Firebase Auth`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Found ${users.length} users in Firebase Auth`);
 
       return {
         users,

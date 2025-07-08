@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,7 +37,7 @@ import {
   addMonths,
   subMonths,
 } from "date-fns";
-import { Project, ProjectMilestone } from "@/types/project";
+import { Project, ProjectMilestone, ProjectTimeline } from "@/types/project";
 import { toast } from "@/components/ui/use-toast";
 import {
   AlertDialog,
@@ -49,16 +49,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { LoadingContainer } from "@/components/ui/loading";
+import { useAPI } from "@/hooks/useAPI";
 
 interface ProjectTimelineTabProps {
   project: Project;
   onProjectUpdate: () => void;
+  initialTimelineData?: ProjectTimeline; // Optional pre-fetched timeline data for SSR optimization
 }
 
 export function ProjectTimelineTab({
   project,
   onProjectUpdate,
+  initialTimelineData,
 }: ProjectTimelineTabProps) {
+  const api = useAPI();
+  const [timelineData, setTimelineData] = useState<ProjectTimeline>(
+    initialTimelineData || project.timeline
+  );
+  const [isLoading, setIsLoading] = useState(
+    !initialTimelineData && !project.timeline?.milestones?.length
+  ); // Don't show loading if we have initial data
   const [isAddMilestoneOpen, setIsAddMilestoneOpen] = useState(false);
   const [editingMilestone, setEditingMilestone] =
     useState<ProjectMilestone | null>(null);
@@ -72,6 +83,36 @@ export function ProjectTimelineTab({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
 
+  // Fetch timeline data if not provided initially (backwards compatibility)
+  useEffect(() => {
+    if (!initialTimelineData && !project.timeline?.milestones?.length) {
+      fetchTimelineData();
+    }
+  }, [initialTimelineData, project._id, project.timeline?.milestones?.length]);
+
+  const fetchTimelineData = async () => {
+    if (!api) return;
+
+    try {
+      setIsLoading(true);
+      console.time("ProjectTimelineTab-fetch");
+
+      const response = (await api.get(`projects/${project._id}/timeline`)) as {
+        timeline: ProjectTimeline;
+      };
+
+      setTimelineData(response.timeline);
+      console.timeEnd("ProjectTimelineTab-fetch");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📊 ProjectTimelineTab: Timeline data loaded from API");
+    } catch (error) {
+      console.error("Error fetching timeline data:", error);
+      // Fallback to project timeline data if API fails
+      setTimelineData(project.timeline);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleToggleMilestone = async (
     milestoneId: string,
     completed: boolean
@@ -83,7 +124,7 @@ export function ProjectTimelineTab({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          milestones: project.timeline.milestones.map((m) =>
+          milestones: timelineData.milestones.map((m) =>
             m.id === milestoneId
               ? {
                   ...m,
@@ -180,7 +221,7 @@ export function ProjectTimelineTab({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          milestones: project.timeline.milestones.map((m) =>
+          milestones: timelineData.milestones.map((m) =>
             m.id === editingMilestone.id
               ? {
                   ...m,
@@ -445,95 +486,119 @@ export function ProjectTimelineTab({
           </div>
         </CardHeader>
         <CardContent className="pt-4">
-          <div className="space-y-4">
-            {project.timeline.milestones.map((milestone, index) => (
-              <div
-                key={milestone.id}
-                className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/20 transition-colors group"
-              >
-                <div className="flex flex-col items-center">
-                  <button
-                    onClick={() =>
-                      handleToggleMilestone(milestone.id, !milestone.completed)
-                    }
-                    className="transition-colors hover:scale-110"
-                  >
-                    {milestone.completed ? (
-                      <CheckCircle className="h-6 w-6 text-green-600 cursor-pointer" />
-                    ) : (
-                      <Circle className="h-6 w-6 text-muted-foreground cursor-pointer hover:text-green-600" />
-                    )}
-                  </button>
-                  {index < project.timeline.milestones.length - 1 && (
-                    <div className="w-0.5 h-8 bg-border mt-2" />
-                  )}
+          {isLoading ? (
+            <div className="space-y-4">
+              {/* Skeleton for milestones */}
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="flex items-start gap-4 p-4 border rounded-lg animate-pulse"
+                >
+                  <div className="w-6 h-6 bg-muted rounded-full flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-5 bg-muted rounded w-3/4" />
+                    <div className="h-4 bg-muted rounded w-1/2" />
+                    <div className="h-3 bg-muted rounded w-1/4" />
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h4
-                        className={`font-medium ${
-                          milestone.completed
-                            ? "line-through text-muted-foreground"
-                            : ""
-                        }`}
-                      >
-                        {milestone.title}
-                      </h4>
-                      {milestone.description && (
-                        <p
-                          className={`text-sm mt-1 ${
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {timelineData.milestones.map((milestone, index) => (
+                <div
+                  key={milestone.id}
+                  className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/20 transition-colors group"
+                >
+                  <div className="flex flex-col items-center">
+                    <button
+                      onClick={() =>
+                        handleToggleMilestone(
+                          milestone.id,
+                          !milestone.completed
+                        )
+                      }
+                      className="transition-colors hover:scale-110"
+                    >
+                      {milestone.completed ? (
+                        <CheckCircle className="h-6 w-6 text-green-600 cursor-pointer" />
+                      ) : (
+                        <Circle className="h-6 w-6 text-muted-foreground cursor-pointer hover:text-green-600" />
+                      )}
+                    </button>
+                    {index < timelineData.milestones.length - 1 && (
+                      <div className="w-0.5 h-8 bg-border mt-2" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4
+                          className={`font-medium ${
                             milestone.completed
                               ? "line-through text-muted-foreground"
-                              : "text-muted-foreground"
+                              : ""
                           }`}
                         >
-                          {milestone.description}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        <span>
-                          Due{" "}
-                          {format(new Date(milestone.dueDate), "MMM d, yyyy")}
-                        </span>
-                        {milestone.assignedTo &&
-                          milestone.assignedTo.length > 0 && (
-                            <span>{milestone.assignedTo.length} assigned</span>
-                          )}
+                          {milestone.title}
+                        </h4>
+                        {milestone.description && (
+                          <p
+                            className={`text-sm mt-1 ${
+                              milestone.completed
+                                ? "line-through text-muted-foreground"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {milestone.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                          <span>
+                            Due{" "}
+                            {format(new Date(milestone.dueDate), "MMM d, yyyy")}
+                          </span>
+                          {milestone.assignedTo &&
+                            milestone.assignedTo.length > 0 && (
+                              <span>
+                                {milestone.assignedTo.length} assigned
+                              </span>
+                            )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditMilestone(milestone)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeletingMilestone(milestone)}
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditMilestone(milestone)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeletingMilestone(milestone)}
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-            {project.timeline.milestones.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium mb-2">No milestones yet</p>
-                <p className="text-sm">
-                  Add your first milestone to start tracking progress
-                </p>
-              </div>
-            )}
-          </div>
+              ))}
+              {timelineData.milestones.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium mb-2">No milestones yet</p>
+                  <p className="text-sm">
+                    Add your first milestone to start tracking progress
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

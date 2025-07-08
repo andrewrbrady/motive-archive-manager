@@ -15,7 +15,7 @@ import {
 import { Save, RotateCcw, Plus, Loader2, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { IconPicker, getIconComponent } from "@/components/ui/IconPicker";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 interface PlatformSetting {
   key: string;
@@ -84,26 +84,23 @@ const PlatformSettingsContent: React.FC = () => {
     icon: "",
   });
 
-  const { authenticatedFetch, isAuthenticated, hasValidToken } =
-    useAuthenticatedFetch();
+  const api = useAPI();
 
   useEffect(() => {
-    if (isAuthenticated && hasValidToken) {
+    if (api) {
       fetchPlatformSettings();
     }
-  }, [isAuthenticated, hasValidToken]);
+  }, [api]);
 
   const fetchPlatformSettings = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
-      const response = await authenticatedFetch("/api/admin/platform-settings");
-      if (response.ok) {
-        const data = await response.json();
-        setPlatformSettings(data.length > 0 ? data : defaultPlatformSettings);
-      } else {
-        // If no settings exist yet, use defaults
-        setPlatformSettings(defaultPlatformSettings);
-      }
+      const data = (await api.get(
+        "/api/admin/platform-settings"
+      )) as PlatformSetting[];
+      setPlatformSettings(data.length > 0 ? data : defaultPlatformSettings);
     } catch (error) {
       console.error("Error fetching platform settings:", error);
       setPlatformSettings(defaultPlatformSettings);
@@ -126,23 +123,11 @@ const PlatformSettingsContent: React.FC = () => {
   };
 
   const handleSave = async () => {
+    if (!api) return;
+
     try {
       setIsSaving(true);
-      const response = await authenticatedFetch(
-        "/api/admin/platform-settings",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(platformSettings),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to save platform settings");
-      }
+      await api.post("/api/admin/platform-settings", platformSettings);
 
       setHasChanges(false);
       toast({

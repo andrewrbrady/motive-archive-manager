@@ -156,7 +156,8 @@ export async function POST(
   }
 }
 
-function isVideoDeliverable(type: string): boolean {
+function isVideoDeliverable(type: string | undefined): boolean {
+  if (!type) return false;
   const videoTypes = [
     "Video",
     "Video Gallery",

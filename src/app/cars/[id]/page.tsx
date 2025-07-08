@@ -14,6 +14,12 @@ interface CarPageProps {
 
 async function getCar(id: string) {
   try {
+    // Validate ObjectId format before using it
+    if (!ObjectId.isValid(id)) {
+      console.error(`Invalid ObjectId format: ${id}`);
+      return null;
+    }
+
     const mongoClient = await getMongoClient();
     const db = mongoClient.db(process.env.MONGODB_DB || "motive_archive");
     const carsCollection = db.collection("cars");

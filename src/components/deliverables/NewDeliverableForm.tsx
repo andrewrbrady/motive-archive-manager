@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,10 +17,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { Plus } from "lucide-react";
 import toast from "react-hot-toast";
-import { Platform, DeliverableType } from "@/types/deliverable";
-import { FirestoreUser } from "@/types/firebase";
+import {
+  Platform,
+  DeliverableType,
+  DeliverablePlatform,
+} from "@/types/deliverable";
+import { useAPI } from "@/hooks/useAPI";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
+import { usePlatforms } from "@/contexts/PlatformContext";
+import { useMediaTypes } from "@/hooks/useMediaTypes";
+import { EditorSelector } from "./EditorSelector";
 
 interface Car {
   _id: string;
@@ -38,11 +47,15 @@ export default function NewDeliverableForm({
   carId,
   onDeliverableCreated,
 }: NewDeliverableFormProps) {
+  const api = useAPI();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState("");
-  const [platform, setPlatform] = useState<Platform>();
+  const [selectedPlatforms, setSelectedPlatforms] = useState<
+    { label: string; value: string }[]
+  >([]);
   const [type, setType] = useState<DeliverableType>();
+  const [mediaTypeId, setMediaTypeId] = useState<string>("");
   const [duration, setDuration] = useState(0);
   const [aspectRatio, setAspectRatio] = useState("");
   const [editor, setEditor] = useState("");
@@ -50,85 +63,39 @@ export default function NewDeliverableForm({
   const [releaseDate, setReleaseDate] = useState("");
   const [dropboxLink, setDropboxLink] = useState("");
   const [socialMediaLink, setSocialMediaLink] = useState("");
-  const [users, setUsers] = useState<FirestoreUser[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
   const [selectedCarId, setSelectedCarId] = useState(carId || "");
-  const [openSelects, setOpenSelects] = useState<Record<string, boolean>>({});
 
-  const handleSelectOpenChange = (selectId: string, open: boolean) => {
-    setOpenSelects((prev) => ({ ...prev, [selectId]: open }));
+  const { platforms: availablePlatforms } = usePlatforms();
+  const { mediaTypes, isLoading: mediaTypesLoading } = useMediaTypes();
+
+  // Helper function to get media type name for display
+  const getMediaTypeName = (mediaTypeId: string) => {
+    if (!mediaTypeId) return null;
+    const mediaType = mediaTypes.find(
+      (mt) => mt._id.toString() === mediaTypeId
+    );
+    return mediaType ? mediaType.name : null;
   };
 
-  const isAnySelectOpen = Object.values(openSelects).some(Boolean);
+  const fetchCars = async () => {
+    if (!api) return;
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Starting to fetch users...");
-        const response = await fetch("/api/users");
-        if (!response.ok) {
-          throw new Error("Failed to fetch users");
-        }
-        const data = await response.json();
-
-        // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Raw API response:", data);
-        // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Data is array:", Array.isArray(data));
-
-        // Handle the correct API response structure: { users: [...], total: number }
-        if (data.users && Array.isArray(data.users)) {
-          const activeUsers = data.users.filter(
-            (user: FirestoreUser) => user.status === "active"
-          );
-          // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Active users:", activeUsers.length);
-          // [REMOVED] // [REMOVED] console.log("NewDeliverableForm: Sample user:", activeUsers[0]);
-          setUsers(activeUsers);
-        } else if (Array.isArray(data)) {
-          // Fallback for legacy API responses that return array directly
-          const activeUsers = data.filter(
-            (user: FirestoreUser) => user.status === "active"
-          );
-          setUsers(activeUsers);
-        } else {
-          console.error("Unexpected API response structure:", data);
-          toast.error("Failed to load users properly");
-        }
-      } catch (error) {
-        console.error("Error fetching users:", error);
-        toast.error("Failed to fetch users");
-      }
-    };
-
-    // Only fetch users if we don't already have them
-    if (users.length === 0) {
-      fetchUsers();
+    try {
+      const response = await api.get("cars");
+      const data = response as any;
+      setCars(data.cars || []);
+    } catch (error) {
+      console.error("Error fetching cars:", error);
+      toast.error("Failed to fetch cars");
     }
-
-    // Only fetch cars if no carId was provided
-    if (!carId) {
-      const fetchCars = async () => {
-        try {
-          const response = await fetch("/api/cars");
-          if (!response.ok) {
-            throw new Error("Failed to fetch cars");
-          }
-          const data = await response.json();
-          setCars(data.cars || []);
-        } catch (error) {
-          console.error("Error fetching cars:", error);
-          toast.error("Failed to fetch cars");
-        }
-      };
-
-      if (cars.length === 0) {
-        fetchCars();
-      }
-    }
-  }, []); // Remove dependencies to prevent re-fetching
+  };
 
   const resetForm = () => {
     setTitle("");
-    setPlatform(undefined);
+    setSelectedPlatforms([]);
     setType(undefined);
+    setMediaTypeId("");
     setDuration(0);
     setAspectRatio("");
     setEditor("");
@@ -143,73 +110,54 @@ export default function NewDeliverableForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      !title ||
-      !platform ||
-      !type ||
-      !editor ||
-      !editDeadline ||
-      !releaseDate
-    ) {
-      toast.error("Please fill in all required fields");
+
+    if (!title || title.trim() === "") {
+      toast.error("Please enter a title");
+      return;
+    }
+
+    if (!api) {
+      toast.error("Authentication required");
       return;
     }
 
     const deliverableCarId = carId || selectedCarId;
 
-    // Find the selected user to get both name and firebase_uid
-    const selectedUser = users.find((user) => user.uid === editor);
-    if (!selectedUser) {
-      toast.error("Please select a valid editor");
-      return;
-    }
-
-    setIsLoading(true);
     try {
-      // Determine which API endpoint to use based on whether we have a car
-      const apiUrl = deliverableCarId
-        ? `/api/cars/${deliverableCarId}/deliverables`
-        : `/api/deliverables`;
+      setIsLoading(true);
 
-      const requestBody: any = {
-        title,
-        platform,
+      const response = await api.post("/api/deliverables", {
+        title: title.trim(),
         type,
+        mediaTypeId,
+        platform_id: selectedPlatforms[0]?.value,
         duration,
         aspect_ratio: aspectRatio,
-        editor: selectedUser.name, // Store the name for display
-        firebase_uid: selectedUser.uid, // Store the UID for filtering
-        status: "not_started", // Default status
-        edit_deadline: new Date(editDeadline),
-        release_date: new Date(releaseDate),
-        dropbox_link: dropboxLink || undefined,
-        social_media_link: socialMediaLink || undefined,
-      };
-
-      // Only add car_id if we have one
-      if (deliverableCarId) {
-        requestBody.car_id = deliverableCarId;
-      }
-
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
+        edit_deadline: editDeadline
+          ? new Date(editDeadline).toISOString()
+          : undefined,
+        release_date: releaseDate
+          ? new Date(releaseDate).toISOString()
+          : undefined,
+        editor,
+        car_id: deliverableCarId || undefined,
+        dropbox_link: dropboxLink,
+        social_media_link: socialMediaLink,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to create deliverable");
-      }
+      // Reset form
+      resetForm();
+
+      // Close modal and notify parent
+      setIsOpen(false);
+      onDeliverableCreated();
 
       toast.success("Deliverable created successfully");
-      onDeliverableCreated();
-      setIsOpen(false);
-      resetForm();
     } catch (error) {
       console.error("Error creating deliverable:", error);
-      toast.error("Failed to create deliverable");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create deliverable"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -219,24 +167,17 @@ export default function NewDeliverableForm({
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          New
+          <Plus className="mr-2 h-4 w-4" />
+          New Deliverable
         </Button>
       </DialogTrigger>
-      <DialogContent
-        className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full"
-        onEscapeKeyDown={(e) => isAnySelectOpen && e.preventDefault()}
-        onPointerDownOutside={(e) => isAnySelectOpen && e.preventDefault()}
-      >
-        <DialogHeader className="flex-shrink-0 pb-2 border-b border-[hsl(var(--border-subtle))]">
-          <DialogTitle className="text-xl font-bold text-[hsl(var(--foreground))] dark:text-white">
-            Create New Deliverable
-          </DialogTitle>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Create New Deliverable</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4">
-          <form onSubmit={handleSubmit} className="space-y-3">
-            {/* Basic Information Section */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
             <div className="space-y-2">
               <div className="flex items-center gap-1">
                 <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
@@ -258,10 +199,55 @@ export default function NewDeliverableForm({
                     id="title"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Enter title"
-                    required
-                    className="text-sm"
+                    placeholder="Enter deliverable title"
+                    disabled={isLoading}
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="platforms"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Platform
+                  </label>
+                  <MultiSelect
+                    value={selectedPlatforms}
+                    onChange={setSelectedPlatforms}
+                    options={availablePlatforms.map((platform) => ({
+                      label: platform.name,
+                      value: platform._id,
+                    }))}
+                    placeholder="Select platform"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="type"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Type
+                  </label>
+                  <Select
+                    value={mediaTypeId}
+                    onValueChange={setMediaTypeId}
+                    disabled={isLoading || mediaTypesLoading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mediaTypes.map((mediaType) => (
+                        <SelectItem
+                          key={mediaType._id.toString()}
+                          value={mediaType._id.toString()}
+                        >
+                          {mediaType.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {!carId && (
@@ -270,23 +256,19 @@ export default function NewDeliverableForm({
                       htmlFor="car"
                       className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
                     >
-                      Car (Optional)
+                      Car
                     </label>
                     <Select
                       value={selectedCarId}
-                      onValueChange={(value) => setSelectedCarId(value)}
-                      open={openSelects["car"]}
-                      onOpenChange={(open) =>
-                        handleSelectOpenChange("car", open)
-                      }
+                      onValueChange={setSelectedCarId}
+                      disabled={isLoading}
                     >
-                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                        <SelectValue placeholder="Select car (optional)" />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select car" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No car selected</SelectItem>
                         {cars.map((car) => (
-                          <SelectItem key={car._id} value={car._id.toString()}>
+                          <SelectItem key={car._id} value={car._id}>
                             {car.year} {car.make} {car.model}
                           </SelectItem>
                         ))}
@@ -294,172 +276,62 @@ export default function NewDeliverableForm({
                     </Select>
                   </div>
                 )}
+              </div>
+            </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="platform"
-                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
-                    >
-                      Platform
-                    </label>
-                    <Select
-                      value={platform || ""}
-                      onValueChange={(value) => setPlatform(value as Platform)}
-                      open={openSelects["platform"]}
-                      onOpenChange={(open) =>
-                        handleSelectOpenChange("platform", open)
-                      }
-                    >
-                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                        <SelectValue placeholder="Select platform" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem
-                          key="instagram-reels"
-                          value="Instagram Reels"
-                        >
-                          Instagram Reels
-                        </SelectItem>
-                        <SelectItem key="youtube" value="YouTube">
-                          YouTube
-                        </SelectItem>
-                        <SelectItem key="youtube-shorts" value="YouTube Shorts">
-                          YouTube Shorts
-                        </SelectItem>
-                        <SelectItem key="tiktok" value="TikTok">
-                          TikTok
-                        </SelectItem>
-                        <SelectItem key="facebook" value="Facebook">
-                          Facebook
-                        </SelectItem>
-                        <SelectItem
-                          key="bring-a-trailer"
-                          value="Bring a Trailer"
-                        >
-                          Bring a Trailer
-                        </SelectItem>
-                        <SelectItem key="other" value="Other">
-                          Other
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-1">
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                  Technical Details
+                </span>
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+              </div>
 
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="type"
-                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
-                    >
-                      Type
-                    </label>
-                    <Select
-                      value={type || ""}
-                      onValueChange={(value) =>
-                        setType(value as DeliverableType)
-                      }
-                      open={openSelects["type"]}
-                      onOpenChange={(open) =>
-                        handleSelectOpenChange("type", open)
-                      }
-                    >
-                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem key="feature" value="feature">
-                          Feature
-                        </SelectItem>
-                        <SelectItem key="promo" value="promo">
-                          Promo
-                        </SelectItem>
-                        <SelectItem key="review" value="review">
-                          Review
-                        </SelectItem>
-                        <SelectItem key="walkthrough" value="walkthrough">
-                          Walkthrough
-                        </SelectItem>
-                        <SelectItem key="highlights" value="highlights">
-                          Highlights
-                        </SelectItem>
-                        <SelectItem key="photo_gallery" value="photo_gallery">
-                          Photo Gallery
-                        </SelectItem>
-                        <SelectItem
-                          key="marketing-email"
-                          value="Marketing Email"
-                        >
-                          Marketing Email
-                        </SelectItem>
-                        <SelectItem key="blog" value="Blog">
-                          Blog
-                        </SelectItem>
-                        <SelectItem key="other-type" value="other">
-                          Other
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <div className="space-y-2">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="duration"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Duration (seconds)
+                  </label>
+                  <Input
+                    id="duration"
+                    type="number"
+                    value={duration}
+                    onChange={(e) => setDuration(Number(e.target.value))}
+                    placeholder="Enter duration in seconds"
+                    disabled={isLoading}
+                  />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="duration"
-                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
-                    >
-                      Duration (seconds)
-                    </label>
-                    <Input
-                      id="duration"
-                      type="number"
-                      value={duration}
-                      onChange={(e) => setDuration(parseInt(e.target.value))}
-                      min={0}
-                      required
-                      className="text-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="aspectRatio"
-                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
-                    >
-                      Aspect Ratio
-                    </label>
-                    <Select
-                      value={aspectRatio}
-                      onValueChange={setAspectRatio}
-                      open={openSelects["aspectRatio"]}
-                      onOpenChange={(open) =>
-                        handleSelectOpenChange("aspectRatio", open)
-                      }
-                    >
-                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                        <SelectValue placeholder="Select aspect ratio" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem key="16:9" value="16:9">
-                          16:9
-                        </SelectItem>
-                        <SelectItem key="9:16" value="9:16">
-                          9:16
-                        </SelectItem>
-                        <SelectItem key="1:1" value="1:1">
-                          1:1
-                        </SelectItem>
-                        <SelectItem key="4:3" value="4:3">
-                          4:3
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="aspectRatio"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Aspect Ratio
+                  </label>
+                  <Select
+                    value={aspectRatio}
+                    onValueChange={setAspectRatio}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select aspect ratio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="16:9">16:9</SelectItem>
+                      <SelectItem value="9:16">9:16</SelectItem>
+                      <SelectItem value="4:5">4:5</SelectItem>
+                      <SelectItem value="1:1">1:1</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
 
-            {/* Assignment & Dates Section */}
             <div className="space-y-2">
               <div className="flex items-center gap-1">
                 <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
@@ -477,66 +349,41 @@ export default function NewDeliverableForm({
                   >
                     Editor
                   </label>
-                  <Select
-                    value={editor}
-                    onValueChange={(value) => setEditor(value)}
-                    open={openSelects["editor"]}
-                    onOpenChange={(open) =>
-                      handleSelectOpenChange("editor", open)
-                    }
-                  >
-                    <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                      <SelectValue placeholder="Select editor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users.map((user) => (
-                        <SelectItem key={user.uid} value={user.uid}>
-                          {user.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <EditorSelector
+                    deliverableId="new"
+                    size="lg"
+                    onEditorChange={(newEditor) => setEditor(newEditor)}
+                  />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="editDeadline"
-                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
-                    >
-                      Edit Deadline
-                    </label>
-                    <Input
-                      id="editDeadline"
-                      type="date"
-                      value={editDeadline}
-                      onChange={(e) => setEditDeadline(e.target.value)}
-                      required
-                      className="text-sm"
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="editDeadline"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Edit Deadline
+                  </label>
+                  <DateTimePicker
+                    value={editDeadline}
+                    onChange={setEditDeadline}
+                  />
+                </div>
 
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="releaseDate"
-                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
-                    >
-                      Release Date
-                    </label>
-                    <Input
-                      id="releaseDate"
-                      type="date"
-                      value={releaseDate}
-                      onChange={(e) => setReleaseDate(e.target.value)}
-                      required
-                      className="text-sm"
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="releaseDate"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Release Date
+                  </label>
+                  <DateTimePicker
+                    value={releaseDate}
+                    onChange={setReleaseDate}
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Links Section */}
             <div className="space-y-2">
               <div className="flex items-center gap-1">
                 <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
@@ -559,7 +406,7 @@ export default function NewDeliverableForm({
                     value={dropboxLink}
                     onChange={(e) => setDropboxLink(e.target.value)}
                     placeholder="Enter Dropbox link"
-                    className="text-sm"
+                    disabled={isLoading}
                   />
                 </div>
 
@@ -574,34 +421,28 @@ export default function NewDeliverableForm({
                     id="socialMediaLink"
                     value={socialMediaLink}
                     onChange={(e) => setSocialMediaLink(e.target.value)}
-                    placeholder="Enter Social Media link"
-                    className="text-sm"
+                    placeholder="Enter social media link"
+                    disabled={isLoading}
                   />
                 </div>
               </div>
             </div>
-          </form>
-        </div>
+          </div>
 
-        {/* Actions Footer */}
-        <div className="flex-shrink-0 flex justify-end gap-3 pt-4 border-t border-[hsl(var(--border-subtle))]">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setIsOpen(false)}
-            size="sm"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            disabled={isLoading}
-            size="sm"
-            onClick={handleSubmit}
-          >
-            {isLoading ? "Creating..." : "Create"}
-          </Button>
-        </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsOpen(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              Create Deliverable
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

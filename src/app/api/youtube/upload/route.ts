@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       channel_id,
     }: YouTubeUploadRequest = await req.json();
 
-    console.log("Starting YouTube upload request...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Starting YouTube upload request...");
 
     // Validate input - need either deliverable_id or video_url
     if (!deliverable_id && !video_url) {
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     const refreshToken = process.env.YOUTUBE_REFRESH_TOKEN;
     if (refreshToken) {
       try {
-        console.log("Setting up YouTube authentication with refresh token...");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Setting up YouTube authentication with refresh token...");
 
         // Set the refresh token
         oauth2Client.setCredentials({
@@ -221,7 +221,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    console.log("Downloading video from:", downloadUrl);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Downloading video from:", downloadUrl);
 
     let videoResponse;
     try {
@@ -255,7 +255,7 @@ export async function POST(req: NextRequest) {
     }
 
     const videoBuffer = await videoResponse.arrayBuffer();
-    console.log("Video downloaded, size:", videoBuffer.byteLength, "bytes");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Video downloaded, size:", videoBuffer.byteLength, "bytes");
 
     if (videoBuffer.byteLength === 0) {
       return NextResponse.json(
@@ -269,7 +269,7 @@ export async function POST(req: NextRequest) {
     stream.push(Buffer.from(videoBuffer));
     stream.push(null);
 
-    console.log("🎬 Starting YouTube video upload...");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎬 Starting YouTube video upload...");
     console.log("📤 Upload details:", {
       title: videoTitle,
       privacy_status: privacy_status,
@@ -279,19 +279,19 @@ export async function POST(req: NextRequest) {
 
     // Log channel targeting attempt
     if (channel_id) {
-      console.log(`🎯 Attempting to target specific channel: ${channel_id}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🎯 Attempting to target specific channel: ${channel_id}`);
     }
 
     // Test authentication by listing channels first
     try {
-      console.log("🔍 Verifying YouTube channel access...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Verifying YouTube channel access...");
       const channelsResponse = await youtube.channels.list({
         part: ["snippet", "status", "brandingSettings"],
         mine: true,
       });
 
       const channels = channelsResponse.data.items || [];
-      console.log(`✅ Found ${channels.length} YouTube channel(s):`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ Found ${channels.length} YouTube channel(s):`);
       channels.forEach((channel, index) => {
         const isBrandAccount =
           channel.snippet?.title !== channel.snippet?.defaultLanguage;
@@ -305,7 +305,7 @@ export async function POST(req: NextRequest) {
         console.log(
           `       - Description: ${channel.snippet?.description?.substring(0, 100) || "No description"}...`
         );
-        console.log(`       - Type: ${channelType}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`       - Type: ${channelType}`);
       });
 
       // Always check for MotiveArchiveMedia channel access for uploads
@@ -320,7 +320,7 @@ export async function POST(req: NextRequest) {
 
         const motiveChannels = motiveChannelResponse.data.items || [];
         if (motiveChannels.length > 0) {
-          console.log("✅ MotiveArchiveMedia channel accessible for upload");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ MotiveArchiveMedia channel accessible for upload");
           // Test upload access
           try {
             const uploadsResponse = await youtube.search.list({
@@ -347,10 +347,10 @@ export async function POST(req: NextRequest) {
             );
           }
         } else {
-          console.log("❌ MotiveArchiveMedia channel not accessible");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ MotiveArchiveMedia channel not accessible");
         }
       } catch (err) {
-        console.log("MotiveArchiveMedia channel check failed:", err);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("MotiveArchiveMedia channel check failed:", err);
       }
 
       if (channels.length === 0) {
@@ -372,7 +372,7 @@ export async function POST(req: NextRequest) {
           );
 
           if (motiveChannels.length > 0) {
-            console.log("✅ Found MotiveArchiveMedia channel for upload:");
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Found MotiveArchiveMedia channel for upload:");
             motiveChannels.forEach((channel, index) => {
               console.log(
                 `   ${index + 1}. "${channel.snippet?.title}" (${channel.id})`
@@ -401,7 +401,7 @@ export async function POST(req: NextRequest) {
               );
               // Don't return error, continue with upload
             } catch (uploadErr) {
-              console.log("❌ Cannot access channel uploads:", uploadErr);
+              // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ Cannot access channel uploads:", uploadErr);
               return NextResponse.json(
                 {
                   error:
@@ -420,7 +420,7 @@ export async function POST(req: NextRequest) {
             );
           }
         } catch (err) {
-          console.log("MotiveArchiveMedia channel check failed:", err);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("MotiveArchiveMedia channel check failed:", err);
           return NextResponse.json(
             {
               error:
@@ -460,7 +460,7 @@ export async function POST(req: NextRequest) {
     // Refresh token if it's expired or about to expire
     if (currentCredentials.refresh_token) {
       try {
-        console.log("Refreshing access token before upload...");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Refreshing access token before upload...");
         const { credentials: refreshedCredentials } =
           await oauth2Client.refreshAccessToken();
         oauth2Client.setCredentials({
@@ -470,7 +470,7 @@ export async function POST(req: NextRequest) {
           token_type: refreshedCredentials.token_type,
           scope: refreshedCredentials.scope,
         });
-        console.log("✅ Token refreshed successfully");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Token refreshed successfully");
       } catch (refreshError) {
         console.error("❌ Failed to refresh token:", refreshError);
         return NextResponse.json(
@@ -507,7 +507,7 @@ export async function POST(req: NextRequest) {
     const channelId = uploadResponse.data.snippet?.channelId;
     const channelTitle = uploadResponse.data.snippet?.channelTitle;
 
-    console.log("✅ Upload successful!");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Upload successful!");
     console.log("📺 Video details:", {
       video_id: videoId,
       youtube_url: youtubeUrl,
@@ -599,7 +599,8 @@ export async function POST(req: NextRequest) {
 }
 
 // Helper function to check if deliverable is a video type
-function isVideoDeliverable(type: string): boolean {
+function isVideoDeliverable(type: string | undefined): boolean {
+  if (!type) return false;
   const videoTypes = [
     "Video",
     "Video Gallery",

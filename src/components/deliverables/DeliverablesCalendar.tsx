@@ -27,6 +27,8 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { useAPI } from "@/hooks/useAPI";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 
 interface Car {
   _id: string;
@@ -46,6 +48,14 @@ interface CalendarEvent {
   end: Date;
   resource: DeliverableWithCar & { isDeadline: boolean };
   allDay?: boolean;
+}
+
+interface CarsResponse {
+  cars: Car[];
+}
+
+interface DeliverablesResponse {
+  deliverables: DeliverableWithCar[];
 }
 
 const locales = {
@@ -70,8 +80,9 @@ const statusColors = {
 };
 
 export default function DeliverablesCalendar() {
-  const [deliverables, setDeliverables] = useState<DeliverableWithCar[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const api = useAPI();
+
+  // Non-blocking state for UI interactions
   const [view, setView] = useState<View>("month");
   const [date, setDate] = useState(new Date());
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -81,17 +92,9 @@ export default function DeliverablesCalendar() {
   const [platform, setPlatform] = useState("");
   const [type, setType] = useState("");
   const [editor, setEditor] = useState("");
-  const [cars, setCars] = useState<Car[]>([]);
   const [selectedCar, setSelectedCar] = useState("");
   const [creativeRole, setCreativeRole] = useState("");
-  const [users, setUsers] = useState<
-    { _id: string; name: string; creativeRoles: string[] }[]
-  >([]);
-
-  const filteredUsers = useMemo(() => {
-    if (!creativeRole || creativeRole === "all") return users;
-    return users.filter((user) => user.creativeRoles.includes(creativeRole));
-  }, [users, creativeRole]);
+  const [showOnlyScheduled, setShowOnlyScheduled] = useState(false);
 
   const CREATIVE_ROLES = [
     "video_editor",
@@ -104,39 +107,83 @@ export default function DeliverablesCalendar() {
     "storyboard_artist",
   ];
 
-  const fetchCars = async () => {
-    try {
-      const response = await fetch("/api/cars");
-      if (!response.ok) throw new Error("Failed to fetch cars");
-      const data = await response.json();
-      setCars(data.cars);
-    } catch (error) {
-      console.error("Error fetching cars:", error);
-      toast.error("Failed to fetch cars");
-    }
-  };
+  // FIXED: Use non-blocking useAPIQuery for cars data
+  const {
+    data: carsData,
+    isLoading: isLoadingCars,
+    error: carsError,
+  } = useAPIQuery<CarsResponse>("cars", {
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
 
-  const fetchUsers = async () => {
-    try {
-      const response = await fetch("/api/users");
-      if (!response.ok) throw new Error("Failed to fetch users");
-      const data = await response.json();
-      setUsers(
-        data.filter(
-          (user: any) =>
-            user.status === "active" && user.creativeRoles.length > 0
-        )
-      );
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      toast.error("Failed to fetch users");
-    }
-  };
+  // FIXED: Use non-blocking useAPIQuery for users data
+  const {
+    data: usersData,
+    isLoading: isLoadingUsers,
+    error: usersError,
+  } = useAPIQuery<
+    { _id: string; name: string; creativeRoles: string[]; status: string }[]
+  >("users", {
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
 
-  useEffect(() => {
-    fetchCars();
-    fetchUsers();
-  }, []);
+  // Build deliverables query params
+  const deliverableParams = useMemo(() => {
+    const params = new URLSearchParams({
+      sortField: "edit_deadline",
+      sortDirection: "asc",
+    });
+
+    if (search) params.append("search", search);
+    if (status && status !== "all") params.append("status", status);
+    if (platform && platform !== "all") params.append("platform", platform);
+    if (type && type !== "all") params.append("type", type);
+    if (editor && editor !== "all") params.append("editor", editor);
+    if (selectedCar && selectedCar !== "all")
+      params.append("car_id", selectedCar);
+    if (creativeRole && creativeRole !== "all")
+      params.append("creative_role", creativeRole);
+
+    return params.toString();
+  }, [search, status, platform, type, editor, selectedCar, creativeRole]);
+
+  // FIXED: Use non-blocking useAPIQuery for deliverables data
+  const {
+    data: deliverablesData,
+    isLoading: isLoadingDeliverables,
+    error: deliverablesError,
+    refetch: refetchDeliverables,
+  } = useAPIQuery<DeliverablesResponse>(`deliverables?${deliverableParams}`, {
+    staleTime: 2 * 60 * 1000, // 2 minutes cache for deliverables
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Process data safely
+  const cars = carsData?.cars || [];
+  const users =
+    usersData?.filter(
+      (user) =>
+        user.status === "active" &&
+        user.creativeRoles &&
+        user.creativeRoles.length > 0
+    ) || [];
+  const deliverables = deliverablesData?.deliverables || [];
+
+  // Determine overall loading state - only for essential data
+  const isLoading = isLoadingCars || isLoadingUsers || isLoadingDeliverables;
+
+  const filteredUsers = useMemo(() => {
+    if (!creativeRole || creativeRole === "all") return users;
+    return users.filter((user) => user.creativeRoles.includes(creativeRole));
+  }, [users, creativeRole]);
 
   // Reset editor if current editor doesn't have the selected role
   useEffect(() => {
@@ -150,39 +197,6 @@ export default function DeliverablesCalendar() {
       }
     }
   }, [creativeRole, editor, users]);
-
-  const fetchDeliverables = async () => {
-    try {
-      const params = new URLSearchParams({
-        sortField: "edit_deadline",
-        sortDirection: "asc",
-      });
-
-      if (search) params.append("search", search);
-      if (status && status !== "all") params.append("status", status);
-      if (platform && platform !== "all") params.append("platform", platform);
-      if (type && type !== "all") params.append("type", type);
-      if (editor && editor !== "all") params.append("editor", editor);
-      if (selectedCar && selectedCar !== "all")
-        params.append("car_id", selectedCar);
-      if (creativeRole && creativeRole !== "all")
-        params.append("creative_role", creativeRole);
-
-      const response = await fetch(`/api/deliverables?${params}`);
-      if (!response.ok) throw new Error("Failed to fetch deliverables");
-      const data = await response.json();
-      setDeliverables(data.deliverables);
-    } catch (error) {
-      console.error("Error fetching deliverables:", error);
-      toast.error("Failed to fetch deliverables");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDeliverables();
-  }, [search, status, platform, type, editor, selectedCar]);
 
   const events = useMemo(() => {
     const allEvents: CalendarEvent[] = [];
@@ -306,7 +320,8 @@ export default function DeliverablesCalendar() {
     return {
       className: cn(
         "transition-colors",
-        isToday && "today-cell bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]"
+        isToday &&
+          "today-cell bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))]"
       ),
     };
   };
@@ -413,28 +428,16 @@ export default function DeliverablesCalendar() {
   };
 
   const handleEventDrop = async ({ event, start, end }: any) => {
+    if (!api) return;
     try {
       const deliverable = event.resource;
-      const response = await fetch(
-        `/api/cars/${deliverable.car_id}/deliverables/${deliverable._id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            edit_deadline: format(start, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
-            updated_at: new Date(),
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to update deliverable date");
-      }
+      await api.put(`deliverables/${deliverable._id}`, {
+        edit_deadline: format(start, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
+        updated_at: new Date(),
+      });
 
       toast.success("Deadline updated successfully");
-      fetchDeliverables();
+      refetchDeliverables();
     } catch (error) {
       console.error("Error updating deliverable date:", error);
       toast.error("Failed to update deadline");
@@ -442,7 +445,7 @@ export default function DeliverablesCalendar() {
   };
 
   const handleEventResize = async ({ event, start, end }: any) => {
-    if (event.resource.type === "photo_gallery") return;
+    if (event.resource.type === "photo_gallery" || !api) return;
 
     try {
       const deliverable = event.resource;
@@ -450,26 +453,13 @@ export default function DeliverablesCalendar() {
         (end.getTime() - start.getTime()) / 1000
       );
 
-      const response = await fetch(
-        `/api/cars/${deliverable.car_id}/deliverables/${deliverable._id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            duration: durationInSeconds,
-            updated_at: new Date(),
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to update deliverable duration");
-      }
+      await api.put(`deliverables/${deliverable._id}`, {
+        duration: durationInSeconds,
+        updated_at: new Date(),
+      });
 
       toast.success("Duration updated successfully");
-      fetchDeliverables();
+      refetchDeliverables();
     } catch (error) {
       console.error("Error updating deliverable duration:", error);
       toast.error("Failed to update duration");
@@ -497,15 +487,16 @@ export default function DeliverablesCalendar() {
     };
   }, []);
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center py-8">
-        <div className="animate-pulse text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-          Loading calendar...
-        </div>
-      </div>
-    );
-  }
+  // FIXED: Commented out blocking loading condition to prevent UI blocking
+  // if (isLoading) {
+  //   return (
+  //     <div className="flex justify-center py-8">
+  //       <div className="animate-pulse text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
+  //         Loading calendar...
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div
@@ -516,6 +507,21 @@ export default function DeliverablesCalendar() {
         "bg-[var(--background-primary)] dark:bg-[hsl(var(--background))]"
       )}
     >
+      {/* Non-blocking loading indicator */}
+      {isLoading && (
+        <div className="bg-muted/30 border border-muted rounded-md p-3 mb-4">
+          <div className="flex items-center space-x-2">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-muted-foreground">
+              Loading calendar data...
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Calendar interface is ready - data loading in background
+          </p>
+        </div>
+      )}
+
       <div className="mb-4 space-y-4">
         <div className="flex items-center gap-4">
           <div className="flex-1">

@@ -1,0 +1,92 @@
+[
+  {
+    "title": "Instagram Reel",
+    "type": "video",
+    "duration": 15,
+    "aspect_ratio": "9:16",
+    "edit_deadline": "2024-01-20T17:00:00.000Z",
+    "release_date": "2024-01-22T12:00:00.000Z",
+    "status": "not_started"
+  },
+  {
+    "title": "Overall Recap of the Event (16×9)",
+    "type": "video",
+    "duration": null,
+    "aspect_ratio": "16:9",
+    "edit_deadline": null,
+    "release_date": null,
+    "status": "not_started"
+  },
+  {
+    "title": "Overall Recap of the Event (9×16)",
+    "type": "video",
+    "duration": null,
+    "aspect_ratio": "9:16",
+    "edit_deadline": null,
+    "release_date": null,
+    "status": "not_started"
+  },
+  {
+    "title": "Highlight Recap – Hype Video (9×16)",
+    "type": "video",
+    "duration": null,
+    "aspect_ratio": "9:16",
+    "edit_deadline": null,
+    "release_date": null,
+    "status": "not_started"
+  },
+  {
+    "title": "Highlight Recap of Photo/Video Shoot at the Garage & Driving (9×16)",
+    "type": "video",
+    "duration": null,
+    "aspect_ratio": "9:16",
+    "edit_deadline": null,
+    "release_date": null,
+    "status": "not_started"
+  },
+  {
+    "title": "Highlight Recap of Photo/Video Shoot at the Garage & Driving (16×9)",
+    "type": "video",
+    "duration": null,
+    "aspect_ratio": "16:9",
+    "edit_deadline": null,
+    "release_date": null,
+    "status": "not_started"
+  },
+  {
+    "title": "Highlight Recap of FuelFed AMG Event (Sunday Morning) (16×9)",
+    "type": "video",
+    "duration": null,
+    "aspect_ratio": "16:9",
+    "edit_deadline": null,
+    "release_date": null,
+    "status": "not_started"
+  },
+  {
+    "title": "Event Recap Photo Gallery – Cars, People, Experience",
+    "type": "photo",
+    "duration": null,
+    "aspect_ratio": null,
+    "edit_deadline": null,
+    "release_date": null,
+    "status": "not_started"
+  },
+  {
+    "title": "Individual Mini Shoots – Owners' Cars on Garage Deck / Driving / etc.",
+    "type": "photo",
+    "duration": null,
+    "aspect_ratio": null,
+    "edit_deadline": null,
+    "release_date": null,
+    "status": "not_started"
+  },
+  {
+    "title": "FuelFed Event Gallery – Morning Show",
+    "type": "photo",
+    "duration": null,
+    "aspect_ratio": null,
+    "edit_deadline": null,
+    "release_date": null,
+    "status": "not_started"
+  }
+]

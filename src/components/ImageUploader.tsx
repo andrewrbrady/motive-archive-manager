@@ -2,6 +2,9 @@
 
 import React, { useState, useRef } from "react";
 import { CarImage } from "@/types/car";
+import { useAPI } from "@/hooks/useAPI";
+import { getValidToken } from "@/lib/api-client";
+import { compressImages, needsCompression } from "@/lib/imageCompression";
 
 interface UploadResponse {
   imageUrl: string;
@@ -36,13 +39,16 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   contextInput,
   carId,
 }) => {
+  const api = useAPI();
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  if (!api) return <div>Loading...</div>;
+
   const uploadFile = async (file: File): Promise<UploadResponse> => {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("files", file);
       formData.append("metadata", JSON.stringify(metadata));
       if (carId) {
         formData.append("carId", carId);
@@ -54,43 +60,40 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         status: "uploading",
       });
 
-      const xhr = new XMLHttpRequest();
+      try {
+        const data = (await api.upload("/api/images/upload", formData)) as {
+          success: boolean;
+          images: Array<{
+            url: string;
+            metadata?: CarImage["metadata"];
+          }>;
+          error?: string;
+        };
 
-      // Track upload progress
-      xhr.upload.addEventListener("progress", (event) => {
-        if (event.lengthComputable) {
-          // Scale progress to 0-75% during upload
-          const uploadProgress = Math.round((event.loaded * 75) / event.total);
-          onImageProgress?.({
-            fileName: file.name,
-            progress: uploadProgress,
-            status: "uploading",
-          });
+        if (!data.success || !data.images || data.images.length === 0) {
+          throw new Error(data.error || "No images were uploaded successfully");
         }
-      });
 
-      xhr.onload = async () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const response = JSON.parse(xhr.responseText);
-            resolve({
-              imageUrl: response.imageUrl,
-              metadata: response.metadata,
-            });
-          } catch (error) {
-            reject(new Error("Failed to parse upload response"));
-          }
-        } else {
-          reject(new Error("Upload failed"));
+        const uploadedImage = data.images[0];
+        let imageUrl = uploadedImage.url;
+
+        if (
+          imageUrl &&
+          imageUrl.includes("imagedelivery.net") &&
+          !imageUrl.match(
+            /\/(public|thumbnail|avatar|medium|large|webp|preview|original|w=\d+)$/
+          )
+        ) {
+          imageUrl = `${imageUrl}/w=200,h=200,fit=cover`;
         }
-      };
 
-      xhr.onerror = () => {
-        reject(new Error("Upload failed"));
-      };
-
-      xhr.open("POST", "/api/cloudflare/images");
-      xhr.send(formData);
+        resolve({
+          imageUrl: imageUrl,
+          metadata: uploadedImage.metadata || {},
+        });
+      } catch (error) {
+        reject(error);
+      }
     });
   };
 
@@ -113,11 +116,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         status: "pending",
       });
 
-      const { imageUrl, metadata: uploadMetadata } = await uploadFile(
-        firstFile
-      );
+      const { imageUrl, metadata: uploadMetadata } =
+        await uploadFile(firstFile);
 
-      // Update progress to 75% when starting analysis
       onImageProgress?.({
         fileName: firstFile.name,
         progress: 75,
@@ -126,24 +127,11 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       });
 
       try {
-        const response = await fetch("/api/openai/analyze-image", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            imageUrl,
-            vehicleInfo: metadata?.vehicleInfo,
-          }),
-        });
+        const { analysis } = (await api.post("openai/analyze-image", {
+          imageUrl,
+          vehicleInfo: metadata?.vehicleInfo,
+        })) as { analysis: any };
 
-        if (!response.ok) {
-          throw new Error("Failed to analyze image");
-        }
-
-        const { analysis } = await response.json();
-
-        // Update to 100% only after analysis is complete
         onImageProgress?.({
           fileName: firstFile.name,
           progress: 100,
@@ -155,10 +143,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           },
         });
 
-        // Show first image immediately
         onUploadComplete?.([imageUrl]);
 
-        // Upload remaining files in the background
         if (files.length > 1) {
           const remainingFiles = files.slice(1);
           const uploadRemainingFiles = async () => {
@@ -172,9 +158,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   status: "pending",
                 });
 
-                const { imageUrl, metadata: uploadMetadata } = await uploadFile(
-                  file
-                );
+                const { imageUrl, metadata: uploadMetadata } =
+                  await uploadFile(file);
 
                 onImageProgress?.({
                   fileName: file.name,
@@ -184,22 +169,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 });
 
                 try {
-                  const response = await fetch("/api/openai/analyze-image", {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                      imageUrl,
-                      vehicleInfo: metadata?.vehicleInfo,
-                    }),
-                  });
-
-                  if (!response.ok) {
-                    throw new Error("Failed to analyze image");
-                  }
-
-                  const { analysis } = await response.json();
+                  const { analysis } = (await api.post("openai/analyze-image", {
+                    imageUrl,
+                    vehicleInfo: metadata?.vehicleInfo,
+                  })) as { analysis: any };
 
                   onImageProgress?.({
                     fileName: file.name,
@@ -240,7 +213,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             }
           };
 
-          // Start background upload
           uploadRemainingFiles();
         }
       } catch (error) {

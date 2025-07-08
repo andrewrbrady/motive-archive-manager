@@ -65,8 +65,14 @@ export const getStatusText = (status: DeliverableStatus): string => {
   }
 };
 
-export const getPillColor = (field: string, value: string): string => {
+export const getPillColor = (
+  field: string,
+  value: string | undefined
+): string => {
   if (field === "platform") {
+    if (!value) {
+      return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
+    }
     switch (value.toLowerCase()) {
       case "youtube":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";

@@ -18,6 +18,7 @@ import DeleteConfirmDialog from "@/components/ui/DeleteConfirmDialog";
 import { useToast } from "@/components/ui/use-toast";
 import ClientsFilters from "./ClientsFilters";
 import { LoadingContainer } from "@/components/ui/loading";
+import { useAPI } from "@/hooks/useAPI";
 
 const BUSINESS_TYPES = [
   "Dealership",
@@ -54,6 +55,12 @@ export default function ClientsTable({ filters }: ClientsTableProps) {
   const [totalPages, setTotalPages] = useState(1);
   const { toast } = useToast();
 
+  const api = useAPI();
+
+  if (!api) {
+    return <LoadingContainer />;
+  }
+
   useEffect(() => {
     fetchClients();
   }, [page, filters]);
@@ -61,9 +68,7 @@ export default function ClientsTable({ filters }: ClientsTableProps) {
   const fetchClients = async () => {
     try {
       setLoading(true);
-      // [REMOVED] // [REMOVED] console.log("Fetching clients with filters:", filters);
 
-      // Build query params
       const params = new URLSearchParams({
         page: page.toString(),
       });
@@ -73,18 +78,14 @@ export default function ClientsTable({ filters }: ClientsTableProps) {
       if (filters.businessType)
         params.append("businessType", filters.businessType);
 
-      const response = await fetch(`/api/clients?${params.toString()}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      // [REMOVED] // [REMOVED] console.log("Received clients data:", data);
+      const data = (await api.get(`clients?${params.toString()}`)) as {
+        clients?: Client[];
+        totalPages?: number;
+      };
 
       setClients(data.clients || []);
       setTotalPages(data.totalPages || 1);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching clients:", error);
       toast({
         title: "Error",
@@ -100,11 +101,7 @@ export default function ClientsTable({ filters }: ClientsTableProps) {
     if (!deletingClient) return;
 
     try {
-      const response = await fetch(`/api/clients/${deletingClient._id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) throw new Error("Failed to delete client");
+      await api.delete(`clients/${deletingClient._id}`);
 
       toast({
         title: "Success",
@@ -112,7 +109,7 @@ export default function ClientsTable({ filters }: ClientsTableProps) {
       });
 
       fetchClients();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting client:", error);
       toast({
         title: "Error",

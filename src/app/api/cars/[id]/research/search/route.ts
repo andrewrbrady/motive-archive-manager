@@ -28,9 +28,9 @@ export async function GET(request: Request) {
       );
     }
 
-    // [REMOVED] // [REMOVED] console.log(`Processing search request for car ${carId}`);
-    // [REMOVED] // [REMOVED] console.log(`Query: "${query}"`);
-    // [REMOVED] // [REMOVED] console.log(`Using model: ${model}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Processing search request for car ${carId}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Query: "${query}"`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Using model: ${model}`);
 
     const { results, answer } = await hybridSearch(query, carId, model);
 

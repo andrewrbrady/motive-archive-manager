@@ -36,7 +36,7 @@ interface JsonUploadPasteModalProps {
   onSubmit: (data: any[]) => Promise<void>;
   title: string;
   description?: string;
-  expectedType: string; // "events", "deliverables", or "cars"
+  expectedType: string; // "events", "deliverables", "deliverables-relaxed", or "cars"
   isSubmitting?: boolean;
   carData?: {
     make?: string;
@@ -143,6 +143,17 @@ export default function JsonUploadPasteModal({
               return {
                 isValid: false,
                 error: `Deliverable at index ${i} missing required fields: title, platform, type, edit_deadline`,
+              };
+            }
+          }
+        } else if (expectedType === "deliverables-relaxed") {
+          // Relaxed validation for LLM-generated deliverables - only require title
+          for (let i = 0; i < data.length; i++) {
+            const item = data[i];
+            if (!item.title) {
+              return {
+                isValid: false,
+                error: `Deliverable at index ${i} missing required field: title`,
               };
             }
           }

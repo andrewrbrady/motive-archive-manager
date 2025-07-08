@@ -12,7 +12,22 @@ const contextMapCache = new Map<string, string[]>();
 const getContextMap = (): Record<string, string[]> => {
   return {
     // Car page tab contexts
-    "tab:gallery": ["tab"],
+    "tab:gallery": [
+      "tab",
+      "page",
+      "image",
+      "mode",
+      "search",
+      "angle",
+      "view",
+      "movement",
+      "tod",
+      "side",
+      "category",
+      "sort",
+      "sortDirection",
+      "limit",
+    ],
     "tab:car-galleries": ["tab"],
     "tab:specs": ["tab"],
     "tab:shoots": ["tab"],

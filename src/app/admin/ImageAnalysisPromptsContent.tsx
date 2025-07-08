@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Edit, Trash2, Save, X } from "lucide-react";
 import { toast } from "sonner";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 interface ImageAnalysisPrompt {
   _id: string;
@@ -58,18 +58,17 @@ const ImageAnalysisPromptsContent: React.FC = () => {
     category: "general",
   });
 
-  const { authenticatedFetch, isAuthenticated, hasValidToken } =
-    useAuthenticatedFetch();
+  const api = useAPI();
 
   // Fetch prompts
   const fetchPrompts = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
-      const response = await authenticatedFetch(
+      const data = (await api.get(
         "/api/admin/image-analysis-prompts"
-      );
-      if (!response.ok) throw new Error("Failed to fetch prompts");
-      const data = await response.json();
+      )) as ImageAnalysisPrompt[];
       setPrompts(data);
     } catch (error) {
       console.error("Error fetching prompts:", error);
@@ -80,36 +79,26 @@ const ImageAnalysisPromptsContent: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isAuthenticated && hasValidToken) {
+    if (api) {
       fetchPrompts();
     }
-  }, [isAuthenticated, hasValidToken]);
+  }, [api]);
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmitting || !api) return;
 
     try {
       setIsSubmitting(true);
 
-      const url = editingPrompt
-        ? `/api/admin/image-analysis-prompts/${editingPrompt._id}`
-        : "/api/admin/image-analysis-prompts";
-
-      const method = editingPrompt ? "PUT" : "POST";
-
-      const response = await authenticatedFetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to save prompt");
+      if (editingPrompt) {
+        await api.put(
+          `/api/admin/image-analysis-prompts/${editingPrompt._id}`,
+          formData
+        );
+      } else {
+        await api.post("/api/admin/image-analysis-prompts", formData);
       }
 
       toast.success(
@@ -132,22 +121,12 @@ const ImageAnalysisPromptsContent: React.FC = () => {
 
   // Handle delete
   const handleDelete = async (prompt: ImageAnalysisPrompt) => {
-    if (isSubmitting) return;
+    if (isSubmitting || !api) return;
 
     try {
       setIsSubmitting(true);
 
-      const response = await authenticatedFetch(
-        `/api/admin/image-analysis-prompts/${prompt._id}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete prompt");
-      }
+      await api.delete(`/api/admin/image-analysis-prompts/${prompt._id}`);
 
       toast.success("Prompt deleted successfully");
       await fetchPrompts();
@@ -164,29 +143,15 @@ const ImageAnalysisPromptsContent: React.FC = () => {
 
   // Handle toggle default
   const handleToggleDefault = async (prompt: ImageAnalysisPrompt) => {
-    if (isSubmitting) return;
+    if (isSubmitting || !api) return;
 
     try {
       setIsSubmitting(true);
 
-      const response = await authenticatedFetch(
-        `/api/admin/image-analysis-prompts/${prompt._id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...prompt,
-            isDefault: !prompt.isDefault,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update prompt");
-      }
+      await api.put(`/api/admin/image-analysis-prompts/${prompt._id}`, {
+        ...prompt,
+        isDefault: !prompt.isDefault,
+      });
 
       toast.success("Default status updated successfully");
       await fetchPrompts();
@@ -200,29 +165,15 @@ const ImageAnalysisPromptsContent: React.FC = () => {
 
   // Handle toggle active
   const handleToggleActive = async (prompt: ImageAnalysisPrompt) => {
-    if (isSubmitting) return;
+    if (isSubmitting || !api) return;
 
     try {
       setIsSubmitting(true);
 
-      const response = await authenticatedFetch(
-        `/api/admin/image-analysis-prompts/${prompt._id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...prompt,
-            isActive: !prompt.isActive,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update prompt");
-      }
+      await api.put(`/api/admin/image-analysis-prompts/${prompt._id}`, {
+        ...prompt,
+        isActive: !prompt.isActive,
+      });
 
       toast.success("Active status updated successfully");
       await fetchPrompts();

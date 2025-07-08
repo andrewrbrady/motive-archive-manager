@@ -11,6 +11,7 @@ import { useSession } from "@/hooks/useFirebaseAuth";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useAPI } from "@/hooks/useAPI";
 
 interface UserRolesProps {
   userId: string;
@@ -40,6 +41,11 @@ const AVAILABLE_CREATIVE_ROLES = [
 ];
 const USER_STATUSES = ["active", "inactive", "suspended"];
 
+// TypeScript interfaces for API responses
+interface UpdateUserResponse {
+  user: any;
+}
+
 export default function UserRolesManagement({
   userId,
   initialRoles,
@@ -48,6 +54,7 @@ export default function UserRolesManagement({
   onUpdate,
 }: UserRolesProps) {
   const { data: session } = useSession();
+  const api = useAPI();
   const [roles, setRoles] = useState<string[]>(initialRoles || ["user"]);
   const [creativeRoles, setCreativeRoles] = useState<string[]>(
     initialCreativeRoles || []
@@ -104,42 +111,29 @@ export default function UserRolesManagement({
 
   // Save user roles
   const handleSave = async () => {
+    if (!api) {
+      toast.error("Authentication not ready. Please try again.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       // Ensure user always has at least "user" role
       const rolesList = roles.length > 0 ? roles : ["user"];
 
-      const response = await fetch(`/api/users/${userId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          updateType: "roles",
-          roles: rolesList,
-          creativeRoles,
-          status,
-        }),
+      const responseData = await api.put(`users/${userId}`, {
+        updateType: "roles",
+        roles: rolesList,
+        creativeRoles,
+        status,
       });
 
-      if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({ error: "Unknown error" }));
-        throw new Error(
-          errorData.error || `Failed to update roles: ${response.statusText}`
-        );
-      }
-
-      // Get the response data with updated user information
-      const responseData = await response.json();
-      const updatedUser = responseData.user;
+      const updatedUser = (responseData as UpdateUserResponse).user;
 
       // Attempt to refresh the session to sync the role changes
       try {
-        await fetch("/api/auth/refresh-session");
+        await api.post("auth/refresh-session", {});
       } catch (refreshError) {
         console.error(
           "Error refreshing session after role update:",

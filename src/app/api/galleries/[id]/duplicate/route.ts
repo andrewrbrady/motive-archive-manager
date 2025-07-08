@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       name: `${originalGallery.name} (Copy)`,
       description: originalGallery.description || "",
       imageIds: [...(originalGallery.imageIds || [])], // Copy the image IDs
+      primaryImageId: originalGallery.primaryImageId || undefined, // Copy the primaryImageId
       orderedImages: originalGallery.orderedImages
         ? [...originalGallery.orderedImages]
         : undefined, // Copy the ordered images if they exist
@@ -55,6 +56,8 @@ export async function POST(request: NextRequest) {
     const responseGallery = {
       ...duplicatedGallery,
       _id: duplicatedGallery._id.toString(),
+      imageIds: duplicatedGallery.imageIds.map((id: ObjectId) => id.toString()),
+      primaryImageId: duplicatedGallery.primaryImageId?.toString(),
     };
 
     return NextResponse.json({

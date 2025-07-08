@@ -34,8 +34,26 @@ import {
   GripVertical,
 } from "lucide-react";
 import { toast } from "sonner";
-import { BatchTemplate, DeliverableTemplate } from "@/types/deliverable";
-import DeliverableTemplateGantt from "./DeliverableTemplateGantt";
+
+import { useAPI } from "@/hooks/useAPI";
+
+// Define batch interfaces locally
+interface DeliverableTemplate {
+  title: string;
+  platform_id?: string;
+  platform?: string; // Legacy field
+  mediaTypeId?: string;
+  type?: string; // Legacy field
+  duration?: number;
+  aspect_ratio: string;
+  daysUntilDeadline?: number;
+  daysUntilRelease?: number;
+}
+
+interface BatchTemplate {
+  name: string;
+  templates: DeliverableTemplate[];
+}
 
 export default function BatchTemplateManager() {
   const [isOpen, setIsOpen] = useState(false);
@@ -45,19 +63,22 @@ export default function BatchTemplateManager() {
     name: "",
     templates: [],
   });
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
 
   useEffect(() => {
     if (isOpen) {
       fetchTemplates();
     }
-  }, [isOpen]);
+  }, [isOpen, api]);
 
   // Fetch templates on mount
   const fetchTemplates = async () => {
     try {
-      const response = await fetch("/api/batch-templates");
-      if (!response.ok) throw new Error("Failed to fetch templates");
-      const data = await response.json();
+      const data = (await api.get("batch-templates")) as {
+        templates: Record<string, BatchTemplate>;
+      };
       setTemplates(data.templates);
     } catch (error) {
       console.error("Error fetching templates:", error);
@@ -91,15 +112,7 @@ export default function BatchTemplateManager() {
     }
 
     try {
-      const response = await fetch("/api/batch-templates", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newTemplate),
-      });
-
-      if (!response.ok) throw new Error("Failed to save template");
+      await api.post("batch-templates", newTemplate);
 
       toast.success("Template saved successfully");
       fetchTemplates();
@@ -116,14 +129,7 @@ export default function BatchTemplateManager() {
     if (!confirm("Are you sure you want to delete this template?")) return;
 
     try {
-      const response = await fetch(
-        `/api/batch-templates/${encodeURIComponent(name)}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) throw new Error("Failed to delete template");
+      await api.delete(`batch-templates/${encodeURIComponent(name)}`);
 
       toast.success("Template deleted successfully");
       fetchTemplates();
@@ -145,15 +151,7 @@ export default function BatchTemplateManager() {
     };
 
     try {
-      const response = await fetch("/api/batch-templates", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(duplicatedTemplate),
-      });
-
-      if (!response.ok) throw new Error("Failed to duplicate template");
+      await api.post("batch-templates", duplicatedTemplate);
 
       toast.success("Template duplicated successfully");
       fetchTemplates();
@@ -204,54 +202,6 @@ export default function BatchTemplateManager() {
     }));
   };
 
-  const handleTemplateUpdate = (
-    index: number,
-    updates: Partial<DeliverableTemplate>
-  ) => {
-    setNewTemplate((prev) => ({
-      ...prev,
-      templates: prev.templates.map((template, i) =>
-        i === index ? { ...template, ...updates } : template
-      ),
-    }));
-  };
-
-  const handleReorder = (fromIndex: number, toIndex: number) => {
-    setNewTemplate((prev) => {
-      const newTemplates = [...prev.templates];
-      const [movedTemplate] = newTemplates.splice(fromIndex, 1);
-      newTemplates.splice(toIndex, 0, movedTemplate);
-      return { ...prev, templates: newTemplates };
-    });
-  };
-
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    e.dataTransfer.setData("text/plain", index.toString());
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    const element = e.currentTarget as HTMLElement;
-    element.style.transform = "translateY(2px)";
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    const element = e.currentTarget as HTMLElement;
-    element.style.transform = "";
-  };
-
-  const handleDrop = (e: React.DragEvent, toIndex: number) => {
-    e.preventDefault();
-    const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
-    if (fromIndex !== toIndex) {
-      handleReorder(fromIndex, toIndex);
-    }
-    const element = e.currentTarget as HTMLElement;
-    element.style.transform = "";
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -297,16 +247,8 @@ export default function BatchTemplateManager() {
                 {newTemplate.templates.map((template, index) => (
                   <div
                     key={index}
-                    className="grid grid-cols-[auto_200px_1fr_140px_140px_120px_120px_auto] gap-3 items-start p-3 rounded-lg border bg-card transition-all"
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, index)}
-                    onDragOver={(e) => handleDragOver(e, index)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, index)}
+                    className="grid grid-cols-[200px_1fr_140px_140px_120px_120px_auto] gap-3 items-start p-3 rounded-lg border bg-card transition-all"
                   >
-                    <div className="cursor-move opacity-50 hover:opacity-100 mt-2">
-                      <GripVertical className="h-4 w-4" />
-                    </div>
                     <Select
                       value={template.platform}
                       onValueChange={(value) =>
@@ -432,17 +374,6 @@ export default function BatchTemplateManager() {
 
               {newTemplate.templates.length > 0 && (
                 <div className="space-y-4">
-                  <div className="mt-8">
-                    <h4 className="text-sm font-medium mb-2">
-                      Timeline Preview
-                    </h4>
-                    <DeliverableTemplateGantt
-                      template={newTemplate}
-                      onTemplateUpdate={handleTemplateUpdate}
-                      onReorder={handleReorder}
-                    />
-                  </div>
-
                   <Button onClick={saveTemplate}>
                     {editingTemplate ? "Update Template" : "Save Template"}
                   </Button>

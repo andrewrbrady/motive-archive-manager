@@ -6,9 +6,12 @@ import { ObjectId } from "mongodb";
 export const maxDuration = 300;
 export const runtime = "nodejs";
 
+// Force dynamic rendering for uploads
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  console.log("[API] Images upload called at", new Date().toISOString());
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[API] Images upload called at", new Date().toISOString());
 
   try {
     // Log request details
@@ -16,12 +19,12 @@ export async function POST(request: NextRequest) {
       "[API] Request headers:",
       Object.fromEntries(request.headers.entries())
     );
-    console.log("[API] Request URL:", request.url);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[API] Request URL:", request.url);
 
     const formData = await request.formData();
     const files = formData.getAll("files");
 
-    console.log("[API] FormData parsed, files count:", files.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[API] FormData parsed, files count:", files.length);
 
     // Get car association and metadata from FormData
     const carId = formData.get("carId") as string;
@@ -31,14 +34,14 @@ export async function POST(request: NextRequest) {
     if (metadataString) {
       try {
         customMetadata = JSON.parse(metadataString);
-        console.log("[API] Custom metadata parsed:", customMetadata);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[API] Custom metadata parsed:", customMetadata);
       } catch (e) {
         console.warn("[API] Failed to parse metadata:", e);
       }
     }
 
     if (carId) {
-      console.log("[API] Car association found:", carId);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[API] Car association found:", carId);
     }
 
     if (!files || files.length === 0) {
@@ -53,7 +56,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[API] Processing ${files.length} files for upload`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[API] Processing ${files.length} files for upload`);
 
     // Validate environment variables
     if (!process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID) {
@@ -86,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < files.length; i++) {
       const fileData = files[i];
-      console.log(`[API] Processing file ${i + 1}/${files.length}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[API] Processing file ${i + 1}/${files.length}`);
 
       if (!(fileData instanceof File)) {
         const error = `File ${i + 1} is not a valid File object`;
@@ -120,17 +123,39 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      if (file.size > 4 * 1024 * 1024) {
-        // 4MB limit (reduced for Vercel)
+      // More lenient file size check - 8MB per file for better user experience
+      if (file.size > 8 * 1024 * 1024) {
         const error = `File "${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)}MB)`;
         console.error("[API]", error);
         uploadErrors.push({
           fileName: file.name,
           fileIndex: i + 1,
           error,
-          details: "File exceeds 4MB limit (Vercel function payload limit)",
+          details:
+            "File exceeds 8MB limit. Please compress your image before uploading.",
         });
         continue;
+      }
+
+      // Check total request size for multiple files
+      const totalSize = files.reduce((acc: number, f: any) => {
+        if (f instanceof File) return acc + f.size;
+        return acc;
+      }, 0);
+
+      if (totalSize > 25 * 1024 * 1024) {
+        const error = `Total upload size too large (${(totalSize / 1024 / 1024).toFixed(1)}MB)`;
+        console.error("[API]", error);
+        return NextResponse.json(
+          {
+            error: "Upload too large",
+            details:
+              "Total upload size exceeds 25MB. Please upload fewer images at once or compress them.",
+            totalSize: `${(totalSize / 1024 / 1024).toFixed(1)}MB`,
+            timestamp: new Date().toISOString(),
+          },
+          { status: 413 }
+        );
       }
 
       try {
@@ -138,11 +163,11 @@ export async function POST(request: NextRequest) {
         const cloudflareForm = new FormData();
         cloudflareForm.append("file", file);
 
-        console.log(`[API] Uploading "${file.name}" to Cloudflare...`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[API] Uploading "${file.name}" to Cloudflare...`);
 
         // Upload to Cloudflare Images
         const cloudflareUrl = `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1`;
-        console.log("[API] Cloudflare URL:", cloudflareUrl);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[API] Cloudflare URL:", cloudflareUrl);
 
         const response = await fetch(cloudflareUrl, {
           method: "POST",
@@ -180,7 +205,7 @@ export async function POST(request: NextRequest) {
         }
 
         const result = await response.json();
-        console.log(`[API] Cloudflare response for "${file.name}":`, result);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[API] Cloudflare response for "${file.name}":`, result);
 
         if (!result.success) {
           console.error(
@@ -199,7 +224,7 @@ export async function POST(request: NextRequest) {
 
         // Get image URL from variants
         const imageUrl = result.result.variants[0].replace(/\/public$/, "");
-        console.log(`[API] Image URL for "${file.name}":`, imageUrl);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[API] Image URL for "${file.name}":`, imageUrl);
 
         // Create metadata - use custom metadata if provided, otherwise default
         const metadata =
@@ -215,7 +240,7 @@ export async function POST(request: NextRequest) {
 
         try {
           // Store in MongoDB
-          console.log(`[API] Storing "${file.name}" in MongoDB...`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[API] Storing "${file.name}" in MongoDB...`);
           const db = await getDatabase();
           const imageDoc = {
             _id: new ObjectId(),
@@ -330,7 +355,7 @@ export async function POST(request: NextRequest) {
     }
 
     // All successful
-    console.log("[API] All uploads successful");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[API] All uploads successful");
     return NextResponse.json(response);
   } catch (error) {
     const endTime = Date.now();
@@ -358,7 +383,7 @@ export async function POST(request: NextRequest) {
 
 // Add OPTIONS handler for CORS preflight requests
 export async function OPTIONS(request: NextRequest) {
-  console.log("[API] OPTIONS request received for images upload");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[API] OPTIONS request received for images upload");
   return new NextResponse(null, {
     status: 204,
     headers: {

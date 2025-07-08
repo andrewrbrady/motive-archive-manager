@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useAPI } from "@/hooks/useAPI";
 
 interface YoutubeAddChannelDialogProps {
   open: boolean;
@@ -29,6 +30,9 @@ export default function YoutubeAddChannelDialog({
   const [tags, setTags] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,24 +49,13 @@ export default function YoutubeAddChannelDialog({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/youtube/channels", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          channel_id: channelId,
-          tags: tags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
-        }),
+      await api.post("youtube/channels", {
+        channel_id: channelId,
+        tags: tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to add channel");
-      }
 
       toast({
         title: "Success",

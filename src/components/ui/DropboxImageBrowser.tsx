@@ -14,6 +14,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAPI } from "@/hooks/useAPI";
 
 interface DropboxFile {
   name: string;
@@ -42,6 +43,7 @@ export default function DropboxImageBrowser({
   onError,
   initialFolderUrl = "",
 }: DropboxImageBrowserProps) {
+  const api = useAPI();
   const [folderUrl, setFolderUrl] = useState(initialFolderUrl);
   const [images, setImages] = useState<DropboxFile[]>([]);
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
@@ -50,6 +52,8 @@ export default function DropboxImageBrowser({
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(
     null
   );
+
+  if (!api) return <div>Loading...</div>;
 
   const handleBrowseFolder = async () => {
     if (!folderUrl.trim()) {
@@ -62,16 +66,9 @@ export default function DropboxImageBrowser({
     setSelectedImages(new Set());
 
     try {
-      const response = await fetch(
-        `/api/dropbox/folder?url=${encodeURIComponent(folderUrl)}`
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to browse folder");
-      }
-
-      const data = await response.json();
+      const data = (await api.get(
+        `dropbox/folder?url=${encodeURIComponent(folderUrl)}`
+      )) as { images: DropboxFile[] };
       setImages(data.images || []);
 
       if (data.images.length === 0) {
@@ -122,23 +119,10 @@ export default function DropboxImageBrowser({
     });
 
     try {
-      const response = await fetch("/api/dropbox/folder/import", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          folderUrl,
-          selectedImages: Array.from(selectedImages),
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to import images");
-      }
-
-      const result = await response.json();
+      const result = (await api.post("dropbox/folder/import", {
+        folderUrl,
+        selectedImages: Array.from(selectedImages),
+      })) as any;
 
       if (result.uploaded && result.uploaded.length > 0) {
         const cloudflareIds = result.uploaded.map(

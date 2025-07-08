@@ -19,8 +19,13 @@ import NewMakeDialog from "@/components/makes/NewMakeDialog";
 import { toast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { useAPI } from "@/hooks/useAPI";
+
+// TypeScript interfaces for API responses
+interface MakesResponse extends Array<Make> {}
 
 export default function MakesContent() {
+  const api = useAPI();
   const [makes, setMakes] = useState<Make[]>([]);
   const [filteredMakes, setFilteredMakes] = useState<Make[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,13 +60,11 @@ export default function MakesContent() {
   }, [makes, searchQuery, filterMakes]);
 
   const fetchMakes = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
-      const response = await fetch("/api/makes");
-      if (!response.ok) {
-        throw new Error("Failed to fetch makes");
-      }
-      const data = await response.json();
+      const data = (await api.get("makes")) as MakesResponse;
       setMakes(data);
       setFilteredMakes(data);
     } catch (error) {
@@ -81,20 +84,10 @@ export default function MakesContent() {
   };
 
   const handleCreate = async (newMake: Partial<Make>) => {
+    if (!api) return;
+
     try {
-      const response = await fetch("/api/makes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newMake),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create make");
-      }
-
-      const createdMake = await response.json();
+      const createdMake = (await api.post("makes", newMake)) as Make;
       setMakes([...makes, createdMake]);
       setIsNewMakeDialogOpen(false);
       toast({
@@ -115,15 +108,10 @@ export default function MakesContent() {
   const handleDelete = async (makeId: string) => {
     if (!confirm("Are you sure you want to delete this make?")) return;
 
+    if (!api) return;
+
     try {
-      const response = await fetch(`/api/makes?id=${makeId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete make");
-      }
-
+      await api.delete(`makes?id=${makeId}`);
       setMakes(makes.filter((make) => make._id !== makeId));
       toast({
         title: "Success",

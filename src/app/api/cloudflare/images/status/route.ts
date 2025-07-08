@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const { id } = await request.json();
-    // [REMOVED] // [REMOVED] console.log("[STATUS API] Checking status for image ID:", id);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[STATUS API] Checking status for image ID:", id);
 
     if (!id) {
       return NextResponse.json(
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     // Try to find the image by cloudflareId
     const image = await imagesCollection.findOne({ cloudflareId: id });
-    // [REMOVED] // [REMOVED] console.log("[STATUS API] MongoDB image found:", image ? "yes" : "no");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[STATUS API] MongoDB image found:", image ? "yes" : "no");
 
     if (image) {
       console.log(
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
         image.metadata?.angle ||
         image.metadata?.description
       ) {
-        // [REMOVED] // [REMOVED] console.log("[STATUS API] Analysis found, returning complete status");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[STATUS API] Analysis found, returning complete status");
         return NextResponse.json({
           status: "complete",
           ready: true,
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     // If we get here, we need to check with Cloudflare
-    // [REMOVED] // [REMOVED] console.log("[STATUS API] Checking with Cloudflare");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[STATUS API] Checking with Cloudflare");
     const response = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1/${id}`,
       {
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
         const imageUrl = image.url;
         const vehicleInfo = image.metadata?.vehicleInfo;
 
-        // [REMOVED] // [REMOVED] console.log("[STATUS API] Attempting to re-analyze image with OpenAI");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[STATUS API] Attempting to re-analyze image with OpenAI");
         const analysisResponse = await fetch(
           `${request.nextUrl.origin}/api/openai/analyze-image`,
           {
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // Image exists in Cloudflare but not in our DB - the upload is incomplete
-      // [REMOVED] // [REMOVED] console.log("[STATUS API] Image exists in Cloudflare but not in MongoDB");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[STATUS API] Image exists in Cloudflare but not in MongoDB");
       return NextResponse.json({
         status: "uploading",
         ready: false,

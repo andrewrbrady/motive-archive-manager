@@ -1,13 +1,14 @@
 import { MongoClient, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
-import { ImageMetadata, getFormattedImageUrl } from "@/lib/cloudflare";
 import { StandardizedCar } from "@/types/routes/cars";
 import { cleanAiAnalysis, convertToPlainObject } from "@/utils/car-helpers";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
 
-export const dynamic = "force-dynamic";
+// ✅ PERFORMANCE FIX: Use ISR instead of force-dynamic
+export const revalidate = 300; // 5 minutes
 
 if (!MONGODB_URI) {
   throw new Error("Please add your Mongo URI to .env.local");
@@ -17,6 +18,7 @@ interface Car {
   _id: ObjectId;
   documents: string[];
   imageIds: ObjectId[];
+  primaryImageId?: ObjectId;
   galleryIds?: ObjectId[];
   client?: string;
   clientInfo?: {
@@ -33,6 +35,92 @@ interface Car {
     };
     businessType: string;
   };
+  make: string;
+  model: string;
+  year?: number;
+  vin?: string;
+  color?: string;
+  mileage?: {
+    value: number;
+    unit: string;
+  };
+  price?: any;
+  description?: string;
+  status?: string;
+  condition?: string;
+  location?: string;
+  type?: string;
+  doors?: number;
+  interior_color?: string;
+  engine?: {
+    type?: string;
+    displacement?: {
+      value: number;
+      unit: string;
+    };
+    power?: {
+      hp: number;
+      kW: number;
+      ps: number;
+    };
+    torque?: {
+      "lb-ft": number;
+      Nm: number;
+    };
+    features?: string[];
+    configuration?: string;
+    cylinders?: number;
+    fuelType?: string;
+    manufacturer?: string;
+  };
+  transmission?: {
+    type: string;
+    speeds?: number;
+  };
+  dimensions?: {
+    length?: { value: number; unit: string };
+    width?: { value: number; unit: string };
+    height?: { value: number; unit: string };
+    wheelbase?: { value: number; unit: string };
+    trackWidth?: { value: number; unit: string };
+    weight?: { value: number; unit: string };
+    gvwr?: { value: number; unit: string };
+  };
+  manufacturing?: {
+    plant?: {
+      city?: string;
+      country?: string;
+      company?: string;
+    };
+    series?: string;
+    trim?: string;
+    bodyClass?: string;
+  };
+  performance?: {
+    "0_to_60_mph"?: { value: number; unit: string };
+    top_speed?: { value: number; unit: string };
+  };
+  interior_features?: {
+    seats?: number;
+    upholstery?: string;
+    features?: string[];
+  };
+  safety?: {
+    tpms?: {
+      type: string;
+      present: boolean;
+    };
+    [key: string]: any;
+  };
+  aiAnalysis?: {
+    [key: string]: {
+      value: string;
+      confidence: "confirmed" | "inferred" | "suggested";
+      source: string;
+    };
+  };
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 }
 
 interface Image {
@@ -40,7 +128,7 @@ interface Image {
   cloudflareId: string;
   url: string;
   filename: string;
-  metadata: ImageMetadata;
+  metadata: any;
   carId: ObjectId;
   createdAt: string;
   updatedAt: string;
@@ -198,7 +286,7 @@ export async function GET(request: Request) {
 
     // If including galleries, handle them appropriately
     if (includeGalleries === "true") {
-      // [REMOVED] // [REMOVED] console.log("[CarAPI] Including galleries in response");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[CarAPI] Including galleries in response");
 
       // Convert string galleryIds to ObjectIds for proper lookup
       pipeline.push({
@@ -231,7 +319,7 @@ export async function GET(request: Request) {
         },
       });
 
-      // [REMOVED] // [REMOVED] console.log("[CarAPI] Added gallery ObjectId conversion to pipeline");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[CarAPI] Added gallery ObjectId conversion to pipeline");
 
       // Lookup galleries using the converted ObjectIds - simplified and more robust
       pipeline.push({
@@ -251,7 +339,7 @@ export async function GET(request: Request) {
         },
       });
 
-      // [REMOVED] // [REMOVED] console.log("[CarAPI] Added gallery lookup to pipeline");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[CarAPI] Added gallery lookup to pipeline");
 
       // Add thumbnail images in a separate, safer lookup
       pipeline.push({
@@ -287,7 +375,7 @@ export async function GET(request: Request) {
         },
       });
 
-      // [REMOVED] // [REMOVED] console.log("[CarAPI] Added thumbnail processing to pipeline");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[CarAPI] Added thumbnail processing to pipeline");
 
       // Clean up temporary fields
       pipeline.push({
@@ -297,7 +385,7 @@ export async function GET(request: Request) {
         },
       });
 
-      // [REMOVED] // [REMOVED] console.log("[CarAPI] Cleaned up temporary fields from pipeline");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[CarAPI] Cleaned up temporary fields from pipeline");
     }
 
     // Add projection if fields were specified
@@ -312,7 +400,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    // [REMOVED] // [REMOVED] console.log("[CarAPI] Car found:", car._id);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[CarAPI] Car found:", car._id);
     if (includeGalleries === "true") {
       console.log(
         "[CarAPI] Raw galleries from aggregation:",
@@ -325,7 +413,7 @@ export async function GET(request: Request) {
 
       // Populate thumbnail images for galleries if they exist
       if (car.galleries && car.galleries.length > 0) {
-        // [REMOVED] // [REMOVED] console.log("[CarAPI] Populating thumbnail images for galleries");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[CarAPI] Populating thumbnail images for galleries");
 
         // Get all first image IDs from galleries
         const thumbnailImageIds = car.galleries
@@ -367,14 +455,14 @@ export async function GET(request: Request) {
               if (thumbnailImage) {
                 gallery.thumbnailImage = {
                   _id: thumbnailImage._id.toString(),
-                  url: thumbnailImage.url,
+                  url: fixCloudflareImageUrl(thumbnailImage.url),
                 };
               }
             }
             return gallery;
           });
 
-          // [REMOVED] // [REMOVED] console.log("[CarAPI] Updated galleries with thumbnail images");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[CarAPI] Updated galleries with thumbnail images");
         }
       }
     }
@@ -386,6 +474,7 @@ export async function GET(request: Request) {
       make: car.make || "Unknown",
       model: car.model || "Unknown",
       documents: Array.isArray(car.documents) ? car.documents : [],
+      primaryImageId: car.primaryImageId?.toString() || undefined,
       price: {
         listPrice:
           typeof car.price === "object"
@@ -445,7 +534,7 @@ export async function GET(request: Request) {
           ...img,
           _id: img._id?.toString() || "",
           car_id: img.carId?.toString() || img.car_id?.toString() || "",
-          url: getFormattedImageUrl(img.url), // Use our new utility function
+          url: fixCloudflareImageUrl(img.url),
           metadata: {
             ...img.metadata,
             // Set isPrimary flag based on primaryImageId
@@ -471,7 +560,7 @@ export async function GET(request: Request) {
           thumbnailImage: gallery.thumbnailImage
             ? {
                 _id: gallery.thumbnailImage._id?.toString() || "",
-                url: getFormattedImageUrl(gallery.thumbnailImage.url),
+                url: fixCloudflareImageUrl(gallery.thumbnailImage.url),
               }
             : undefined,
           createdAt: gallery.createdAt || "",
@@ -497,6 +586,61 @@ export async function GET(request: Request) {
       car.updatedAt instanceof Date
         ? car.updatedAt.toISOString()
         : car.updatedAt || new Date().toISOString();
+
+    // Add detailed specifications that the copywriter needs
+    // These fields are used by the copywriter for generating captions
+    if (car.engine) {
+      (standardizedCar as any).engine = car.engine;
+    }
+
+    if (car.transmission) {
+      (standardizedCar as any).transmission = car.transmission;
+    }
+
+    if (car.dimensions) {
+      (standardizedCar as any).dimensions = car.dimensions;
+    }
+
+    if (car.manufacturing) {
+      (standardizedCar as any).manufacturing = car.manufacturing;
+    }
+
+    if (car.performance) {
+      (standardizedCar as any).performance = car.performance;
+    }
+
+    if (car.interior_features) {
+      (standardizedCar as any).interior_features = car.interior_features;
+    }
+
+    if (car.interior_color) {
+      (standardizedCar as any).interior_color = car.interior_color;
+    }
+
+    if (car.condition) {
+      (standardizedCar as any).condition = car.condition;
+    }
+
+    if (car.location) {
+      (standardizedCar as any).location = car.location;
+    }
+
+    if (car.doors) {
+      (standardizedCar as any).doors = car.doors;
+    }
+
+    if (car.safety) {
+      (standardizedCar as any).safety = car.safety;
+    }
+
+    if (car.type) {
+      (standardizedCar as any).type = car.type;
+    }
+
+    // Include aiAnalysis if it exists (for enriched data)
+    if (car.aiAnalysis) {
+      (standardizedCar as any).aiAnalysis = car.aiAnalysis;
+    }
 
     // Generate a unique ETag based on updatedAt timestamp
     const etag = `"${standardizedCar.updatedAt || new Date().toISOString()}"`;
@@ -583,13 +727,13 @@ export async function DELETE(request: Request) {
     client = await getMongoClient();
     const db = client.db(DB_NAME);
 
-    // [REMOVED] // [REMOVED] console.log(`Deleting car with ID: ${id}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Deleting car with ID: ${id}`);
     const result = await db.collection("cars").deleteOne({
       _id: objectId,
     });
 
     if (result.deletedCount === 0) {
-      // [REMOVED] // [REMOVED] console.log(`Car not found with ID: ${id}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Car not found with ID: ${id}`);
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
@@ -602,7 +746,7 @@ export async function DELETE(request: Request) {
     );
   } finally {
     if (client) {
-      // [REMOVED] // [REMOVED] console.log(`Closing MongoDB connection for car`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Closing MongoDB connection for car`);
       await client.close();
     }
   }
@@ -617,8 +761,8 @@ export async function PATCH(request: Request) {
     const id = segments[segments.length - 1]; // -1 because URL is /cars/[id]
 
     if (process.env.NODE_ENV !== "production") {
-      // [REMOVED] // [REMOVED] console.log("\n=== CAR UPDATE API CALLED ===");
-      // [REMOVED] // [REMOVED] console.log("Car ID:", id);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("\n=== CAR UPDATE API CALLED ===");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car ID:", id);
     }
 
     const updates = await request.json();
@@ -670,17 +814,17 @@ export async function PATCH(request: Request) {
       // Handle galleryIds field specifically
       if (key === "galleryIds") {
         if (process.env.NODE_ENV !== "production") {
-          // [REMOVED] // [REMOVED] console.log(`\n=== GALLERY IDS UPDATE ===`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`\n=== GALLERY IDS UPDATE ===`);
           console.log(
             "Received galleryIds count:",
             Array.isArray(value) ? value.length : "not array"
           );
-          // [REMOVED] // [REMOVED] console.log("Type:", typeof value, "IsArray:", Array.isArray(value));
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Type:", typeof value, "IsArray:", Array.isArray(value));
         }
 
         if (!Array.isArray(value)) {
           if (process.env.NODE_ENV !== "production") {
-            // [REMOVED] // [REMOVED] console.log("galleryIds is not an array, setting to empty array");
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("galleryIds is not an array, setting to empty array");
           }
           acc[key] = [];
           return acc;
@@ -692,7 +836,7 @@ export async function PATCH(request: Request) {
             .filter((id) => {
               const isValid = id && ObjectId.isValid(id.toString());
               if (!isValid && process.env.NODE_ENV !== "production") {
-                // [REMOVED] // [REMOVED] console.log(`Invalid gallery ID filtered out`);
+                // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Invalid gallery ID filtered out`);
               }
               return isValid;
             })
@@ -702,8 +846,8 @@ export async function PATCH(request: Request) {
             });
 
           if (process.env.NODE_ENV !== "production") {
-            // [REMOVED] // [REMOVED] console.log(`Final galleryIds count: ${validGalleryIds.length}`);
-            // [REMOVED] // [REMOVED] console.log(`=== END GALLERY IDS UPDATE ===\n`);
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Final galleryIds count: ${validGalleryIds.length}`);
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`=== END GALLERY IDS UPDATE ===\n`);
           }
           acc[key] = validGalleryIds;
         } catch (error) {
@@ -803,9 +947,9 @@ export async function PATCH(request: Request) {
     cleanedUpdates.updatedAt = new Date();
 
     if (process.env.NODE_ENV !== "production") {
-      // [REMOVED] // [REMOVED] console.log(`\n=== DATABASE UPDATE ===`);
-      // [REMOVED] // [REMOVED] console.log("Car ID:", objectId);
-      // [REMOVED] // [REMOVED] console.log("Update fields count:", Object.keys(cleanedUpdates).length);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`\n=== DATABASE UPDATE ===`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car ID:", objectId);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Update fields count:", Object.keys(cleanedUpdates).length);
     }
 
     // Perform the update with cleaned data
@@ -823,12 +967,12 @@ export async function PATCH(request: Request) {
     }
 
     if (process.env.NODE_ENV !== "production") {
-      // [REMOVED] // [REMOVED] console.log(`Database update successful`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Database update successful`);
       console.log(
         "Updated car galleryIds count:",
         result.galleryIds?.length || 0
       );
-      // [REMOVED] // [REMOVED] console.log(`=== END DATABASE UPDATE ===\n`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`=== END DATABASE UPDATE ===\n`);
     }
 
     // Convert to plain object to ensure it's JSON serializable
@@ -840,7 +984,7 @@ export async function PATCH(request: Request) {
         model: serializedCar.model,
         hasVin: !!serializedCar.vin,
       });
-      // [REMOVED] // [REMOVED] console.log("\n=== CAR UPDATE COMPLETED ===\n");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("\n=== CAR UPDATE COMPLETED ===\n");
     }
 
     return NextResponse.json(serializedCar);

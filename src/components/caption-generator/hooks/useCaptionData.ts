@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+import { useAPI } from "@/hooks/useAPI";
 import type {
   CarDetails,
   EventDetails,
@@ -20,6 +21,8 @@ export function useCaptionData({
   projectId,
   mode = "car",
 }: UseCaptionDataProps) {
+  const api = useAPI();
+
   // Car data
   const [carDetails, setCarDetails] = useState<CarDetails | null>(null);
   const [projectCars, setProjectCars] = useState<CarDetails[]>([]);
@@ -66,28 +69,31 @@ export function useCaptionData({
 
   // Fetch car details (for single car mode)
   const fetchCarDetails = useCallback(async () => {
-    if (!carId || mode !== "car") return;
+    if (!carId || mode !== "car" || !api) return;
 
     setLoadingCars(true);
     try {
-      const response = await fetch(`/api/cars/${carId}`);
-      if (!response.ok) throw new Error("Failed to fetch car details");
-
-      const data = await response.json();
+      const data = (await api.get(`cars/${carId}`)) as CarDetails & {
+        client?: string;
+        clientId?: string;
+        clientInfo?: { _id: string };
+      };
       setCarDetails(data);
       setSelectedCarIds([carId]);
 
       // Try to get client handle
       const clientId = data.client || data.clientId || data.clientInfo?._id;
       if (clientId) {
-        const clientRes = await fetch(`/api/clients/${clientId}`);
-        if (clientRes.ok) {
-          const client = await clientRes.json();
+        try {
+          const client = (await api.get(`clients/${clientId}`)) as any;
           if (client.socialMedia?.instagram) {
             setClientHandle(
               `@${client.socialMedia.instagram.replace(/^@/, "")}`
             );
           }
+        } catch (clientError) {
+          console.error("Error fetching client:", clientError);
+          setClientHandle(null);
         }
       }
     } catch (error) {
@@ -96,18 +102,17 @@ export function useCaptionData({
     } finally {
       setLoadingCars(false);
     }
-  }, [carId, mode]);
+  }, [carId, mode, api]);
 
   // Fetch project cars (for project mode)
   const fetchProjectCars = useCallback(async () => {
-    if (!projectId || mode !== "project") return;
+    if (!projectId || mode !== "project" || !api) return;
 
     setLoadingCars(true);
     try {
-      const response = await fetch(`/api/projects/${projectId}/cars`);
-      if (!response.ok) throw new Error("Failed to fetch project cars");
-
-      const data = await response.json();
+      const data = (await api.get(`projects/${projectId}/cars`)) as {
+        cars?: CarDetails[];
+      };
       setProjectCars(data.cars || []);
     } catch (error) {
       console.error("Error fetching project cars:", error);
@@ -115,18 +120,17 @@ export function useCaptionData({
     } finally {
       setLoadingCars(false);
     }
-  }, [projectId, mode]);
+  }, [projectId, mode, api]);
 
   // Fetch project events
   const fetchProjectEvents = useCallback(async () => {
-    if (!projectId || mode !== "project") return;
+    if (!projectId || mode !== "project" || !api) return;
 
     setLoadingEvents(true);
     try {
-      const response = await fetch(`/api/projects/${projectId}/events`);
-      if (!response.ok) throw new Error("Failed to fetch project events");
-
-      const data = await response.json();
+      const data = (await api.get(
+        `projects/${projectId}/events`
+      )) as EventDetails[];
       setProjectEvents(data || []);
     } catch (error) {
       console.error("Error fetching project events:", error);
@@ -134,46 +138,50 @@ export function useCaptionData({
     } finally {
       setLoadingEvents(false);
     }
-  }, [projectId, mode]);
+  }, [projectId, mode, api]);
 
   // Fetch system prompts
-  const fetchSystemPrompts = useCallback(async (length?: string) => {
-    setLoadingSystemPrompts(true);
-    setSystemPromptError(null);
+  const fetchSystemPrompts = useCallback(
+    async (length?: string) => {
+      if (!api) return;
 
-    try {
-      const lengthParam = length ? `?length=${length}` : "";
-      const response = await fetch(`/api/system-prompts/list${lengthParam}`);
+      setLoadingSystemPrompts(true);
+      setSystemPromptError(null);
 
-      if (!response.ok) throw new Error("Failed to fetch system prompts");
+      try {
+        const endpoint = length
+          ? `system-prompts/list?length=${length}`
+          : "system-prompts/list";
+        const data = (await api.get(endpoint)) as SystemPrompt[];
+        setSystemPrompts(Array.isArray(data) ? data : []);
 
-      const data = await response.json();
-      setSystemPrompts(Array.isArray(data) ? data : []);
-
-      // Auto-select the first active system prompt
-      const activePrompt = data.find((prompt: SystemPrompt) => prompt.isActive);
-      if (activePrompt) {
-        setSelectedSystemPromptId(activePrompt._id);
-      } else if (data.length > 0) {
-        setSelectedSystemPromptId(data[0]._id);
+        // Auto-select the first active system prompt
+        const activePrompt = data.find(
+          (prompt: SystemPrompt) => prompt.isActive
+        );
+        if (activePrompt) {
+          setSelectedSystemPromptId(activePrompt._id);
+        } else if (data.length > 0) {
+          setSelectedSystemPromptId(data[0]._id);
+        }
+      } catch (error) {
+        console.error("Error fetching system prompts:", error);
+        setSystemPromptError("Failed to load system prompts");
+        toast.error("Failed to fetch system prompts");
+      } finally {
+        setLoadingSystemPrompts(false);
       }
-    } catch (error) {
-      console.error("Error fetching system prompts:", error);
-      setSystemPromptError("Failed to load system prompts");
-      toast.error("Failed to fetch system prompts");
-    } finally {
-      setLoadingSystemPrompts(false);
-    }
-  }, []);
+    },
+    [api]
+  );
 
   // Fetch prompt templates
   const fetchPromptTemplates = useCallback(async () => {
+    if (!api) return;
+
     setLoadingPromptTemplates(true);
     try {
-      const response = await fetch("/api/caption-prompts");
-      if (!response.ok) throw new Error("Failed to fetch prompt templates");
-
-      const data = await response.json();
+      const data = (await api.get("caption-prompts")) as PromptTemplate[];
       setPromptTemplates(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching prompt templates:", error);
@@ -181,16 +189,15 @@ export function useCaptionData({
     } finally {
       setLoadingPromptTemplates(false);
     }
-  }, []);
+  }, [api]);
 
   // Fetch length settings
   const fetchLengthSettings = useCallback(async () => {
+    if (!api) return;
+
     setLoadingLengthSettings(true);
     try {
-      const response = await fetch("/api/length-settings");
-      if (!response.ok) throw new Error("Failed to fetch length settings");
-
-      const data = await response.json();
+      const data = (await api.get("length-settings")) as LengthSetting[];
       setLengthSettings(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching length settings:", error);
@@ -198,10 +205,12 @@ export function useCaptionData({
     } finally {
       setLoadingLengthSettings(false);
     }
-  }, []);
+  }, [api]);
 
   // Fetch saved captions
   const fetchSavedCaptions = useCallback(async () => {
+    if (!api) return;
+
     setLoadingSavedCaptions(true);
     try {
       const params = new URLSearchParams();
@@ -209,10 +218,9 @@ export function useCaptionData({
       if (projectId && mode === "project")
         params.append("projectId", projectId);
 
-      const response = await fetch(`/api/captions?${params.toString()}`);
-      if (!response.ok) throw new Error("Failed to fetch saved captions");
-
-      const data = await response.json();
+      const data = (await api.get(
+        `captions?${params.toString()}`
+      )) as SavedCaption[];
       setSavedCaptions(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching saved captions:", error);
@@ -220,7 +228,7 @@ export function useCaptionData({
     } finally {
       setLoadingSavedCaptions(false);
     }
-  }, [carId, projectId, mode]);
+  }, [carId, projectId, mode, api]);
 
   // Car selection handlers
   const handleCarSelection = useCallback((carIds: string[]) => {
@@ -314,6 +322,8 @@ export function useCaptionData({
 
   // Initialize data on mount
   useEffect(() => {
+    if (!api) return;
+
     if (mode === "car" && carId) {
       fetchCarDetails();
     } else if (mode === "project" && projectId) {
@@ -326,6 +336,7 @@ export function useCaptionData({
     fetchLengthSettings();
     fetchSavedCaptions();
   }, [
+    api,
     mode,
     carId,
     projectId,

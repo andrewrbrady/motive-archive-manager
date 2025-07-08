@@ -30,12 +30,12 @@ type ApiResponse = SuccessResponse | ErrorResponse;
 export async function GET(
   request: NextRequest
 ): Promise<NextResponse<ApiResponse>> {
-  console.log("🔒 GET /api/users/list: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/users/list: Starting request");
 
   // Check authentication and admin role
   const authResult = await verifyAuthMiddleware(request, ["admin"]);
   if (authResult) {
-    console.log("❌ GET /api/users/list: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ GET /api/users/list: Authentication failed");
     return authResult;
   }
 

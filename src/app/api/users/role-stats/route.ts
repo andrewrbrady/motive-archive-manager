@@ -2,14 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { withFirebaseAuth } from "@/lib/firebase-auth-middleware";
 
-// Make this route dynamic since it uses auth() which requires headers
+// Keep dynamic for auth requirements but add application-level caching
 export const dynamic = "force-dynamic";
+
+// Simple in-memory cache for role stats (resets on server restart)
+let cachedRoleStats: any = null;
+let cacheTimestamp: number = 0;
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
 async function getRoleStats(
   request: NextRequest
 ): Promise<NextResponse<object>> {
   try {
     // Authentication and authorization is handled by withFirebaseAuth wrapper
+
+    // Check cache first
+    const now = Date.now();
+    if (cachedRoleStats && now - cacheTimestamp < CACHE_DURATION) {
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚀 Role stats: Serving from cache");
+      const response = NextResponse.json(cachedRoleStats);
+      response.headers.set("X-Cache", "HIT");
+      response.headers.set("Cache-Control", "private, max-age=1800"); // 30 minutes
+      return response;
+    }
+
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚀 Role stats: Cache miss, fetching fresh data");
 
     // Query Firestore to get all users
     const usersSnapshot = await adminDb.collection("users").get();
@@ -39,7 +56,7 @@ async function getRoleStats(
     });
 
     // Format response
-    const response = {
+    const responseData = {
       roles: Array.from(roleCounts.entries()).map(([role, count]) => ({
         role,
         count,
@@ -50,9 +67,19 @@ async function getRoleStats(
           count,
         })
       ),
+      lastUpdated: new Date().toISOString(),
     };
 
-    return NextResponse.json(response);
+    // Cache the response
+    cachedRoleStats = responseData;
+    cacheTimestamp = Date.now();
+
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚀 Role stats: Fresh data cached");
+
+    const response = NextResponse.json(responseData);
+    response.headers.set("X-Cache", "MISS");
+    response.headers.set("Cache-Control", "private, max-age=1800"); // 30 minutes
+    return response;
   } catch (error: any) {
     console.error("Error fetching role statistics:", error);
     return NextResponse.json(

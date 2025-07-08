@@ -48,9 +48,10 @@ export function DateTimePicker({
   const currentDate = value
     ? (() => {
         if (isAllDay && value.match(/^\d{4}-\d{2}-\d{2}$/)) {
-          // For all-day events with date-only format, parse as UTC to avoid timezone shifts
+          // For all-day events with date-only format, parse consistently with calendar
+          // Create a date that will display the same as what the calendar shows
           const [year, month, day] = value.split("-").map(Number);
-          return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+          return new Date(year, month - 1, day, 12, 0, 0, 0); // Use noon to avoid timezone edge cases
         } else {
           // For datetime strings, parse normally
           return new Date(value);
@@ -67,10 +68,8 @@ export function DateTimePicker({
     }
 
     if (isAllDay) {
-      // For all-day events, set to start of day
-      const newDate = new Date(selectedDate);
-      newDate.setHours(0, 0, 0, 0);
-      onChange(format(newDate, "yyyy-MM-dd'T'HH:mm"));
+      // For all-day events, output date-only format (YYYY-MM-DD)
+      onChange(format(selectedDate, "yyyy-MM-dd"));
     } else {
       // Preserve the current time or use default
       const [hours, minutes] = currentTime.split(":").map(Number);
@@ -95,11 +94,12 @@ export function DateTimePicker({
 
   const handleTimeSelect = (hours: number, minutes: number) => {
     if (!currentDate) {
-      // If no date is selected, use today
+      // If no date is selected, use today with the selected time
       const newDate = new Date();
       newDate.setHours(hours, minutes, 0, 0);
       onChange(format(newDate, "yyyy-MM-dd'T'HH:mm"));
     } else {
+      // Use the current date with the new time
       const newDate = new Date(currentDate);
       newDate.setHours(hours, minutes, 0, 0);
       onChange(format(newDate, "yyyy-MM-dd'T'HH:mm"));
@@ -159,32 +159,9 @@ export function DateTimePicker({
               {currentDate ? (
                 <span>
                   {(() => {
-                    let formatted;
-                    if (isAllDay && value.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                      // For all-day events, format using UTC methods to avoid timezone conversion
-                      const months = [
-                        "Jan",
-                        "Feb",
-                        "Mar",
-                        "Apr",
-                        "May",
-                        "Jun",
-                        "Jul",
-                        "Aug",
-                        "Sep",
-                        "Oct",
-                        "Nov",
-                        "Dec",
-                      ];
-                      const month = months[currentDate.getUTCMonth()];
-                      const day = currentDate.getUTCDate();
-                      const year = currentDate.getUTCFullYear();
-                      formatted = `${month} ${day}, ${year}`;
-                    } else {
-                      // For timed events, use date-fns format normally
-                      formatted = format(currentDate, "MMM d, yyyy");
-                    }
-                    return formatted;
+                    // For all-day events, format consistently with calendar display
+                    // Use local date methods to match how the calendar shows the date
+                    return format(currentDate, "MMM d, yyyy");
                   })()}
                   {!isAllDay && (
                     <span className="text-muted-foreground ml-2">

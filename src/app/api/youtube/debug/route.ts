@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     const youtube = google.youtube({ version: "v3", auth: oauth2Client });
     const oauth2Api = google.oauth2({ version: "v2", auth: oauth2Client });
 
-    console.log("\n=== YOUTUBE DEBUG SESSION ===");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("\n=== YOUTUBE DEBUG SESSION ===");
 
     // 1. Check user info
     let userInfo = null;
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
         verified_email: userInfo.verified_email,
       });
     } catch (error) {
-      console.log("❌ User Info failed:", error);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ User Info failed:", error);
     }
 
     // 2. Check OAuth token info
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
         expires_in: tokenInfo.data.expires_in,
       });
     } catch (error) {
-      console.log("❌ Token Info failed:", error);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ Token Info failed:", error);
     }
 
     // 3. Try various channel API calls
@@ -172,8 +172,8 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    console.log("📊 Test Results:", tests);
-    console.log("=== END DEBUG SESSION ===\n");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📊 Test Results:", tests);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== END DEBUG SESSION ===\n");
 
     return NextResponse.json({
       userInfo,

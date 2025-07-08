@@ -10,6 +10,9 @@ import EditContainerModal from "./EditContainerModal";
 import ContainerItemsModal from "./ContainerItemsModal";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
+import { LoadingContainer } from "@/components/ui/loading-container";
 
 interface ContainersListProps {
   containers: ContainerResponse[];
@@ -29,13 +32,23 @@ interface ContainerItem {
   condition?: string;
 }
 
+// TypeScript interfaces for API responses
+interface LocationsResponse {
+  data?: LocationResponse[];
+}
+
+interface ContainerItemsResponse {
+  data?: ContainerItem[];
+}
+
 export default function ContainersList({
   containers,
   onContainerUpdate,
   onContainerDelete,
   hoverModeActive = false,
 }: ContainersListProps) {
-  const { toast } = useToast();
+  const { toast: uiToast } = useToast();
+  const api = useAPI();
   const [editingContainer, setEditingContainer] =
     useState<ContainerResponse | null>(null);
   const [selectedContainer, setSelectedContainer] =
@@ -53,11 +66,12 @@ export default function ContainersList({
 
   // Fetch locations when component mounts
   useEffect(() => {
+    if (!api) return;
+
     const fetchLocations = async () => {
       try {
-        const response = await fetch("/api/locations");
-        if (!response.ok) throw new Error("Failed to fetch locations");
-        const data = await response.json();
+        const response = await api.get("locations");
+        const data = Array.isArray(response) ? response : [];
 
         // Convert array to record for easy lookup
         const locationsRecord: Record<string, LocationResponse> = {};
@@ -68,11 +82,30 @@ export default function ContainersList({
         setLocations(locationsRecord);
       } catch (error) {
         console.error("Error fetching locations:", error);
+        toast.error("Failed to fetch locations");
       }
     };
 
     fetchLocations();
+  }, [api]);
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
+      }
+    };
   }, []);
+
+  // Authentication check
+  if (!api) {
+    return (
+      <div className="h-96 flex items-center justify-center">
+        <LoadingContainer />
+      </div>
+    );
+  }
 
   const getLocationName = (locationId: string | undefined) => {
     if (!locationId) return "No location";
@@ -83,7 +116,7 @@ export default function ContainersList({
     container: ContainerResponse,
     event: React.MouseEvent
   ) => {
-    if (!hoverModeActive) return;
+    if (!hoverModeActive || !api) return;
 
     // Clear any pending hide timeout
     if (hideTimeoutRef.current) {
@@ -103,19 +136,18 @@ export default function ContainersList({
     // Only fetch items if we haven't fetched them before
     if (!containerItems[container.id]) {
       try {
-        const response = await fetch(`/api/containers/${container.id}/items`);
-        if (response.ok) {
-          const items = await response.json();
-          setContainerItems((prev) => ({
-            ...prev,
-            [container.id]: items,
-          }));
-        }
+        const items = await api.get(`containers/${container.id}/items`);
+        const itemsArray = Array.isArray(items) ? items : [];
+        setContainerItems((prev) => ({
+          ...prev,
+          [container.id]: itemsArray,
+        }));
       } catch (error) {
         console.error(
           "Error fetching container items for hover preview:",
           error
         );
+        toast.error("Failed to fetch container items");
       }
     }
   };
@@ -146,34 +178,21 @@ export default function ContainersList({
     }, 300);
   };
 
-  // Clean up timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (hideTimeoutRef.current) {
-        clearTimeout(hideTimeoutRef.current);
-      }
-    };
-  }, []);
-
   const handleSaveEdit = async (updatedContainer: ContainerResponse) => {
-    try {
-      const response = await fetch(`/api/containers/${updatedContainer.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedContainer),
-      });
+    if (!api) return;
 
-      if (!response.ok) throw new Error("Failed to update container");
+    try {
+      await api.put(`containers/${updatedContainer.id}`, updatedContainer);
       onContainerUpdate(updatedContainer);
-      toast({
+      toast.success("Container updated successfully");
+      uiToast({
         title: "Success",
         description: "Container updated successfully",
       });
     } catch (error) {
       console.error("Error updating container:", error);
-      toast({
+      toast.error("Failed to update container");
+      uiToast({
         title: "Error",
         description: "Failed to update container",
         variant: "destructive",
@@ -182,26 +201,24 @@ export default function ContainersList({
   };
 
   const handleDelete = async (containerId: string) => {
-    try {
-      const response = await fetch(`/api/containers/${containerId}`, {
-        method: "DELETE",
-      });
+    if (!api) return;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete container");
-      }
+    try {
+      await api.delete(`containers/${containerId}`);
 
       onContainerDelete(containerId);
-      toast({
+      toast.success("Container deleted successfully");
+      uiToast({
         title: "Success",
         description: "Container deleted successfully",
       });
     } catch (error: any) {
       console.error("Error deleting container:", error);
-      toast({
+      const errorMessage = error.message || "Failed to delete container";
+      toast.error(errorMessage);
+      uiToast({
         title: "Error",
-        description: error.message || "Failed to delete container",
+        description: errorMessage,
         variant: "destructive",
       });
     }

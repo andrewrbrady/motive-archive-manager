@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
 import { Inspection } from "@/types/inspection";
 import { toast } from "sonner";
 import InspectionList from "./InspectionList";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 
 interface InspectionTabProps {
   carId: string;
@@ -22,58 +23,78 @@ interface InspectionTabProps {
 
 export default function InspectionTab({ carId }: InspectionTabProps) {
   const router = useRouter();
-  const [inspections, setInspections] = useState<Inspection[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch inspections for this car
-  const fetchInspections = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(`/api/cars/${carId}/inspections`);
+  // Use optimized query hook for data fetching
+  const {
+    data: inspectionsData,
+    isLoading,
+    error,
+    refetch: fetchInspections,
+  } = useAPIQuery<{ inspections?: Inspection[] }>(`cars/${carId}/inspections`, {
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    retry: 2,
+    retryDelay: 1000,
+  });
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch inspections");
-      }
+  // Memoize inspections array
+  const inspections = useMemo(() => {
+    return inspectionsData?.inspections || [];
+  }, [inspectionsData?.inspections]);
 
-      const data = await response.json();
-      setInspections(data.inspections || []);
-    } catch (error) {
-      console.error("Error fetching inspections:", error);
-      toast.error("Failed to load inspections");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Memoize computed statistics
+  const { passedInspections, failedInspections, totalInspections } =
+    useMemo(() => {
+      const passed = inspections.filter((i) => i.status === "pass").length;
+      const failed = inspections.filter(
+        (i) => i.status === "needs_attention"
+      ).length;
+      const total = inspections.length;
 
-  useEffect(() => {
-    if (carId) {
-      fetchInspections();
-    }
-  }, [carId]);
+      return {
+        passedInspections: passed,
+        failedInspections: failed,
+        totalInspections: total,
+      };
+    }, [inspections]);
 
-  const handleCreateInspection = () => {
-    // Navigate to the new inspection page
+  // Handle error state
+  if (error) {
+    console.error("Error fetching inspections:", error);
+    toast.error("Failed to load inspections");
+  }
+
+  // Memoized navigation handlers
+  const handleCreateInspection = useCallback(() => {
     router.push(`/cars/${carId}/inspections/new`);
-  };
+  }, [router, carId]);
 
-  const handleEditInspection = (inspection: Inspection) => {
-    // Navigate to the edit inspection page
-    router.push(`/cars/${carId}/inspections/${inspection._id}/edit`);
-  };
+  const handleEditInspection = useCallback(
+    (inspection: Inspection) => {
+      router.push(`/cars/${carId}/inspections/${inspection._id}/edit`);
+    },
+    [router, carId]
+  );
 
-  const handleViewInspection = (inspection: Inspection) => {
-    // Navigate to the view inspection page
-    router.push(`/cars/${carId}/inspections/${inspection._id}`);
-  };
+  const handleViewInspection = useCallback(
+    (inspection: Inspection) => {
+      router.push(`/cars/${carId}/inspections/${inspection._id}`);
+    },
+    [router, carId]
+  );
 
-  // Summary stats
-  const passedInspections = inspections.filter(
-    (i) => i.status === "pass"
-  ).length;
-  const failedInspections = inspections.filter(
-    (i) => i.status === "needs_attention"
-  ).length;
-  const totalInspections = inspections.length;
+  // Show consistent spinner loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">
+            Loading inspections...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -142,11 +163,7 @@ export default function InspectionTab({ carId }: InspectionTabProps) {
       )}
 
       {/* Main Content */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      ) : totalInspections === 0 ? (
+      {totalInspections === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />

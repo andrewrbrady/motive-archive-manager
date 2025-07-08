@@ -10,15 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Loader2,
-  Settings,
   Cloud,
   Monitor,
   Palette,
@@ -41,7 +33,6 @@ interface BatchImageMatteModalProps {
   onImageProcessed?: (originalImageId: string, newImageData: any) => void;
 }
 
-type ProcessingMethod = "cloud" | "local";
 type ProcessingStage = "settings" | "preview" | "replacing";
 
 interface ProcessingStatus {
@@ -67,8 +58,6 @@ export function BatchImageMatteModal({
   const [matteColor, setMatteColor] = useState<string>("#000000");
   const [cloudflareWidth, setCloudflareWidth] = useState<string>("2000");
   const [cloudflareQuality, setCloudflareQuality] = useState<string>("100");
-  const [processingMethod, setProcessingMethod] =
-    useState<ProcessingMethod>("cloud");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isReplacing, setIsReplacing] = useState(false);
   const [processingStatuses, setProcessingStatuses] = useState<
@@ -79,16 +68,6 @@ export function BatchImageMatteModal({
 
   const { previewProcessImage, replaceImageInGallery } =
     useGalleryImageProcessing();
-
-  // Load processing method preference from localStorage
-  useEffect(() => {
-    const savedMethod = localStorage.getItem(
-      "imageMatteMethod"
-    ) as ProcessingMethod;
-    if (savedMethod && (savedMethod === "cloud" || savedMethod === "local")) {
-      setProcessingMethod(savedMethod);
-    }
-  }, []);
 
   // Initialize processing statuses when images change
   useEffect(() => {
@@ -105,12 +84,6 @@ export function BatchImageMatteModal({
       setStage("settings");
     }
   }, [images]);
-
-  // Save processing method preference to localStorage
-  const handleProcessingMethodChange = (method: ProcessingMethod) => {
-    setProcessingMethod(method);
-    localStorage.setItem("imageMatteMethod", method);
-  };
 
   // Helper function to build enhanced Cloudflare URL
   const getEnhancedImageUrl = (
@@ -173,7 +146,7 @@ export function BatchImageMatteModal({
           canvasHeight: parseInt(canvasHeight),
           paddingPercent: parseFloat(paddingPercent),
           matteColor,
-          processingMethod,
+
           requestedWidth: parseInt(canvasWidth),
           requestedHeight: parseInt(canvasHeight),
           scaleMultiplier: 1,
@@ -274,7 +247,7 @@ export function BatchImageMatteModal({
           canvasHeight: parseInt(canvasHeight),
           paddingPercent: parseFloat(paddingPercent),
           matteColor,
-          processingMethod,
+
           requestedWidth: parseInt(canvasWidth),
           requestedHeight: parseInt(canvasHeight),
           scaleMultiplier: 1,
@@ -444,39 +417,6 @@ export function BatchImageMatteModal({
                       />
                     </div>
                   </div>
-                </div>
-
-                {/* Processing Method Settings */}
-                <div className="p-3 border rounded-lg bg-muted/30">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Settings className="h-4 w-4" />
-                    <Label className="text-sm font-medium">
-                      Processing Method
-                    </Label>
-                  </div>
-                  <Select
-                    value={processingMethod}
-                    onValueChange={handleProcessingMethodChange}
-                    disabled={isProcessing}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select processing method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cloud">
-                        <div className="flex items-center gap-2">
-                          <Cloud className="h-4 w-4" />
-                          <span>Cloud Run</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="local">
-                        <div className="flex items-center gap-2">
-                          <Monitor className="h-4 w-4" />
-                          <span>Local Binary</span>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
 

@@ -10,6 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { fetchActiveContacts } from "@/lib/fetchContacts";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 interface ContactSelectorProps {
   value?: string;
@@ -19,6 +21,25 @@ interface ContactSelectorProps {
   includeInactive?: boolean;
 }
 
+interface ContactsResponse {
+  contacts: ContactWithStringId[];
+}
+
+// Contact type with string _id to match API response and fetchActiveContacts return type
+interface ContactWithStringId {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  company?: string;
+  status: "active" | "inactive";
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export default function ContactSelector({
   value,
   onValueChange,
@@ -26,28 +47,31 @@ export default function ContactSelector({
   disabled = false,
   includeInactive = false,
 }: ContactSelectorProps) {
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<ContactWithStringId[]>([]);
   const [loading, setLoading] = useState(true);
+  const api = useAPI();
 
   useEffect(() => {
+    if (!api) return; // Guard inside hook
+
     const loadContacts = async () => {
       try {
         setLoading(true);
-        let contactsData;
+        let contactsData: ContactWithStringId[];
 
         if (includeInactive) {
           // Fetch all contacts if includeInactive is true
-          const response = await fetch("/api/contacts");
-          const data = await response.json();
+          const data = await api.get<ContactsResponse>("contacts");
           contactsData = data.contacts || [];
         } else {
-          // Fetch only active contacts
+          // Fetch only active contacts - fetchActiveContacts returns ContactWithStringId[]
           contactsData = await fetchActiveContacts();
         }
 
         setContacts(contactsData);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error loading contacts:", error);
+        toast.error("Failed to load contacts");
         setContacts([]);
       } finally {
         setLoading(false);
@@ -55,7 +79,18 @@ export default function ContactSelector({
     };
 
     loadContacts();
-  }, [includeInactive]);
+  }, [includeInactive, api]);
+
+  // Authentication check - show loading if not authenticated
+  if (!api) {
+    return (
+      <Select disabled>
+        <SelectTrigger>
+          <SelectValue placeholder="Loading..." />
+        </SelectTrigger>
+      </Select>
+    );
+  }
 
   if (loading) {
     return (

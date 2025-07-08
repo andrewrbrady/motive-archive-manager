@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,12 +17,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { Deliverable, Platform, DeliverableType } from "@/types/deliverable";
+import {
+  Deliverable,
+  Platform,
+  DeliverableType,
+  DeliverablePlatform,
+  MediaType,
+} from "@/types/deliverable";
 import { format } from "date-fns";
 import UserSelector from "@/components/users/UserSelector";
-import { useUsers } from "@/hooks/useUsers";
+import { useEditors } from "@/hooks/useEditors";
+import { useAPI } from "@/hooks/useAPI";
+import { FirestoreUser } from "@/types/firebase";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
+import { usePlatforms } from "@/contexts/PlatformContext";
+import { useGalleries } from "@/hooks/use-galleries";
+import { useMediaTypes } from "@/hooks/useMediaTypes";
 
 interface EditDeliverableFormProps {
   deliverable: Deliverable;
@@ -30,37 +44,187 @@ interface EditDeliverableFormProps {
   onClose: () => void;
 }
 
+interface UpdateDeliverableData {
+  title: string;
+  platform?: Platform; // Keep for backward compatibility
+  platforms?: string[]; // New field for multiple platform IDs
+  type: DeliverableType; // Keep for backward compatibility
+  mediaTypeId?: string; // New field for MediaType ID
+  duration: number;
+  aspect_ratio: string;
+  editor: string;
+  firebase_uid: string | null;
+  edit_deadline: string;
+  release_date: string;
+  dropbox_link: string;
+  social_media_link: string;
+  scheduled: boolean;
+  gallery_ids?: string[]; // Array of gallery IDs
+  caption_ids?: string[]; // Array of caption IDs
+}
+
+interface UpdateDeliverableResponse {
+  success: boolean;
+  error?: string;
+}
+
 export default function EditDeliverableForm({
   deliverable,
   onDeliverableUpdated,
   onClose,
 }: EditDeliverableFormProps) {
-  const { data: users = [] } = useUsers();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState(deliverable.title);
-  const [platform, setPlatform] = useState<Platform>(deliverable.platform);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<
+    { label: string; value: string }[]
+  >([]);
   const [type, setType] = useState<DeliverableType>(deliverable.type);
+  const [selectedMediaTypeId, setSelectedMediaTypeId] = useState<string | null>(
+    deliverable.mediaTypeId?.toString() || null
+  );
   const [duration, setDuration] = useState(deliverable.duration);
   const [aspectRatio, setAspectRatio] = useState(deliverable.aspect_ratio);
-  const [editor, setEditor] = useState(deliverable.firebase_uid || "");
-  const [editDeadline, setEditDeadline] = useState(
-    deliverable.edit_deadline
-      ? new Date(deliverable.edit_deadline).toISOString().split("T")[0]
-      : ""
+  const [editorId, setEditorId] = useState<string | null>(null);
+  const [editorName, setEditorName] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
+  const [releaseDate, setReleaseDate] = useState("");
+  const [dropboxLink, setDropboxLink] = useState("");
+  const [socialMediaLink, setSocialMediaLink] = useState("");
+  const [scheduled, setScheduled] = useState(false);
+  const [selectedGalleryIds, setSelectedGalleryIds] = useState<string[]>([]);
+  const [selectedCaptionIds, setSelectedCaptionIds] = useState<string[]>([]);
+
+  const { platforms: availablePlatforms, isLoading: platformsLoading } =
+    usePlatforms();
+
+  const api = useAPI();
+  const { data: editors = [] } = useEditors();
+
+  // Fetch MediaTypes
+  const {
+    mediaTypes,
+    isLoading: mediaTypesLoading,
+    error: mediaTypesError,
+  } = useMediaTypes();
+
+  // Gallery and caption data
+  const { data: galleriesData, isLoading: galleriesLoading } = useGalleries({
+    limit: 100,
+  });
+  const [captionsData, setCaptionsData] = useState<any[]>([]);
+  const [captionsLoading, setCaptionsLoading] = useState(false);
+
+  const [openSelects, setOpenSelects] = useState<{ [key: string]: boolean }>(
+    {}
   );
-  const [releaseDate, setReleaseDate] = useState(
-    deliverable.release_date
-      ? new Date(deliverable.release_date).toISOString().split("T")[0]
-      : ""
-  );
-  const [dropboxLink, setDropboxLink] = useState(
-    deliverable.dropbox_link || ""
-  );
-  const [socialMediaLink, setSocialMediaLink] = useState(
-    deliverable.social_media_link || ""
-  );
-  const [openSelects, setOpenSelects] = useState<Record<string, boolean>>({});
+
+  const safeFormatDate = (date: any): string => {
+    if (!date) return "";
+
+    try {
+      // Handle the case where the date is already in YYYY-MM-DD format
+      if (typeof date === "string" && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return date;
+      }
+
+      // Parse the date consistently with how the calendar interprets dates
+      // This ensures the edit modal shows the same date as the calendar
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return "";
+
+      // Use local date methods to match calendar display behavior
+      // This will show the same date that the calendar displays
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    } catch (error) {
+      console.warn("Invalid date format:", date);
+      return "";
+    }
+  };
+
+  const findUserUidFromName = (editorName: string): string | null => {
+    const user = editors.find((u: any) => u.name === editorName);
+    return user ? user.uid : null;
+  };
+
+  useEffect(() => {
+    setTitle(deliverable.title);
+    setType(deliverable.type);
+    setSelectedMediaTypeId(deliverable.mediaTypeId?.toString() || null);
+    setDuration(deliverable.duration);
+    setAspectRatio(deliverable.aspect_ratio);
+
+    let initialEditorId: string | null = null;
+    if (deliverable.firebase_uid) {
+      initialEditorId = deliverable.firebase_uid;
+    } else if (deliverable.editor && editors.length) {
+      const user = editors.find((u: any) => u.name === deliverable.editor);
+      initialEditorId = user ? user.uid : null;
+    }
+    setEditorId(initialEditorId);
+
+    setEditorName(deliverable.editor || "");
+    setEditDeadline(safeFormatDate(deliverable.edit_deadline));
+    setReleaseDate(safeFormatDate(deliverable.release_date));
+    setDropboxLink(deliverable.dropbox_link || "");
+    setSocialMediaLink(deliverable.social_media_link || "");
+    setScheduled(deliverable.scheduled || false);
+    setSelectedGalleryIds(deliverable.gallery_ids || []);
+    setSelectedCaptionIds(deliverable.caption_ids || []);
+  }, [deliverable, editors]);
+
+  // Separate useEffect for platform handling to avoid infinite loops
+  useEffect(() => {
+    if (availablePlatforms.length > 0) {
+      if (deliverable.platforms && deliverable.platforms.length > 0) {
+        const selectedPlatformOptions = deliverable.platforms
+          .map((platformId) => {
+            const platform = availablePlatforms.find(
+              (p) => p._id === platformId
+            );
+            return platform
+              ? { label: platform.name, value: platform._id }
+              : null;
+          })
+          .filter(Boolean) as { label: string; value: string }[];
+        setSelectedPlatforms(selectedPlatformOptions);
+      } else if (deliverable.platform) {
+        const platform = availablePlatforms.find(
+          (p) => p.name === deliverable.platform
+        );
+        if (platform) {
+          setSelectedPlatforms([{ label: platform.name, value: platform._id }]);
+        }
+      }
+    }
+  }, [availablePlatforms.length, deliverable.platforms, deliverable.platform]);
+
+  // Fetch captions data
+  useEffect(() => {
+    const fetchCaptions = async () => {
+      if (!api) return;
+
+      setCaptionsLoading(true);
+      try {
+        const captions = await api.get("captions?limit=100");
+        setCaptionsData(Array.isArray(captions) ? captions : []);
+      } catch (error) {
+        console.error("Error fetching captions:", error);
+        setCaptionsData([]);
+      } finally {
+        setCaptionsLoading(false);
+      }
+    };
+
+    fetchCaptions();
+  }, [api]);
+
+  if (!api) {
+    return null;
+  }
 
   const handleSelectOpenChange = (selectId: string, open: boolean) => {
     setOpenSelects((prev) => ({ ...prev, [selectId]: open }));
@@ -68,98 +232,73 @@ export default function EditDeliverableForm({
 
   const isAnySelectOpen = Object.values(openSelects).some(Boolean);
 
-  // Helper function to find user UID from name (for legacy data)
-  const findUserUidFromName = (editorName: string): string | null => {
-    if (!editorName || !users.length) return null;
-    const user = users.find((u) => u.name === editorName);
-    return user ? user.uid : null;
-  };
-
-  // Initialize editor data - try firebase_uid first, then try to find UID from name
-  const getInitialEditorId = (): string | null => {
-    if (deliverable.firebase_uid) {
-      return deliverable.firebase_uid;
-    }
-    if (deliverable.editor) {
-      return findUserUidFromName(deliverable.editor);
-    }
-    return null;
-  };
-
-  const [editorId, setEditorId] = useState<string | null>(getInitialEditorId());
-  const [editorName, setEditorName] = useState(deliverable.editor || "");
-
-  // Helper function to safely format dates
-  const safeFormatDate = (date: any): string => {
-    try {
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return "";
-      return format(d, "yyyy-MM-dd");
-    } catch (error) {
-      console.error("Error formatting date:", error);
-      return "";
-    }
-  };
-
-  // Reset form data when deliverable changes
-  useEffect(() => {
-    if (deliverable) {
-      setTitle(deliverable.title);
-      setPlatform(deliverable.platform);
-      setType(deliverable.type);
-      setDuration(deliverable.duration);
-      setAspectRatio(deliverable.aspect_ratio);
-      setEditorId(getInitialEditorId());
-      setEditorName(deliverable.editor || "");
-      setEditDeadline(safeFormatDate(deliverable.edit_deadline));
-      setReleaseDate(safeFormatDate(deliverable.release_date));
-      setDropboxLink(deliverable.dropbox_link || "");
-      setSocialMediaLink(deliverable.social_media_link || "");
-    }
-  }, [deliverable, users]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !platform || !type || !editDeadline || !releaseDate) {
-      toast.error("Please fill in all required fields");
+
+    if (!title || title.trim() === "") {
+      toast.error("Please enter a title");
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `/api/cars/${deliverable.car_id}/deliverables/${deliverable._id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            title,
-            platform,
-            type,
-            duration: type === "Photo Gallery" ? 0 : duration,
-            aspect_ratio: aspectRatio,
-            editor: editorName,
-            firebase_uid: editorId,
-            edit_deadline: new Date(editDeadline).toISOString(),
-            release_date: new Date(releaseDate).toISOString(),
-            dropbox_link: dropboxLink,
-            social_media_link: socialMediaLink,
-          }),
-        }
+      const updateData: UpdateDeliverableData = {
+        title: title.trim(),
+        platforms: selectedPlatforms.map((p) => p.value),
+        type: type,
+        mediaTypeId: selectedMediaTypeId || undefined,
+        duration: type === "Photo Gallery" ? 0 : duration || 0,
+        aspect_ratio: aspectRatio || "",
+        editor: editorName || "",
+        firebase_uid: editorId,
+        edit_deadline: editDeadline
+          ? (() => {
+              // For date-only format (YYYY-MM-DD), create a date that will round-trip correctly
+              if (editDeadline.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [year, month, day] = editDeadline.split("-").map(Number);
+                // Create a local date first, then convert to ISO to preserve the display date
+                const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+                return localDate.toISOString();
+              }
+              // For datetime format, parse normally
+              return new Date(editDeadline).toISOString();
+            })()
+          : "",
+        release_date: releaseDate
+          ? (() => {
+              // For date-only format (YYYY-MM-DD), create a date that will round-trip correctly
+              if (releaseDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [year, month, day] = releaseDate.split("-").map(Number);
+                // Create a local date first, then convert to ISO to preserve the display date
+                const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+                return localDate.toISOString();
+              }
+              // For datetime format, parse normally
+              return new Date(releaseDate).toISOString();
+            })()
+          : "",
+        dropbox_link: dropboxLink || "",
+        social_media_link: socialMediaLink || "",
+        scheduled: scheduled,
+        gallery_ids: selectedGalleryIds,
+        caption_ids: selectedCaptionIds,
+      };
+
+      const response = await api.put<UpdateDeliverableResponse>(
+        `deliverables/${deliverable._id}`,
+        updateData
       );
 
-      if (!response.ok) {
-        throw new Error("Failed to update deliverable");
+      if (!response.success) {
+        throw new Error(response.error || "Failed to update deliverable");
       }
 
       toast.success("Deliverable updated successfully");
       onDeliverableUpdated();
       setIsOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating deliverable:", error);
-      toast.error("Failed to update deliverable");
+      toast.error(error.message || "Failed to update deliverable");
     } finally {
       setIsLoading(false);
     }
@@ -173,7 +312,7 @@ export default function EditDeliverableForm({
         </Button>
       </DialogTrigger>
       <DialogContent
-        className="max-w-2xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full"
+        className="max-w-4xl max-h-[90vh] flex flex-col w-[95vw] sm:w-full z-[100]"
         onEscapeKeyDown={(e) => isAnySelectOpen && e.preventDefault()}
         onPointerDownOutside={(e) => isAnySelectOpen && e.preventDefault()}
       >
@@ -185,7 +324,6 @@ export default function EditDeliverableForm({
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden py-4">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Basic Information Section */}
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
@@ -213,98 +351,186 @@ export default function EditDeliverableForm({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="platform"
-                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
-                    >
-                      Platform
-                    </label>
-                    <Select
-                      value={platform}
-                      onValueChange={(value) => setPlatform(value as Platform)}
-                      open={openSelects["platform"]}
-                      onOpenChange={(open) =>
-                        handleSelectOpenChange("platform", open)
-                      }
-                    >
-                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                        <SelectValue placeholder="Select platform" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Instagram Reels">
-                          Instagram Reels
-                        </SelectItem>
-                        <SelectItem value="Instagram Post">
-                          Instagram Post
-                        </SelectItem>
-                        <SelectItem value="Instagram Story">
-                          Instagram Story
-                        </SelectItem>
-                        <SelectItem value="YouTube">YouTube</SelectItem>
-                        <SelectItem value="YouTube Shorts">
-                          YouTube Shorts
-                        </SelectItem>
-                        <SelectItem value="TikTok">TikTok</SelectItem>
-                        <SelectItem value="Facebook">Facebook</SelectItem>
-                        <SelectItem value="Bring a Trailer">
-                          Bring a Trailer
-                        </SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="platforms"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Platforms
+                  </label>
+                  <MultiSelect
+                    value={selectedPlatforms}
+                    onChange={setSelectedPlatforms}
+                    options={availablePlatforms.map((p) => ({
+                      label: p.name,
+                      value: p._id,
+                    }))}
+                    placeholder="Select platforms"
+                  />
+                </div>
 
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="type"
-                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
-                    >
-                      Type
-                    </label>
-                    <Select
-                      value={type}
-                      onValueChange={(value) =>
-                        setType(value as DeliverableType)
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="mediaType"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Media Type
+                  </label>
+                  <Select
+                    value={selectedMediaTypeId || "legacy"}
+                    onValueChange={(value) => {
+                      if (value === "legacy") {
+                        setSelectedMediaTypeId(null);
+                        // Also keep legacy type field synced for backward compatibility
+                        setType("other");
+                      } else {
+                        setSelectedMediaTypeId(value);
+                        // Find corresponding MediaType and sync legacy type field
+                        const selectedMediaType = mediaTypes.find(
+                          (mt) => mt._id.toString() === value
+                        );
+                        if (selectedMediaType) {
+                          // Map MediaType names to legacy DeliverableType values for backward compatibility
+                          const legacyTypeMapping: Record<
+                            string,
+                            DeliverableType
+                          > = {
+                            Video: "Video",
+                            "Photo Gallery": "Photo Gallery",
+                            "Mixed Gallery": "Mixed Gallery",
+                            "Video Gallery": "Video Gallery",
+                          };
+                          setType(
+                            legacyTypeMapping[selectedMediaType.name] || "other"
+                          );
+                        }
                       }
-                      open={openSelects["type"]}
-                      onOpenChange={(open) =>
-                        handleSelectOpenChange("type", open)
-                      }
-                    >
-                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Photo Gallery">
-                          Photo Gallery
+                    }}
+                    open={openSelects["mediaType"]}
+                    onOpenChange={(open) => {
+                      handleSelectOpenChange("mediaType", open);
+                    }}
+                  >
+                    <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
+                      <SelectValue placeholder="Select media type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mediaTypesLoading && (
+                        <SelectItem value="loading" disabled>
+                          Loading media types...
                         </SelectItem>
-                        <SelectItem value="Video">Video</SelectItem>
-                        <SelectItem value="Mixed Gallery">
-                          Mixed Gallery
+                      )}
+                      {!mediaTypesLoading && mediaTypes.length === 0 && (
+                        <SelectItem value="empty" disabled>
+                          No media types available
                         </SelectItem>
-                        <SelectItem value="Video Gallery">
-                          Video Gallery
-                        </SelectItem>
-                        <SelectItem value="Still">Still</SelectItem>
-                        <SelectItem value="Graphic">Graphic</SelectItem>
-                        <SelectItem value="feature">Feature</SelectItem>
-                        <SelectItem value="promo">Promo</SelectItem>
-                        <SelectItem value="review">Review</SelectItem>
-                        <SelectItem value="walkthrough">Walkthrough</SelectItem>
-                        <SelectItem value="highlights">Highlights</SelectItem>
-                        <SelectItem value="Marketing Email">
-                          Marketing Email
-                        </SelectItem>
-                        <SelectItem value="Blog">Blog</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      )}
+                      {!mediaTypesLoading &&
+                        mediaTypes.map((mediaType) => (
+                          <SelectItem
+                            key={mediaType._id.toString()}
+                            value={mediaType._id.toString()}
+                          >
+                            {mediaType.name}
+                            {mediaType.description && (
+                              <span className="text-xs text-muted-foreground ml-2">
+                                - {mediaType.description}
+                              </span>
+                            )}
+                          </SelectItem>
+                        ))}
+                      {/* Fallback option for legacy compatibility */}
+                      <SelectItem value="legacy">
+                        <span className="text-muted-foreground">
+                          Other (Legacy Type)
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {/* Show legacy type when no MediaType is selected */}
+                  {!selectedMediaTypeId && (
+                    <div className="mt-2">
+                      <label
+                        htmlFor="legacyType"
+                        className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                      >
+                        Legacy Type
+                      </label>
+                      <Select
+                        value={type}
+                        onValueChange={(value) =>
+                          setType(value as DeliverableType)
+                        }
+                        open={openSelects["legacyType"]}
+                        onOpenChange={(open) =>
+                          handleSelectOpenChange("legacyType", open)
+                        }
+                      >
+                        <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
+                          <SelectValue placeholder="Select legacy type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Photo Gallery">
+                            Photo Gallery
+                          </SelectItem>
+                          <SelectItem value="Video">Video</SelectItem>
+                          <SelectItem value="Mixed Gallery">
+                            Mixed Gallery
+                          </SelectItem>
+                          <SelectItem value="Video Gallery">
+                            Video Gallery
+                          </SelectItem>
+                          <SelectItem value="Still">Still</SelectItem>
+                          <SelectItem value="Graphic">Graphic</SelectItem>
+                          <SelectItem value="feature">Feature</SelectItem>
+                          <SelectItem value="promo">Promo</SelectItem>
+                          <SelectItem value="review">Review</SelectItem>
+                          <SelectItem value="walkthrough">
+                            Walkthrough
+                          </SelectItem>
+                          <SelectItem value="highlights">Highlights</SelectItem>
+                          <SelectItem value="Marketing Email">
+                            Marketing Email
+                          </SelectItem>
+                          <SelectItem value="Blog">Blog</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="aspectRatio"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                    >
+                      Aspect Ratio
+                    </label>
+                    <Select value={aspectRatio} onValueChange={setAspectRatio}>
+                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
+                        <SelectValue placeholder="Select aspect ratio" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[
+                          "16:9",
+                          "9:16",
+                          "1:1",
+                          "4:5",
+                          "5:4",
+                          "3:2",
+                          "2:3",
+                          "custom",
+                        ].map((ratio) => (
+                          <SelectItem key={ratio} value={ratio}>
+                            {ratio}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="space-y-1.5">
                     <label
                       htmlFor="duration"
@@ -318,32 +544,10 @@ export default function EditDeliverableForm({
                       value={type === "Photo Gallery" ? "N/A" : duration}
                       onChange={(e) => setDuration(parseInt(e.target.value))}
                       min={0}
-                      required={type !== "Photo Gallery"}
                       disabled={type === "Photo Gallery"}
                       placeholder={type === "Photo Gallery" ? "N/A" : undefined}
                       className="text-sm"
                     />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="aspectRatio"
-                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
-                    >
-                      Aspect Ratio
-                    </label>
-                    <Select value={aspectRatio} onValueChange={setAspectRatio}>
-                      <SelectTrigger className="text-sm hover:bg-accent hover:text-accent-foreground transition-colors">
-                        <SelectValue placeholder="Select aspect ratio" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="16:9">16:9</SelectItem>
-                        <SelectItem value="9:16">9:16</SelectItem>
-                        <SelectItem value="1:1">1:1</SelectItem>
-                        <SelectItem value="4:3">4:3</SelectItem>
-                        <SelectItem value="4:5">4:5</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                 </div>
               </div>
@@ -392,13 +596,11 @@ export default function EditDeliverableForm({
                     >
                       Edit Deadline
                     </label>
-                    <Input
-                      id="editDeadline"
-                      type="date"
+                    <DateTimePicker
                       value={editDeadline}
-                      onChange={(e) => setEditDeadline(e.target.value)}
-                      required
+                      onChange={(value) => setEditDeadline(value)}
                       className="text-sm"
+                      isAllDay={true}
                     />
                   </div>
 
@@ -409,13 +611,11 @@ export default function EditDeliverableForm({
                     >
                       Release Date
                     </label>
-                    <Input
-                      id="releaseDate"
-                      type="date"
+                    <DateTimePicker
                       value={releaseDate}
-                      onChange={(e) => setReleaseDate(e.target.value)}
-                      required
+                      onChange={(value) => setReleaseDate(value)}
                       className="text-sm"
+                      isAllDay={true}
                     />
                   </div>
                 </div>
@@ -463,6 +663,131 @@ export default function EditDeliverableForm({
                     placeholder="Enter Social Media link"
                     className="text-sm"
                   />
+                </div>
+              </div>
+            </div>
+
+            {/* Content References Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                  Content References
+                </span>
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="galleries"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Galleries
+                  </label>
+                  <MultiSelect
+                    value={selectedGalleryIds.map((id) => {
+                      const gallery = galleriesData?.galleries?.find(
+                        (g) => g._id === id
+                      );
+                      return gallery
+                        ? { label: gallery.name, value: gallery._id }
+                        : { label: id, value: id };
+                    })}
+                    onChange={(selected) =>
+                      setSelectedGalleryIds(selected.map((s) => s.value))
+                    }
+                    options={
+                      galleriesLoading
+                        ? []
+                        : galleriesData?.galleries?.map((gallery) => ({
+                            label: gallery.name,
+                            value: gallery._id,
+                          })) || []
+                    }
+                    placeholder={
+                      galleriesLoading
+                        ? "Loading galleries..."
+                        : "Select galleries"
+                    }
+                  />
+                  <p className="text-xs text-[hsl(var(--foreground-muted))]">
+                    Link galleries that contain content for this deliverable
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="captions"
+                    className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide"
+                  >
+                    Captions
+                  </label>
+                  <MultiSelect
+                    value={selectedCaptionIds.map((id) => {
+                      const caption = captionsData.find((c) => c._id === id);
+                      return caption
+                        ? {
+                            label: `${caption.platform}: ${caption.caption.substring(0, 50)}${caption.caption.length > 50 ? "..." : ""}`,
+                            value: caption._id,
+                          }
+                        : { label: id, value: id };
+                    })}
+                    onChange={(selected) =>
+                      setSelectedCaptionIds(selected.map((s) => s.value))
+                    }
+                    options={
+                      captionsLoading
+                        ? []
+                        : captionsData.map((caption) => ({
+                            label: `${caption.platform}: ${caption.caption.substring(0, 50)}${caption.caption.length > 50 ? "..." : ""}`,
+                            value: caption._id,
+                          }))
+                    }
+                    placeholder={
+                      captionsLoading
+                        ? "Loading captions..."
+                        : "Select captions"
+                    }
+                  />
+                  <p className="text-xs text-[hsl(var(--foreground-muted))]">
+                    Link captions that can be used for this deliverable
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Options Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+                <span className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide">
+                  Options
+                </span>
+                <div className="h-px bg-[hsl(var(--border-subtle))] flex-1"></div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="scheduled"
+                      checked={scheduled}
+                      onCheckedChange={(checked) =>
+                        setScheduled(checked === true)
+                      }
+                    />
+                    <label
+                      htmlFor="scheduled"
+                      className="text-xs font-medium text-[hsl(var(--foreground-muted))] uppercase tracking-wide cursor-pointer"
+                    >
+                      Scheduled
+                    </label>
+                  </div>
+                  <p className="text-xs text-[hsl(var(--foreground-muted))]">
+                    Mark this deliverable as scheduled to distinguish it in
+                    calendar views
+                  </p>
                 </div>
               </div>
             </div>

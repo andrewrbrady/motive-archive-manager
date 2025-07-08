@@ -102,7 +102,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const vin = searchParams.get("vin");
 
-  // [REMOVED] // [REMOVED] console.log("Received VIN request for:", vin);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Received VIN request for:", vin);
 
   if (!vin) {
     return NextResponse.json(
@@ -118,7 +118,7 @@ export async function GET(request: Request) {
     );
     const data = await response.json();
 
-    // [REMOVED] // [REMOVED] console.log("Raw NHTSA API response:", JSON.stringify(data, null, 2));
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Raw NHTSA API response:", JSON.stringify(data, null, 2));
 
     if (!data.Results) {
       return NextResponse.json(
@@ -131,12 +131,12 @@ export async function GET(request: Request) {
     const results = data.Results.reduce((acc: any, item: any) => {
       if (item.Value && item.Value !== "Not Applicable") {
         acc[item.Variable] = item.Value;
-        // [REMOVED] // [REMOVED] console.log(`Found value for ${item.Variable}:`, item.Value);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Found value for ${item.Variable}:`, item.Value);
       }
       return acc;
     }, {});
 
-    // [REMOVED] // [REMOVED] console.log("Processed NHTSA results:", results);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Processed NHTSA results:", results);
 
     // Get AI analysis of the data
     let aiAnalysis;
@@ -314,7 +314,7 @@ export async function GET(request: Request) {
       aiAnalysis: additionalFields,
     };
 
-    // [REMOVED] // [REMOVED] console.log("Final VIN response:", vinInfo);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Final VIN response:", vinInfo);
 
     return NextResponse.json(vinInfo);
   } catch (error) {

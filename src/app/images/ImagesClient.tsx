@@ -2,9 +2,10 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { SimpleImageGallery } from "@/components/cars/SimpleImageGallery";
-import { CanvasExtensionModal } from "@/components/cars/CanvasExtensionModal";
-import { ImageMatteModal } from "@/components/cars/ImageMatteModal";
-import { ImageCropModal } from "@/components/cars/ImageCropModal";
+import {
+  ImageProcessingModal,
+  ProcessingType,
+} from "@/components/ui/image-processing";
 import { ImageViewModal } from "@/components/cars/ImageViewModal";
 import { useImages } from "@/hooks/use-images";
 import { ImageData } from "@/app/images/columns";
@@ -17,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import ImageUploadWithProgress from "@/components/ui/ImageUploadWithProgress";
+import ImageUploader from "@/components/ui/ImageUploader";
 import Pagination from "@/components/ui/pagination";
 import {
   Plus,
@@ -103,20 +104,12 @@ export default function ImagesClient() {
   const [carSearchQuery, setCarSearchQuery] = useState("");
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
 
-  // Canvas extension modal state
-  const [isCanvasModalOpen, setIsCanvasModalOpen] = useState(false);
-  const [selectedImageForCanvas, setSelectedImageForCanvas] =
+  // Unified image processing modal state
+  const [isProcessingModalOpen, setIsProcessingModalOpen] = useState(false);
+  const [selectedImageForProcessing, setSelectedImageForProcessing] =
     useState<ImageData | null>(null);
-
-  // Image matte modal state
-  const [isMatteModalOpen, setIsMatteModalOpen] = useState(false);
-  const [selectedImageForMatte, setSelectedImageForMatte] =
-    useState<ImageData | null>(null);
-
-  // Image crop modal state
-  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
-  const [selectedImageForCrop, setSelectedImageForCrop] =
-    useState<ImageData | null>(null);
+  const [processingType, setProcessingType] =
+    useState<ProcessingType>("image-crop");
 
   // Image view modal state
   const [isImageViewModalOpen, setIsImageViewModalOpen] = useState(false);
@@ -194,22 +187,27 @@ export default function ImagesClient() {
   });
 
   // Handle search with debounce
-  const [debouncedSetSearch] = useDebounce((value: string) => {
-    const params = new URLSearchParams(searchParams?.toString() || "");
-    params.set("page", "1"); // Reset to first page on new search
-    if (value) {
-      params.set("search", value);
-    } else {
-      params.delete("search");
+  const [debouncedSearchValue] = useDebounce(searchInput, 500);
+
+  // Handle debounced search changes in useEffect
+  useEffect(() => {
+    // Only update URL if this is not the initial load
+    if (debouncedSearchValue !== searchQuery) {
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("page", "1"); // Reset to first page on new search
+      if (debouncedSearchValue) {
+        params.set("search", debouncedSearchValue);
+      } else {
+        params.delete("search");
+      }
+      router.push(`${pathname}?${params.toString()}`);
     }
-    router.push(`${pathname}?${params.toString()}`);
-  }, 500);
+  }, [debouncedSearchValue, searchQuery, searchParams, pathname, router]);
 
   // Handle search input change
   const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchInput(value);
-    debouncedSetSearch(value);
   };
 
   // Update URL with new filter value
@@ -284,18 +282,21 @@ export default function ImagesClient() {
 
   // Modal handlers
   const handleCanvasExtension = (image: ImageData) => {
-    setSelectedImageForCanvas(image);
-    setIsCanvasModalOpen(true);
+    setSelectedImageForProcessing(image);
+    setProcessingType("canvas-extension");
+    setIsProcessingModalOpen(true);
   };
 
   const handleImageMatte = (image: ImageData) => {
-    setSelectedImageForMatte(image);
-    setIsMatteModalOpen(true);
+    setSelectedImageForProcessing(image);
+    setProcessingType("image-matte");
+    setIsProcessingModalOpen(true);
   };
 
   const handleImageCrop = (image: ImageData) => {
-    setSelectedImageForCrop(image);
-    setIsCropModalOpen(true);
+    setSelectedImageForProcessing(image);
+    setProcessingType("image-crop");
+    setIsProcessingModalOpen(true);
   };
 
   const handleImageView = (image: ImageData) => {
@@ -389,24 +390,42 @@ export default function ImagesClient() {
                     Upload Images
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
                   <DialogHeader>
                     <DialogTitle>Upload Images</DialogTitle>
                     <DialogDescription>
                       Select images to upload to the gallery.
                     </DialogDescription>
                   </DialogHeader>
-                  <ImageUploadWithProgress
+                  <ImageUploader
+                    mode="general"
+                    carId={
+                      carFilter && carFilter !== "all" ? carFilter : undefined
+                    }
+                    metadata={{
+                      category: "unclassified",
+                      angle: "unknown",
+                      movement: "unknown",
+                      tod: "unknown",
+                      view: "unknown",
+                    }}
                     onComplete={() => {
+                      console.log(
+                        "🔄 ImagesClient: onComplete callback triggered"
+                      );
                       toast({
                         title: "Upload successful",
                         description: "Images uploaded successfully",
                       });
                       // Refresh the images list
+                      console.log(
+                        "🔄 ImagesClient: Calling mutate() to refresh images"
+                      );
                       mutate();
+                      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 ImagesClient: Closing upload dialog");
                       setIsUploadDialogOpen(false);
                     }}
-                    onError={(error) => {
+                    onError={(error: string) => {
                       toast({
                         title: "Upload failed",
                         description:
@@ -651,39 +670,16 @@ export default function ImagesClient() {
           )}
 
           {/* Modals */}
-          {selectedImageForCanvas && (
-            <CanvasExtensionModal
-              isOpen={isCanvasModalOpen}
+          {selectedImageForProcessing && (
+            <ImageProcessingModal
+              isOpen={isProcessingModalOpen}
               onClose={() => {
-                setIsCanvasModalOpen(false);
-                setSelectedImageForCanvas(null);
+                setIsProcessingModalOpen(false);
+                setSelectedImageForProcessing(null);
                 mutate();
               }}
-              image={selectedImageForCanvas}
-            />
-          )}
-
-          {selectedImageForMatte && (
-            <ImageMatteModal
-              isOpen={isMatteModalOpen}
-              onClose={() => {
-                setIsMatteModalOpen(false);
-                setSelectedImageForMatte(null);
-                mutate();
-              }}
-              image={selectedImageForMatte}
-            />
-          )}
-
-          {selectedImageForCrop && (
-            <ImageCropModal
-              isOpen={isCropModalOpen}
-              onClose={() => {
-                setIsCropModalOpen(false);
-                setSelectedImageForCrop(null);
-                mutate();
-              }}
-              image={selectedImageForCrop}
+              image={selectedImageForProcessing}
+              processingType={processingType}
             />
           )}
 

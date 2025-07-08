@@ -31,7 +31,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Plus, Edit, Trash2, Save, X, RotateCcw, Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 interface LengthSetting {
   key: string;
@@ -86,26 +86,23 @@ const LengthSettingsContent: React.FC = () => {
     instructions: "",
   });
 
-  const { authenticatedFetch, isAuthenticated, hasValidToken } =
-    useAuthenticatedFetch();
+  const api = useAPI();
 
   useEffect(() => {
-    if (isAuthenticated && hasValidToken) {
+    if (api) {
       fetchLengthSettings();
     }
-  }, [isAuthenticated, hasValidToken]);
+  }, [api]);
 
   const fetchLengthSettings = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
-      const response = await authenticatedFetch("/api/admin/length-settings");
-      if (response.ok) {
-        const data = await response.json();
-        setLengthSettings(data.length > 0 ? data : defaultLengthSettings);
-      } else {
-        // If no settings exist yet, use defaults
-        setLengthSettings(defaultLengthSettings);
-      }
+      const data = (await api.get(
+        "/api/admin/length-settings"
+      )) as LengthSetting[];
+      setLengthSettings(data.length > 0 ? data : defaultLengthSettings);
     } catch (error) {
       console.error("Error fetching length settings:", error);
       setLengthSettings(defaultLengthSettings);
@@ -128,20 +125,11 @@ const LengthSettingsContent: React.FC = () => {
   };
 
   const handleSave = async () => {
+    if (!api) return;
+
     try {
       setIsSaving(true);
-      const response = await authenticatedFetch("/api/admin/length-settings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(lengthSettings),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to save length settings");
-      }
+      await api.post("/api/admin/length-settings", lengthSettings);
 
       setHasChanges(false);
       toast({
@@ -242,34 +230,16 @@ const LengthSettingsContent: React.FC = () => {
   };
 
   const handleDelete = async (keyToDelete: string) => {
-    // Prevent deleting default settings
-    const defaultKeys = ["concise", "standard", "detailed", "comprehensive"];
-    if (defaultKeys.includes(keyToDelete)) {
-      toast({
-        title: "Error",
-        description: "Cannot delete default length settings",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!api) return;
 
     try {
-      const response = await authenticatedFetch(
-        `/api/admin/length-settings?key=${keyToDelete}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to delete length setting");
-      }
+      await api.delete(`/api/admin/length-settings?key=${keyToDelete}`);
 
       // Remove from local state
       setLengthSettings((prev) =>
         prev.filter((setting) => setting.key !== keyToDelete)
       );
+      setHasChanges(true);
 
       toast({
         title: "Success",

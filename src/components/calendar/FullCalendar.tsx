@@ -83,6 +83,7 @@ export function FullCalendarComponent({
 }: FullCalendarProps) {
   const [showEvents, setShowEvents] = useState(true);
   const [showDeliverables, setShowDeliverables] = useState(true);
+  const [showOnlyScheduled, setShowOnlyScheduled] = useState(false);
   const [eventTypeFilters, setEventTypeFilters] = useState<string[]>([]);
   const [deliverableTypeFilters, setDeliverableTypeFilters] = useState<
     string[]
@@ -111,7 +112,19 @@ export function FullCalendarComponent({
 
   // Get unique deliverable platforms
   const uniqueDeliverablePlatforms = useMemo(
-    () => [...new Set(deliverables.map((deliverable) => deliverable.platform))],
+    () => [
+      ...new Set(
+        deliverables
+          .map((deliverable) => {
+            // Priority: platform_id > platform (legacy)
+            if (deliverable.platform_id) {
+              return deliverable.platform_id.toString();
+            }
+            return deliverable.platform;
+          })
+          .filter((platform): platform is string => platform !== undefined)
+      ),
+    ],
     [deliverables]
   );
 
@@ -188,13 +201,26 @@ export function FullCalendarComponent({
     // Add filtered deliverable items
     ...(showDeliverables
       ? deliverables
-          .filter(
-            (deliverable) =>
-              (deliverablePlatformFilters.length === 0 ||
-                deliverablePlatformFilters.includes(deliverable.platform)) &&
-              (deliverableTypeFilters.length === 0 ||
-                deliverableTypeFilters.includes(deliverable.type))
-          )
+          .filter((deliverable) => {
+            // Platform filter logic - handle new platform_id and legacy platform
+            const platformMatch =
+              deliverablePlatformFilters.length === 0 ||
+              (deliverable.platform_id &&
+                deliverablePlatformFilters.includes(
+                  deliverable.platform_id.toString()
+                )) ||
+              (deliverable.platform &&
+                deliverablePlatformFilters.includes(deliverable.platform));
+
+            const typeMatch =
+              deliverableTypeFilters.length === 0 ||
+              deliverableTypeFilters.includes(deliverable.type);
+
+            const scheduledMatch =
+              !showOnlyScheduled || deliverable.scheduled === true;
+
+            return platformMatch && typeMatch && scheduledMatch;
+          })
           .flatMap((deliverable): FullCalendarEvent[] => {
             const items: FullCalendarEvent[] = [];
 
@@ -204,12 +230,16 @@ export function FullCalendarComponent({
             ) {
               const deadlineEvent: FullCalendarEvent = {
                 id: `${deliverable._id?.toString()}-deadline`,
-                title: `${deliverable.title} (Edit Deadline)`,
+                title: `${deliverable.scheduled ? "🗓️ " : ""}${deliverable.title} (Edit Deadline)`,
                 start: new Date(deliverable.edit_deadline),
                 end: new Date(deliverable.edit_deadline),
                 allDay: true,
-                backgroundColor: `hsl(var(--deliverable-deadline))`,
-                borderColor: `hsl(var(--deliverable-deadline))`,
+                backgroundColor: deliverable.scheduled
+                  ? `hsl(var(--deliverable-deadline-scheduled))`
+                  : `hsl(var(--deliverable-deadline))`,
+                borderColor: deliverable.scheduled
+                  ? `hsl(var(--deliverable-deadline-scheduled))`
+                  : `hsl(var(--deliverable-deadline))`,
                 textColor: "white",
                 editable: true,
                 startEditable: true,
@@ -232,12 +262,16 @@ export function FullCalendarComponent({
               if (deliverable.release_date) {
                 const releaseEvent: FullCalendarEvent = {
                   id: `${deliverable._id?.toString()}-release`,
-                  title: `${deliverable.title} (Release)`,
+                  title: `${deliverable.scheduled ? "🗓️ " : ""}${deliverable.title} (Release)`,
                   start: new Date(deliverable.release_date),
                   end: new Date(deliverable.release_date),
                   allDay: true,
-                  backgroundColor: `hsl(var(--deliverable-release))`,
-                  borderColor: `hsl(var(--deliverable-release))`,
+                  backgroundColor: deliverable.scheduled
+                    ? `hsl(var(--deliverable-release-scheduled))`
+                    : `hsl(var(--deliverable-release))`,
+                  borderColor: deliverable.scheduled
+                    ? `hsl(var(--deliverable-release-scheduled))`
+                    : `hsl(var(--deliverable-release))`,
                   textColor: "white",
                   editable: true,
                   startEditable: true,
@@ -289,8 +323,8 @@ export function FullCalendarComponent({
 
         // Update to use the correct API path structure with carId
         const apiUrl = `/api/cars/${carId}/events/${eventData.resource.id}`;
-        // [REMOVED] // [REMOVED] console.log("Updating event with data:", updatedEvent);
-        // [REMOVED] // [REMOVED] console.log("PUT request to:", apiUrl);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Updating event with data:", updatedEvent);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("PUT request to:", apiUrl);
 
         const response = await fetch(apiUrl, {
           method: "PUT",
@@ -301,7 +335,7 @@ export function FullCalendarComponent({
         });
 
         // Log the response status
-        // [REMOVED] // [REMOVED] console.log("API response status:", response.status);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API response status:", response.status);
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -312,7 +346,7 @@ export function FullCalendarComponent({
         }
 
         const result = await response.json();
-        // [REMOVED] // [REMOVED] console.log("Updated event result:", result);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Updated event result:", result);
 
         toast.success("Event updated");
 
@@ -351,8 +385,8 @@ export function FullCalendarComponent({
         };
 
         // Update to use the correct API path structure with carId
-        const apiUrl = `/api/cars/${deliverable.car_id}/deliverables/${deliverable._id}`;
-        // [REMOVED] // [REMOVED] console.log("PUT request to:", apiUrl);
+        const apiUrl = `/api/deliverables/${deliverable._id}`;
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("PUT request to:", apiUrl);
 
         const response = await fetch(apiUrl, {
           method: "PUT",
@@ -363,7 +397,7 @@ export function FullCalendarComponent({
         });
 
         // Log the response status
-        // [REMOVED] // [REMOVED] console.log("API response status:", response.status);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API response status:", response.status);
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -374,7 +408,7 @@ export function FullCalendarComponent({
         }
 
         const result = await response.json();
-        // [REMOVED] // [REMOVED] console.log("Updated deliverable result:", result);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Updated deliverable result:", result);
 
         toast.success("Deliverable updated");
 
@@ -414,8 +448,8 @@ export function FullCalendarComponent({
 
         // Update to use the correct API path structure with carId
         const apiUrl = `/api/cars/${carId}/events/${eventData.resource.id}`;
-        // [REMOVED] // [REMOVED] console.log("Updating event with data:", updatedEvent);
-        // [REMOVED] // [REMOVED] console.log("PUT request to:", apiUrl);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Updating event with data:", updatedEvent);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("PUT request to:", apiUrl);
 
         const response = await fetch(apiUrl, {
           method: "PUT",
@@ -426,7 +460,7 @@ export function FullCalendarComponent({
         });
 
         // Log the response status
-        // [REMOVED] // [REMOVED] console.log("API response status:", response.status);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API response status:", response.status);
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -437,7 +471,7 @@ export function FullCalendarComponent({
         }
 
         const result = await response.json();
-        // [REMOVED] // [REMOVED] console.log("Updated event result:", result);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Updated event result:", result);
 
         toast.success("Event updated");
 
@@ -511,6 +545,21 @@ export function FullCalendarComponent({
                       <Square className="mr-2 h-4 w-4" />
                     )}
                     <span>Deliverables</span>
+                  </DropdownMenuCheckboxItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuCheckboxItem
+                    checked={showOnlyScheduled}
+                    onCheckedChange={setShowOnlyScheduled}
+                    disabled={!showDeliverables}
+                  >
+                    {showOnlyScheduled ? (
+                      <CheckSquare className="mr-2 h-4 w-4" />
+                    ) : (
+                      <Square className="mr-2 h-4 w-4" />
+                    )}
+                    <span>Show Only Scheduled</span>
                   </DropdownMenuCheckboxItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>
@@ -858,7 +907,7 @@ export function FullCalendarComponent({
           filterControls={filterControls}
           onFiltersClick={() => {
             // Handle filters button click
-            console.log("Filters button clicked");
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Filters button clicked");
           }}
           showEvents={showEvents}
           showDeliverables={showDeliverables}

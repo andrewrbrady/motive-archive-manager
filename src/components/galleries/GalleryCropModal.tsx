@@ -42,6 +42,7 @@ import {
   X,
   Upload,
   Maximize2,
+  Scissors,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { CloudflareImage } from "@/components/ui/CloudflareImage";
@@ -52,6 +53,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAPI } from "@/hooks/useAPI";
+import { toast as hotToast } from "react-hot-toast";
+import Image from "next/image";
 
 interface CropArea {
   x: number;
@@ -65,14 +69,82 @@ interface ImageDimensions {
   height: number;
 }
 
-type ProcessingMethod = "cloud" | "local";
-
 interface GalleryCropModalProps {
   isOpen: boolean;
   onClose: () => void;
   image: ImageData | null;
   galleryId: string;
   onImageProcessed?: (originalImageId: string, newImageData: any) => void;
+}
+
+interface CacheImageData {
+  imageUrl: string;
+}
+
+interface CacheImageResponse {
+  success?: boolean;
+  cachedPath?: string;
+  error?: string;
+}
+
+interface LivePreviewData {
+  cachedImagePath: string;
+  cropArea: CropArea;
+  outputWidth: number;
+  outputHeight: number;
+  scale: number;
+}
+
+interface LivePreviewResponse {
+  success?: boolean;
+  previewImageData?: string;
+  processingTime?: number;
+  error?: string;
+}
+
+interface CropImageData {
+  imageUrl?: string;
+  cachedImagePath?: string;
+  cropArea?: CropArea;
+  outputWidth: number;
+  outputHeight: number;
+  scale: number;
+  uploadToCloudflare: boolean;
+  originalFilename: string;
+  scaleMultiplier?: number;
+  cropX?: number;
+  cropY?: number;
+  cropWidth?: number;
+  cropHeight?: number;
+  previewImageDimensions?: ImageDimensions | null;
+  sourceImageWidth?: number; // For high-quality processing, specify source resolution
+}
+
+interface CropImageResponse {
+  success?: boolean;
+  processedImageUrl?: string;
+  processingTime?: number;
+  remoteServiceUsed?: boolean;
+  error?: string;
+  imageData?: string;
+}
+
+interface ReplaceImageDirectData {
+  originalImageId: string;
+  processedImageId: string;
+}
+
+interface ReplaceImageDirectResponse {
+  success?: boolean;
+  originalImageId?: string;
+  processedImage?: {
+    _id: string;
+    url: string;
+    filename: string;
+    metadata?: any;
+    carId?: string;
+  };
+  error?: string;
 }
 
 export function GalleryCropModal({
@@ -82,7 +154,13 @@ export function GalleryCropModal({
   galleryId,
   onImageProcessed,
 }: GalleryCropModalProps) {
-  const { replaceImageInGallery } = useGalleryImageProcessing();
+  const api = useAPI();
+  const {
+    previewProcessImage,
+    replaceImageInGallery,
+    isProcessing: isGalleryProcessing,
+    isReplacing: isGalleryReplacing,
+  } = useGalleryImageProcessing();
 
   // State management
   const [cropArea, setCropArea] = useState<CropArea>({
@@ -96,8 +174,6 @@ export function GalleryCropModal({
   const [outputHeight, setOutputHeight] = useState<string>("1080");
   const [cloudflareWidth, setCloudflareWidth] = useState<string>("3000");
   const [cloudflareQuality, setCloudflareQuality] = useState<string>("100");
-  const [processingMethod, setProcessingMethod] =
-    useState<ProcessingMethod>("cloud");
 
   // Live preview settings
   const [livePreviewEnabled, setLivePreviewEnabled] = useState<boolean>(true);
@@ -146,11 +222,9 @@ export function GalleryCropModal({
 
   // Load processing method preference from localStorage
   useEffect(() => {
-    const savedMethod = localStorage.getItem(
-      "galleryCropMethod"
-    ) as ProcessingMethod;
+    if (!api) return; // Add conditional check inside async function
+    const savedMethod = localStorage.getItem("galleryCropMethod");
     if (savedMethod && (savedMethod === "cloud" || savedMethod === "local")) {
-      setProcessingMethod(savedMethod);
     }
 
     // Load live preview preference
@@ -158,35 +232,7 @@ export function GalleryCropModal({
     if (savedLivePreview !== null) {
       setLivePreviewEnabled(savedLivePreview === "true");
     }
-  }, []);
-
-  // Save processing method preference to localStorage
-  const handleProcessingMethodChange = (method: ProcessingMethod) => {
-    setProcessingMethod(method);
-    localStorage.setItem("galleryCropMethod", method);
-  };
-
-  // Save live preview preference and handle toggle
-  const handleLivePreviewToggle = (enabled: boolean) => {
-    setLivePreviewEnabled(enabled);
-    if (enabled && shouldTriggerLivePreview()) {
-      debouncedGeneratePreview();
-    }
-  };
-
-  const handlePreset = (width: number, height: number) => {
-    setOutputWidth(width.toString());
-    setOutputHeight(height.toString());
-
-    // Immediately initialize crop area for the new dimensions
-    if (originalDimensions) {
-      initializeCropArea(originalDimensions, width, height);
-    }
-
-    if (shouldTriggerLivePreview()) {
-      debouncedGeneratePreview();
-    }
-  };
+  }, [api]);
 
   // Helper function to initialize crop area based on output dimensions
   const initializeCropArea = useCallback(
@@ -247,121 +293,164 @@ export function GalleryCropModal({
   // Get processing image URL (higher resolution)
   const getProcessingImageUrl = useCallback(
     (baseUrl: string) => {
-      if (!baseUrl.includes("imagedelivery.net")) return baseUrl;
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔧 getProcessingImageUrl input:", baseUrl);
 
-      const urlParts = baseUrl.split("/");
-      urlParts[urlParts.length - 1] = `w=${cloudflareWidth},q=100`;
-      return urlParts.join("/");
+      if (!baseUrl.includes("imagedelivery.net")) {
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Non-Cloudflare URL, returning as-is");
+        return baseUrl;
+      }
+
+      // First, normalize to medium variant for consistency
+      const mediumUrl = getMediumVariantUrl(baseUrl);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Normalized to medium variant:", mediumUrl);
+
+      // Then apply high-resolution parameters for processing
+      const params = [`w=${cloudflareWidth}`, "q=100"];
+
+      // Replace the medium variant with our processing parameters
+      const urlParts = mediumUrl.split("/");
+      urlParts[urlParts.length - 1] = params.join(",");
+      const processedUrl = urlParts.join("/");
+
+      console.log("🔧 Processing URL result:", {
+        original: baseUrl,
+        medium: mediumUrl,
+        processed: processedUrl,
+        width: cloudflareWidth,
+      });
+
+      return processedUrl;
     },
     [cloudflareWidth]
   );
 
   // Get preview image URL (medium resolution for caching)
   const getPreviewImageUrl = useCallback((baseUrl: string) => {
-    if (!baseUrl.includes("imagedelivery.net")) return baseUrl;
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 getPreviewImageUrl input:", baseUrl);
 
-    const urlParts = baseUrl.split("/");
-    urlParts[urlParts.length - 1] = "w=1500,q=90";
-    return urlParts.join("/");
+    if (!baseUrl.includes("imagedelivery.net")) {
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Non-Cloudflare URL, returning as-is");
+      return baseUrl;
+    }
+
+    // First, normalize to medium variant for consistency
+    const mediumUrl = getMediumVariantUrl(baseUrl);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Normalized to medium variant:", mediumUrl);
+
+    // Then apply preview parameters
+    const params = ["w=1500", "q=90"];
+
+    // Replace the medium variant with our preview parameters
+    const urlParts = mediumUrl.split("/");
+    urlParts[urlParts.length - 1] = params.join(",");
+    const previewUrl = urlParts.join("/");
+
+    console.log("🔍 Preview URL result:", {
+      original: baseUrl,
+      medium: mediumUrl,
+      preview: previewUrl,
+    });
+
+    return previewUrl;
   }, []);
 
   // Cache image locally for live preview
   const cacheImageForPreview = useCallback(async () => {
-    if (!image?.url || processingMethod !== "local") return;
+    if (!api) return; // Add conditional check inside async function
+    if (!image?.url) return;
 
     try {
       const previewImageUrl = getPreviewImageUrl(image.url);
 
-      const response = await fetch("/api/images/cache-for-preview", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl: previewImageUrl,
-          imageId: image._id,
-        }),
-      });
+      const requestData: CacheImageData = {
+        imageUrl: previewImageUrl,
+      };
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setCachedImagePath(result.cachedPath);
-        }
+      const result = await api.post<CacheImageResponse>(
+        "images/cache-for-preview",
+        requestData
+      );
+
+      if (result.success && result.cachedPath) {
+        setCachedImagePath(result.cachedPath);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to cache image for preview:", error);
+      hotToast.error("Failed to cache image for preview");
     }
-  }, [image?.url, image?._id, processingMethod, getPreviewImageUrl]);
+  }, [api, image?.url, getPreviewImageUrl]);
 
   // Generate live preview using C++ executable
   const generateLivePreview = useCallback(async () => {
-    if (
-      !livePreviewEnabled ||
-      !cachedImagePath ||
-      !originalDimensions ||
-      processingMethod !== "local"
-    ) {
+    if (!api) return; // Add conditional check inside async function
+    if (!livePreviewEnabled || !cachedImagePath || !originalDimensions) {
       return;
     }
 
     setIsGeneratingPreview(true);
 
     try {
-      const response = await fetch("/api/images/live-preview", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          cachedImagePath,
-          cropX: cropArea.x,
-          cropY: cropArea.y,
-          cropWidth: cropArea.width,
-          cropHeight: cropArea.height,
-          outputWidth: 400,
-          outputHeight: Math.round(
-            400 * (parseInt(outputHeight) / parseInt(outputWidth))
-          ),
-          scale: scale,
-          previewImageDimensions: originalDimensions,
-        }),
-      });
+      const requestData = {
+        cachedImagePath,
+        cropX: cropArea.x,
+        cropY: cropArea.y,
+        cropWidth: cropArea.width,
+        cropHeight: cropArea.height,
+        outputWidth: 400,
+        outputHeight: Math.round(
+          400 * (parseInt(outputHeight) / parseInt(outputWidth))
+        ),
+        scale: scale,
+        previewImageDimensions: originalDimensions,
+      };
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.previewImageData) {
-          const byteCharacters = atob(result.previewImageData);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: "image/jpeg" });
+      const result = await api.post<LivePreviewResponse>(
+        "images/live-preview",
+        requestData
+      );
 
-          if (livePreviewUrl) {
-            URL.revokeObjectURL(livePreviewUrl);
-          }
+      if (result.success && result.previewImageData) {
+        if (livePreviewUrl) {
+          URL.revokeObjectURL(livePreviewUrl);
+        }
 
-          const blobUrl = URL.createObjectURL(blob);
-          setLivePreviewUrl(blobUrl);
+        // Create data URL from base64
+        const dataUrl = `data:image/jpeg;base64,${result.previewImageData}`;
+        setLivePreviewUrl(dataUrl);
+        if (result.processingTime) {
           setPreviewProcessingTime(result.processingTime);
         }
+      } else {
+        console.warn(
+          "Live preview failed:",
+          result.error || "No error details provided"
+        );
       }
-    } catch (error) {
-      console.error("Failed to generate live preview:", error);
+    } catch (error: any) {
+      // Improve error logging to handle empty objects
+      const errorMessage = error?.message || error?.error || "Unknown error";
+      const errorDetails = error?.response?.data || error?.data || error;
+      console.error("Failed to generate live preview:", {
+        message: errorMessage,
+        details: errorDetails,
+        timestamp: new Date().toISOString(),
+      });
+      hotToast.error("Failed to generate live preview");
     } finally {
       setIsGeneratingPreview(false);
     }
   }, [
+    api,
     livePreviewEnabled,
     cachedImagePath,
     originalDimensions,
-    cropArea,
+    cropArea.x,
+    cropArea.y,
+    cropArea.width,
+    cropArea.height,
     scale,
     outputWidth,
     outputHeight,
-    processingMethod,
     livePreviewUrl,
   ]);
 
@@ -378,10 +467,8 @@ export function GalleryCropModal({
 
   // Helper function to check if live preview should trigger
   const shouldTriggerLivePreview = useCallback(() => {
-    return (
-      livePreviewEnabled && cachedImagePath && processingMethod === "local"
-    );
-  }, [livePreviewEnabled, cachedImagePath, processingMethod]);
+    return livePreviewEnabled && cachedImagePath;
+  }, [livePreviewEnabled, cachedImagePath]);
 
   // Helper function to build enhanced Cloudflare URL
   const getEnhancedImageUrl = (
@@ -404,7 +491,40 @@ export function GalleryCropModal({
     return baseUrl;
   };
 
-  // Memoize the enhanced image URL
+  // Helper function to get consistent medium variant URL for dimension calculations
+  const getMediumVariantUrl = (baseUrl: string) => {
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎯 getMediumVariantUrl input:", baseUrl);
+
+    if (!baseUrl.includes("imagedelivery.net")) {
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Non-Cloudflare URL, returning as-is");
+      return baseUrl;
+    }
+
+    // Always use 'medium' variant for consistent dimensions
+    const urlParts = baseUrl.split("/");
+    const lastPart = urlParts[urlParts.length - 1];
+
+    // Check if the last part is a variant (alphabetic or has parameters)
+    if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+      // Replace with medium variant
+      urlParts[urlParts.length - 1] = "medium";
+    } else {
+      // No variant specified, append medium
+      urlParts.push("medium");
+    }
+
+    const mediumUrl = urlParts.join("/");
+    console.log("🎯 getMediumVariantUrl result:", {
+      original: baseUrl,
+      lastPart: lastPart,
+      medium: mediumUrl,
+      wasNormalized: baseUrl !== mediumUrl,
+    });
+
+    return mediumUrl;
+  };
+
+  // Memoize the enhanced image URL for processing (uses cloudflareWidth)
   const enhancedImageUrl = useMemo(() => {
     if (!image?.url) return null;
     const enhanced = getEnhancedImageUrl(
@@ -415,9 +535,16 @@ export function GalleryCropModal({
     return enhanced;
   }, [image?.url, cloudflareWidth, cloudflareQuality]);
 
+  // Memoize the medium variant URL for dimension calculations
+  const mediumImageUrl = useMemo(() => {
+    if (!image?.url) return null;
+    return getMediumVariantUrl(image.url);
+  }, [image?.url]);
+
   // Load original image dimensions
   useEffect(() => {
-    if (enhancedImageUrl && !originalDimensions) {
+    if (!api) return; // Add conditional check inside async function
+    if (mediumImageUrl && !originalDimensions) {
       const img = new window.Image();
       img.onload = () => {
         const dimensions = {
@@ -425,6 +552,10 @@ export function GalleryCropModal({
           height: img.naturalHeight,
         };
         setOriginalDimensions(dimensions);
+
+        console.log(
+          `🖼️ Loaded dimensions from medium variant: ${dimensions.width}×${dimensions.height}`
+        );
 
         // Check if image is large enough for the tallest preset (1920px)
         const minRequiredHeight = 1920;
@@ -441,19 +572,41 @@ export function GalleryCropModal({
           parseInt(outputHeight)
         );
       };
-      img.src = enhancedImageUrl;
+      img.onerror = (error) => {
+        console.error(
+          "Failed to load medium variant image for dimensions:",
+          error
+        );
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Falling back to enhanced image URL for dimensions");
+
+        // Fallback to enhanced image URL if medium variant fails
+        if (enhancedImageUrl) {
+          img.src = enhancedImageUrl;
+        }
+      };
+      img.src = mediumImageUrl;
     }
-  }, [enhancedImageUrl, originalDimensions, initializeCropArea]);
+  }, [
+    mediumImageUrl,
+    enhancedImageUrl,
+    originalDimensions,
+    initializeCropArea,
+    api,
+    outputWidth,
+    outputHeight,
+  ]);
 
   // Cache image for live preview when modal opens
   useEffect(() => {
-    if (isOpen && image?.url && processingMethod === "local") {
+    if (!api) return; // Add conditional check inside async function
+    if (isOpen && image?.url) {
       cacheImageForPreview();
     }
-  }, [isOpen, image?.url, processingMethod, cacheImageForPreview]);
+  }, [isOpen, image?.url, cacheImageForPreview, api]);
 
   // Auto-generate initial live preview when crop area is ready
   useEffect(() => {
+    if (!api) return; // Add conditional check inside async function
     if (
       originalDimensions &&
       cropArea.width > 0 &&
@@ -464,13 +617,17 @@ export function GalleryCropModal({
     }
   }, [
     originalDimensions,
-    cropArea,
+    cropArea.x,
+    cropArea.y,
+    cropArea.width,
+    cropArea.height,
     shouldTriggerLivePreview,
-    debouncedGeneratePreview,
+    api,
   ]);
 
   // Load processed image dimensions when processed image changes
   useEffect(() => {
+    if (!api) return; // Add conditional check inside async function
     if (processedImageUrl) {
       const img = new window.Image();
       img.onload = () => {
@@ -483,10 +640,11 @@ export function GalleryCropModal({
     } else {
       setProcessedDimensions(null);
     }
-  }, [processedImageUrl]);
+  }, [processedImageUrl, api]);
 
   // Load high-res image dimensions when high-res image changes
   useEffect(() => {
+    if (!api) return; // Add conditional check inside async function
     if (highResImageUrl) {
       const img = new window.Image();
       img.onload = () => {
@@ -499,12 +657,12 @@ export function GalleryCropModal({
     } else {
       setHighResDimensions(null);
     }
-  }, [highResImageUrl]);
+  }, [highResImageUrl, api]);
 
   // Draw the crop preview on canvas
   const drawCropPreview = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !enhancedImageUrl || !originalDimensions) {
+    if (!canvas || !mediumImageUrl || !originalDimensions) {
       return;
     }
 
@@ -598,13 +756,59 @@ export function GalleryCropModal({
         );
       });
     };
-    img.src = enhancedImageUrl;
-  }, [enhancedImageUrl, originalDimensions, cropArea]);
+    img.onerror = (error) => {
+      console.error("Failed to load medium variant for canvas:", error);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Canvas fallback to enhanced image URL");
 
-  // Redraw canvas when crop area changes
+      // Fallback to enhanced image URL if medium variant fails
+      if (enhancedImageUrl) {
+        img.src = enhancedImageUrl;
+      }
+    };
+    img.src = mediumImageUrl;
+  }, [
+    mediumImageUrl,
+    enhancedImageUrl,
+    originalDimensions,
+    cropArea,
+    canvasScale,
+  ]);
+
+  // Update canvas when crop area or enhanced image changes
   useEffect(() => {
+    if (!api) return;
     drawCropPreview();
-  }, [drawCropPreview]);
+  }, [drawCropPreview, api]);
+
+  // Authentication guard - moved after all hooks
+  if (!api) {
+    return null;
+  }
+
+  // Save live preview preference and handle toggle
+  const handleLivePreviewToggle = (enabled: boolean) => {
+    setLivePreviewEnabled(enabled);
+    if (enabled && shouldTriggerLivePreview()) {
+      debouncedGeneratePreview();
+    }
+  };
+
+  const handlePreset = (width: number, height: number) => {
+    setOutputWidth(width.toString());
+    setOutputHeight(height.toString());
+
+    // Immediately initialize crop area for the new dimensions
+    if (originalDimensions) {
+      initializeCropArea(originalDimensions, width, height);
+    }
+
+    if (shouldTriggerLivePreview()) {
+      debouncedGeneratePreview();
+    }
+  };
+
+  // Get the current enhanced image URL for display
+  const currentImageUrl = enhancedImageUrl;
 
   // Canvas mouse handlers for interactive cropping
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -662,6 +866,7 @@ export function GalleryCropModal({
   };
 
   const handleProcess = async () => {
+    if (!api) return;
     if (!image || !enhancedImageUrl || !originalDimensions) {
       toast({
         title: "Error",
@@ -688,73 +893,74 @@ export function GalleryCropModal({
     try {
       const processingImageUrl = getProcessingImageUrl(image.url || "");
 
-      console.log("🚀 Making crop API call with:", {
-        processingImageUrl: processingImageUrl.substring(0, 100) + "...",
-        cropArea,
-        outputWidth: parseInt(outputWidth),
-        outputHeight: parseInt(outputHeight),
-        scale,
-        processingMethod,
-        originalDimensions,
-      });
-
-      const response = await fetch("/api/images/crop-image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      console.log("✂️ Crop processing starting:", {
+        originalUrl: image.url,
+        processingUrl: processingImageUrl,
+        urlTransformation: {
+          from: image.url,
+          to: processingImageUrl,
+          isCloudflare: image.url.includes("imagedelivery.net"),
         },
-        body: JSON.stringify({
-          imageUrl: processingImageUrl,
-          cropX: Math.round(cropArea.x),
-          cropY: Math.round(cropArea.y),
-          cropWidth: Math.round(cropArea.width),
-          cropHeight: Math.round(cropArea.height),
+        parameters: {
+          cropArea,
           outputWidth: parseInt(outputWidth),
           outputHeight: parseInt(outputHeight),
-          scale: scale,
-          processingMethod: processingMethod,
-          uploadToCloudflare: false,
-          originalFilename: image?.filename,
-          originalCarId: image?.carId,
-          previewImageDimensions: originalDimensions,
-        }),
+          scale,
+        },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Processing failed");
+      const requestData: CropImageData = {
+        imageUrl: processingImageUrl,
+        cropX: Math.round(cropArea.x),
+        cropY: Math.round(cropArea.y),
+        cropWidth: Math.round(cropArea.width),
+        cropHeight: Math.round(cropArea.height),
+        outputWidth: parseInt(outputWidth),
+        outputHeight: parseInt(outputHeight),
+        scale: scale,
+        uploadToCloudflare: false,
+        originalFilename: image?.filename || "",
+        previewImageDimensions: originalDimensions,
+      };
+
+      const result = await api.post<CropImageResponse>(
+        "images/crop-image",
+        requestData
+      );
+
+      console.log("✅ Crop API response:", {
+        success: result.success,
+        hasProcessedImageUrl: !!result.processedImageUrl,
+        hasImageData: !!result.imageData,
+        remoteServiceUsed: result.remoteServiceUsed,
+        error: result.error,
+      });
+
+      if (!result.success) {
+        const errorMessage = result.error || "Processing failed";
+        throw new Error(errorMessage);
       }
 
-      const result = await response.json();
-
-      if (result.success) {
-        if (result.processedImageUrl) {
-          setProcessedImageUrl(result.processedImageUrl);
-        } else if (result.imageData) {
-          const byteCharacters = atob(result.imageData);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: "image/jpeg" });
-          const blobUrl = URL.createObjectURL(blob);
-          setProcessedImageUrl(blobUrl);
-        }
-
-        setRemoteServiceUsed(result.remoteServiceUsed || false);
-
-        toast({
-          title: "Success",
-          description: `Image cropped successfully using ${
-            result.remoteServiceUsed ? "Cloud Run service" : "local binary"
-          }`,
-        });
+      // Handle both processedImageUrl (data URL) and imageData (base64)
+      if (result.processedImageUrl) {
+        setProcessedImageUrl(result.processedImageUrl);
+      } else if (result.imageData) {
+        const dataUrl = `data:image/jpeg;base64,${result.imageData}`;
+        setProcessedImageUrl(dataUrl);
       } else {
-        throw new Error(result.error || "Processing failed");
+        throw new Error("No processed image data received from API");
       }
-    } catch (error) {
-      console.error("Processing error:", error);
+
+      setRemoteServiceUsed(result.remoteServiceUsed || false);
+
+      const successMessage = `Image cropped successfully using Sharp processing`;
+
+      toast({
+        title: "Crop Preview Ready",
+        description: "Image cropped successfully. Review the result below.",
+      });
+    } catch (error: any) {
+      console.error("❌ Crop processing error:", error);
 
       let errorMessage =
         error instanceof Error ? error.message : "Unknown error occurred";
@@ -762,16 +968,18 @@ export function GalleryCropModal({
 
       if (errorMessage.includes("crop-image endpoint may not be available")) {
         suggestion =
-          "Try switching to 'Local Processing' in the settings below.";
+          "There may be an issue with the image processing service. Please try again.";
       }
 
       setError(errorMessage);
 
+      const fullErrorMessage = suggestion
+        ? `${errorMessage}\n\n💡 ${suggestion}`
+        : errorMessage;
+
       toast({
         title: "Processing Failed",
-        description: suggestion
-          ? `${errorMessage}\n\n💡 ${suggestion}`
-          : errorMessage,
+        description: fullErrorMessage,
         variant: "destructive",
       });
     } finally {
@@ -780,6 +988,7 @@ export function GalleryCropModal({
   };
 
   const handleHighResProcess = async (multiplier: 2 | 4) => {
+    if (!api) return; // Add conditional check inside async function
     if (!processedImageUrl || !image) {
       toast({
         title: "Error",
@@ -795,57 +1004,48 @@ export function GalleryCropModal({
     try {
       const processingImageUrl = getProcessingImageUrl(image.url || "");
 
-      const response = await fetch("/api/images/crop-image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl: processingImageUrl,
-          cropX: Math.round(cropArea.x),
-          cropY: Math.round(cropArea.y),
-          cropWidth: Math.round(cropArea.width),
-          cropHeight: Math.round(cropArea.height),
-          outputWidth: parseInt(outputWidth) * multiplier,
-          outputHeight: parseInt(outputHeight) * multiplier,
-          scale: scale * multiplier,
-          processingMethod: processingMethod,
-          uploadToCloudflare: false,
-          originalFilename: image?.filename,
-          originalCarId: image?.carId,
-          previewImageDimensions: originalDimensions,
-        }),
-      });
+      const requestData: CropImageData = {
+        imageUrl: processingImageUrl,
+        cropX: Math.round(cropArea.x),
+        cropY: Math.round(cropArea.y),
+        cropWidth: Math.round(cropArea.width),
+        cropHeight: Math.round(cropArea.height),
+        outputWidth: parseInt(outputWidth) * multiplier,
+        outputHeight: parseInt(outputHeight) * multiplier,
+        scale: scale * multiplier,
+        uploadToCloudflare: false,
+        originalFilename: image?.filename || "",
+        scaleMultiplier: multiplier,
+        previewImageDimensions: originalDimensions,
+        sourceImageWidth: multiplier >= 2 ? 3000 : undefined, // Use high-res source for 2x+
+      };
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "High-res processing failed");
+      const result = await api.post<CropImageResponse>(
+        "images/crop-image",
+        requestData
+      );
+
+      if (!result.success) {
+        const errorMessage = result.error || "High-res processing failed";
+        throw new Error(errorMessage);
       }
 
-      const result = await response.json();
-
-      if (result.success) {
-        if (result.processedImageUrl) {
-          setHighResImageUrl(result.processedImageUrl);
-        } else if (result.imageData) {
-          const byteCharacters = atob(result.imageData);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: "image/jpeg" });
-          const blobUrl = URL.createObjectURL(blob);
-          setHighResImageUrl(blobUrl);
-        }
-
-        toast({
-          title: "Success",
-          description: `${multiplier}x high-resolution image generated successfully`,
-        });
+      // Handle both processedImageUrl (data URL) and imageData (base64)
+      if (result.processedImageUrl) {
+        setHighResImageUrl(result.processedImageUrl);
+      } else if (result.imageData) {
+        const dataUrl = `data:image/jpeg;base64,${result.imageData}`;
+        setHighResImageUrl(dataUrl);
       } else {
-        throw new Error(result.error || "High-res processing failed");
+        throw new Error("No high-res processed image data received from API");
       }
+
+      const successMessage = `${multiplier}x high-resolution image generated successfully`;
+      hotToast.success(successMessage);
+      toast({
+        title: "Success",
+        description: successMessage,
+      });
     } catch (error) {
       console.error("High-res processing error:", error);
 
@@ -855,7 +1055,7 @@ export function GalleryCropModal({
 
       if (errorMessage.includes("crop-image endpoint may not be available")) {
         suggestion =
-          "Try switching to 'Local Processing' in the settings below.";
+          "There may be an issue with the image processing service. Please try again.";
       }
 
       setError(errorMessage);
@@ -874,6 +1074,8 @@ export function GalleryCropModal({
   };
 
   const handleReplaceImage = async (multiplier: 1 | 2) => {
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚨🚨🚨 REPLACE IMAGE FUNCTION CALLED 🚨🚨🚨", multiplier);
+    if (!api) return; // Add conditional check inside async function
     if (!image || !processedImageUrl) return;
 
     // Add time-based lock to prevent rapid successive calls
@@ -898,70 +1100,67 @@ export function GalleryCropModal({
       return;
     }
 
-    console.log(`🎯 handleReplaceImage(${multiplier}) starting...`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🎯 handleReplaceImage(${multiplier}) starting...`);
     setLastProcessingTime(now);
 
     try {
       // Set the specific multiplier state first
       if (multiplier === 1) {
         setIsReplacing1x(true);
-        console.log("🔒 Locked 1x processing");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 Locked 1x processing");
       } else {
         setIsReplacing2x(true);
-        console.log("🔒 Locked 2x processing");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 Locked 2x processing");
       }
 
       // Set general replacing state
       setIsReplacing(true);
 
-      console.log(`📤 Making API call with multiplier: ${multiplier}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`📤 Making API call with multiplier: ${multiplier}`);
 
       // Use the selected multiplier for the processing
       const processingImageUrl = getProcessingImageUrl(image.url || "");
 
-      // First, process the image and upload to Cloudflare
-      const processingResponse = await fetch("/api/images/crop-image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl: processingImageUrl,
-          cropX: Math.round(cropArea.x),
-          cropY: Math.round(cropArea.y),
-          cropWidth: Math.round(cropArea.width),
-          cropHeight: Math.round(cropArea.height),
-          outputWidth: parseInt(outputWidth) * multiplier,
-          outputHeight: parseInt(outputHeight) * multiplier,
-          scale: scale * multiplier,
-          processingMethod,
-          uploadToCloudflare: true,
-          originalFilename: image?.filename,
-          originalCarId: image?.carId,
-          previewImageDimensions: originalDimensions,
-          requestedWidth: parseInt(outputWidth),
-          requestedHeight: parseInt(outputHeight),
-        }),
-      });
+      // Process the image and upload to Cloudflare
+      const processingRequestData: CropImageData = {
+        imageUrl: processingImageUrl,
+        cropX: Math.round(cropArea.x),
+        cropY: Math.round(cropArea.y),
+        cropWidth: Math.round(cropArea.width),
+        cropHeight: Math.round(cropArea.height),
+        outputWidth: parseInt(outputWidth) * multiplier,
+        outputHeight: parseInt(outputHeight) * multiplier,
+        scale: scale * multiplier,
+        uploadToCloudflare: true,
+        originalFilename: image?.filename || "",
+        scaleMultiplier: multiplier,
+        previewImageDimensions: originalDimensions,
+        ...(multiplier >= 2 && { sourceImageWidth: 3000 }), // Only include for 2x+ to avoid undefined
+      };
 
-      if (!processingResponse.ok) {
-        const errorData = await processingResponse.json();
-        throw new Error(errorData.error || "Failed to process image");
-      }
+      // 🐛 DEBUG: Log the actual request data being sent
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚨🚨🚨 2X DEBUG ${multiplier}x REQUEST 🚨🚨🚨`);
+      console.log(
+        `sourceImageWidth in request:`,
+        processingRequestData.sourceImageWidth
+      );
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Full request:`, processingRequestData);
 
-      const processingResult = await processingResponse.json();
-      console.log(`✅ Processing result for ${multiplier}x:`, processingResult);
+      const processingResult = await api.post<CropImageResponse>(
+        "images/crop-image",
+        processingRequestData
+      );
 
-      if (
-        !processingResult.success ||
-        !processingResult.cloudflareUpload?.success
-      ) {
-        throw new Error("Failed to upload processed image to Cloudflare");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ Processing result for ${multiplier}x:`, processingResult);
+
+      if (!processingResult.success) {
+        const errorMessage =
+          processingResult.error || "Failed to process image";
+        throw new Error(errorMessage);
       }
 
       // Get the processed image ID from the upload result
-      const processedImageId =
-        processingResult.cloudflareUpload?.images?.[0]?.id;
+      const processedImageId = processingResult.processedImageUrl;
 
       if (!processedImageId) {
         throw new Error("Failed to get processed image ID from upload result");
@@ -973,42 +1172,36 @@ export function GalleryCropModal({
       );
 
       // Now update the gallery to use the already-processed image
-      const response = await fetch(
-        `/api/galleries/${galleryId}/replace-image-direct`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            originalImageId: image._id,
-            processedImageId: processedImageId,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to replace image");
+      if (!image._id) {
+        throw new Error("Original image ID is missing");
       }
 
-      const result = await response.json();
-      console.log(`✅ Gallery replacement result for ${multiplier}x:`, result);
+      const replaceRequestData: ReplaceImageDirectData = {
+        originalImageId: String(image._id),
+        processedImageId: processedImageId,
+      };
+
+      const result = await api.post<ReplaceImageDirectResponse>(
+        `galleries/${galleryId}/replace-image-direct`,
+        replaceRequestData
+      );
+
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ Gallery replacement result for ${multiplier}x:`, result);
 
       // Verify the new image is available before updating UI
       if (result && result.processedImage && result.processedImage.url) {
         // Immediately update the UI - no need to wait for CDN propagation
         // The image component will handle loading states naturally
-        console.log("🎯 Immediately updating UI with new image data...");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎯 Immediately updating UI with new image data...");
 
-        if (onImageProcessed) {
-          console.log("🎯 Calling onImageProcessed and closing modal...");
+        if (onImageProcessed && result.originalImageId) {
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎯 Calling onImageProcessed and closing modal...");
           onImageProcessed(result.originalImageId, result.processedImage);
           handleClose();
         }
       }
 
-      console.log(`🎉 Successfully completed ${multiplier}x processing`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🎉 Successfully completed ${multiplier}x processing`);
 
       toast({
         title: "Success",
@@ -1026,7 +1219,7 @@ export function GalleryCropModal({
         variant: "destructive",
       });
     } finally {
-      console.log(`🔓 Unlocking states for ${multiplier}x processing`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🔓 Unlocking states for ${multiplier}x processing`);
       setIsReplacing(false);
       setIsReplacing1x(false);
       setIsReplacing2x(false);
@@ -1035,27 +1228,40 @@ export function GalleryCropModal({
   };
 
   const handleClose = () => {
-    setCropArea({ x: 0, y: 0, width: 0, height: 0 });
-    setScale(1.0);
     setOutputWidth("1080");
     setOutputHeight("1080");
+    setCloudflareWidth("3000");
+    setCloudflareQuality("100");
+    setCropArea({ x: 0, y: 0, width: 0, height: 0 });
+    setScale(1.0);
     setProcessedImageUrl(null);
+    setHighResImageUrl(null);
     setError(null);
     setRemoteServiceUsed(false);
+    setLastProcessingTime(0);
+    setProcessedDimensions(null);
+    setHighResDimensions(null);
+    setIsProcessingHighRes(false);
+    setHighResMultiplier(null);
     setLivePreviewUrl(null);
     setCachedImagePath(null);
     setPreviewProcessingTime(null);
+    setOriginalDimensions(null);
+    setIsWaitingForImage(false);
 
-    // Clean up any blob URLs
+    // Clear any pending preview timeouts
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current);
+      previewTimeoutRef.current = null;
+    }
+
+    // Clear cached preview images
     if (livePreviewUrl) {
       URL.revokeObjectURL(livePreviewUrl);
     }
 
     onClose();
   };
-
-  // Get the current enhanced image URL for display
-  const currentImageUrl = enhancedImageUrl;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -1083,7 +1289,7 @@ export function GalleryCropModal({
               <div className="space-y-2 flex flex-col">
                 <div className="flex items-center justify-between flex-shrink-0">
                   <Label>Live Preview</Label>
-                  {processingMethod === "local" && (
+                  {false && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -1108,18 +1314,13 @@ export function GalleryCropModal({
                 </div>
 
                 <div className="border rounded-lg p-2 bg-muted/50 relative flex-1 min-h-0 max-h-[50vh]">
-                  {livePreviewEnabled &&
-                  processingMethod === "local" &&
-                  livePreviewUrl ? (
+                  {livePreviewEnabled && livePreviewUrl ? (
                     <div className="h-full flex flex-col">
                       <div className="flex-1 flex items-center justify-center min-h-0">
-                        <CloudflareImage
+                        <img
                           src={livePreviewUrl}
                           alt="Live preview"
-                          width={600}
-                          height={600}
                           className="w-full h-auto max-w-full max-h-full object-contain rounded"
-                          variant="public"
                         />
                       </div>
                       {previewProcessingTime && (
@@ -1132,10 +1333,16 @@ export function GalleryCropModal({
                   ) : (
                     <div className="h-full flex items-center justify-center">
                       <p className="text-sm text-muted-foreground">
-                        {processingMethod === "local"
-                          ? "Enable live preview to see real-time crop results"
-                          : "Preview will appear after processing"}
+                        {livePreviewEnabled
+                          ? "Adjust crop settings to see live preview"
+                          : "Enable live preview to see real-time crop results"}
                       </p>
+                    </div>
+                  )}
+                  {/* Loading indicator */}
+                  {isGeneratingPreview && (
+                    <div className="absolute bottom-2 right-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
                     </div>
                   )}
                 </div>
@@ -1404,43 +1611,9 @@ export function GalleryCropModal({
                   </div>
                 </div>
 
-                {/* Processing Method */}
-                <div className="space-y-2 flex-shrink-0">
-                  <Label className="text-xs">Processing Method</Label>
-                  <Select
-                    value={processingMethod}
-                    onValueChange={handleProcessingMethodChange}
-                  >
-                    <SelectTrigger className="h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cloud">
-                        <div className="flex items-center gap-2">
-                          <Cloud className="h-4 w-4" />
-                          Cloud Processing (Recommended)
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="local">
-                        <div className="flex items-center gap-2">
-                          <Monitor className="h-4 w-4" />
-                          Local Processing
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Error Messages */}
-                {error && (
-                  <div className="p-2 bg-red-50 border border-red-200 rounded-lg flex-shrink-0">
-                    <p className="text-sm text-red-800">{error}</p>
-                  </div>
-                )}
-
                 {/* Processed Image Preview - only show when live preview is not active */}
                 {processedImageUrl &&
-                  !(livePreviewEnabled && processingMethod === "local") && (
+                  !(livePreviewEnabled && livePreviewUrl) && (
                     <div className="space-y-1 flex-shrink-0">
                       <Label className="text-xs">Processed Image</Label>
                       <div className="border rounded-lg p-2 bg-muted/50">

@@ -7,6 +7,7 @@ import LocationsClient from "../locations/LocationsClient";
 import ClientsContent from "@/app/admin/ClientsContent";
 import ContactsContent from "@/app/admin/ContactsContent";
 import MakesContent from "@/app/admin/MakesContent";
+import MediaTypesContent from "@/app/admin/media-types/MediaTypesContent";
 import CreativeRolesManagement from "@/components/users/CreativeRolesManagement";
 import { Loader2 } from "lucide-react";
 import {
@@ -28,18 +29,50 @@ import LengthSettingsContent from "./LengthSettingsContent";
 import PlatformSettingsContent from "./PlatformSettingsContent";
 import EventTypeSettingsContent from "./EventTypeSettingsContent";
 import ImageAnalysisPromptsContent from "./ImageAnalysisPromptsContent";
+import BrandTonesContent from "./BrandTonesContent";
+import { ModelsConfigurator } from "@/components/admin/ModelsConfigurator";
+import DeliverableBatchManagement from "@/components/admin/DeliverableBatchManagement";
+import { useAPI } from "@/hooks/useAPI";
+
+// TypeScript interfaces for API responses
+interface OAuthDebugResponse {
+  oauthConfig: {
+    environment: {
+      NODE_ENV: string;
+      VERCEL_ENV?: string;
+      baseUrl: string;
+      oauthCallbackUrl: string;
+    };
+    google: {
+      clientIdSet: boolean;
+      clientSecretSet: boolean;
+      expectedCallbackUrl: string;
+    };
+  };
+  troubleshooting: {
+    redirectUriIssue: {
+      description: string;
+    };
+  };
+}
+
+interface UserDebugResponse {
+  userDebugInfo: any;
+}
 
 export default function AdminTabs() {
+  const api = useAPI();
   const [oauthDebugData, setOauthDebugData] = useState<any>(null);
   const [userDebugData, setUserDebugData] = useState<any>(null);
   const [debugLoading, setDebugLoading] = useState(false);
   const [userEmail, setUserEmail] = useState("");
 
   const fetchOAuthDebug = async () => {
+    if (!api) return;
+
     setDebugLoading(true);
     try {
-      const response = await fetch("/api/auth/debug-oauth");
-      const data = await response.json();
+      const data = (await api.get("auth/debug-oauth")) as OAuthDebugResponse;
       setOauthDebugData(data);
     } catch (error) {
       console.error("Error fetching OAuth debug:", error);
@@ -49,14 +82,13 @@ export default function AdminTabs() {
   };
 
   const debugUser = async () => {
-    if (!userEmail) return;
+    if (!userEmail || !api) return;
 
     setDebugLoading(true);
     try {
-      const response = await fetch(
-        `/api/auth/debug-oauth?user=${encodeURIComponent(userEmail)}`
-      );
-      const data = await response.json();
+      const data = (await api.get(
+        `auth/debug-oauth?user=${encodeURIComponent(userEmail)}`
+      )) as UserDebugResponse;
       setUserDebugData(data.userDebugInfo);
     } catch (error) {
       console.error("Error debugging user:", error);
@@ -285,6 +317,11 @@ export default function AdminTabs() {
       content: <MakesContent />,
     },
     {
+      value: "media-types",
+      label: "Media Types",
+      content: <MediaTypesContent />,
+    },
+    {
       value: "caption-prompts",
       label: "Caption Prompts",
       content: <CaptionPromptsContent />,
@@ -293,6 +330,16 @@ export default function AdminTabs() {
       value: "system-prompts",
       label: "System Prompts",
       content: <SystemPromptsContent />,
+    },
+    {
+      value: "brand-tones",
+      label: "Brand Tones",
+      content: <BrandTonesContent />,
+    },
+    {
+      value: "ai-models",
+      label: "AI Models",
+      content: <ModelsConfigurator />,
     },
     {
       value: "platform-settings",
@@ -313,6 +360,11 @@ export default function AdminTabs() {
       value: "image-analysis-prompts",
       label: "Image Analysis Prompts",
       content: <ImageAnalysisPromptsContent />,
+    },
+    {
+      value: "deliverable-batches",
+      label: "Deliverable Batches",
+      content: <DeliverableBatchManagement />,
     },
   ];
 

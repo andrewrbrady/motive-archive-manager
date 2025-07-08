@@ -1,431 +1,462 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
-import useSWR from "swr";
-import { fetcher } from "@/lib/fetcher";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { FilterState, ExtendedImageType } from "@/types/gallery";
 import { useFastRouter } from "@/lib/navigation/simple-cache";
+import { useAPI, useAPIStatus } from "@/hooks/useAPI";
+import { useDebounce } from "@/hooks/useDebounce"; // Import useDebounce for search input
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
+import { SelectedCopy } from "@/components/content-studio/types";
 
-export function useImageGallery(carId: string, vehicleInfo?: any) {
-  const router = useRouter();
-  const { fastReplace } = useFastRouter();
-  const searchParams = useSearchParams();
-  const { toast } = useToast();
-  const lastNavigationRef = useRef<number>(0);
+// Helper function to normalize image URLs to medium variant
+const getMediumVariantUrl = (baseUrl: string): string => {
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 URL normalization input:", baseUrl);
 
-  // URL-based state
-  const isEditMode = searchParams?.get("mode") === "edit";
-  const urlPage = searchParams?.get("page");
-  const currentImageId = searchParams?.get("image");
+  if (!baseUrl || !baseUrl.includes("imagedelivery.net")) {
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Non-Cloudflare URL, returning as-is:", baseUrl);
+    return baseUrl;
+  }
 
-  // SWR for data fetching
-  const { data, error, isLoading, mutate } = useSWR(
-    `/api/cars/${carId}/images?limit=500`,
-    fetcher
-  );
+  // Always use 'medium' variant for consistent dimensions and quality
+  const urlParts = baseUrl.split("/");
+  const lastPart = urlParts[urlParts.length - 1];
 
-  const images = useMemo(() => data?.images || [], [data?.images]);
+  // Check if the last part is a variant (alphabetic or has parameters)
+  if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+    // Replace with medium variant
+    urlParts[urlParts.length - 1] = "medium";
+  } else {
+    // No variant specified, append medium
+    urlParts.push("medium");
+  }
 
-  // Local state
-  const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
-  const [currentPage, setCurrentPage] = useState(0);
-  const [filters, setFilters] = useState<FilterState>({});
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  const [showImageInfo, setShowImageInfo] = useState(false);
-  const [selectedUrlOption, setSelectedUrlOption] =
-    useState<string>("Original");
-  const [isReanalyzing, setIsReanalyzing] = useState(false);
+  const normalizedUrl = urlParts.join("/");
+  console.log("🔄 URL normalization result:", {
+    original: baseUrl,
+    normalized: normalizedUrl,
+    wasNormalized: baseUrl !== normalizedUrl,
+  });
 
-  const itemsPerPage = 15;
+  return normalizedUrl;
+};
 
-  // Memoized filter options
-  const filterOptions = useMemo(() => {
-    const options = {
-      angles: new Set<string>(),
-      views: new Set<string>(),
-      movements: new Set<string>(),
-      tods: new Set<string>(),
-      sides: new Set<string>(),
+// Enhanced caching utilities for image gallery
+interface ImageGalleryCacheItem {
+  data: {
+    images: ExtendedImageType[];
+    pagination?: {
+      totalImages?: number;
+      totalPages?: number;
+      currentPage?: number;
     };
+  };
+  timestamp: number;
+  carLastModified?: number;
+  filters: string; // Serialized filters for cache key
+  searchQuery: string;
+}
 
-    images.forEach((image: ExtendedImageType) => {
-      const { metadata } = image;
-      if (metadata?.angle?.trim()) options.angles.add(metadata.angle.trim());
-      if (metadata?.view?.trim()) options.views.add(metadata.view.trim());
-      if (metadata?.movement?.trim())
-        options.movements.add(metadata.movement.trim());
-      if (metadata?.tod?.trim()) options.tods.add(metadata.tod.trim());
-      if (metadata?.side?.trim()) options.sides.add(metadata.side.trim());
-    });
+interface ImageMetadataCache {
+  [imageId: string]: {
+    metadata: any;
+    timestamp: number;
+  };
+}
 
-    return {
-      angles: Array.from(options.angles).sort(),
-      views: Array.from(options.views).sort(),
-      movements: Array.from(options.movements).sort(),
-      tods: Array.from(options.tods).sort(),
-      sides: Array.from(options.sides).sort(),
-    };
-  }, [images]);
+const CACHE_PREFIX = "img_gallery_";
+const METADATA_CACHE_PREFIX = "img_meta_";
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes for API responses
+const METADATA_CACHE_DURATION = 60 * 60 * 1000; // 1 hour for metadata
 
-  // Memoized filtered images
-  const filteredImages = useMemo(() => {
-    return images.filter((image: ExtendedImageType) => {
-      // Filter by metadata filters
-      const matchesFilters = Object.entries(filters).every(([key, value]) => {
-        if (!value) return true;
-        const metadataValue =
-          image.metadata?.[key as keyof typeof image.metadata];
-        return metadataValue === value;
-      });
+// Enhanced cache utilities
+const cacheUtils = {
+  // Cache API responses with filter-based keys
+  setCacheData: (
+    carId: string,
+    filters: FilterState,
+    searchQuery: string,
+    data: any,
+    carLastModified?: number
+  ) => {
+    try {
+      const filterKey = JSON.stringify(filters);
+      const cacheKey = `${CACHE_PREFIX}${carId}_${btoa(filterKey)}_${btoa(searchQuery || "")}`;
 
-      // Filter by search query
-      const matchesSearch =
-        !searchQuery ||
-        image.metadata?.description
-          ?.toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        image.filename?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        image.metadata?.angle
-          ?.toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        image.metadata?.view?.toLowerCase().includes(searchQuery.toLowerCase());
+      const cacheItem: ImageGalleryCacheItem = {
+        data,
+        timestamp: Date.now(),
+        carLastModified,
+        filters: filterKey,
+        searchQuery,
+      };
 
-      return matchesFilters && matchesSearch;
-    });
-  }, [images, filters, searchQuery]);
+      localStorage.setItem(cacheKey, JSON.stringify(cacheItem));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📦 Cached gallery data:", { carId, filters, searchQuery });
+    } catch (error) {
+      console.warn("Failed to cache gallery data:", error);
+    }
+  },
 
-  // Memoized current image
-  const currentImage = useMemo(() => {
-    if (!currentImageId) return filteredImages[0];
-    return (
-      filteredImages.find(
-        (img: ExtendedImageType) =>
-          img.id === currentImageId || img._id === currentImageId
-      ) || filteredImages[0]
-    );
-  }, [filteredImages, currentImageId]);
+  // Get cached API responses
+  getCacheData: (
+    carId: string,
+    filters: FilterState,
+    searchQuery: string,
+    carLastModified?: number
+  ) => {
+    try {
+      const filterKey = JSON.stringify(filters);
+      const cacheKey = `${CACHE_PREFIX}${carId}_${btoa(filterKey)}_${btoa(searchQuery || "")}`;
 
-  const mainIndex = useMemo(() => {
-    if (!currentImage) return 0;
-    return filteredImages.findIndex(
-      (img: ExtendedImageType) =>
-        img.id === currentImage.id || img._id === currentImage._id
-    );
-  }, [filteredImages, currentImage]);
+      const cached = localStorage.getItem(cacheKey);
+      if (!cached) return null;
 
-  // Memoized paginated images
-  const paginatedImages = useMemo(() => {
-    const startIndex = currentPage * itemsPerPage;
-    return filteredImages.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredImages, currentPage, itemsPerPage]);
+      const cacheItem: ImageGalleryCacheItem = JSON.parse(cached);
+      const now = Date.now();
 
-  const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
-
-  // Handlers
-  const handlePageChange = useCallback(
-    (newPage: number) => {
-      try {
-        setCurrentPage(newPage);
-        const params = new URLSearchParams(searchParams?.toString() || "");
-        params.set("page", (newPage + 1).toString());
-        router.replace(`?${params.toString()}`, { scroll: false });
-      } catch (error) {
-        console.error("Error changing page:", error);
-        // Fallback: just update local state
-        setCurrentPage(newPage);
+      // Check if cache has expired
+      if (now - cacheItem.timestamp > CACHE_DURATION) {
+        localStorage.removeItem(cacheKey);
+        return null;
       }
-    },
-    [searchParams, router]
-  );
 
-  const setMainImage = useCallback(
-    (imageId: string) => {
-      try {
-        // Minimal throttling for ultra-responsive feel
-        const now = Date.now();
-        if (now - lastNavigationRef.current < 50) {
-          return; // Skip if called within 50ms of last call
-        }
-        lastNavigationRef.current = now;
+      // Check if car has been modified since cache
+      if (
+        carLastModified &&
+        cacheItem.carLastModified &&
+        carLastModified > cacheItem.carLastModified
+      ) {
+        localStorage.removeItem(cacheKey);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Cache invalidated due to car modification");
+        return null;
+      }
 
-        const imageIndex = filteredImages.findIndex(
-          (img: ExtendedImageType) => img.id === imageId || img._id === imageId
+      console.log("💾 Using cached gallery data:", {
+        carId,
+        filters,
+        searchQuery,
+      });
+      return cacheItem.data;
+    } catch (error) {
+      console.warn("Failed to read cached gallery data:", error);
+      return null;
+    }
+  },
+
+  // Cache image metadata
+  setImageMetadata: (imageId: string, metadata: any) => {
+    try {
+      const metadataCache: ImageMetadataCache = JSON.parse(
+        localStorage.getItem(`${METADATA_CACHE_PREFIX}metadata`) || "{}"
+      );
+
+      metadataCache[imageId] = {
+        metadata,
+        timestamp: Date.now(),
+      };
+
+      localStorage.setItem(
+        `${METADATA_CACHE_PREFIX}metadata`,
+        JSON.stringify(metadataCache)
+      );
+    } catch (error) {
+      console.warn("Failed to cache image metadata:", error);
+    }
+  },
+
+  // Get cached image metadata
+  getImageMetadata: (imageId: string) => {
+    try {
+      const metadataCache: ImageMetadataCache = JSON.parse(
+        localStorage.getItem(`${METADATA_CACHE_PREFIX}metadata`) || "{}"
+      );
+
+      const cached = metadataCache[imageId];
+      if (!cached) return null;
+
+      const now = Date.now();
+      if (now - cached.timestamp > METADATA_CACHE_DURATION) {
+        delete metadataCache[imageId];
+        localStorage.setItem(
+          `${METADATA_CACHE_PREFIX}metadata`,
+          JSON.stringify(metadataCache)
         );
-        if (imageIndex >= 0) {
-          const targetPage = Math.floor(imageIndex / itemsPerPage);
+        return null;
+      }
 
-          // Update local state immediately for instant UI feedback
-          setCurrentPage(targetPage);
+      return cached.metadata;
+    } catch (error) {
+      console.warn("Failed to read cached image metadata:", error);
+      return null;
+    }
+  },
 
-          // Batch URL updates to reduce navigation calls
-          const params = new URLSearchParams(searchParams?.toString() || "");
-          const currentImage = params.get("image");
-          const currentPageParam = params.get("page");
-          const newPageParam = (targetPage + 1).toString();
+  // Clear cache for a specific car
+  clearCarCache: (carId: string) => {
+    try {
+      const keys = Object.keys(localStorage);
+      const carCacheKeys = keys.filter((key) =>
+        key.startsWith(`${CACHE_PREFIX}${carId}_`)
+      );
 
-          // Only update URL if values actually changed
-          if (currentImage !== imageId || currentPageParam !== newPageParam) {
-            params.set("image", imageId);
-            params.set("page", newPageParam);
+      carCacheKeys.forEach((key) => localStorage.removeItem(key));
+      console.log(
+        `🗑️ Cleared cache for car ${carId}: ${carCacheKeys.length} entries`
+      );
+    } catch (error) {
+      console.warn("Failed to clear car cache:", error);
+    }
+  },
 
-            // Use ultra-fast router for instant navigation
-            const newUrl = `?${params.toString()}`;
-            fastReplace(newUrl, { scroll: false });
+  // Clear all expired cache entries
+  clearExpiredCache: () => {
+    try {
+      const keys = Object.keys(localStorage);
+      const now = Date.now();
+      let clearedCount = 0;
+
+      keys.forEach((key) => {
+        if (key.startsWith(CACHE_PREFIX)) {
+          try {
+            const cached = JSON.parse(localStorage.getItem(key) || "{}");
+            if (cached.timestamp && now - cached.timestamp > CACHE_DURATION) {
+              localStorage.removeItem(key);
+              clearedCount++;
+            }
+          } catch {
+            localStorage.removeItem(key);
+            clearedCount++;
           }
         }
-      } catch (error) {
-        console.error("Error setting main image:", error);
-        // Fallback: just update local state without URL navigation
-        const imageIndex = filteredImages.findIndex(
-          (img: ExtendedImageType) => img.id === imageId || img._id === imageId
+      });
+
+      if (clearedCount > 0) {
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🧹 Cleared ${clearedCount} expired cache entries`);
+      }
+    } catch (error) {
+      console.warn("Failed to clear expired cache:", error);
+    }
+  },
+
+  // Invalidate cache when images are modified
+  invalidateImageCache: (carId: string, imageId?: string) => {
+    try {
+      if (imageId) {
+        // Clear metadata cache for specific image
+        const metadataCache: ImageMetadataCache = JSON.parse(
+          localStorage.getItem(`${METADATA_CACHE_PREFIX}metadata`) || "{}"
         );
-        if (imageIndex >= 0) {
-          const targetPage = Math.floor(imageIndex / itemsPerPage);
-          setCurrentPage(targetPage);
-        }
+        delete metadataCache[imageId];
+        localStorage.setItem(
+          `${METADATA_CACHE_PREFIX}metadata`,
+          JSON.stringify(metadataCache)
+        );
       }
-    },
-    [filteredImages, itemsPerPage, searchParams, fastReplace]
-  );
 
-  const handleNext = useCallback(() => {
-    try {
-      const nextIndex = (mainIndex + 1) % filteredImages.length;
-      const nextImage = filteredImages[nextIndex];
-      if (nextImage) {
-        setMainImage(nextImage.id || nextImage._id);
-      }
+      // Clear all gallery cache for the car
+      cacheUtils.clearCarCache(carId);
+      console.log(
+        `🔄 Invalidated cache for car ${carId}${imageId ? ` and image ${imageId}` : ""}`
+      );
     } catch (error) {
-      console.error("Error navigating to next image:", error);
+      console.warn("Failed to invalidate image cache:", error);
     }
-  }, [mainIndex, filteredImages, setMainImage]);
+  },
+};
 
-  const handlePrev = useCallback(() => {
-    try {
-      const prevIndex =
-        (mainIndex - 1 + filteredImages.length) % filteredImages.length;
-      const prevImage = filteredImages[prevIndex];
-      if (prevImage) {
-        setMainImage(prevImage.id || prevImage._id);
-      }
-    } catch (error) {
-      console.error("Error navigating to previous image:", error);
-    }
-  }, [mainIndex, filteredImages, setMainImage]);
+// Export cache utilities for external use
+export const imageGalleryCacheUtils = cacheUtils;
 
-  const toggleImageSelection = useCallback((imageId: string) => {
-    setSelectedImages((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(imageId)) {
-        newSet.delete(imageId);
-      } else {
-        newSet.add(imageId);
-      }
-      return newSet;
+export interface EnrichedImage {
+  id: string;
+  imageUrl: string;
+  alt: string;
+  galleryName: string;
+  order?: number;
+  filename?: string;
+  url?: string;
+}
+
+/**
+ * Custom hook for handling image gallery operations in BlockComposer
+ * Extracted from BlockComposer.tsx to reduce file size and improve maintainability
+ */
+export function useImageGallery(selectedCopies: SelectedCopy[]) {
+  // Determine context for image gallery
+  const carId = selectedCopies[0]?.carId;
+  const projectId = selectedCopies[0]?.projectId;
+
+  // For projects: fetch linked galleries first, then extract images from them
+  // For cars: fetch images directly from the car
+  const galleriesUrl = projectId ? `projects/${projectId}/galleries` : null;
+  const carImagesUrl = carId && !projectId ? `cars/${carId}/images` : null;
+
+  const {
+    data: galleriesData,
+    isLoading: loadingGalleries,
+    refetch: refetchGalleries,
+  } = useAPIQuery<{ galleries: any[] }>(galleriesUrl || "null-query", {
+    enabled: Boolean(galleriesUrl),
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+  });
+
+  const {
+    data: carImagesData,
+    isLoading: loadingCarImages,
+    refetch: refetchCarImages,
+  } = useAPIQuery<{ images: any[] }>(carImagesUrl || "null-query", {
+    enabled: Boolean(carImagesUrl),
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+  });
+
+  // Extract all images from linked galleries (for projects) - OPTIMIZED
+  const galleryImages = useMemo(() => {
+    if (!galleriesData?.galleries) return [];
+
+    const images: any[] = [];
+    galleriesData.galleries.forEach((gallery) => {
+      // Use orderedImages if available for proper ordering, fallback to imageIds
+      const imageList =
+        gallery.orderedImages?.length > 0
+          ? gallery.orderedImages.map((item: any) => ({
+              id: item.id,
+              order: item.order,
+              galleryName: gallery.name,
+            }))
+          : gallery.imageIds?.map((id: string, index: number) => ({
+              id,
+              order: index,
+              galleryName: gallery.name,
+            })) || [];
+
+      images.push(...imageList);
     });
-  }, []);
 
-  const handleUploadComplete = useCallback(async () => {
-    try {
-      await mutate();
-      setIsUploadDialogOpen(false);
-      toast({
-        title: "Success",
-        description: "Images uploaded successfully",
-      });
-    } catch (error) {
-      console.error("Error after upload:", error);
-      toast({
-        title: "Error",
-        description: "Failed to refresh images after upload",
-        variant: "destructive",
-      });
+    return images.sort((a, b) => a.order - b.order);
+  }, [galleriesData?.galleries]);
+
+  // Extract unique image IDs to fetch actual image data (for projects)
+  const imageIds = useMemo(() => {
+    return [...new Set(galleryImages.map((img) => img.id))];
+  }, [galleryImages]);
+
+  // Fetch actual image data for the image IDs (for projects)
+  const { data: imageMetadata, isLoading: loadingImageData } = useAPIQuery<
+    any[]
+  >(
+    imageIds.length > 0
+      ? `images/metadata?ids=${imageIds.join(",")}`
+      : "null-query",
+    {
+      enabled: imageIds.length > 0,
+      staleTime: 5 * 60 * 1000, // 5 minutes cache
     }
-  }, [mutate, toast]);
+  );
 
-  const handleDeleteSelected = useCallback(async () => {
-    if (selectedImages.size === 0) return;
+  // Combine gallery context with image data (for projects) - OPTIMIZED
+  const enrichedGalleryImages = useMemo((): EnrichedImage[] => {
+    if (!imageMetadata || !galleryImages.length) return [];
 
-    try {
-      const imageIds = Array.from(selectedImages);
-      const response = await fetch(`/api/cars/${carId}/images`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageIds,
-          deleteFromStorage: true,
-        }),
-      });
+    // Create a map of image ID to metadata for O(1) lookup instead of nested loops
+    const imageDataMap = new Map(
+      imageMetadata.map((img) => [img.imageId || img._id, img])
+    );
 
-      if (!response.ok) {
-        throw new Error(`Delete failed: ${response.status}`);
-      }
+    // Enrich gallery images with actual image data
+    return galleryImages
+      .map((galleryImg) => {
+        const imageData = imageDataMap.get(galleryImg.id);
+        if (!imageData) return null;
 
-      toast({
-        title: "Success",
-        description: `${imageIds.length} image(s) deleted successfully`,
-      });
-      setSelectedImages(new Set());
-      await mutate();
-    } catch (error) {
-      console.error("Error deleting images:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete images",
-        variant: "destructive",
-      });
-    }
-  }, [selectedImages, carId, toast, mutate]);
-
-  const reanalyzeImage = useCallback(
-    async (imageId: string, promptId?: string, modelId?: string) => {
-      if (isReanalyzing) return;
-
-      setIsReanalyzing(true);
-      try {
-        const promptText = promptId ? " with custom prompt" : "";
-        const modelText = modelId ? ` using ${modelId}` : "";
-
-        toast({
-          title: "Re-analyzing Image",
-          description: `Using enhanced validation${promptText}${modelText} to improve metadata accuracy...`,
-        });
-
-        const requestBody: any = {
-          imageId,
-          carId,
+        return {
+          ...imageData,
+          id: galleryImg.id,
+          order: galleryImg.order,
+          galleryName: galleryImg.galleryName,
+          // Ensure we have proper URL and alt text for the UI with proper Cloudflare formatting
+          imageUrl: fixCloudflareImageUrl(imageData.url),
+          alt: imageData.filename || `Image from ${galleryImg.galleryName}`,
         };
+      })
+      .filter(Boolean) as EnrichedImage[];
+  }, [imageMetadata, galleryImages]);
 
-        if (promptId) {
-          requestBody.promptId = promptId;
-        }
-        if (modelId) {
-          requestBody.modelId = modelId;
-        }
+  // Process car images (for cars) - OPTIMIZED
+  const carImages = useMemo((): EnrichedImage[] => {
+    if (!carImagesData?.images) return [];
 
-        const response = await fetch("/api/openai/reanalyze-image", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestBody),
-        });
+    return carImagesData.images.map((image: any, index: number) => ({
+      ...image,
+      id: image._id || image.id,
+      imageUrl: fixCloudflareImageUrl(image.url),
+      alt: image.filename || `Car image ${index + 1}`,
+      galleryName: "Car Images",
+    }));
+  }, [carImagesData?.images]);
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.details || "Re-analysis failed");
-        }
+  // Final images list: use project galleries or car images - OPTIMIZED with proper dependencies
+  const finalImages = useMemo((): EnrichedImage[] => {
+    return projectId ? enrichedGalleryImages : carImages;
+  }, [projectId, enrichedGalleryImages, carImages]);
 
-        const result = await response.json();
+  // Loading state for images
+  const loadingImages =
+    loadingGalleries || loadingImageData || loadingCarImages;
 
-        toast({
-          title: "Re-analysis Complete",
-          description: "Image metadata has been updated with improved accuracy",
-        });
+  // Refetch function
+  const refetchImages = projectId ? refetchGalleries : refetchCarImages;
 
-        await mutate();
-      } catch (error) {
-        console.error("Re-analysis error:", error);
-        toast({
-          title: "Re-analysis Failed",
-          description:
-            error instanceof Error
-              ? error.message
-              : "Failed to re-analyze image",
-          variant: "destructive",
-        });
-      } finally {
-        setIsReanalyzing(false);
-      }
-    },
-    [isReanalyzing, carId, toast, mutate]
-  );
+  // Statistics
+  const imageStats = useMemo(() => {
+    const totalImages = finalImages.length;
+    const galleryCount = projectId
+      ? galleriesData?.galleries?.length || 0
+      : carImagesData
+        ? 1
+        : 0;
 
-  const handleSetPrimaryImage = useCallback(
-    async (imageId: string) => {
-      try {
-        const response = await fetch(`/api/cars/${carId}/thumbnail`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ primaryImageId: imageId }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response
-            .json()
-            .catch(() => ({ error: "Failed to update primary image" }));
-          throw new Error(errorData.error || "Failed to update primary image");
-        }
-
-        toast({
-          title: "Success",
-          description: "Primary image updated successfully",
-        });
-
-        await mutate();
-      } catch (error) {
-        console.error("Error setting primary image:", error);
-        toast({
-          title: "Error",
-          description:
-            error instanceof Error
-              ? error.message
-              : "Failed to update primary image",
-          variant: "destructive",
-        });
-        throw error; // Re-throw so the UI can handle the error state
-      }
-    },
-    [carId, toast, mutate]
-  );
+    return {
+      totalImages,
+      galleryCount,
+      hasImages: totalImages > 0,
+      isEmpty: totalImages === 0,
+      isProject: Boolean(projectId),
+      isCar: Boolean(carId && !projectId),
+    };
+  }, [
+    finalImages.length,
+    projectId,
+    galleriesData?.galleries?.length,
+    carImagesData,
+    carId,
+  ]);
 
   return {
-    // Data
-    images,
-    filteredImages,
-    paginatedImages,
-    currentImage,
-    filterOptions,
-    isLoading,
-    error,
-    totalPages,
-    mainIndex,
+    // Images data
+    finalImages,
+    galleryImages: enrichedGalleryImages,
+    carImages,
 
-    // State
-    filters,
-    searchQuery,
-    selectedImages,
-    currentPage,
-    isModalOpen,
-    isUploadDialogOpen,
-    showImageInfo,
-    selectedUrlOption,
-    isReanalyzing,
-    isEditMode,
+    // Loading states
+    loadingImages,
+    loadingGalleries,
+    loadingCarImages,
+    loadingImageData,
 
     // Actions
-    setFilters,
-    setSearchQuery,
-    setSelectedImages,
-    setCurrentPage: handlePageChange,
-    setMainImage,
-    handleNext,
-    handlePrev,
-    toggleImageSelection,
-    setIsModalOpen,
-    setIsUploadDialogOpen,
-    setShowImageInfo,
-    setSelectedUrlOption,
-    handleUploadComplete,
-    handleDeleteSelected,
-    reanalyzeImage,
-    handleSetPrimaryImage,
-    mutate,
+    refetchImages,
+    refetchGalleries,
+    refetchCarImages,
+
+    // Metadata
+    imageStats,
+    projectId,
+    carId,
+
+    // Raw data (for debugging/advanced use)
+    galleriesData,
+    carImagesData,
+    imageMetadata,
   };
 }

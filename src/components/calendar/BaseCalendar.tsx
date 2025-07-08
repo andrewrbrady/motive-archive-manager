@@ -118,11 +118,13 @@ export interface BaseCalendarProps<T extends BaseCalendarEvent> {
   timeslots?: number;
   scrollToTime?: Date;
   popup?: boolean;
+  popupOffset?: number;
   selectable?: boolean;
   resizable?: boolean;
   draggable?: boolean;
   longPressThreshold?: number;
   dayLayoutAlgorithm?: DayLayoutAlgorithm | DayLayoutFunction<T>;
+  showAllEvents?: boolean;
   showFilterControls?: boolean;
   showVisibilityControls?: boolean;
   filterOptions?: FilterOptions;
@@ -173,7 +175,9 @@ export default function BaseCalendar<T extends BaseCalendarEvent>({
   step = 30,
   timeslots = 2,
   scrollToTime = new Date(0, 0, 0, 8, 0, 0),
-  popup = true,
+  popup = false, // Disable popup to show more events inline
+  popupOffset = 15, // Show up to 15 events before "show more" link - balanced for 180px height
+  showAllEvents = false, // Disable to maintain drag/drop - we'll use CSS height approach instead
   selectable = true,
   resizable = true,
   draggable = true,
@@ -605,12 +609,14 @@ export default function BaseCalendar<T extends BaseCalendarEvent>({
         resizableAccessor={(event) => resizable && !(event as T).allDay}
         showMultiDayTimes
         popup={popup}
+        popupOffset={popupOffset}
         timeslots={timeslots}
         step={step}
         defaultView={defaultView}
         dayLayoutAlgorithm={dayLayoutAlgorithm as any}
         scrollToTime={scrollToTime}
         longPressThreshold={longPressThreshold}
+        showAllEvents={showAllEvents}
         formats={{ ...defaultFormats, ...formats }}
         messages={{ ...defaultMessages, ...messages }}
       />

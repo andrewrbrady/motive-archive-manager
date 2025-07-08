@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     try {
       // Revoke the refresh token
       await oauth2Client.revokeToken(refreshToken);
-      console.log("✅ YouTube refresh token revoked successfully");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ YouTube refresh token revoked successfully");
     } catch (revokeError) {
       console.warn(
         "⚠️ Failed to revoke token (may already be invalid):",
@@ -69,7 +69,7 @@ async function removeEnvironmentToken() {
     try {
       envContent = fs.readFileSync(envPath, "utf8");
     } catch (error) {
-      console.log("No .env.local file found - nothing to remove");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("No .env.local file found - nothing to remove");
       return;
     }
 
@@ -82,7 +82,7 @@ async function removeEnvironmentToken() {
     // Write back to file
     fs.writeFileSync(envPath, filteredLines.join("\n"));
 
-    console.log("✅ Refresh token removed from environment file");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Refresh token removed from environment file");
   } catch (error) {
     console.error("❌ Failed to update environment file:", error);
     // Don't throw - this is not critical

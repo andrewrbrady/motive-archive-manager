@@ -40,6 +40,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import InspectionImageUpload from "@/components/ui/InspectionImageUpload";
 import DropboxImageBrowser from "@/components/ui/DropboxImageBrowser";
+import { getEnhancedImageUrl } from "@/lib/imageUtils";
 
 interface InspectionFormProps {
   carId: string;
@@ -464,7 +465,11 @@ export default function InspectionForm({
                   className="relative rounded-lg overflow-hidden border group"
                 >
                   <img
-                    src={`https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${imageId}/public`}
+                    src={getEnhancedImageUrl(
+                      `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${imageId}/public`,
+                      "400",
+                      "85"
+                    )}
                     alt="Inspection image"
                     className="w-full h-auto object-cover"
                   />

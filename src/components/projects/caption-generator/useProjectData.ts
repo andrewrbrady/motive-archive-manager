@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "@/components/ui/use-toast";
+import { useAPI } from "@/hooks/useAPI";
 import {
   ProjectCar,
   ProjectEvent,
@@ -17,15 +18,24 @@ import type { User } from "firebase/auth";
 
 interface UseProjectDataProps {
   projectId: string;
-  user?: User | null;
+  skipPromptTemplates?: boolean;
 }
 
-export function useProjectData({ projectId, user }: UseProjectDataProps) {
+export function useProjectData({
+  projectId,
+  skipPromptTemplates = false,
+}: UseProjectDataProps) {
+  const api = useAPI();
+
   // Car-related state
   const [projectCars, setProjectCars] = useState<ProjectCar[]>([]);
   const [selectedCarIds, setSelectedCarIds] = useState<string[]>([]);
   const [carDetails, setCarDetails] = useState<BaTCarDetails[]>([]);
   const [loadingCars, setLoadingCars] = useState(false);
+  const [
+    hasUserInteractedWithCarSelection,
+    setHasUserInteractedWithCarSelection,
+  ] = useState(false);
 
   // Event-related state
   const [projectEvents, setProjectEvents] = useState<ProjectEvent[]>([]);
@@ -83,32 +93,23 @@ export function useProjectData({ projectId, user }: UseProjectDataProps) {
   const [editingText, setEditingText] = useState<string>("");
 
   const fetchProjectCars = async () => {
+    if (!api) return;
+
     try {
       setLoadingCars(true);
 
-      if (!user) {
-        console.log("useProjectData: No user available for fetchProjectCars");
-        throw new Error("No authenticated user found");
-      }
-
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch(`/api/projects/${projectId}/cars`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch project cars");
-      }
-
-      const data = await response.json();
+      const data = (await api.get(`projects/${projectId}/cars`)) as {
+        cars: ProjectCar[];
+      };
       setProjectCars(data.cars || []);
 
-      // Auto-select all cars if none are selected
-      if (data.cars && data.cars.length > 0 && selectedCarIds.length === 0) {
+      // Auto-select all cars if none are selected AND user hasn't interacted yet
+      if (
+        data.cars &&
+        data.cars.length > 0 &&
+        selectedCarIds.length === 0 &&
+        !hasUserInteractedWithCarSelection
+      ) {
         setSelectedCarIds(data.cars.map((car: ProjectCar) => car._id));
       }
     } catch (error) {
@@ -124,11 +125,11 @@ export function useProjectData({ projectId, user }: UseProjectDataProps) {
   };
 
   const fetchCarDetails = async () => {
+    if (!api) return;
+
     try {
       const carDetailsPromises = selectedCarIds.map(async (carId) => {
-        const response = await fetch(`/api/cars/${carId}`);
-        if (!response.ok) throw new Error(`Failed to fetch car ${carId}`);
-        return response.json();
+        return (await api.get(`cars/${carId}`)) as BaTCarDetails;
       });
 
       const details = await Promise.all(carDetailsPromises);
@@ -144,28 +145,14 @@ export function useProjectData({ projectId, user }: UseProjectDataProps) {
   };
 
   const fetchProjectEvents = async () => {
+    if (!api) return;
+
     try {
       setLoadingEvents(true);
 
-      if (!user) {
-        console.log("useProjectData: No user available for fetchProjectEvents");
-        throw new Error("No authenticated user found");
-      }
-
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch(`/api/projects/${projectId}/events`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch project events");
-      }
-
-      const data = await response.json();
+      const data = (await api.get(
+        `projects/${projectId}/events`
+      )) as ProjectEvent[];
       setProjectEvents(data || []);
     } catch (error) {
       console.error("Error fetching project events:", error);
@@ -199,29 +186,13 @@ export function useProjectData({ projectId, user }: UseProjectDataProps) {
   };
 
   const fetchSystemPrompts = async () => {
+    if (!api) return;
+
     try {
       setLoadingSystemPrompts(true);
       setSystemPromptError(null);
 
-      if (!user) {
-        console.log("useProjectData: No user available for fetchSystemPrompts");
-        throw new Error("No authenticated user found");
-      }
-
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch("/api/system-prompts/list", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch system prompts");
-      }
-
-      const data = await response.json();
+      const data = (await api.get("system-prompts/list")) as SystemPrompt[];
       setSystemPrompts(Array.isArray(data) ? data : []);
 
       // Auto-select the first active system prompt if available
@@ -240,14 +211,10 @@ export function useProjectData({ projectId, user }: UseProjectDataProps) {
   };
 
   const fetchLengthSettings = async () => {
+    if (!api) return;
+
     try {
-      const response = await fetch("/api/length-settings");
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch length settings");
-      }
-
-      const data = await response.json();
+      const data = (await api.get("length-settings")) as LengthSetting[];
       setLengthSettings(data);
     } catch (error) {
       console.error("Error fetching length settings:", error);
@@ -255,16 +222,13 @@ export function useProjectData({ projectId, user }: UseProjectDataProps) {
   };
 
   const fetchPromptTemplates = async () => {
+    if (!api) return;
+
     try {
       setPromptLoading(true);
       setPromptError(null);
-      const response = await fetch("/api/caption-prompts");
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch prompt templates");
-      }
-
-      const data = await response.json();
+      const data = (await api.get("caption-prompts")) as PromptTemplate[];
       setPromptList(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching prompt templates:", error);
@@ -275,57 +239,54 @@ export function useProjectData({ projectId, user }: UseProjectDataProps) {
   };
 
   const fetchProjectCaptions = async () => {
+    if (!api) return;
+
     try {
-      if (!user) {
-        console.log(
-          "useProjectData: No user available for fetchProjectCaptions"
-        );
-        throw new Error("No authenticated user found");
-      }
-
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch(`/api/projects/${projectId}/captions`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error("Failed to fetch project captions");
-      }
-      const captions = await response.json();
+      const captions = (await api.get(
+        `projects/${projectId}/captions`
+      )) as SavedCaption[];
       setSavedCaptions(captions);
     } catch (err) {
       console.error("Error fetching project captions:", err);
     }
   };
 
-  // Fetch project data when projectId changes
+  // Fetch all data when component mounts or projectId changes
   useEffect(() => {
-    if (projectId && user) {
-      fetchProjectCars();
-      fetchProjectEvents();
-      fetchProjectCaptions();
-    }
-  }, [projectId, user]);
+    if (!api) return;
 
-  // Fetch system prompts when component mounts
-  useEffect(() => {
-    if (user) {
-      fetchSystemPrompts();
-    }
-  }, [user]);
+    const fetchAllData = async () => {
+      console.time("useProjectData-parallel-fetch");
+      try {
+        // Create array of promises for parallel execution
+        const promises = [];
 
-  // Fetch length settings when component mounts
-  useEffect(() => {
-    fetchLengthSettings();
-  }, []);
+        // Project-specific data (only if projectId exists)
+        if (projectId) {
+          promises.push(
+            fetchProjectCars(),
+            fetchProjectEvents(),
+            fetchProjectCaptions()
+          );
+        }
 
-  // Fetch prompt templates when component mounts
-  useEffect(() => {
-    fetchPromptTemplates();
-  }, []);
+        // Global data (always fetch)
+        promises.push(fetchSystemPrompts(), fetchLengthSettings());
+
+        if (!skipPromptTemplates) {
+          promises.push(fetchPromptTemplates());
+        }
+
+        await Promise.all(promises);
+      } catch (error) {
+        console.error("Error in parallel fetch:", error);
+      } finally {
+        console.timeEnd("useProjectData-parallel-fetch");
+      }
+    };
+
+    fetchAllData();
+  }, [projectId, api, skipPromptTemplates]);
 
   // Fetch detailed car information when selected cars change
   useEffect(() => {
@@ -359,6 +320,7 @@ export function useProjectData({ projectId, user }: UseProjectDataProps) {
   }, [selectedPrompt]);
 
   const handleCarSelection = (carId: string) => {
+    setHasUserInteractedWithCarSelection(true);
     setSelectedCarIds((prev) => {
       if (prev.includes(carId)) {
         return prev.filter((id) => id !== carId);
@@ -369,11 +331,14 @@ export function useProjectData({ projectId, user }: UseProjectDataProps) {
   };
 
   const handleSelectAllCars = () => {
-    if (selectedCarIds.length === projectCars.length) {
-      setSelectedCarIds([]);
-    } else {
-      setSelectedCarIds(projectCars.map((car) => car._id));
-    }
+    setHasUserInteractedWithCarSelection(true);
+    setSelectedCarIds((prevSelected) => {
+      if (prevSelected.length === projectCars.length) {
+        return [];
+      } else {
+        return projectCars.map((car) => car._id);
+      }
+    });
   };
 
   const handleEventSelection = (eventId: string) => {

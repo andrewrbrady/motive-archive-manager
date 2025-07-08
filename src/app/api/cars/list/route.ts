@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { ObjectId } from "mongodb";
 import { createDynamicResponse } from "@/lib/cache-utils";
 
@@ -142,7 +142,7 @@ export async function GET(request: Request) {
       primaryImage: car.primaryImage
         ? {
             ...car.primaryImage,
-            url: getFormattedImageUrl(car.primaryImage.url, "thumbnail"), // Use smaller thumbnail for list
+            url: fixCloudflareImageUrl(car.primaryImage.url), // Simple fix for Cloudflare URLs
           }
         : null,
     }));

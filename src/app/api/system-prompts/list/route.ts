@@ -38,6 +38,7 @@ async function getSystemPromptsList(request: NextRequest) {
       ];
     }
 
+    // Optimized query with field projection and limit
     const systemPrompts = await db
       .collection("systemPrompts")
       .find(filter)

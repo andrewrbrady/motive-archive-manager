@@ -85,7 +85,7 @@ export function UrlModal({
 
   // Handle closing the modal
   const handleClose = () => {
-    // [REMOVED] // [REMOVED] console.log("UrlModal handleClose called, preserveParams:", preserveParams);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("UrlModal handleClose called, preserveParams:", preserveParams);
 
     // Set isOpen to false immediately for better UX
     setIsOpen(false);
@@ -131,7 +131,7 @@ export function UrlModal({
     };
   }, [isOpen]);
 
-  // [REMOVED] // [REMOVED] console.log("UrlModal final isOpen state:", isOpen);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("UrlModal final isOpen state:", isOpen);
 
   if (!isOpen) return null;
 

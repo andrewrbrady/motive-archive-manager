@@ -1,0 +1,76 @@
+{
+  "extends": "next/core-web-vitals",
+  "ignorePatterns": ["src/components/MDXEditor.tsx"],
+  "rules": {
+    "react/no-unescaped-entities": ["error", { "forbid": [">", "}"] }],
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-debugger": "error",
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.name='fetch']",
+        "message": "⚠️  NUCLEAR AUTH WARNING: Direct fetch() calls should be reviewed. For /api/* endpoints, use the authenticated API client from 'hooks/useAPI' instead. Example: const api = useAPI(); const data = await api.get('/your-endpoint');"
+      },
+      {
+        "selector": "Property[key.name='Authorization']",
+        "message": "❌ NUCLEAR AUTH VIOLATION: Manual Authorization headers are forbidden. The authenticated API client handles this automatically. Use useAPI() instead."
+      },
+      {
+        "selector": "Property[key.value='Authorization']",
+        "message": "❌ NUCLEAR AUTH VIOLATION: Manual Authorization headers are forbidden. The authenticated API client handles this automatically. Use useAPI() instead."
+      },
+      {
+        "selector": "CallExpression[callee.name='useAuthenticatedFetch']",
+        "message": "❌ NUCLEAR AUTH VIOLATION: useAuthenticatedFetch has been removed. Use the new authenticated API client from 'hooks/useAPI' instead."
+      }
+    ],
+    "no-restricted-imports": [
+      "error",
+      {
+        "name": "lib/fetcher",
+        "importNames": ["useAPI"],
+        "message": "❌ NUCLEAR AUTH VIOLATION: The legacy useAPI from 'lib/fetcher' is forbidden. Use the new authenticated useAPI from 'hooks/useAPI' instead."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["*.ts", "*.tsx"],
+      "rules": {
+        "no-console": ["warn", { "allow": ["warn", "error"] }]
+      }
+    },
+    {
+      "files": [
+        "src/app/api/**/*",
+        "src/lib/**/*",
+        "src/scripts/**/*",
+        "scripts/**/*",
+        "*.config.js",
+        "*.config.ts",
+        "src/auth.ts",
+        "src/auth.config.ts"
+      ],
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
+      "files": [
+        "src/lib/api-client.ts",
+        "src/app/api/**/*",
+        "src/lib/auth/**/*",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "src/scripts/**/*",
+        "scripts/**/*"
+      ],
+      "rules": {
+        "no-restricted-syntax": "off",
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
+}

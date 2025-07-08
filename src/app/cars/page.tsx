@@ -1,10 +1,10 @@
 import React from "react";
 import { Metadata } from "next";
-import CarsPageClient from "./CarsPageClient";
+import CarsPageOptimized from "./CarsPageOptimized";
 
-// Make this page dynamic to avoid database connection issues during build
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+// ✅ PERFORMANCE OPTIMIZATION: Enable static generation with revalidation
+// This allows Next.js to cache the page and revalidate every 5 minutes
+export const revalidate = 300; // 5 minutes
 
 export const metadata: Metadata = {
   title: "Cars Collection | Motive Archive Manager",
@@ -48,39 +48,26 @@ export default async function CarsPage(props: any) {
       }
     });
 
-    // Return the client component without server-side data fetching
-    // All data will be fetched on the client side to avoid build-time database connections
+    // ✅ Use optimized component with progressive loading
     return (
-      <CarsPageClient
-        cars={[]} // Empty initial state
-        totalPages={1}
+      <CarsPageOptimized
         currentPage={page}
         pageSize={pageSize}
-        totalCount={0}
         view={view}
         isEditMode={isEditMode}
         filters={filters}
-        makes={[]} // Empty initial state
-        clients={[]} // Empty initial state
-        shouldFetchData={true} // Flag to indicate client should fetch data
       />
     );
   } catch (error) {
     console.error("Error in CarsPage:", error);
     // Return a fallback page instead of throwing
     return (
-      <CarsPageClient
-        cars={[]}
-        totalPages={1}
+      <CarsPageOptimized
         currentPage={1}
         pageSize={48}
-        totalCount={0}
         view="grid"
         isEditMode={false}
         filters={{}}
-        makes={[]}
-        clients={[]}
-        shouldFetchData={true}
       />
     );
   }

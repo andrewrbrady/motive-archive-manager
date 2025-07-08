@@ -19,6 +19,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { useAPI } from "@/hooks/useAPI";
 
 interface YouTubeChannel {
   id: string;
@@ -37,6 +38,7 @@ interface AuthStatus {
 }
 
 export default function YouTubeAuthComponent() {
+  const api = useAPI();
   const [authStatus, setAuthStatus] = useState<AuthStatus>({
     isAuthenticated: false,
     channels: [],
@@ -46,25 +48,20 @@ export default function YouTubeAuthComponent() {
 
   // Check current authentication status
   const checkAuthStatus = async () => {
-    try {
-      const response = await fetch("/api/youtube/auth/status");
-      const data = await response.json();
+    if (!api) {
+      setLoading(false);
+      return;
+    }
 
-      if (response.ok) {
-        setAuthStatus(data);
-      } else {
-        setAuthStatus({
-          isAuthenticated: false,
-          channels: [],
-          error: data.error,
-        });
-      }
-    } catch (error) {
+    try {
+      const data = (await api.get("youtube/auth/status")) as AuthStatus;
+      setAuthStatus(data);
+    } catch (error: any) {
       console.error("Error checking auth status:", error);
       setAuthStatus({
         isAuthenticated: false,
         channels: [],
-        error: "Failed to check authentication status",
+        error: error.message || "Failed to check authentication status",
       });
     } finally {
       setLoading(false);
@@ -73,20 +70,27 @@ export default function YouTubeAuthComponent() {
 
   // Start YouTube authentication
   const startAuthentication = async () => {
+    if (!api) {
+      toast.error("Authentication required");
+      return;
+    }
+
     try {
       setAuthenticating(true);
-      const response = await fetch("/api/youtube/auth/start");
-      const data = await response.json();
+      const data = (await api.get("youtube/auth/start")) as {
+        auth_url?: string;
+        error?: string;
+      };
 
-      if (response.ok && data.auth_url) {
+      if (data.auth_url) {
         // Open OAuth URL in same window
         window.location.href = data.auth_url;
       } else {
         toast.error(data.error || "Failed to start authentication");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error starting authentication:", error);
-      toast.error("Failed to start authentication");
+      toast.error(error.message || "Failed to start authentication");
     } finally {
       setAuthenticating(false);
     }
@@ -94,30 +98,28 @@ export default function YouTubeAuthComponent() {
 
   // Revoke authentication
   const revokeAuthentication = async () => {
+    if (!api) {
+      toast.error("Authentication required");
+      return;
+    }
+
     try {
-      const response = await fetch("/api/youtube/auth/revoke", {
-        method: "POST",
+      await api.post("youtube/auth/revoke");
+      toast.success("Authentication revoked successfully");
+      setAuthStatus({
+        isAuthenticated: false,
+        channels: [],
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        toast.success("Authentication revoked successfully");
-        setAuthStatus({
-          isAuthenticated: false,
-          channels: [],
-        });
-      } else {
-        toast.error(data.error || "Failed to revoke authentication");
-      }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error revoking authentication:", error);
-      toast.error("Failed to revoke authentication");
+      toast.error(error.message || "Failed to revoke authentication");
     }
   };
 
   // Check for OAuth callback on component mount
   useEffect(() => {
+    if (!api) return; // Guard clause inside hook
+
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get("code");
     const error = urlParams.get("error");
@@ -136,7 +138,16 @@ export default function YouTubeAuthComponent() {
     } else {
       checkAuthStatus();
     }
-  }, []);
+  }, [api]);
+
+  if (!api) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <AlertCircle className="h-6 w-6 mr-2" />
+        <span>Authentication required to manage YouTube integration</span>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

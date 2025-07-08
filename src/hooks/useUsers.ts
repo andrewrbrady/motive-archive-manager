@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { FirestoreUser } from "@/lib/firestore/users";
-import { useAPI } from "@/lib/fetcher";
+import { useAPI } from "@/hooks/useAPI";
 
 export function useUsers() {
   const api = useAPI();
 
   const fetchUsers = async (): Promise<FirestoreUser[]> => {
-    const data = await api.get("/api/users");
+    if (!api) throw new Error("Authentication required");
+
+    const data: any = await api.get("/api/users");
 
     // Handle the correct API response structure: { users: [...], total: number }
     if (data.users && Array.isArray(data.users)) {
@@ -22,5 +24,6 @@ export function useUsers() {
   return useQuery({
     queryKey: ["users"],
     queryFn: fetchUsers,
+    enabled: !!api, // Only run query when API client is available
   });
 }

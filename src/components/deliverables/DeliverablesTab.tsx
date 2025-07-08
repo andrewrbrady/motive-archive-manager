@@ -3,14 +3,20 @@ import { Deliverable } from "@/types/deliverable";
 import { DeliverablesTabProps } from "./deliverables-tab/types";
 import { useDeliverables } from "./deliverables-tab/hooks/useDeliverables";
 import { useBatchMode } from "./deliverables-tab/hooks/useBatchMode";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 import DeliverablesHeader from "./deliverables-tab/components/DeliverablesHeader";
 import DeliverableCard from "./deliverables-tab/components/DeliverableCard";
 import DeliverablesTable from "./deliverables-tab/components/DeliverablesTable";
+import ResizableDeliverablesTable from "./deliverables-tab/components/ResizableDeliverablesTable";
 import DeliverableModal from "./deliverables-tab/components/DeliverableModal";
 import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
+/**
+ * DeliverablesTab - Phase 2 optimized deliverables component
+ * Implements non-blocking loading states and error handling following Phase 1 patterns
+ */
 export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   const [selectedDeliverable, setSelectedDeliverable] =
     useState<Deliverable | null>(null);
@@ -21,10 +27,10 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   // Get the actual carId string
   const actualCarId = Array.isArray(carId) ? carId[0] : carId;
 
-  // Initialize authenticated fetch hook
-  const { authenticatedFetch } = useAuthenticatedFetch();
+  // Initialize API client
+  const api = useAPI();
 
-  // Use our custom hooks
+  // Use our optimized custom hooks - now non-blocking
   const {
     deliverables,
     isLoading,
@@ -52,20 +58,19 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
   };
 
   const handleJsonSubmit = async (jsonData: any[]) => {
+    if (!api) return;
+
     try {
       setIsSubmittingJson(true);
 
-      const response = await authenticatedFetch(
-        `/api/cars/${actualCarId}/deliverables/batch`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ deliverables: jsonData }),
-        }
-      );
+      const result = (await api.post(
+        `/api/cars/${actualCarId}/deliverables/batch-relaxed`,
+        { deliverables: jsonData }
+      )) as any;
 
-      const result = await response.json();
-      toast.success(`Successfully created ${result.count} deliverables`);
+      toast.success(
+        `Successfully created ${result.count} deliverables with relaxed validation`
+      );
 
       // Refresh the deliverables list
       fetchDeliverables();
@@ -80,7 +85,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     }
   };
 
-  // Actions object for components
+  // Actions for child components
   const actions = {
     onEdit: (deliverable: Deliverable) => {
       // Edit functionality is handled by EditDeliverableForm component
@@ -88,6 +93,7 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
     onDelete: handleDelete,
     onDuplicate: handleDuplicate,
     onStatusChange: handleStatusChange,
+    onRefresh: fetchDeliverables,
   };
 
   return (
@@ -100,18 +106,24 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         onShowJsonUpload={() => setShowJsonUpload(true)}
       />
 
+      {/* Phase 2 improvement: Non-blocking loading state with tab switching message */}
+      {isLoading && (
+        <div className="bg-muted/30 border border-muted rounded-md p-4">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm text-muted-foreground">
+              Loading deliverables...
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            You can switch tabs while this loads
+          </p>
+        </div>
+      )}
+
       {/* Mobile View - Cards */}
       <div className="block md:hidden space-y-3">
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <div className="text-center">
-              <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-2"></div>
-              <p className="text-sm text-muted-foreground">
-                Loading deliverables...
-              </p>
-            </div>
-          </div>
-        ) : deliverables.length === 0 ? (
+        {!isLoading && deliverables.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-sm text-muted-foreground">
               No deliverables found. Create your first one!
@@ -131,12 +143,13 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         )}
       </div>
 
-      {/* Desktop View - Table */}
-      <DeliverablesTable
+      {/* Desktop View - Table with Resizable Columns */}
+      <ResizableDeliverablesTable
         deliverables={deliverables}
         isLoading={isLoading}
         actions={actions}
         batchMode={batchMode}
+        onOpenModal={handleOpenModal}
       />
 
       {/* Detail Modal */}
@@ -152,9 +165,9 @@ export default function DeliverablesTab({ carId }: DeliverablesTabProps) {
         isOpen={showJsonUpload}
         onClose={() => setShowJsonUpload(false)}
         onSubmit={handleJsonSubmit}
-        title="Batch Create Deliverables from JSON"
-        description="Upload a JSON file or paste JSON data to create multiple deliverables at once. The JSON should be an array of deliverable objects."
-        expectedType="deliverables"
+        title="Batch Create Deliverables from JSON (Relaxed)"
+        description="Upload a JSON file or paste JSON data to create multiple deliverables at once. The JSON should be an array of deliverable objects with minimal validation - only title is required. Platform and editor assignments can be done later."
+        expectedType="deliverables-relaxed"
         isSubmitting={isSubmittingJson}
       />
     </div>

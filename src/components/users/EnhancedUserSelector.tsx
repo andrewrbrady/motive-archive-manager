@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useQuery, UseQueryResult } from "@tanstack/react-query";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 import {
   Select,
   SelectContent,
@@ -13,7 +13,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, User, UserMinus } from "lucide-react";
 import { FirestoreUser } from "@/types/firebase";
-import { getUsers } from "@/lib/users/cache";
 
 interface EnhancedUserSelectorProps {
   value: string | null;
@@ -48,32 +47,32 @@ export default function EnhancedUserSelector({
   side = "top",
   editorName,
 }: EnhancedUserSelectorProps) {
-  // Use React Query for data fetching and caching
+  // Use React Query for data fetching and caching with our authenticated API client
   const {
-    data: users = [],
+    data: usersResponse,
     isLoading,
     error,
     refetch,
-  }: UseQueryResult<FirestoreUser[], Error> = useQuery({
-    queryKey: ["users"],
-    queryFn: async (): Promise<FirestoreUser[]> => {
-      // [REMOVED] // [REMOVED] console.log("Fetching all users");
-      const fetchedUsers = await getUsers();
-      // [REMOVED] // [REMOVED] console.log("Fetched users:", fetchedUsers);
-
-      // Only filter out OAuth IDs and inactive users
-      const filteredUsers = fetchedUsers.filter((user: FirestoreUser) => {
-        const hasOAuthId = user.uid && /^\d{21,}$/.test(user.uid);
-        const isActive = user.status === "active";
-        return !hasOAuthId && isActive;
-      });
-
-      // [REMOVED] // [REMOVED] console.log("Filtered users:", filteredUsers);
-      return filteredUsers;
-    },
+  } = useAPIQuery<{ users?: FirestoreUser[] } | FirestoreUser[]>("/users", {
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
     gcTime: 30 * 60 * 1000, // Keep unused data in cache for 30 minutes
   });
+
+  // Handle both API response formats and filter users
+  const users = useMemo(() => {
+    const allUsers = Array.isArray(usersResponse)
+      ? usersResponse
+      : usersResponse?.users || [];
+
+    // Filter out OAuth IDs and inactive users like the server-side function did
+    return allUsers.filter((user: FirestoreUser) => {
+      if (!user || typeof user !== "object" || !user.uid) return false;
+
+      const hasOAuthId = user.uid && /^\d{21,}$/.test(user.uid);
+      const isActive = user.status === "active";
+      return !hasOAuthId && isActive;
+    });
+  }, [usersResponse]);
 
   // No need to filter by creative role anymore
   const filteredUsers = users;

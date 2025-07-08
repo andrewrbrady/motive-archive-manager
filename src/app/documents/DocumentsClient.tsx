@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { Pencil, Trash2 } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
 
 interface Document {
   _id: string;
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export default function DocumentsClient({ carId, initialDocuments }: Props) {
+  const api = useAPI();
   const router = useRouter();
   const [documents, setDocuments] = useState(initialDocuments);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -31,29 +33,25 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
   const [documentToEdit, setDocumentToEdit] = useState<Document | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
+  if (!api) return <div>Loading...</div>;
+
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
 
     try {
-      const response = await fetch("/api/documents", {
-        method: "POST",
-        body: JSON.stringify({
-          carId,
-          merchant: {
-            name: formData.get("merchantName"),
-          },
-          transaction: {
-            date: formData.get("date"),
-            total: parseFloat(formData.get("total") as string),
-          },
-          items: [],
-        }),
-      });
+      const newDocument = (await api.post("documents", {
+        carId,
+        merchant: {
+          name: formData.get("merchantName"),
+        },
+        transaction: {
+          date: formData.get("date"),
+          total: parseFloat(formData.get("total") as string),
+        },
+        items: [],
+      })) as Document;
 
-      if (!response.ok) throw new Error("Failed to create document");
-
-      const newDocument = await response.json();
       setDocuments([...documents, newDocument]);
       setIsAddModalOpen(false);
       router.refresh();
@@ -69,9 +67,9 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
     const formData = new FormData(e.currentTarget);
 
     try {
-      const response = await fetch(`/api/documents/${documentToEdit._id}`, {
-        method: "PUT",
-        body: JSON.stringify({
+      const updatedDocument = (await api.put(
+        `documents/${documentToEdit._id}`,
+        {
           merchant: {
             name: formData.get("merchantName"),
           },
@@ -79,12 +77,9 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
             date: formData.get("date"),
             total: parseFloat(formData.get("total") as string),
           },
-        }),
-      });
+        }
+      )) as Document;
 
-      if (!response.ok) throw new Error("Failed to update document");
-
-      const updatedDocument = await response.json();
       setDocuments(
         documents.map((doc) =>
           doc._id === updatedDocument._id ? updatedDocument : doc
@@ -101,18 +96,7 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
     if (!documentToDelete) return;
 
     try {
-      const response = await fetch(`/api/documents/${documentToDelete}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ carId }), // Add carId to help backend identify relationship
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to delete document");
-      }
+      await api.deleteWithBody(`documents/${documentToDelete}`, { carId });
 
       // Only update UI after successful deletion
       setDocuments((prev) =>
@@ -144,7 +128,10 @@ export default function DocumentsClient({ carId, initialDocuments }: Props) {
           </thead>
           <tbody>
             {documents.map((doc) => (
-              <tr key={doc._id} className="bg-[var(--background-primary)] border-b hover:bg-[hsl(var(--background))]">
+              <tr
+                key={doc._id}
+                className="bg-[var(--background-primary)] border-b hover:bg-[hsl(var(--background))]"
+              >
                 <td className="px-6 py-4">
                   {format(new Date(doc.transaction.date), "MMM d, yyyy")}
                 </td>

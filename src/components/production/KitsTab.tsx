@@ -48,9 +48,22 @@ import DeleteConfirmationDialog from "../DeleteConfirmationDialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
+
+// TypeScript interfaces for API responses
+interface KitsResponse {
+  data?: Kit[];
+  [key: string]: any;
+}
+
+interface StudioInventoryResponse {
+  data?: any[];
+  [key: string]: any;
+}
 
 export default function KitsTab() {
-  const { toast } = useToast();
+  const { toast: uiToast } = useToast();
   const [kits, setKits] = useState<Kit[]>([]);
   const [filteredKits, setFilteredKits] = useState<Kit[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -80,6 +93,9 @@ export default function KitsTab() {
   const [inventoryItems, setInventoryItems] = useState<any[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
 
+  // Add useAPI hook
+  const api = useAPI();
+
   // Derived state for selected items
   const formSelectedItems = useMemo(() => {
     return Object.keys(selectedItemsMap).filter((id) => selectedItemsMap[id]);
@@ -87,8 +103,9 @@ export default function KitsTab() {
 
   // Fetch kits on component mount
   useEffect(() => {
+    if (!api) return;
     fetchKits();
-  }, []);
+  }, [api]);
 
   // Filter kits when search query or status filter changes
   useEffect(() => {
@@ -97,12 +114,14 @@ export default function KitsTab() {
 
   // Reset form when opening create/edit modal
   useEffect(() => {
+    if (!api) return;
+
     if (isCreateModalOpen) {
-      // [REMOVED] // [REMOVED] console.log("Modal opened, initializing form state");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Modal opened, initializing form state");
 
       if (currentKit) {
         // Edit mode - populate form with current kit data
-        // [REMOVED] // [REMOVED] console.log("Edit mode for kit:", currentKit);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Edit mode for kit:", currentKit);
         setFormName(currentKit.name || "");
         setFormDescription(currentKit.description || "");
         setFormStatus(currentKit.status || "available");
@@ -115,11 +134,11 @@ export default function KitsTab() {
         kitItems.forEach((id) => {
           itemsMap[id] = true;
         });
-        // [REMOVED] // [REMOVED] console.log("Setting selected items map:", itemsMap);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Setting selected items map:", itemsMap);
         setSelectedItemsMap(itemsMap);
       } else {
         // Create mode - reset form to defaults
-        // [REMOVED] // [REMOVED] console.log("Create mode - resetting form");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Create mode - resetting form");
         setFormName("");
         setFormDescription("");
         setFormStatus("available");
@@ -130,10 +149,19 @@ export default function KitsTab() {
       fetchInventoryItems();
     } else {
       // Modal closed, clear selections
-      // [REMOVED] // [REMOVED] console.log("Modal closed, clearing form state");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Modal closed, clearing form state");
       setSelectedItemsMap({});
     }
-  }, [isCreateModalOpen, currentKit]);
+  }, [isCreateModalOpen, currentKit, api]);
+
+  // Authentication check
+  if (!api) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   // Filter inventory items based on search query
   const filteredInventoryItems = inventoryItems.filter((item) => {
@@ -146,7 +174,7 @@ export default function KitsTab() {
       item.model?.toLowerCase().includes(query);
     // Debug: Log the item ID to ensure it exists and is correct
     if (isCreateModalOpen && matches) {
-      // [REMOVED] // [REMOVED] console.log("Matched item:", item.id, item.name);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Matched item:", item.id, item.name);
     }
     return matches;
   });
@@ -154,15 +182,14 @@ export default function KitsTab() {
   const fetchKits = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/kits");
-      if (!response.ok) {
-        throw new Error("Failed to fetch kits");
-      }
-      const data = await response.json();
+      const response = (await api.get("kits")) as KitsResponse;
+      const data = Array.isArray(response)
+        ? (response as Kit[])
+        : ((response.data || []) as Kit[]);
       setKits(data);
     } catch (error) {
       console.error("Error fetching kits:", error);
-      toast({
+      uiToast({
         title: "Error",
         description: "Failed to load kits. Please try again.",
         variant: "destructive",
@@ -198,28 +225,18 @@ export default function KitsTab() {
 
   const handleCreateKit = async (newKit: Partial<Kit>) => {
     try {
-      const response = await fetch("/api/kits", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newKit),
-      });
+      const response = (await api.post("kits", newKit)) as Kit;
 
-      if (!response.ok) {
-        throw new Error("Failed to create kit");
-      }
-
-      const createdKit = await response.json();
+      const createdKit = response;
       setKits([...kits, createdKit]);
       setIsCreateModalOpen(false);
-      toast({
+      uiToast({
         title: "Success",
         description: "Kit created successfully",
       });
     } catch (error) {
       console.error("Error creating kit:", error);
-      toast({
+      uiToast({
         title: "Error",
         description: "Failed to create kit. Please try again.",
         variant: "destructive",
@@ -229,28 +246,21 @@ export default function KitsTab() {
 
   const handleUpdateKit = async (updatedKit: Kit) => {
     try {
-      const response = await fetch(`/api/kits/${updatedKit.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedKit),
-      });
+      const response = (await api.put(
+        `kits/${updatedKit.id}`,
+        updatedKit
+      )) as Kit;
 
-      if (!response.ok) {
-        throw new Error("Failed to update kit");
-      }
-
-      const updated = await response.json();
+      const updated = response;
       setKits(kits.map((kit) => (kit.id === updated.id ? updated : kit)));
       setIsCreateModalOpen(false);
-      toast({
+      uiToast({
         title: "Success",
         description: "Kit updated successfully",
       });
     } catch (error) {
       console.error("Error updating kit:", error);
-      toast({
+      uiToast({
         title: "Error",
         description: "Failed to update kit. Please try again.",
         variant: "destructive",
@@ -262,24 +272,18 @@ export default function KitsTab() {
     if (!currentKit) return;
 
     try {
-      const response = await fetch(`/api/kits/${currentKit.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete kit");
-      }
+      await api.delete(`kits/${currentKit.id}`);
 
       setKits(kits.filter((kit) => kit.id !== currentKit.id));
       setIsDeleteDialogOpen(false);
       setCurrentKit(null);
-      toast({
+      uiToast({
         title: "Success",
         description: "Kit deleted successfully",
       });
     } catch (error) {
       console.error("Error deleting kit:", error);
-      toast({
+      uiToast({
         title: "Error",
         description: "Failed to delete kit. Please try again.",
         variant: "destructive",
@@ -310,11 +314,8 @@ export default function KitsTab() {
   // Fetch detailed kit information including items
   const fetchKitDetails = async (kitId: string, forCheckout = false) => {
     try {
-      const response = await fetch(`/api/kits/${kitId}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch kit details");
-      }
-      const kitDetails = await response.json();
+      const response = (await api.get(`kits/${kitId}`)) as Kit;
+      const kitDetails = response;
       setCurrentKit(kitDetails);
 
       if (forCheckout) {
@@ -324,7 +325,7 @@ export default function KitsTab() {
       }
     } catch (error) {
       console.error("Error fetching kit details:", error);
-      toast({
+      uiToast({
         title: "Error",
         description: "Failed to load kit details. Please try again.",
         variant: "destructive",
@@ -417,7 +418,7 @@ export default function KitsTab() {
     link.click();
     document.body.removeChild(link);
 
-    toast({
+    uiToast({
       title: "Export Successful",
       description: `Exported ${kitsToExport.length} kits to CSV`,
     });
@@ -427,11 +428,10 @@ export default function KitsTab() {
   const fetchInventoryItems = async () => {
     setIsLoadingItems(true);
     try {
-      const response = await fetch("/api/studio_inventory");
-      if (!response.ok) {
-        throw new Error("Failed to fetch inventory items");
-      }
-      const data = await response.json();
+      const response = (await api.get(
+        "studio_inventory"
+      )) as StudioInventoryResponse;
+      const data = Array.isArray(response) ? response : response.data || [];
 
       // Process the items to ensure they all have a proper id
       const processedItems = data.map((item: any) => ({
@@ -440,7 +440,7 @@ export default function KitsTab() {
         id: item.id || item._id,
       }));
 
-      // [REMOVED] // [REMOVED] console.log("Fetched items sample:", processedItems.slice(0, 3));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetched items sample:", processedItems.slice(0, 3));
 
       // Filter out items that are already in other kits
       const availableItems = processedItems.filter(
@@ -452,7 +452,7 @@ export default function KitsTab() {
       setInventoryItems(availableItems);
     } catch (error) {
       console.error("Error fetching inventory items:", error);
-      toast({
+      uiToast({
         title: "Error",
         description: "Failed to load inventory items. Please try again.",
         variant: "destructive",
@@ -464,12 +464,12 @@ export default function KitsTab() {
 
   // Toggle selection of an inventory item with new approach
   const toggleItemSelection = (itemId: string) => {
-    // [REMOVED] // [REMOVED] console.log("Toggling item:", itemId);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Toggling item:", itemId);
 
     setSelectedItemsMap((prev) => {
       const newMap = { ...prev };
       newMap[itemId] = !prev[itemId];
-      // [REMOVED] // [REMOVED] console.log("New selection map:", newMap);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("New selection map:", newMap);
       return newMap;
     });
   };
@@ -477,7 +477,7 @@ export default function KitsTab() {
   // Handle form submission with updated selection approach
   const handleSubmitForm = () => {
     if (!formName.trim()) {
-      toast({
+      uiToast({
         title: "Validation Error",
         description: "Please enter a kit name",
         variant: "destructive",
@@ -486,7 +486,7 @@ export default function KitsTab() {
     }
 
     if (formSelectedItems.length === 0) {
-      toast({
+      uiToast({
         title: "Validation Error",
         description: "Please select at least one item for the kit",
         variant: "destructive",
@@ -757,9 +757,9 @@ export default function KitsTab() {
           <Dialog
             open={isCreateModalOpen}
             onOpenChange={(open) => {
-              // [REMOVED] // [REMOVED] console.log("Dialog onOpenChange:", open);
+              // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Dialog onOpenChange:", open);
               if (!open) {
-                // [REMOVED] // [REMOVED] console.log("Dialog closing, cleaning up state");
+                // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Dialog closing, cleaning up state");
                 setSelectedItemsMap({});
                 setIsCreateModalOpen(false);
                 setCurrentKit(null);
@@ -850,7 +850,7 @@ export default function KitsTab() {
                       <div className="flex flex-col gap-2">
                         {filteredInventoryItems.map((item) => {
                           // Debug: Log each item being rendered
-                          // [REMOVED] // [REMOVED] console.log("Rendering item:", item.id, item.name);
+                          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Rendering item:", item.id, item.name);
                           const isSelected = !!selectedItemsMap[item.id];
 
                           return (

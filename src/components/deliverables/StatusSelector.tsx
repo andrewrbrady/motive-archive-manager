@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/select";
 import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAPI } from "@/hooks/useAPI";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 interface StatusSelectorProps {
   deliverableId: string;
@@ -27,25 +29,31 @@ export function StatusSelector({
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ PERFORMANCE: Lazy API initialization - only get API when user actually interacts
+  const [needsAPI, setNeedsAPI] = useState(false);
+  const api = useAPI();
+
   const updateStatus = async (newStatus: DeliverableStatus) => {
     if (newStatus === status) return;
+
+    // Trigger API initialization when user actually interacts
+    if (!needsAPI) {
+      setNeedsAPI(true);
+    }
+
+    // If API not ready yet, wait for it
+    if (!api) {
+      setError("Authentication required - please wait...");
+      return;
+    }
 
     setIsUpdating(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/deliverables/${deliverableId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: newStatus }),
+      await api.put(`/api/deliverables/${deliverableId}`, {
+        status: newStatus,
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to update status");
-      }
 
       setStatus(newStatus);
       if (onStatusChange) {

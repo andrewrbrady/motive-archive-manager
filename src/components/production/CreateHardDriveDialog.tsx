@@ -20,6 +20,7 @@ import { HardDriveData } from "@/models/hard-drive";
 import { LocationResponse } from "@/models/location";
 import { MapPin } from "lucide-react";
 import { UrlModal } from "@/components/ui/url-modal";
+import { useAPI } from "@/hooks/useAPI";
 
 interface CreateHardDriveDialogProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ export default function CreateHardDriveDialog({
   onClose,
   onSave,
 }: CreateHardDriveDialogProps) {
+  const api = useAPI();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [locations, setLocations] = useState<LocationResponse[]>([]);
@@ -51,17 +53,20 @@ export default function CreateHardDriveDialog({
 
   // Fetch locations when the component mounts
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && api) {
       fetchLocations();
     }
-  }, [isOpen]);
+  }, [isOpen, api]);
 
   const fetchLocations = async () => {
+    if (!api) {
+      console.error("API client not available");
+      return;
+    }
+
     try {
       setIsLoadingLocations(true);
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
+      const data = (await api.get("locations")) as LocationResponse[];
       setLocations(data);
     } catch (error) {
       console.error("Error fetching locations:", error);
@@ -121,6 +126,10 @@ export default function CreateHardDriveDialog({
       }));
     }
   };
+
+  if (!api) {
+    return null; // Don't render if API is not available
+  }
 
   return (
     <UrlModal

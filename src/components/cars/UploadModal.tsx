@@ -55,24 +55,33 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     },
   });
 
-  const handleUpload = async () => {
+  const handleUpload = () => {
     if (files.length === 0) return;
 
-    try {
-      await onUpload(files, {
-        onProgress: (file: File, progress: number) => {
-          // [REMOVED] // [REMOVED] console.log(`Progress for ${file.name}: ${progress}%`);
-        },
-        onSuccess: (file: File) => {
-          // [REMOVED] // [REMOVED] console.log(`Upload complete for ${file.name}`);
-        },
-        onError: (file: File, error: Error) => {
-          console.error(`Upload failed for ${file.name}:`, error);
-        },
-      });
-    } catch (error) {
-      console.error("Upload failed:", error);
-    }
+    // Immediate optimistic feedback
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Starting upload in background...");
+
+    // Background upload operation - non-blocking
+    const uploadOperation = async () => {
+      try {
+        await onUpload(files, {
+          onProgress: (file: File, progress: number) => {
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Progress for ${file.name}: ${progress}%`);
+          },
+          onSuccess: (file: File) => {
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Upload complete for ${file.name}`);
+          },
+          onError: (file: File, error: Error) => {
+            console.error(`Upload failed for ${file.name}:`, error);
+          },
+        });
+      } catch (error) {
+        console.error("Upload failed:", error);
+      }
+    };
+
+    // Execute upload in background - non-blocking
+    setTimeout(uploadOperation, 0);
   };
 
   return (

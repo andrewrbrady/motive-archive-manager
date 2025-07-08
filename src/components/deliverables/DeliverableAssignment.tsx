@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { X, Loader2 } from "lucide-react";
 import { Deliverable } from "@/types/deliverable";
 import { FirestoreUser } from "@/types/firebase";
+import { useAPI } from "@/hooks/useAPI";
 
 interface DeliverableAssignmentProps {
   isOpen: boolean;
@@ -42,6 +43,9 @@ export default function DeliverableAssignment({
     deliverable?.firebase_uid || null
   );
   const router = useRouter();
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
 
   // Fetch users when the dialog opens
   useEffect(() => {
@@ -49,34 +53,32 @@ export default function DeliverableAssignment({
       fetchUsers();
       setSelectedUser(deliverable?.firebase_uid || null);
     }
-  }, [isOpen, deliverable]);
+  }, [isOpen, deliverable, api]);
 
   // Fetch eligible users from your API
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/users");
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch users");
-      }
-
-      const data = await response.json();
+      const data = (await api.get("users")) as
+        | { users?: FirestoreUser[] }
+        | FirestoreUser[];
 
       // Log the raw response to see what we're getting
       console.log(
         "API response received, count:",
-        data.users
-          ? data.users.length
-          : Array.isArray(data)
-            ? data.length
-            : "not an array"
+        Array.isArray(data)
+          ? data.length
+          : (data as any).users?.length || "not an array"
       );
 
       // Handle the correct API response structure: { users: [...], total: number }
-      let usersArray;
-      if (data.users && Array.isArray(data.users)) {
-        usersArray = data.users;
+      let usersArray: FirestoreUser[];
+      if (
+        !Array.isArray(data) &&
+        (data as any).users &&
+        Array.isArray((data as any).users)
+      ) {
+        usersArray = (data as any).users;
       } else if (Array.isArray(data)) {
         // Fallback for legacy API responses that return array directly
         usersArray = data;
@@ -92,8 +94,6 @@ export default function DeliverableAssignment({
         (user: FirestoreUser) => user.status === "active"
       );
 
-      // [REMOVED] // [REMOVED] console.log("Active users count:", eligibleUsers.length);
-
       // Make sure we're setting all active users to the state
       setUsers(eligibleUsers);
     } catch (error) {
@@ -107,8 +107,8 @@ export default function DeliverableAssignment({
   // Add a useEffect for logging the users
   useEffect(() => {
     if (users.length > 0) {
-      // [REMOVED] // [REMOVED] console.log("Users state updated:", users.length);
-      // [REMOVED] // [REMOVED] console.log("User names:", users.map((u) => u.name).join(", "));
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Users state updated:", users.length);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("User names:", users.map((u) => u.name).join(", "));
     }
   }, [users]);
 

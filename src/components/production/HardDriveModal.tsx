@@ -17,6 +17,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAPI } from "@/hooks/useAPI";
 
 interface HardDriveModalProps {
   isOpen: boolean;
@@ -37,7 +38,9 @@ export default function HardDriveModal({
   onSave,
   drive,
 }: HardDriveModalProps) {
-  // [REMOVED] // [REMOVED] console.log("HardDriveModal rendering with isOpen:", isOpen, "drive:", drive);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("HardDriveModal rendering with isOpen:", isOpen, "drive:", drive);
+
+  const api = useAPI();
 
   // Add a local state to track if we should render directly without relying on URL params
   const [forceRender, setForceRender] = useState(false);
@@ -45,10 +48,10 @@ export default function HardDriveModal({
   // If the parent says the modal should be open, but we don't see it, force render
   useEffect(() => {
     if (isOpen && !forceRender) {
-      // [REMOVED] // [REMOVED] console.log("Setting forceRender to true because isOpen is true");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Setting forceRender to true because isOpen is true");
       setForceRender(true);
     } else if (!isOpen && forceRender) {
-      // [REMOVED] // [REMOVED] console.log("Setting forceRender to false because isOpen is false");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Setting forceRender to false because isOpen is false");
       setForceRender(false);
     }
   }, [isOpen, forceRender]);
@@ -64,7 +67,7 @@ export default function HardDriveModal({
     type: "HDD",
     interface: "USB",
     status: "Available",
-    locationId: "none",
+    locationId: "",
     notes: "",
     rawAssets: [],
   });
@@ -91,7 +94,15 @@ export default function HardDriveModal({
       setFormData({
         ...drive,
         _id: undefined, // Don't include _id in form data
-        locationId: drive.locationId || "none",
+        label: drive.label || "",
+        systemName: drive.systemName || "",
+        type: drive.type || "HDD",
+        interface: drive.interface || "USB",
+        status: drive.status || "Available",
+        locationId: drive.locationId || "",
+        notes: drive.notes || "",
+        capacity: drive.capacity || { total: 0, used: 0, available: 0 },
+        rawAssets: drive.rawAssets || [],
       });
     } else {
       // Reset form when adding new drive
@@ -106,7 +117,7 @@ export default function HardDriveModal({
         type: "HDD",
         interface: "USB",
         status: "Available",
-        locationId: "none",
+        locationId: "",
         notes: "",
         rawAssets: [],
       });
@@ -117,17 +128,20 @@ export default function HardDriveModal({
 
   // Fetch locations when the modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && api) {
       fetchLocations();
     }
-  }, [isOpen]);
+  }, [isOpen, api]);
 
   const fetchLocations = async () => {
+    if (!api) {
+      console.error("API client not available");
+      return;
+    }
+
     try {
       setIsLoadingLocations(true);
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
+      const data = (await api.get("locations")) as LocationResponse[];
       setLocations(data);
     } catch (error) {
       console.error("Error fetching locations:", error);
@@ -205,20 +219,14 @@ export default function HardDriveModal({
           );
         }
 
-        // Fetch drive information from our API
-        const response = await fetch(
-          `/api/system/drives?path=/Volumes/${encodeURIComponent(path)}`
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error ||
-              "Failed to get drive information. Please ensure you select a valid drive or folder."
-          );
+        if (!api) {
+          throw new Error("API client not available");
         }
 
-        const driveInfo = await response.json();
+        // Fetch drive information from our API
+        const driveInfo = (await api.get(
+          `system/drives?path=/Volumes/${encodeURIComponent(path)}`
+        )) as any;
 
         // Update form with drive information
         setFormData((prev) => ({
@@ -234,8 +242,8 @@ export default function HardDriveModal({
           interface: driveInfo.interface.includes("Thunderbolt")
             ? "Thunderbolt"
             : driveInfo.interface.includes("USB")
-            ? "USB-C"
-            : "USB",
+              ? "USB-C"
+              : "USB",
           locationId: driveInfo.driveType.location || prev.locationId,
           notes:
             prev.notes ||
@@ -279,13 +287,14 @@ export default function HardDriveModal({
   };
 
   const handleSystemDriveInfo = async () => {
+    if (!api) {
+      setError("API client not available");
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const response = await fetch("/api/system/drives?path=/");
-      if (!response.ok) {
-        throw new Error("Failed to fetch system drive info");
-      }
-      const driveInfo = await response.json();
+      const driveInfo = (await api.get("system/drives?path=/")) as any;
 
       // Generate a unique label with timestamp
       const timestamp = new Date()
@@ -325,6 +334,11 @@ export default function HardDriveModal({
   };
 
   const handleScan = async () => {
+    if (!api) {
+      setError("API client not available");
+      return;
+    }
+
     try {
       if (!formData.systemName) {
         setError("Please select or enter a system path first");
@@ -336,16 +350,9 @@ export default function HardDriveModal({
       setScanResult(null);
 
       // Fetch directory listing from the drive
-      const response = await fetch(
-        `/api/system/directory?path=${encodeURIComponent(formData.systemName)}`
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to scan drive directories");
-      }
-
-      const { directories } = await response.json();
+      const { directories } = (await api.get(
+        `system/directory?path=${encodeURIComponent(formData.systemName)}`
+      )) as { directories: { name: string }[] };
 
       // Filter for directories that match YYMMDD format
       const dateRegex = /^(\d{6})$/; // Match YYMMDD format
@@ -373,49 +380,38 @@ export default function HardDriveModal({
       );
 
       // Search for raw assets with matching dates
-      const assetResponse = await fetch("/api/raw/search-by-dates", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ dates: datesToSearch, driveId: formData._id }),
-      });
-
-      if (!assetResponse.ok) {
-        throw new Error("Failed to search for matching assets");
-      }
-
       const { matchedAssets, associatedAssets, newlyAssociated } =
-        await assetResponse.json();
+        (await api.post("raw/search-by-dates", {
+          dates: datesToSearch,
+          driveId: formData._id,
+        })) as {
+          matchedAssets: any[];
+          associatedAssets: any[];
+          newlyAssociated: number;
+        };
 
       // Update the form with scan results
       setFormData((prev) => ({
         ...prev,
+        rawAssets: [
+          ...(prev.rawAssets || []),
+          ...matchedAssets.map((asset: any) => asset._id),
+        ],
         notes:
           prev.notes ||
-          `Scan completed on ${new Date().toLocaleString()}.\n` +
-            `Found ${dateDirectories.length} date directories (YYMMDD format).\n` +
-            `Matched with ${matchedAssets.length} raw assets.\n` +
-            `${associatedAssets.length} assets were already associated with this drive.\n` +
-            `${newlyAssociated} assets were newly associated with this drive.`,
+          `Scan completed on ${new Date().toLocaleString()}.\nFound ${
+            matchedAssets.length
+          } matching assets in ${dateDirectories.length} date directories.\n${
+            newlyAssociated > 0
+              ? `${newlyAssociated} new associations created.`
+              : "All assets were already associated."
+          }`,
       }));
 
-      // Set scan result for display
       setScanResult({
         matchedAssets: matchedAssets.length,
-        scannedFolders: directories.length,
+        scannedFolders: dateDirectories.length,
       });
-
-      // If we found any matches, show a success message
-      if (matchedAssets.length > 0) {
-        setError(null);
-      } else if (dateDirectories.length > 0) {
-        setError(
-          "Found date directories but no matching assets in the database."
-        );
-      } else {
-        setError("No date-formatted directories (YYMMDD) found on this drive.");
-      }
     } catch (error) {
       console.error("Error scanning drive:", error);
       setError(error instanceof Error ? error.message : "Failed to scan drive");
@@ -435,7 +431,7 @@ export default function HardDriveModal({
 
   // If we're using forced rendering, render directly without the UrlModal wrapper
   if (forceRender) {
-    // [REMOVED] // [REMOVED] console.log("HardDriveModal using direct rendering due to forceRender");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("HardDriveModal using direct rendering due to forceRender");
     return (
       <div className="fixed inset-0 bg-[hsl(var(--background))]/95 backdrop-blur-sm flex items-center justify-center z-50 overflow-y-auto py-8">
         <div className="bg-[hsl(var(--background))] p-6 rounded-lg shadow-xl max-w-4xl w-full mx-4 border border-[hsl(var(--border))] relative">
@@ -445,7 +441,7 @@ export default function HardDriveModal({
             </h2>
             <button
               onClick={() => {
-                // [REMOVED] // [REMOVED] console.log("Direct modal close button clicked");
+                // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Direct modal close button clicked");
                 onClose();
               }}
               className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] ml-auto"
@@ -466,7 +462,7 @@ export default function HardDriveModal({
               <label className="block text-sm font-medium mb-1">Label*</label>
               <input
                 type="text"
-                value={formData.label}
+                value={formData.label || ""}
                 onChange={(e) =>
                   setFormData({ ...formData, label: e.target.value })
                 }
@@ -482,7 +478,7 @@ export default function HardDriveModal({
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={formData.systemName}
+                  value={formData.systemName || ""}
                   onChange={(e) =>
                     setFormData({ ...formData, systemName: e.target.value })
                   }
@@ -539,7 +535,7 @@ export default function HardDriveModal({
               <div>
                 <label className="block text-sm font-medium mb-1">Type*</label>
                 <select
-                  value={formData.type}
+                  value={formData.type || "HDD"}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
@@ -560,7 +556,7 @@ export default function HardDriveModal({
                   Interface*
                 </label>
                 <select
-                  value={formData.interface}
+                  value={formData.interface || "USB"}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
@@ -588,7 +584,7 @@ export default function HardDriveModal({
                   Status*
                 </label>
                 <select
-                  value={formData.status}
+                  value={formData.status || "Available"}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
@@ -734,8 +730,8 @@ export default function HardDriveModal({
                     ? "Saving..."
                     : "Adding..."
                   : drive
-                  ? "Save Changes"
-                  : "Add Hard Drive"}
+                    ? "Save Changes"
+                    : "Add Hard Drive"}
               </Button>
             </div>
           </form>
@@ -750,7 +746,7 @@ export default function HardDriveModal({
       paramName={drive ? "editDrive" : "createDrive"}
       paramValue={drive ? drive._id?.toString() : "true"}
       onClose={() => {
-        // [REMOVED] // [REMOVED] console.log("UrlModal onClose triggered");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("UrlModal onClose triggered");
         onClose();
       }}
       title={drive ? "Edit Hard Drive" : "Add New Hard Drive"}
@@ -767,7 +763,7 @@ export default function HardDriveModal({
           <label className="block text-sm font-medium mb-1">Label*</label>
           <input
             type="text"
-            value={formData.label}
+            value={formData.label || ""}
             onChange={(e) =>
               setFormData({ ...formData, label: e.target.value })
             }
@@ -781,7 +777,7 @@ export default function HardDriveModal({
           <div className="flex gap-2">
             <input
               type="text"
-              value={formData.systemName}
+              value={formData.systemName || ""}
               onChange={(e) =>
                 setFormData({ ...formData, systemName: e.target.value })
               }
@@ -838,7 +834,7 @@ export default function HardDriveModal({
           <div>
             <label className="block text-sm font-medium mb-1">Type*</label>
             <select
-              value={formData.type}
+              value={formData.type || "HDD"}
               onChange={(e) =>
                 setFormData({
                   ...formData,
@@ -857,7 +853,7 @@ export default function HardDriveModal({
           <div>
             <label className="block text-sm font-medium mb-1">Interface*</label>
             <select
-              value={formData.interface}
+              value={formData.interface || "USB"}
               onChange={(e) =>
                 setFormData({
                   ...formData,
@@ -883,7 +879,7 @@ export default function HardDriveModal({
           <div>
             <label className="block text-sm font-medium mb-1">Status*</label>
             <select
-              value={formData.status}
+              value={formData.status || "Available"}
               onChange={(e) =>
                 setFormData({
                   ...formData,
@@ -1022,8 +1018,8 @@ export default function HardDriveModal({
                 ? "Saving..."
                 : "Adding..."
               : drive
-              ? "Save Changes"
-              : "Add Hard Drive"}
+                ? "Save Changes"
+                : "Add Hard Drive"}
           </Button>
         </div>
       </form>

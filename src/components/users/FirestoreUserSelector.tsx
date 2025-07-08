@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 import {
   Select,
   SelectContent,
@@ -35,27 +35,25 @@ export default function FirestoreUserSelector({
 }: FirestoreUserSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Fetch users directly from Firestore
+  // Fetch users using our authenticated API client
   const {
-    data: users = [],
+    data: usersResponse,
     isLoading,
     error,
     refetch,
-  } = useQuery({
-    queryKey: ["users"],
-    queryFn: async () => {
-      const response = await fetch("/api/users");
-      if (!response.ok) {
-        throw new Error("Failed to fetch users");
-      }
-      const data = await response.json();
-      return data.filter(
-        (user: FirestoreUser) => user && typeof user === "object"
-      );
-    },
+  } = useAPIQuery<{ users?: FirestoreUser[] } | FirestoreUser[]>("/users", {
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
     gcTime: 30 * 60 * 1000, // Keep unused data in cache for 30 minutes
   });
+
+  // Handle both API response formats (array or object with users property)
+  const users = Array.isArray(usersResponse)
+    ? usersResponse.filter(
+        (user: FirestoreUser) => user && typeof user === "object"
+      )
+    : (usersResponse?.users || []).filter(
+        (user: FirestoreUser) => user && typeof user === "object"
+      );
 
   // Find the selected user
   const selectedUser = value

@@ -18,7 +18,7 @@ import { UserPlus, RefreshCw, Users } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import UserDetailModal from "./UserDetailModal";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 // Shared User interface to be consistent across components
 export interface User {
@@ -37,7 +37,7 @@ export interface User {
 }
 
 export default function UserManagement() {
-  const { user } = useFirebaseAuth();
+  const api = useAPI();
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,26 +49,12 @@ export default function UserManagement() {
   const [isSyncingUser, setIsSyncingUser] = useState<string | null>(null);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
 
-  // Helper function to get auth headers
-  const getAuthHeaders = async (): Promise<Record<string, string>> => {
-    if (!user) return {};
-    try {
-      const token = await user.getIdToken();
-      return {
-        Authorization: `Bearer ${token}`,
-      };
-    } catch (error) {
-      console.error("Error getting auth token:", error);
-      return {};
-    }
-  };
-
   useEffect(() => {
-    // Only fetch users when user is available
-    if (user) {
+    // Only fetch users when API is available
+    if (api) {
       fetchUsers();
     }
-  }, [user]);
+  }, [api]);
 
   useEffect(() => {
     filterUsers();
@@ -97,69 +83,26 @@ export default function UserManagement() {
   };
 
   const fetchUsers = async (startAfter?: string) => {
-    if (!user) return; // Wait for user to be available
+    if (!api) return; // Wait for API to be available
 
     try {
       setIsLoading(true);
 
-      // Get auth headers
-      const headers = await getAuthHeaders();
-      if (Object.keys(headers).length === 0) {
-        throw new Error("No authentication token available");
-      }
-
-      // Try with a simplified approach in case of failures
-      let url = new URL("/api/users/index", window.location.origin);
-
-      // Add pagination parameters if provided
-      if (startAfter) {
-        url.searchParams.set("startAfter", startAfter);
-      }
+      // Build query parameters
+      const queryParams = startAfter ? `?startAfter=${startAfter}` : "";
 
       if (process.env.NODE_ENV !== "production") {
-        // [REMOVED] // [REMOVED] console.log("Fetching users from:", url.toString());
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching users from API");
       }
 
-      // Make the request with Firebase auth headers
-      let response = await fetch(url.toString(), {
-        headers,
-        credentials: "include", // This ensures cookies are sent with the request
-      });
+      // Make the request with the useAPI hook
+      const data = (await api.get(`users/index${queryParams}`)) as {
+        users: User[];
+        hasMore?: boolean;
+        lastId?: string;
+      };
 
       // Log the response status
-      if (process.env.NODE_ENV !== "production") {
-        // [REMOVED] // [REMOVED] console.log("API response status:", response.status);
-      }
-
-      // If the main endpoint fails, show proper error
-      if (!response.ok) {
-        if (process.env.NODE_ENV !== "production") {
-          console.error(
-            "API request failed:",
-            response.status,
-            response.statusText
-          );
-        }
-
-        // Don't show an error toast on initial load - just inform the user about the issue
-        if (!startAfter) {
-          setUsers([]);
-          setFilteredUsers([]);
-
-          // Show toast with instructions to fix
-          toast({
-            title: "Authentication Issue",
-            description: `Failed to load users: ${response.status} ${response.statusText}`,
-            variant: "destructive",
-          });
-
-          return;
-        }
-
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
       if (process.env.NODE_ENV !== "production") {
         console.log("Fetched users data:", {
           hasUsers: !!data.users,
@@ -185,7 +128,7 @@ export default function UserManagement() {
         setLastId(data.lastId);
 
         if (process.env.NODE_ENV !== "production") {
-          // [REMOVED] // [REMOVED] console.log(`Loaded ${data.users.length} users`);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Loaded ${data.users.length} users`);
         }
       } else {
         console.error("Invalid response format:", data);
@@ -261,20 +204,10 @@ export default function UserManagement() {
       return;
     }
 
+    if (!api) return;
+
     try {
-      const headers = await getAuthHeaders();
-      if (Object.keys(headers).length === 0) {
-        throw new Error("No authentication token available");
-      }
-
-      const response = await fetch(`/api/users/${userId}`, {
-        method: "DELETE",
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete user");
-      }
+      await api.delete(`users/${userId}`);
 
       toast({
         title: "Success",
@@ -303,26 +236,12 @@ export default function UserManagement() {
 
   const syncUserAvatar = async (userId: string) => {
     setIsSyncingUser(userId);
+    if (!api) return;
+
     try {
-      const headers = await getAuthHeaders();
-      if (Object.keys(headers).length === 0) {
-        throw new Error("No authentication token available");
-      }
-
-      const response = await fetch("/api/users/sync-avatar", {
-        method: "POST",
-        headers: {
-          ...headers,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ userId }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to sync avatar");
-      }
-
-      const result = await response.json();
+      const result = (await api.post("users/sync-avatar", { userId })) as {
+        photoURL: string;
+      };
 
       // Update the user in our local state
       setUsers((prevUsers) =>
@@ -351,25 +270,12 @@ export default function UserManagement() {
 
   const syncAllAvatars = async () => {
     setIsSyncingAll(true);
+    if (!api) return;
+
     try {
-      const headers = await getAuthHeaders();
-      if (Object.keys(headers).length === 0) {
-        throw new Error("No authentication token available");
-      }
-
-      const response = await fetch("/api/users/sync-all-avatars", {
-        method: "POST",
-        headers: {
-          ...headers,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to sync all avatars");
-      }
-
-      const result = await response.json();
+      const result = (await api.post("users/sync-all-avatars", {})) as {
+        updated: number;
+      };
 
       toast({
         title: "Success",

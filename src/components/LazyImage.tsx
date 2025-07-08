@@ -20,6 +20,8 @@ interface LazyImageProps {
   // New Cloudflare-specific props (optional for backward compatibility)
   variant?: keyof typeof CLOUDFLARE_VARIANTS;
   fallback?: string;
+  // Add sizes prop for better control over image loading
+  sizes?: string;
 }
 
 const LazyImage: React.FC<LazyImageProps> = ({
@@ -36,6 +38,7 @@ const LazyImage: React.FC<LazyImageProps> = ({
   onClick,
   variant,
   fallback,
+  sizes,
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -74,6 +77,22 @@ const LazyImage: React.FC<LazyImageProps> = ({
     if (width === height) return "square";
     if (width > height * 1.5) return "wide";
     return "medium";
+  };
+
+  // Get default sizes based on width if not provided
+  const getDefaultSizes = (): string => {
+    if (sizes) return sizes;
+
+    // For small images (thumbnails), use fixed sizes
+    if (width <= 100) return "100px";
+    if (width <= 200) return "200px";
+
+    // For medium images (gallery cards), use responsive but reasonable sizes
+    if (width <= 400)
+      return "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw";
+
+    // For large images, use more conservative viewport sizes
+    return "(max-width: 640px) 90vw, (max-width: 1024px) 70vw, 50vw";
   };
 
   if (error || !imgSrc) {
@@ -123,7 +142,7 @@ const LazyImage: React.FC<LazyImageProps> = ({
         src={imgSrc}
         alt={alt}
         fill
-        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+        sizes={getDefaultSizes()}
         quality={quality}
         priority={priority}
         variant={getAutoVariant()}

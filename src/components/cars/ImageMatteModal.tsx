@@ -3,21 +3,13 @@ import { ImageData } from "@/app/images/columns";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Loader2,
   Download,
@@ -27,18 +19,27 @@ import {
   XCircle,
   ExternalLink,
   Car,
-  Settings,
-  Cloud,
-  Monitor,
   Palette,
+  Check,
+  X,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
+import { useAPI } from "@/hooks/useAPI";
+import { useGalleryImageProcessing } from "@/lib/hooks/useGalleryImageProcessing";
+import { ImageProcessingModalHeader } from "./shared/ImageProcessingModalHeader";
+import { ImageProcessingModalFooter } from "./shared/ImageProcessingModalFooter";
+import { ImageDisplayWindow } from "@/components/ui/image-processing/ImageDisplayWindow";
+import { PresetSizes } from "@/components/ui/image-processing/PresetSizes";
 
 interface ImageMatteModalProps {
   isOpen: boolean;
   onClose: () => void;
   image: ImageData | null;
+  // Optional props for gallery usage (not implemented yet)
+  enablePreview?: boolean;
+  galleryId?: string;
+  onImageReplaced?: (originalImageId: string, newImageData: any) => void;
 }
 
 interface ImageDimensions {
@@ -55,21 +56,52 @@ interface CloudflareUploadResult {
   error?: string;
 }
 
-type ProcessingMethod = "cloud" | "local";
+interface ProcessedImageData {
+  _id: string;
+  url: string;
+  filename: string;
+  metadata: any;
+  carId: string;
+}
+
+interface CreateMatteResponse {
+  processedImageUrl: string;
+  remoteServiceUsed?: boolean;
+  message?: string;
+  cloudflareUpload?: CloudflareUploadResult;
+}
 
 export function ImageMatteModal({
   isOpen,
   onClose,
   image,
+  enablePreview,
+  galleryId,
+  onImageReplaced,
 }: ImageMatteModalProps) {
+  // All hooks must be declared first - no early returns allowed
+  const api = useAPI();
+
+  // Gallery processing hooks
+  const {
+    previewProcessImage,
+    replaceImageInGallery,
+    isProcessing: isGalleryProcessing,
+    isReplacing,
+  } = useGalleryImageProcessing();
+
+  // Gallery preview workflow state
+  const [processedImage, setProcessedImage] =
+    useState<ProcessedImageData | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+
   const [canvasWidth, setCanvasWidth] = useState<string>("1920");
   const [canvasHeight, setCanvasHeight] = useState<string>("1080");
   const [paddingPercent, setPaddingPercent] = useState<string>("0");
   const [matteColor, setMatteColor] = useState<string>("#000000");
   const [cloudflareWidth, setCloudflareWidth] = useState<string>("2000");
   const [cloudflareQuality, setCloudflareQuality] = useState<string>("100");
-  const [processingMethod, setProcessingMethod] =
-    useState<ProcessingMethod>("cloud");
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessingHighRes, setIsProcessingHighRes] = useState(false);
@@ -91,83 +123,10 @@ export function ImageMatteModal({
   const [processingStatus, setProcessingStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [remoteServiceUsed, setRemoteServiceUsed] = useState<boolean>(false);
-
-  // Load processing method preference from localStorage
-  useEffect(() => {
-    const savedMethod = localStorage.getItem(
-      "imageMatteMethod"
-    ) as ProcessingMethod;
-    if (savedMethod && (savedMethod === "cloud" || savedMethod === "local")) {
-      setProcessingMethod(savedMethod);
-    }
-  }, []);
-
-  // Save processing method preference to localStorage
-  const handleProcessingMethodChange = (method: ProcessingMethod) => {
-    setProcessingMethod(method);
-    localStorage.setItem("imageMatteMethod", method);
-  };
-
-  // Helper function to build enhanced Cloudflare URL
-  const getEnhancedImageUrl = (
-    baseUrl: string,
-    width?: string,
-    quality?: string
-  ) => {
-    let params = [];
-    // Always check for truthy values and non-empty strings
-    if (width && width.trim() !== "") params.push(`w=${width}`);
-    if (quality && quality.trim() !== "") params.push(`q=${quality}`);
-
-    if (params.length === 0) return baseUrl;
-
-    // Handle different Cloudflare URL formats
-    // Format: https://imagedelivery.net/account/image-id/public
-    // Should become: https://imagedelivery.net/account/image-id/w=1080,q=100
-    if (baseUrl.includes("imagedelivery.net")) {
-      // Replace the last segment (usually 'public') with our parameters
-      const urlParts = baseUrl.split("/");
-      urlParts[urlParts.length - 1] = params.join(",");
-      return urlParts.join("/");
-    }
-
-    // Fallback for other URL formats
-    return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
-  };
-
-  // Memoize the enhanced image URL to prevent useEffect dependency array changes
-  const enhancedImageUrl = useMemo(() => {
-    if (!image?.url) return null;
-    const enhanced = getEnhancedImageUrl(
-      image.url,
-      cloudflareWidth,
-      cloudflareQuality
-    );
-    console.log("URL transformation:", {
-      original: image.url,
-      enhanced: enhanced,
-      width: cloudflareWidth,
-      quality: cloudflareQuality,
-    });
-    return enhanced;
-  }, [image?.url, cloudflareWidth, cloudflareQuality]);
-
-  // Get the current enhanced image URL for display
-  const currentImageUrl = enhancedImageUrl;
-
-  // Load original image dimensions
-  useEffect(() => {
-    if (enhancedImageUrl) {
-      const img = new window.Image();
-      img.onload = () => {
-        setOriginalDimensions({
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-        });
-      };
-      img.src = enhancedImageUrl;
-    }
-  }, [enhancedImageUrl]);
+  const [imageLoadError, setImageLoadError] = useState<boolean>(false);
+  const [processedImageLoadError, setProcessedImageLoadError] =
+    useState<boolean>(false);
+  const [useTestImage, setUseTestImage] = useState(false);
 
   // Load processed image dimensions when processed image changes
   useEffect(() => {
@@ -180,8 +139,6 @@ export function ImageMatteModal({
         });
       };
       img.src = processedImageUrl;
-    } else {
-      setProcessedDimensions(null);
     }
   }, [processedImageUrl]);
 
@@ -201,8 +158,194 @@ export function ImageMatteModal({
     }
   }, [highResImageUrl]);
 
+  // Helper function to build enhanced Cloudflare URL
+  const getEnhancedImageUrl = (
+    baseUrl: string,
+    width?: string,
+    quality?: string
+  ) => {
+    let params = [];
+    // Always check for truthy values and non-empty strings
+    if (width && width.trim() !== "") params.push(`w=${width}`);
+    if (quality && quality.trim() !== "") params.push(`q=${quality}`);
+
+    if (params.length === 0) return baseUrl;
+
+    // Handle different Cloudflare URL formats
+    // Format: https://imagedelivery.net/account/image-id/public
+    // Should become: https://imagedelivery.net/account/image-id/w=1080,q=100
+    if (baseUrl.includes("imagedelivery.net")) {
+      // Check if URL already has transformations (contains variant like 'public')
+      if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
+        // Replace the last segment (usually 'public') with our parameters
+        const urlParts = baseUrl.split("/");
+        urlParts[urlParts.length - 1] = params.join(",");
+        return urlParts.join("/");
+      } else {
+        // URL doesn't have a variant, append transformations
+        return `${baseUrl}/${params.join(",")}`;
+      }
+    }
+
+    // Fallback for other URL formats - try to replace /public if it exists
+    return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
+  };
+
+  // Get gallery processing URL (strips Cloudflare transforms for API calls)
+  const getGalleryProcessingImageUrl = (baseUrl: string): string => {
+    if (!baseUrl.includes("imagedelivery.net")) {
+      return baseUrl;
+    }
+
+    // For Cloudflare URLs, ensure we use the /public variant for processing
+    const urlParts = baseUrl.split("/");
+    const baseUrlWithoutVariant = urlParts.slice(0, -1).join("/");
+    return `${baseUrlWithoutVariant}/public`;
+  };
+
+  // Memoize the enhanced image URL to prevent useEffect dependency array changes
+  const enhancedImageUrl = useMemo(() => {
+    if (!image?.url) return null;
+    const enhanced = getEnhancedImageUrl(
+      image.url,
+      cloudflareWidth,
+      cloudflareQuality
+    );
+    console.log("URL transformation:", {
+      original: image.url,
+      enhanced: enhanced,
+      width: cloudflareWidth,
+      quality: cloudflareQuality,
+    });
+    return enhanced;
+  }, [image?.url, cloudflareWidth, cloudflareQuality]);
+
+  // Add debugging for the current image URL
+  useEffect(() => {
+    if (enhancedImageUrl) {
+      console.log("Current image URL for display:", {
+        enhancedImageUrl,
+        isCloudflareUrl: enhancedImageUrl.includes("imagedelivery.net"),
+      });
+    }
+  }, [enhancedImageUrl]);
+
+  // PHASE 1 DEBUGGING: Complete image data structure investigation
+  useEffect(() => {
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== IMAGE MATTE MODAL - PHASE 1 DEBUG START ===");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Image prop object (complete):", image);
+    console.log("Image data structure breakdown:", {
+      hasImage: !!image,
+      imageId: image?._id,
+      cloudflareId: image?.cloudflareId,
+      originalUrl: image?.url,
+      filename: image?.filename,
+      width: image?.width,
+      height: image?.height,
+      carId: image?.carId,
+      metadata: image?.metadata,
+      createdAt: image?.createdAt,
+      updatedAt: image?.updatedAt,
+    });
+
+    // Test URL accessibility
+    if (image?.url) {
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Testing original URL accessibility:", image.url);
+      fetch(image.url, { method: "HEAD", mode: "no-cors" })
+        .then((response) => {
+          console.log("Original URL fetch test result:", {
+            url: image.url,
+            status: response.status,
+            statusText: response.statusText,
+            type: response.type,
+            note: "no-cors mode - limited response info available",
+          });
+        })
+        .catch((error) => {
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Original URL fetch test (expected CORS limitation):", [data omitted]);
+        });
+    }
+
+    // Enhanced URL transformation debugging
+    if (image?.url) {
+      const originalUrl = image.url;
+      const enhanced = getEnhancedImageUrl(
+        originalUrl,
+        cloudflareWidth,
+        cloudflareQuality
+      );
+
+      console.log("URL transformation chain:", {
+        step1_original: originalUrl,
+        step2_enhanced: enhanced,
+        step3_params: {
+          width: cloudflareWidth,
+          quality: cloudflareQuality,
+        },
+        step4_validation: {
+          originalIsString: typeof originalUrl === "string",
+          enhancedIsString: typeof enhanced === "string",
+          originalLength: originalUrl?.length,
+          enhancedLength: enhanced?.length,
+          containsImageDelivery: enhanced?.includes("imagedelivery.net"),
+          hasTransformations: enhanced?.includes(","),
+          preservesImageId: enhanced?.includes(
+            originalUrl.split("/").slice(-1)[0]?.split("?")[0]
+          ),
+        },
+      });
+
+      // Test enhanced URL accessibility
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Testing enhanced URL accessibility:", enhanced);
+      fetch(enhanced, { method: "HEAD", mode: "no-cors" })
+        .then((response) => {
+          console.log("Enhanced URL fetch test result:", {
+            url: enhanced,
+            status: response.status,
+            statusText: response.statusText,
+            type: response.type,
+            note: "no-cors mode - limited response info available",
+          });
+        })
+        .catch((error) => {
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Enhanced URL fetch test (expected CORS limitation):", [data omitted]);
+        });
+    }
+
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== IMAGE MATTE MODAL - PHASE 1 DEBUG END ===");
+  }, [image, cloudflareWidth, cloudflareQuality]);
+
+  // PHASE 1 TESTING: Hardcoded test image URL
+  const testImageUrl =
+    "https://placehold.co/800x600/000000/FFFFFF?text=Test+Image";
+
+  // Get the current enhanced image URL for display
+  const currentImageUrl = useTestImage ? testImageUrl : enhancedImageUrl;
+
+  // Load original image dimensions
+  useEffect(() => {
+    if (enhancedImageUrl) {
+      const img = new window.Image();
+      img.onload = () => {
+        setOriginalDimensions({
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        });
+      };
+      img.src = enhancedImageUrl;
+    }
+  }, [enhancedImageUrl]);
+
+  // Reset error states when image changes
+  useEffect(() => {
+    setImageLoadError(false);
+    setProcessedImageLoadError(false);
+  }, [image?.url]);
+
+  // Note: api is now guaranteed to be available from useAPI hook
+
   const handleProcess = async () => {
-    if (!image || !enhancedImageUrl) return;
+    if (!image || !enhancedImageUrl || !api) return;
 
     setIsProcessing(true);
     setProcessedImageUrl(null);
@@ -215,29 +358,16 @@ export function ImageMatteModal({
     setRemoteServiceUsed(false);
 
     try {
-      const response = await fetch("/api/images/create-matte", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl: enhancedImageUrl,
-          canvasWidth: parseInt(canvasWidth),
-          canvasHeight: parseInt(canvasHeight),
-          paddingPercent: parseFloat(paddingPercent),
-          matteColor,
-          uploadToCloudflare: false,
-          originalFilename: image.filename,
-          processingMethod,
-        }),
-      });
+      const result = (await api.post("images/create-matte", {
+        imageUrl: enhancedImageUrl,
+        canvasWidth: parseInt(canvasWidth),
+        canvasHeight: parseInt(canvasHeight),
+        paddingPercent: parseFloat(paddingPercent),
+        matteColor,
+        uploadToCloudflare: false,
+        originalFilename: image.filename,
+      })) as CreateMatteResponse;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to process image");
-      }
-
-      const result = await response.json();
       setProcessedImageUrl(result.processedImageUrl);
       setRemoteServiceUsed(result.remoteServiceUsed || false);
 
@@ -288,7 +418,7 @@ export function ImageMatteModal({
   };
 
   const handleHighResProcess = async (multiplier: 2 | 4) => {
-    if (!image || !processedDimensions) return;
+    if (!image || !processedDimensions || !api) return;
 
     setIsProcessingHighRes(true);
     setHighResMultiplier(multiplier);
@@ -308,28 +438,16 @@ export function ImageMatteModal({
         cloudflareQuality
       );
 
-      const response = await fetch("/api/images/create-matte", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl: highResSourceUrl,
-          canvasWidth: targetWidth,
-          canvasHeight: targetHeight,
-          paddingPercent: parseFloat(paddingPercent),
-          matteColor,
-          uploadToCloudflare: false,
-          originalFilename: image.filename,
-          processingMethod,
-        }),
-      });
+      const result = (await api.post("images/create-matte", {
+        imageUrl: highResSourceUrl,
+        canvasWidth: targetWidth,
+        canvasHeight: targetHeight,
+        paddingPercent: parseFloat(paddingPercent),
+        matteColor,
+        uploadToCloudflare: false,
+        originalFilename: image.filename,
+      })) as CreateMatteResponse;
 
-      if (!response.ok) {
-        throw new Error("Failed to process high-resolution image");
-      }
-
-      const result = await response.json();
       setHighResImageUrl(result.processedImageUrl);
 
       toast({
@@ -348,7 +466,7 @@ export function ImageMatteModal({
   };
 
   const handleUploadToCloudflare = async () => {
-    if (!image || !processedImageUrl || !enhancedImageUrl) return;
+    if (!image || !processedImageUrl || !enhancedImageUrl || !api) return;
 
     setIsUploading(true);
     setCloudflareResult(null);
@@ -381,29 +499,16 @@ export function ImageMatteModal({
         uploadFilename = `${nameWithoutExt}_matte_${highResMultiplier}x.${ext}`;
       }
 
-      const response = await fetch("/api/images/create-matte", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl: uploadSourceUrl,
-          canvasWidth: uploadWidth,
-          canvasHeight: uploadHeight,
-          paddingPercent: parseFloat(paddingPercent),
-          matteColor,
-          uploadToCloudflare: true,
-          originalFilename: uploadFilename,
-          originalCarId: image.carId,
-          processingMethod,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to upload image");
-      }
-
-      const result = await response.json();
+      const result = (await api.post("images/create-matte", {
+        imageUrl: uploadSourceUrl,
+        canvasWidth: uploadWidth,
+        canvasHeight: uploadHeight,
+        paddingPercent: parseFloat(paddingPercent),
+        matteColor,
+        uploadToCloudflare: true,
+        originalFilename: uploadFilename,
+        originalCarId: image.carId,
+      })) as CreateMatteResponse;
 
       if (result.cloudflareUpload?.success) {
         setCloudflareResult(result.cloudflareUpload);
@@ -474,503 +579,436 @@ export function ImageMatteModal({
     setMatteColor("#000000");
     setCloudflareWidth("2000");
     setCloudflareQuality("100");
+    setImageLoadError(false);
+    setProcessedImageLoadError(false);
+    // Reset gallery preview workflow state
+    setProcessedImage(null);
+    setShowPreview(false);
   };
 
   const handleClose = () => {
     handleReset();
     setOriginalDimensions(null);
+    // Reset gallery preview workflow state
+    setProcessedImage(null);
+    setShowPreview(false);
     onClose();
+  };
+
+  // Gallery preview and replace handlers
+  const handlePreview = async () => {
+    if (!image || !enhancedImageUrl) return;
+    if (!enablePreview || !galleryId || !previewProcessImage) return;
+
+    // Use gallery processing URL for API calls
+    const processingImageUrl = getGalleryProcessingImageUrl(image.url);
+
+    console.log("🖼️ Image Matte processing starting:", {
+      originalUrl: image.url,
+      enhancedUrl: enhancedImageUrl.substring(0, 100) + "...",
+      processingUrl: processingImageUrl,
+      parameters: {
+        canvasWidth: parseInt(canvasWidth),
+        canvasHeight: parseInt(canvasHeight),
+        paddingPercent: parseFloat(paddingPercent),
+        matteColor: matteColor,
+      },
+    });
+
+    const parameters = {
+      imageUrl: processingImageUrl,
+      canvasWidth: parseInt(canvasWidth),
+      canvasHeight: parseInt(canvasHeight),
+      paddingPercent: parseFloat(paddingPercent),
+      matteColor: matteColor,
+    };
+
+    try {
+      const result = await previewProcessImage({
+        galleryId,
+        imageId: image._id,
+        processingType: "image-matte",
+        parameters,
+      });
+
+      if (result && result.success) {
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Image Matte processing completed successfully");
+        setProcessedImage(result.processedImage);
+        setShowPreview(true);
+      } else {
+        console.error("❌ Image Matte processing failed:", {
+          hasResult: !!result,
+          success: result?.success,
+          message: result
+            ? "Processing returned false success"
+            : "No result returned",
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      const errorMessage =
+        (error as any)?.message || (error as any)?.error || "Unknown error";
+      const errorDetails =
+        (error as any)?.response?.data || (error as any)?.data || error;
+      console.error("❌ Image Matte processing error:", {
+        message: errorMessage,
+        details: errorDetails,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  };
+
+  const handleReplaceImage = async () => {
+    if (!api) return;
+    if (!image || !processedImage) return;
+    if (
+      !enablePreview ||
+      !galleryId ||
+      !replaceImageInGallery ||
+      !onImageReplaced
+    )
+      return;
+
+    const processingImageUrl = getGalleryProcessingImageUrl(image.url);
+
+    console.log("🔄 Image Matte replacement starting:", {
+      originalUrl: image.url,
+      processingUrl: processingImageUrl,
+    });
+
+    const parameters = {
+      imageUrl: processingImageUrl,
+      canvasWidth: parseInt(canvasWidth),
+      canvasHeight: parseInt(canvasHeight),
+      paddingPercent: parseFloat(paddingPercent),
+      matteColor: matteColor,
+    };
+
+    try {
+      const result = await replaceImageInGallery(
+        galleryId,
+        image._id,
+        "image-matte",
+        parameters
+      );
+
+      if (result && result.success && onImageReplaced) {
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Image Matte replacement completed successfully");
+        onImageReplaced(result.originalImageId, result.processedImage);
+        handleClose();
+      } else {
+        console.error("❌ Image Matte replacement failed:", {
+          hasResult: !!result,
+          success: result?.success,
+          hasCallback: !!onImageReplaced,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      const errorMessage =
+        (error as any)?.message || (error as any)?.error || "Unknown error";
+      const errorDetails =
+        (error as any)?.response?.data || (error as any)?.data || error;
+      console.error("❌ Image Matte replacement error:", {
+        message: errorMessage,
+        details: errorDetails,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  };
+
+  const handleDiscardPreview = () => {
+    setProcessedImage(null);
+    setShowPreview(false);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Image Matte Generator</DialogTitle>
-          <DialogDescription>
-            Create a custom matte for your image by placing it on a colored
-            canvas with specified dimensions. Perfect for creating consistent
-            aspect ratios and backgrounds for your car photos.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-6xl max-h-[85vh] mx-4 overflow-hidden flex flex-col">
+        <ImageProcessingModalHeader
+          icon={<Palette className="h-5 w-5" />}
+          title="Image Matte Tool"
+          description="Create a custom matte for your image by placing it on a colored canvas with specified dimensions."
+          image={image}
+          processingStatus={processingStatus}
+          error={error}
+          cloudflareResult={cloudflareResult}
+        />
 
-        {/* Car Association Indicator */}
-        {image?.carId && (
-          <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <Car className="h-4 w-4 text-blue-600" />
-            <span className="text-sm text-blue-700">
-              This image is associated with a car. Processed images will be
-              linked to the same car.
-            </span>
-          </div>
-        )}
-
-        {/* Processing Status */}
-        {processingStatus && (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-700">{processingStatus}</p>
-          </div>
-        )}
-
-        {/* Error Display */}
-        {error && (
-          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <XCircle className="h-4 w-4 text-red-600" />
-            <span className="text-sm text-red-700">{error}</span>
-          </div>
-        )}
-
-        {/* Success Display */}
-        {cloudflareResult?.success && (
-          <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <span className="text-sm text-green-700">
-              Image matte uploaded successfully! You can now view it in the
-              gallery.
-            </span>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Left side - Controls */}
-          <div className="space-y-4">
-            <div className="space-y-4">
-              {/* Cloudflare Image Quality Controls */}
-              <div className="p-3 border rounded-lg bg-muted/30">
-                <Label className="text-sm font-medium mb-2 block">
-                  Original Image Quality
-                </Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label htmlFor="cloudflareWidth" className="text-xs">
-                      Width (px)
-                    </Label>
-                    <Input
-                      id="cloudflareWidth"
-                      type="number"
-                      value={cloudflareWidth}
-                      onChange={(e) => setCloudflareWidth(e.target.value)}
-                      placeholder="2000"
-                      min="100"
-                      max="5000"
-                      className="text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="cloudflareQuality" className="text-xs">
-                      Quality (%)
-                    </Label>
-                    <Input
-                      id="cloudflareQuality"
-                      type="number"
-                      value={cloudflareQuality}
-                      onChange={(e) => setCloudflareQuality(e.target.value)}
-                      placeholder="100"
-                      min="1"
-                      max="100"
-                      className="text-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Processing Method Settings */}
-              <div className="p-3 border rounded-lg bg-muted/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <Settings className="h-4 w-4" />
-                  <Label className="text-sm font-medium">
-                    Processing Method
-                  </Label>
-                </div>
-                <Select
-                  value={processingMethod}
-                  onValueChange={handleProcessingMethodChange}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select processing method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cloud">
-                      <div className="flex items-center gap-2">
-                        <Cloud className="h-4 w-4" />
-                        <span>Cloud Run</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="local">
-                      <div className="flex items-center gap-2">
-                        <Monitor className="h-4 w-4" />
-                        <span>Local Binary</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Canvas Dimensions */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label htmlFor="canvasWidth">Canvas Width (px)</Label>
-                  <Input
-                    id="canvasWidth"
-                    type="number"
-                    value={canvasWidth}
-                    onChange={(e) => setCanvasWidth(e.target.value)}
-                    placeholder="1920"
-                    min="100"
-                    max="5000"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="canvasHeight">Canvas Height (px)</Label>
-                  <Input
-                    id="canvasHeight"
-                    type="number"
-                    value={canvasHeight}
-                    onChange={(e) => setCanvasHeight(e.target.value)}
-                    placeholder="1080"
-                    min="100"
-                    max="5000"
-                  />
-                </div>
-              </div>
-
-              {/* Aspect Ratio Preset Buttons */}
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setCanvasWidth("1080");
-                    setCanvasHeight("1920");
-                  }}
-                  className="text-xs"
-                >
-                  9:16 (1080×1920)
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setCanvasWidth("1080");
-                    setCanvasHeight("1350");
-                  }}
-                  className="text-xs"
-                >
-                  4:5 (1080×1350)
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setCanvasWidth("1080");
-                    setCanvasHeight("1080");
-                  }}
-                  className="text-xs"
-                >
-                  1:1 (1080×1080)
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setCanvasWidth("1920");
-                    setCanvasHeight("1080");
-                  }}
-                  className="text-xs"
-                >
-                  16:9 (1920×1080)
-                </Button>
-              </div>
-
-              <div>
-                <Label htmlFor="paddingPercent">Padding Percentage</Label>
-                <Input
-                  id="paddingPercent"
-                  type="number"
-                  step="0.1"
-                  value={paddingPercent}
-                  onChange={(e) => setPaddingPercent(e.target.value)}
-                  placeholder="0"
-                  min="0"
-                  max="50"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Percentage of canvas to use as padding around the image
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="matteColor" className="flex items-center gap-2">
-                  <Palette className="h-4 w-4" />
-                  Matte Color
-                </Label>
-                <div className="flex gap-2 mt-1">
-                  <Input
-                    id="matteColor"
-                    type="color"
-                    value={matteColor}
-                    onChange={(e) => setMatteColor(e.target.value)}
-                    className="w-16 h-10 p-1 border rounded"
-                  />
-                  <Input
-                    type="text"
-                    value={matteColor}
-                    onChange={(e) => setMatteColor(e.target.value)}
-                    placeholder="#000000"
-                    className="flex-1"
-                  />
-                </div>
-                <div className="flex gap-1 mt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setMatteColor("#000000")}
-                    className="text-xs"
-                  >
-                    Black
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setMatteColor("#FFFFFF")}
-                    className="text-xs"
-                  >
-                    White
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setMatteColor("#808080")}
-                    className="text-xs"
-                  >
-                    Gray
-                  </Button>
-                </div>
-              </div>
-
-              {/* Process Button */}
-              <Button
-                onClick={handleProcess}
-                disabled={isProcessing || !image}
-                className="w-full"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating Matte...
-                  </>
-                ) : (
-                  <>
-                    <Palette className="mr-2 h-4 w-4" />
-                    Create Matte
-                  </>
-                )}
-              </Button>
-
-              {/* Action buttons */}
-              {processedImageUrl && (
-                <div className="space-y-2">
-                  <Button
-                    onClick={handleDownload}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Download Matte
-                  </Button>
-
-                  {/* High-res processing buttons */}
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => handleHighResProcess(2)}
-                      disabled={isProcessingHighRes}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs flex-1"
-                    >
-                      {isProcessingHighRes && highResMultiplier === 2 ? (
-                        <>
-                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                          2x...
-                        </>
-                      ) : (
-                        "Generate 2x"
-                      )}
-                    </Button>
-
-                    <Button
-                      onClick={() => handleHighResProcess(4)}
-                      disabled={isProcessingHighRes}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs flex-1"
-                    >
-                      {isProcessingHighRes && highResMultiplier === 4 ? (
-                        <>
-                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                          4x...
-                        </>
-                      ) : (
-                        "Generate 4x"
-                      )}
-                    </Button>
-                  </div>
-
-                  {!cloudflareResult?.success && (
-                    <>
-                      {image?.carId && (
-                        <p className="text-xs text-muted-foreground text-center">
-                          Processed image will be associated with this car
-                        </p>
-                      )}
-                      <Button
-                        onClick={handleUploadToCloudflare}
-                        disabled={isUploading}
-                        variant="outline"
-                        className="w-full"
-                      >
-                        {isUploading ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Uploading...
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="mr-2 h-4 w-4" />
-                            Upload to Cloudflare
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  )}
-
-                  {cloudflareResult?.success && (
-                    <Button
-                      onClick={handleViewInGallery}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      View in Gallery
-                    </Button>
-                  )}
-
-                  <Button
-                    onClick={handleReset}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    Reset
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Middle - Original Image */}
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Original Image</Label>
-                {originalDimensions && (
-                  <span className="text-xs text-muted-foreground">
-                    {originalDimensions.width} × {originalDimensions.height}
-                  </span>
-                )}
-              </div>
-              {currentImageUrl && (
-                <div className="mt-2 border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
-                  <div className="relative max-w-full max-h-[600px]">
-                    <Image
-                      src={currentImageUrl}
-                      alt={image?.filename || "Original image"}
-                      width={0}
-                      height={0}
-                      sizes="100vw"
-                      className="w-auto h-auto max-w-full max-h-[600px] object-contain"
-                      style={{ width: "auto", height: "auto" }}
-                      key={currentImageUrl} // Force reload when URL changes
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right side - Processed Image */}
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">
-                  {highResImageUrl
-                    ? `High-Res Matte (${highResMultiplier}x)`
-                    : "Processed Matte"}
-                </Label>
-                {(highResDimensions || processedDimensions) && (
-                  <span className="text-xs text-muted-foreground">
-                    {highResDimensions
-                      ? `${highResDimensions.width} × ${highResDimensions.height}`
-                      : processedDimensions
-                        ? `${processedDimensions.width} × ${processedDimensions.height}`
-                        : ""}
-                  </span>
-                )}
-              </div>
-              <div className="mt-2 border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
-                {highResImageUrl || processedImageUrl ? (
-                  <div className="relative max-w-full max-h-[600px]">
-                    <Image
-                      src={(highResImageUrl || processedImageUrl)!}
-                      alt={
-                        highResImageUrl
-                          ? "High-resolution matte"
-                          : "Processed matte"
-                      }
-                      width={0}
-                      height={0}
-                      sizes="100vw"
-                      className="w-auto h-auto max-w-full max-h-[600px] object-contain"
-                      style={{ width: "auto", height: "auto" }}
-                    />
-                    {highResImageUrl && (
-                      <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
-                        {highResMultiplier}x High-Res
-                      </div>
+        <div className="flex-1 overflow-y-auto">
+          <div className="space-y-4 p-1">
+            {/* Top Row: Image Preview and Live Preview Side by Side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Left: Original Image */}
+              <ImageDisplayWindow
+                title="Original Image"
+                imageUrl={enhancedImageUrl}
+                altText={image?.filename || "Original image"}
+                dimensions={originalDimensions}
+                loadError={imageLoadError}
+                onError={(e) => {
+                  console.error("Image load error:", e);
+                  setImageLoadError(true);
+                }}
+                onLoad={(e) => {
+                  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Image loaded successfully");
+                  setImageLoadError(false);
+                }}
+                fallbackContent={
+                  <div className="text-center">
+                    <Eye className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No image selected</p>
+                    {image?.url && (
+                      <p className="text-xs mt-1">Original: {image.url}</p>
                     )}
                   </div>
-                ) : (
-                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-                    <div className="text-center">
-                      <Eye className="h-8 w-8 mx-auto mb-2" />
-                      <p className="text-sm">
-                        Processed matte will appear here
-                      </p>
-                    </div>
+                }
+              />
+
+              {/* Right: Processed Image */}
+              <ImageDisplayWindow
+                title={
+                  highResImageUrl
+                    ? `High-Res Matte (${highResMultiplier}x)`
+                    : "Processed Matte"
+                }
+                imageUrl={highResImageUrl || processedImageUrl}
+                altText={
+                  highResImageUrl ? "High-resolution matte" : "Processed matte"
+                }
+                dimensions={highResDimensions || processedDimensions}
+                loadError={processedImageLoadError}
+                onError={(e) => {
+                  console.error("Processed image load error:", e);
+                  setProcessedImageLoadError(true);
+                }}
+                onLoad={(e) => {
+                  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Processed image loaded successfully");
+                  setProcessedImageLoadError(false);
+                }}
+                fallbackContent={
+                  <div className="text-center">
+                    <Eye className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Processed matte will appear here</p>
+                  </div>
+                }
+                showGalleryPreview={
+                  !!(
+                    enablePreview &&
+                    galleryId &&
+                    showPreview &&
+                    processedImage
+                  )
+                }
+                galleryPreviewImage={processedImage}
+              >
+                {highResImageUrl && (
+                  <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
+                    {highResMultiplier}x High-Res
                   </div>
                 )}
+              </ImageDisplayWindow>
+            </div>
+
+            {/* Bottom Row: Settings in Two Columns */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Left Column: Matte Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Matte Settings</h3>
+
+                {/* Canvas Dimensions */}
+                <div className="space-y-2">
+                  <Label>Canvas Dimensions (pixels)</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="canvasWidth" className="text-xs">
+                        Width
+                      </Label>
+                      <Input
+                        id="canvasWidth"
+                        type="number"
+                        value={canvasWidth}
+                        onChange={(e) => setCanvasWidth(e.target.value)}
+                        placeholder="1920"
+                        min="100"
+                        max="5000"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="canvasHeight" className="text-xs">
+                        Height
+                      </Label>
+                      <Input
+                        id="canvasHeight"
+                        type="number"
+                        value={canvasHeight}
+                        onChange={(e) => setCanvasHeight(e.target.value)}
+                        placeholder="1080"
+                        min="100"
+                        max="5000"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Preset Sizes */}
+                <PresetSizes
+                  onSizeSelect={(width, height) => {
+                    setCanvasWidth(width);
+                    setCanvasHeight(height);
+                  }}
+                />
+
+                {/* Padding */}
+                <div>
+                  <Label htmlFor="paddingPercent">Padding Percentage</Label>
+                  <Input
+                    id="paddingPercent"
+                    type="number"
+                    step="0.1"
+                    value={paddingPercent}
+                    onChange={(e) => setPaddingPercent(e.target.value)}
+                    placeholder="0"
+                    min="0"
+                    max="50"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Percentage of canvas to use as padding around the image
+                  </p>
+                </div>
+
+                {/* Matte Color */}
+                <div>
+                  <Label
+                    htmlFor="matteColor"
+                    className="flex items-center gap-2"
+                  >
+                    <Palette className="h-4 w-4" />
+                    Matte Color
+                  </Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      id="matteColor"
+                      type="color"
+                      value={matteColor}
+                      onChange={(e) => setMatteColor(e.target.value)}
+                      className="w-16 h-10 p-1 border rounded"
+                    />
+                    <Input
+                      type="text"
+                      value={matteColor}
+                      onChange={(e) => setMatteColor(e.target.value)}
+                      placeholder="#000000"
+                      className="flex-1"
+                    />
+                  </div>
+                  <div className="flex gap-1 mt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMatteColor("#000000")}
+                      className="text-xs"
+                    >
+                      Black
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMatteColor("#FFFFFF")}
+                      className="text-xs"
+                    >
+                      White
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMatteColor("#808080")}
+                      className="text-xs"
+                    >
+                      Gray
+                    </Button>
+                  </div>
+                </div>
               </div>
 
-              {/* High-res download button */}
-              {highResImageUrl && (
-                <Button
-                  onClick={handleHighResDownload}
-                  variant="outline"
-                  className="w-full"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download {highResMultiplier}x High-Res
-                </Button>
-              )}
+              {/* Right Column: Processing Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Processing Settings</h3>
+
+                {/* Cloudflare Settings */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    Original Image Quality
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="cloudflareWidth" className="text-xs">
+                        Width (px)
+                      </Label>
+                      <Input
+                        id="cloudflareWidth"
+                        type="number"
+                        value={cloudflareWidth}
+                        onChange={(e) => setCloudflareWidth(e.target.value)}
+                        placeholder="2000"
+                        min="100"
+                        max="5000"
+                        className="text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="cloudflareQuality" className="text-xs">
+                        Quality (%)
+                      </Label>
+                      <Input
+                        id="cloudflareQuality"
+                        type="number"
+                        value={cloudflareQuality}
+                        onChange={(e) => setCloudflareQuality(e.target.value)}
+                        placeholder="100"
+                        min="1"
+                        max="100"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+
+        <ImageProcessingModalFooter
+          enablePreview={enablePreview}
+          galleryId={galleryId}
+          showPreview={showPreview}
+          processedImage={processedImage}
+          isGalleryProcessing={isGalleryProcessing}
+          isReplacing={isReplacing}
+          isProcessing={isProcessing}
+          isProcessingHighRes={isProcessingHighRes}
+          highResMultiplier={highResMultiplier}
+          isUploading={isUploading}
+          processedImageUrl={processedImageUrl}
+          highResImageUrl={highResImageUrl}
+          cloudflareResult={cloudflareResult}
+          onReplaceImage={() => handleReplaceImage()}
+          onSaveToImages={() => handleUploadToCloudflare()}
+          onDownloadLocal={() => handleDownload()}
+          onReset={handleReset}
+          onClose={handleClose}
+          canProcess={!!image}
+          processButtonContent={{
+            idle: {
+              icon: <Palette className="mr-2 h-4 w-4" />,
+              text: "Create Matte",
+            },
+            processing: { text: "Creating Matte..." },
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

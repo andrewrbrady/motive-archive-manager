@@ -1,24 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { ImageData } from "@/app/images/columns";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Loader2,
   Download,
@@ -31,14 +17,31 @@ import {
   Settings,
   Cloud,
   Monitor,
+  ZoomIn,
+  Palette,
+  Check,
+  X,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
+import { useAPI } from "@/hooks/useAPI";
+import { useGalleryImageProcessing } from "@/lib/hooks/useGalleryImageProcessing";
+import { toast as hotToast } from "react-hot-toast";
+import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { ImageProcessingModalHeader } from "./shared/ImageProcessingModalHeader";
+import { ImageProcessingModalFooter } from "./shared/ImageProcessingModalFooter";
+import { ImageDisplayWindow } from "@/components/ui/image-processing/ImageDisplayWindow";
+import { PresetSizes } from "@/components/ui/image-processing/PresetSizes";
 
 interface CanvasExtensionModalProps {
   isOpen: boolean;
   onClose: () => void;
   image: ImageData | null;
+  // New optional props for preview workflow
+  enablePreview?: boolean;
+  galleryId?: string;
+  onImageReplaced?: (originalImageId: string, newImageData: any) => void;
 }
 
 interface ImageDimensions {
@@ -55,26 +58,77 @@ interface CloudflareUploadResult {
   error?: string;
 }
 
-type ProcessingMethod = "cloud" | "local";
+interface ExtendCanvasResponse {
+  success: boolean;
+  processedImageUrl: string;
+  remoteServiceUsed?: boolean;
+  remoteService?: boolean;
+  error?: string;
+  cloudflareUpload?: CloudflareUploadResult;
+}
+
+interface ProcessedImageData {
+  _id: string;
+  url: string;
+  filename: string;
+  metadata: any;
+  carId: string;
+}
+
+interface ExtendCanvasData {
+  imageUrl: string;
+  desiredHeight: number;
+  paddingPct: number;
+  whiteThresh: number;
+  uploadToCloudflare: boolean;
+  originalFilename: string;
+  requestedWidth: number;
+  requestedHeight: number;
+  scaleMultiplier: number;
+}
 
 export function CanvasExtensionModal({
   isOpen,
   onClose,
   image,
+  enablePreview = false,
+  galleryId,
+  onImageReplaced,
 }: CanvasExtensionModalProps) {
+  // All hooks must be declared first - no early returns allowed
+  const api = useAPI();
+
+  // Gallery processing hooks
+  const {
+    previewProcessImage,
+    replaceImageInGallery,
+    isProcessing: isGalleryProcessing,
+    isReplacing,
+  } = useGalleryImageProcessing();
+
+  // Gallery preview workflow state
+  const [processedImage, setProcessedImage] =
+    useState<ProcessedImageData | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Canvas extension settings
   const [desiredHeight, setDesiredHeight] = useState<string>("1200");
   const [paddingPct, setPaddingPct] = useState<string>("0.05");
   const [whiteThresh, setWhiteThresh] = useState<string>("90");
+
+  // Cloudflare settings
   const [cloudflareWidth, setCloudflareWidth] = useState<string>("2000");
   const [cloudflareQuality, setCloudflareQuality] = useState<string>("100");
-  const [processingMethod, setProcessingMethod] =
-    useState<ProcessingMethod>("cloud");
+
+  // State management
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessingHighRes, setIsProcessingHighRes] = useState(false);
   const [highResMultiplier, setHighResMultiplier] = useState<number | null>(
     null
   );
+
+  // Image URLs and dimensions
   const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(
     null
   );
@@ -85,27 +139,19 @@ export function CanvasExtensionModal({
     useState<ImageDimensions | null>(null);
   const [highResDimensions, setHighResDimensions] =
     useState<ImageDimensions | null>(null);
+
+  // Upload and status
   const [cloudflareResult, setCloudflareResult] =
     useState<CloudflareUploadResult | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [remoteServiceUsed, setRemoteServiceUsed] = useState<boolean>(false);
+  const [imageLoadError, setImageLoadError] = useState<boolean>(false);
+  const [processedImageLoadError, setProcessedImageLoadError] =
+    useState<boolean>(false);
 
-  // Load processing method preference from localStorage
-  useEffect(() => {
-    const savedMethod = localStorage.getItem(
-      "canvasExtensionMethod"
-    ) as ProcessingMethod;
-    if (savedMethod && (savedMethod === "cloud" || savedMethod === "local")) {
-      setProcessingMethod(savedMethod);
-    }
-  }, []);
-
-  // Save processing method preference to localStorage
-  const handleProcessingMethodChange = (method: ProcessingMethod) => {
-    setProcessingMethod(method);
-    localStorage.setItem("canvasExtensionMethod", method);
-  };
+  // Debug features
+  const [useTestImage, setUseTestImage] = useState<boolean>(false);
 
   // Helper function to build enhanced Cloudflare URL
   const getEnhancedImageUrl = (
@@ -114,46 +160,52 @@ export function CanvasExtensionModal({
     quality?: string
   ) => {
     let params = [];
-    // Always check for truthy values and non-empty strings
     if (width && width.trim() !== "") params.push(`w=${width}`);
     if (quality && quality.trim() !== "") params.push(`q=${quality}`);
 
     if (params.length === 0) return baseUrl;
 
-    // Handle different Cloudflare URL formats
-    // Format: https://imagedelivery.net/account/image-id/public
-    // Should become: https://imagedelivery.net/account/image-id/w=1080,q=100
     if (baseUrl.includes("imagedelivery.net")) {
-      // Replace the last segment (usually 'public') with our parameters
-      const urlParts = baseUrl.split("/");
-      urlParts[urlParts.length - 1] = params.join(",");
-      return urlParts.join("/");
+      if (baseUrl.endsWith("/public") || baseUrl.match(/\/[a-zA-Z]+$/)) {
+        const urlParts = baseUrl.split("/");
+        urlParts[urlParts.length - 1] = params.join(",");
+        return urlParts.join("/");
+      } else {
+        return `${baseUrl}/${params.join(",")}`;
+      }
     }
 
-    // Fallback for other URL formats
     return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
   };
 
-  // Memoize the enhanced image URL to prevent useEffect dependency array changes
+  // Get gallery processing URL (strips Cloudflare transforms for API calls)
+  const getProcessingImageUrl = (baseUrl: string) => {
+    if (!baseUrl.includes("imagedelivery.net")) {
+      return baseUrl;
+    }
+
+    const urlParts = baseUrl.split("/");
+    const baseUrlWithoutVariant = urlParts.slice(0, -1).join("/");
+    return `${baseUrlWithoutVariant}/public`;
+  };
+
+  // Test image URL for debugging
+  const testImageUrl =
+    "https://imagedelivery.net/DPuFizKWBZCkvs8FG_hh3A/6b46d5c0-bf1c-48e4-92d3-cd0a16d3e700/public";
+
+  // Get the enhanced image URL for display
   const enhancedImageUrl = useMemo(() => {
     if (!image?.url) return null;
-    const enhanced = getEnhancedImageUrl(
-      image.url,
-      cloudflareWidth,
-      cloudflareQuality
-    );
-    console.log("URL transformation:", {
-      original: image.url,
-      enhanced: enhanced,
-      width: cloudflareWidth,
-      quality: cloudflareQuality,
-    });
-    return enhanced;
-  }, [image?.url, cloudflareWidth, cloudflareQuality]);
+    if (useTestImage) return testImageUrl;
+    return getEnhancedImageUrl(image.url, cloudflareWidth, cloudflareQuality);
+  }, [image?.url, cloudflareWidth, cloudflareQuality, useTestImage]);
 
-  // Load original image dimensions
+  // Get current image URL for display
+  const currentImageUrl = useTestImage ? testImageUrl : enhancedImageUrl;
+
+  // Set up dimensions on image load
   useEffect(() => {
-    if (enhancedImageUrl) {
+    if (currentImageUrl) {
       const img = new window.Image();
       img.onload = () => {
         setOriginalDimensions({
@@ -161,83 +213,33 @@ export function CanvasExtensionModal({
           height: img.naturalHeight,
         });
       };
-      img.src = enhancedImageUrl;
+      img.src = currentImageUrl;
     }
-  }, [enhancedImageUrl]);
+  }, [currentImageUrl]);
 
-  // Get the current enhanced image URL for display
-  const currentImageUrl = enhancedImageUrl;
-
-  // Load processed image dimensions when processed image changes
-  useEffect(() => {
-    if (processedImageUrl) {
-      const img = new window.Image();
-      img.onload = () => {
-        setProcessedDimensions({
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-        });
-      };
-      img.src = processedImageUrl;
-    } else {
-      setProcessedDimensions(null);
-    }
-  }, [processedImageUrl]);
-
-  // Load high-res image dimensions when high-res image changes
-  useEffect(() => {
-    if (highResImageUrl) {
-      const img = new window.Image();
-      img.onload = () => {
-        setHighResDimensions({
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-        });
-      };
-      img.src = highResImageUrl;
-    } else {
-      setHighResDimensions(null);
-    }
-  }, [highResImageUrl]);
+  // Note: api is now guaranteed to be available from useAPI hook
 
   const handleProcess = async () => {
-    if (!image || !enhancedImageUrl) return;
+    if (!image || !enhancedImageUrl || !api) return;
 
     setIsProcessing(true);
     setCloudflareResult(null);
     setRemoteServiceUsed(false);
 
     try {
-      // Use the unified API endpoint that handles both cloud and local processing
-      const apiEndpoint = "/api/images/extend-canvas";
-
-      const response = await fetch(apiEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl: enhancedImageUrl,
-          desiredHeight: parseInt(desiredHeight),
-          paddingPct: parseFloat(paddingPct),
-          whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
-          processingMethod: processingMethod,
-          uploadToCloudflare: false,
-          originalFilename: image.filename,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to process image");
-      }
-
-      const result = await response.json();
+      const result = (await api.post("images/extend-canvas", {
+        imageUrl: enhancedImageUrl,
+        desiredHeight: parseInt(desiredHeight),
+        paddingPct: parseFloat(paddingPct),
+        whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+        uploadToCloudflare: false,
+        originalFilename: image.filename,
+      })) as ExtendCanvasResponse;
 
       if (result.success) {
         setProcessedImageUrl(result.processedImageUrl);
         setProcessingStatus("completed");
 
-        // Track which service was used
         if (result.remoteServiceUsed || result.remoteService) {
           setRemoteServiceUsed(true);
         }
@@ -266,58 +268,46 @@ export function CanvasExtensionModal({
   };
 
   const handleHighResProcess = async (multiplier: 2 | 4) => {
-    if (!image || !processedDimensions) return;
+    if (!image || !enhancedImageUrl || !api) return;
 
     setIsProcessingHighRes(true);
     setHighResMultiplier(multiplier);
-    setHighResImageUrl(null);
-    setHighResDimensions(null);
 
     try {
-      // Calculate the high-resolution target dimensions
-      // Scale BOTH width and height to maintain aspect ratio
-      const targetWidth = processedDimensions.width * multiplier;
-      const targetHeight = processedDimensions.height * multiplier;
-
-      // Get the high-resolution source image from Cloudflare
-      // Use the multiplied width to get a proportionally larger source image
       const highResCloudflareWidth = parseInt(cloudflareWidth) * multiplier;
+      const highResDesiredHeight = parseInt(desiredHeight) * multiplier;
       const highResSourceUrl = getEnhancedImageUrl(
         image.url,
         highResCloudflareWidth.toString(),
         cloudflareQuality
       );
 
-      const response = await fetch("/api/images/extend-canvas", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl: highResSourceUrl, // Use high-resolution source from Cloudflare
-          desiredHeight: targetHeight,
-          paddingPct: parseFloat(paddingPct),
-          whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
-          uploadToCloudflare: false,
-          originalFilename: image.filename,
-        }),
-      });
+      const result = (await api.post("images/extend-canvas", {
+        imageUrl: highResSourceUrl,
+        desiredHeight: highResDesiredHeight,
+        paddingPct: parseFloat(paddingPct),
+        whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+        uploadToCloudflare: false,
+        originalFilename: image.filename,
+      })) as ExtendCanvasResponse;
 
-      if (!response.ok) {
-        throw new Error("Failed to process high-resolution image");
+      if (result.success) {
+        setHighResImageUrl(result.processedImageUrl);
+        toast({
+          title: "Success",
+          description: `${multiplier}x high-resolution image generated`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "High-resolution processing failed",
+          variant: "destructive",
+        });
       }
-
-      const result = await response.json();
-      setHighResImageUrl(result.processedImageUrl);
-
-      toast({
-        title: "Success",
-        description: `${multiplier}x high-resolution image processed successfully (${targetWidth}×${targetHeight})`,
-      });
     } catch (error) {
       toast({
         title: "Error",
-        description: `Failed to process ${multiplier}x high-resolution image`,
+        description: "Failed to generate high-resolution image",
         variant: "destructive",
       });
     } finally {
@@ -326,29 +316,27 @@ export function CanvasExtensionModal({
   };
 
   const handleUploadToCloudflare = async () => {
-    if (!image || !processedImageUrl || !enhancedImageUrl) return;
+    if (!image || !processedImageUrl || !enhancedImageUrl || !api) return;
 
     setIsUploading(true);
     setCloudflareResult(null);
 
     try {
-      // If we have a high-res image, use high-res parameters for upload
       let uploadHeight = parseInt(desiredHeight);
       let uploadSourceUrl = enhancedImageUrl;
       let uploadFilename = image.filename;
+      let uploadRequestedWidth: number | undefined = undefined;
+      let uploadRequestedHeight: number | undefined = undefined;
 
       if (highResImageUrl && highResMultiplier && processedDimensions) {
-        // Use high-resolution parameters
-        uploadHeight = processedDimensions.height * highResMultiplier;
-        const highResCloudflareWidth =
-          parseInt(cloudflareWidth) * highResMultiplier;
-        uploadSourceUrl = getEnhancedImageUrl(
-          image.url,
-          highResCloudflareWidth.toString(),
-          cloudflareQuality
-        );
+        // For high-res uploads, calculate target dimensions
+        uploadRequestedWidth = processedDimensions.width * highResMultiplier;
+        uploadRequestedHeight = processedDimensions.height * highResMultiplier;
+        uploadHeight = uploadRequestedHeight;
 
-        // Update filename to indicate high-res
+        // Use the processing image URL (without Cloudflare transforms) to avoid input distortion
+        uploadSourceUrl = getProcessingImageUrl(image.url);
+
         const baseFilename = image.filename || "image";
         const nameWithoutExt = baseFilename.replace(/\.[^/.]+$/, "");
         const ext = baseFilename.includes(".")
@@ -357,27 +345,18 @@ export function CanvasExtensionModal({
         uploadFilename = `${nameWithoutExt}_${highResMultiplier}x.${ext}`;
       }
 
-      const response = await fetch("/api/images/extend-canvas", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          imageUrl: uploadSourceUrl,
-          desiredHeight: uploadHeight,
-          paddingPct: parseFloat(paddingPct),
-          whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
-          uploadToCloudflare: true,
-          originalFilename: uploadFilename,
-          originalCarId: image.carId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to upload image");
-      }
-
-      const result = await response.json();
+      const result = (await api.post("images/extend-canvas", {
+        imageUrl: uploadSourceUrl,
+        desiredHeight: uploadHeight,
+        paddingPct: parseFloat(paddingPct),
+        whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+        uploadToCloudflare: true,
+        originalFilename: uploadFilename,
+        originalCarId: image.carId,
+        requestedWidth: uploadRequestedWidth,
+        requestedHeight: uploadRequestedHeight,
+        scaleMultiplier: highResMultiplier,
+      })) as ExtendCanvasResponse;
 
       if (result.cloudflareUpload) {
         setCloudflareResult(result.cloudflareUpload);
@@ -402,7 +381,7 @@ export function CanvasExtensionModal({
       }
     } catch (error) {
       toast({
-        title: "Error",
+        title: "Upload Error",
         description: "Failed to upload image",
         variant: "destructive",
       });
@@ -413,7 +392,6 @@ export function CanvasExtensionModal({
 
   const handleDownload = () => {
     if (processedImageUrl) {
-      // Convert data URL to blob for better download handling
       fetch(processedImageUrl)
         .then((res) => res.blob())
         .then((blob) => {
@@ -427,7 +405,6 @@ export function CanvasExtensionModal({
           window.URL.revokeObjectURL(url);
         })
         .catch(() => {
-          // Fallback to direct download
           const link = document.createElement("a");
           link.href = processedImageUrl;
           link.download = `extended_${image?.filename || "image"}`;
@@ -439,18 +416,10 @@ export function CanvasExtensionModal({
   };
 
   const handleHighResDownload = () => {
-    console.log("High-res download triggered:", {
-      highResImageUrl: highResImageUrl ? "exists" : "null",
-      highResMultiplier,
-      imageFilename: image?.filename,
-    });
-
-    if (highResImageUrl && highResMultiplier) {
-      // Convert data URL to blob for better download handling
+    if (highResImageUrl) {
       fetch(highResImageUrl)
         .then((res) => res.blob())
         .then((blob) => {
-          console.log("Blob created successfully:", blob.size, "bytes");
           const url = window.URL.createObjectURL(blob);
           const link = document.createElement("a");
           link.href = url;
@@ -460,9 +429,7 @@ export function CanvasExtensionModal({
           document.body.removeChild(link);
           window.URL.revokeObjectURL(url);
         })
-        .catch((error) => {
-          console.error("Blob creation failed:", error);
-          // Fallback to direct download
+        .catch(() => {
           const link = document.createElement("a");
           link.href = highResImageUrl;
           link.download = `extended_${highResMultiplier}x_${image?.filename || "image"}`;
@@ -470,19 +437,135 @@ export function CanvasExtensionModal({
           link.click();
           document.body.removeChild(link);
         });
-    } else {
-      console.error("Missing required data for high-res download:", {
-        highResImageUrl: !!highResImageUrl,
-        highResMultiplier,
-      });
     }
   };
 
   const handleViewInGallery = () => {
-    if (cloudflareResult?.success) {
-      // Refresh the page to show the new image in the gallery
-      window.location.reload();
+    if (cloudflareResult?.imageUrl) {
+      window.open(cloudflareResult.imageUrl, "_blank");
     }
+  };
+
+  const handlePreview = async () => {
+    if (!image || !enhancedImageUrl) return;
+    if (!enablePreview || !galleryId || !previewProcessImage) return;
+
+    const processingImageUrl = getProcessingImageUrl(image.url);
+
+    console.log("🖼️ Canvas Extension processing starting:", {
+      originalUrl: image.url,
+      enhancedUrl: enhancedImageUrl.substring(0, 100) + "...",
+      processingUrl: processingImageUrl,
+      parameters: {
+        desiredHeight: parseInt(desiredHeight),
+        paddingPct: parseFloat(paddingPct),
+        whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+      },
+    });
+
+    const parameters = {
+      imageUrl: processingImageUrl,
+      desiredHeight: parseInt(desiredHeight),
+      paddingPct: parseFloat(paddingPct),
+      whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+    };
+
+    try {
+      const result = await previewProcessImage({
+        galleryId,
+        imageId: image._id,
+        processingType: "canvas-extension",
+        parameters,
+      });
+
+      if (result && result.success) {
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Canvas Extension processing completed successfully");
+        setProcessedImage(result.processedImage);
+        setShowPreview(true);
+      } else {
+        console.error("❌ Canvas Extension processing failed:", {
+          hasResult: !!result,
+          success: result?.success,
+          message: result
+            ? "Processing returned false success"
+            : "No result returned",
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      const errorMessage =
+        (error as any)?.message || (error as any)?.error || "Unknown error";
+      const errorDetails =
+        (error as any)?.response?.data || (error as any)?.data || error;
+      console.error("❌ Canvas Extension processing error:", {
+        message: errorMessage,
+        details: errorDetails,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  };
+
+  const handleReplaceImage = async () => {
+    if (!api) return;
+    if (!image || !processedImage) return;
+    if (
+      !enablePreview ||
+      !galleryId ||
+      !replaceImageInGallery ||
+      !onImageReplaced
+    )
+      return;
+
+    const processingImageUrl = getProcessingImageUrl(image.url);
+
+    console.log("🔄 Canvas Extension replacement starting:", {
+      originalUrl: image.url,
+      processingUrl: processingImageUrl,
+    });
+
+    const parameters = {
+      imageUrl: processingImageUrl,
+      desiredHeight: parseInt(desiredHeight),
+      paddingPct: parseFloat(paddingPct),
+      whiteThresh: whiteThresh === "-1" ? -1 : parseInt(whiteThresh),
+    };
+
+    try {
+      const result = await replaceImageInGallery(
+        galleryId,
+        image._id,
+        "canvas-extension",
+        parameters
+      );
+
+      if (result && result.success && onImageReplaced) {
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Canvas Extension replacement completed successfully");
+        onImageReplaced(result.originalImageId, result.processedImage);
+        handleClose();
+      } else {
+        console.error("❌ Canvas Extension replacement failed:", {
+          hasResult: !!result,
+          success: result?.success,
+          hasCallback: !!onImageReplaced,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      const errorMessage =
+        (error as any)?.message || (error as any)?.error || "Unknown error";
+      const errorDetails =
+        (error as any)?.response?.data || (error as any)?.data || error;
+      console.error("❌ Canvas Extension replacement error:", {
+        message: errorMessage,
+        details: errorDetails,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  };
+
+  const handleDiscardPreview = () => {
+    setProcessedImage(null);
+    setShowPreview(false);
   };
 
   const handleReset = () => {
@@ -497,6 +580,11 @@ export function CanvasExtensionModal({
     setWhiteThresh("90");
     setCloudflareWidth("2000");
     setCloudflareQuality("100");
+    setImageLoadError(false);
+    setProcessedImageLoadError(false);
+    setUseTestImage(false);
+    setProcessedImage(null);
+    setShowPreview(false);
   };
 
   const handleClose = () => {
@@ -507,511 +595,282 @@ export function CanvasExtensionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Canvas Extension</DialogTitle>
-          <DialogDescription>
-            Auto-extend the vertical canvas of studio car photos. The program
-            detects the car and its shadow, preserves configurable padding, then
-            stretches the remaining background to reach the target height.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-6xl max-h-[85vh] mx-4 overflow-hidden flex flex-col">
+        <ImageProcessingModalHeader
+          icon={<ZoomIn className="h-5 w-5" />}
+          title="Canvas Extension Tool"
+          description="Auto-extend the vertical canvas of studio car photos. The program detects the car and its shadow, preserves configurable padding, then stretches the remaining background to reach the target height."
+          image={image}
+          processingStatus={processingStatus}
+          error={error}
+          cloudflareResult={cloudflareResult}
+        />
 
-        {/* Car Association Indicator */}
-        {image && (
-          <div className="mx-6 -mt-2 mb-4">
-            {image.carId && image.carId !== "" ? (
-              <div className="flex items-center gap-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <Car className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                  This image is associated with a car
-                </span>
-                <span className="text-xs text-blue-600/80 dark:text-blue-400/80 ml-auto">
-                  Processed images will be linked to the car
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
-                <Car className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  This image is not associated with any car
-                </span>
-                <span className="text-xs text-gray-600/80 dark:text-gray-400/80 ml-auto">
-                  Processed images will be standalone
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+        <div className="flex-1 overflow-y-auto">
+          <div className="space-y-4 p-1">
+            {/* Top Row: Image Preview Side by Side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Left: Original Image */}
+              <ImageDisplayWindow
+                title="Original Image"
+                imageUrl={currentImageUrl}
+                altText={image?.filename || "Original image"}
+                dimensions={originalDimensions}
+                loadError={imageLoadError}
+                onError={(e) => {
+                  console.error("Image load error:", e);
+                  setImageLoadError(true);
+                }}
+                onLoad={(e) => {
+                  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Image loaded successfully");
+                  setImageLoadError(false);
+                }}
+                fallbackContent={
+                  <div className="text-center">
+                    <Eye className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No image selected</p>
+                    {image?.url && (
+                      <p className="text-xs mt-1">Original: {image.url}</p>
+                    )}
+                  </div>
+                }
+              />
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Left side - Controls */}
-          <div className="space-y-4">
-            <div className="space-y-4">
-              {/* Cloudflare Image Quality Controls */}
-              <div className="p-3 border rounded-lg bg-muted/30">
-                <Label className="text-sm font-medium mb-2 block">
-                  Original Image Quality
-                </Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label htmlFor="cloudflareWidth" className="text-xs">
-                      Width (px)
-                    </Label>
-                    <Input
-                      id="cloudflareWidth"
-                      type="number"
-                      value={cloudflareWidth}
-                      onChange={(e) => setCloudflareWidth(e.target.value)}
-                      placeholder="2000"
-                      min="100"
-                      max="5000"
-                      className="text-sm"
-                    />
+              {/* Right: Processed Image */}
+              <ImageDisplayWindow
+                title={
+                  highResImageUrl
+                    ? `High-Res Extended (${highResMultiplier}x)`
+                    : "Extended Canvas"
+                }
+                imageUrl={
+                  enablePreview && processedImage?.url
+                    ? processedImage.url
+                    : highResImageUrl || processedImageUrl
+                }
+                altText={
+                  highResImageUrl
+                    ? "High-resolution extended canvas"
+                    : "Extended canvas"
+                }
+                dimensions={highResDimensions || processedDimensions}
+                loadError={processedImageLoadError}
+                onError={(e) => {
+                  console.error("Processed image load error:", e);
+                  setProcessedImageLoadError(true);
+                }}
+                onLoad={(e) => {
+                  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Processed image loaded successfully");
+                  setProcessedImageLoadError(false);
+                }}
+                fallbackContent={
+                  <div className="text-center">
+                    <Eye className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Extended canvas will appear here</p>
                   </div>
-                  <div>
-                    <Label htmlFor="cloudflareQuality" className="text-xs">
-                      Quality (%)
-                    </Label>
-                    <Input
-                      id="cloudflareQuality"
-                      type="number"
-                      value={cloudflareQuality}
-                      onChange={(e) => setCloudflareQuality(e.target.value)}
-                      placeholder="100"
-                      min="1"
-                      max="100"
-                      className="text-sm"
-                    />
-                  </div>
+                }
+                showGalleryPreview={
+                  !!(
+                    enablePreview &&
+                    galleryId &&
+                    showPreview &&
+                    processedImage
+                  )
+                }
+              />
+            </div>
+
+            {/* Bottom Row: Settings in Two-Column Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Left Column: Canvas Extension Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">
+                  Canvas Extension Settings
+                </h3>
+
+                {/* Desired Height */}
+                <div>
+                  <Label htmlFor="desiredHeight">Desired Height (pixels)</Label>
+                  <Input
+                    id="desiredHeight"
+                    type="number"
+                    value={desiredHeight}
+                    onChange={(e) => setDesiredHeight(e.target.value)}
+                    placeholder="1200"
+                    min="100"
+                    max="5000"
+                  />
                 </div>
-              </div>
 
-              {/* Processing Method Settings */}
-              <div className="p-3 border rounded-lg bg-muted/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <Settings className="h-4 w-4" />
-                  <Label className="text-sm font-medium">
-                    Processing Method
+                {/* Preset Sizes */}
+                <PresetSizes
+                  onSizeSelect={(width, height) => {
+                    setDesiredHeight(height.toString());
+                    setCloudflareWidth(width.toString());
+                  }}
+                />
+
+                {/* Padding Percentage */}
+                <div>
+                  <Label htmlFor="paddingPct">Padding Percentage</Label>
+                  <Input
+                    id="paddingPct"
+                    type="number"
+                    step="0.01"
+                    value={paddingPct}
+                    onChange={(e) => setPaddingPct(e.target.value)}
+                    placeholder="0.05"
+                    min="0"
+                    max="1"
+                  />
+                </div>
+
+                {/* White Threshold */}
+                <div>
+                  <Label htmlFor="whiteThresh" className="block mb-3">
+                    White Threshold
                   </Label>
-                </div>
-                <Select
-                  value={processingMethod}
-                  onValueChange={handleProcessingMethodChange}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select processing method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cloud">
-                      <div className="flex items-center gap-2">
-                        <Cloud className="h-4 w-4" />
-                        <span>Cloud Run</span>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <Slider
+                          value={[
+                            whiteThresh === "-1" ? 90 : parseInt(whiteThresh),
+                          ]}
+                          onValueChange={(value) =>
+                            setWhiteThresh(value[0].toString())
+                          }
+                          max={255}
+                          min={0}
+                          step={1}
+                          className="w-full"
+                          disabled={whiteThresh === "-1"}
+                        />
                       </div>
-                    </SelectItem>
-                    <SelectItem value="local">
-                      <div className="flex items-center gap-2">
-                        <Monitor className="h-4 w-4" />
-                        <span>Local Binary</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="desiredHeight">Desired Height (pixels)</Label>
-                <Input
-                  id="desiredHeight"
-                  type="number"
-                  value={desiredHeight}
-                  onChange={(e) => setDesiredHeight(e.target.value)}
-                  placeholder="1200"
-                  min="100"
-                  max="5000"
-                />
-
-                {/* Aspect Ratio Preset Buttons */}
-                {originalDimensions && (
-                  <div className="flex gap-2 mt-2 flex-wrap">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setDesiredHeight("1920");
-                        setCloudflareWidth("1080");
-                      }}
-                      className="text-xs"
-                    >
-                      9:16 (1080×1920)
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setDesiredHeight("1350");
-                        setCloudflareWidth("1080");
-                      }}
-                      className="text-xs"
-                    >
-                      4:5 (1080×1350)
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setDesiredHeight("1080");
-                        setCloudflareWidth("1080");
-                      }}
-                      className="text-xs"
-                    >
-                      1:1 (1080×1080)
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="paddingPct">Padding Percentage</Label>
-                <Input
-                  id="paddingPct"
-                  type="number"
-                  step="0.01"
-                  value={paddingPct}
-                  onChange={(e) => setPaddingPct(e.target.value)}
-                  placeholder="0.05"
-                  min="0"
-                  max="1"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="whiteThresh" className="block mb-3">
-                  White Threshold
-                </Label>
-
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <Slider
-                        value={[
-                          whiteThresh === "-1" ? 90 : parseInt(whiteThresh),
-                        ]}
-                        onValueChange={(value) =>
-                          setWhiteThresh(value[0].toString())
+                      <Button
+                        type="button"
+                        variant={whiteThresh === "-1" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() =>
+                          setWhiteThresh(whiteThresh === "-1" ? "90" : "-1")
                         }
-                        max={255}
-                        min={0}
-                        step={1}
-                        className="w-full"
-                        disabled={whiteThresh === "-1"}
+                        className="px-3"
+                      >
+                        Auto
+                      </Button>
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs text-muted-foreground">
+                      <span>0 (Black)</span>
+                      <span className="font-medium">
+                        {whiteThresh === "-1"
+                          ? "Auto-detection"
+                          : `Value: ${whiteThresh}`}
+                      </span>
+                      <span>255 (White)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Processing Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Processing Settings</h3>
+
+                {/* Original Image Quality Controls */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    Original Image Quality
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="cloudflareWidth" className="text-xs">
+                        Width (px)
+                      </Label>
+                      <Input
+                        id="cloudflareWidth"
+                        type="number"
+                        value={cloudflareWidth}
+                        onChange={(e) => setCloudflareWidth(e.target.value)}
+                        placeholder="2000"
+                        min="100"
+                        max="5000"
+                        className="text-sm"
                       />
                     </div>
-                    <Button
-                      type="button"
-                      variant={whiteThresh === "-1" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() =>
-                        setWhiteThresh(whiteThresh === "-1" ? "90" : "-1")
-                      }
-                      className="px-3"
-                    >
-                      Auto
-                    </Button>
-                  </div>
-
-                  <div className="flex justify-between items-center text-xs text-muted-foreground">
-                    <span>0 (Black)</span>
-                    <span className="font-medium">
-                      {whiteThresh === "-1"
-                        ? "Auto-detection"
-                        : `Value: ${whiteThresh}`}
-                    </span>
-                    <span>255 (White)</span>
-                  </div>
-                </div>
-              </div>
-
-              <Button
-                onClick={handleProcess}
-                disabled={isProcessing || !image}
-                variant="outline"
-                className="w-full"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  "Process Image"
-                )}
-              </Button>
-
-              {/* Cloudflare Upload Status */}
-              {cloudflareResult && (
-                <div
-                  className={`p-3 rounded-lg border ${
-                    cloudflareResult.success
-                      ? "bg-green-500/10 border-green-500/20 dark:bg-green-500/10 dark:border-green-500/20"
-                      : "bg-red-500/10 border-red-500/20 dark:bg-red-500/10 dark:border-red-500/20"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {cloudflareResult.success ? (
-                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    )}
-                    <span
-                      className={`text-sm font-medium ${
-                        cloudflareResult.success
-                          ? "text-green-700 dark:text-green-300"
-                          : "text-red-700 dark:text-red-300"
-                      }`}
-                    >
-                      {cloudflareResult.success
-                        ? "Uploaded to Cloudflare"
-                        : "Upload Failed"}
-                    </span>
-                  </div>
-                  {cloudflareResult.success && cloudflareResult.filename && (
-                    <p className="text-xs text-green-600/80 dark:text-green-400/80 mt-1">
-                      Saved as: {cloudflareResult.filename}
-                    </p>
-                  )}
-                  {!cloudflareResult.success && cloudflareResult.error && (
-                    <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1">
-                      Error: {cloudflareResult.error}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {processedImageUrl && (
-                <div className="space-y-2">
-                  {/* High-Resolution Processing Section */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      onClick={() => handleHighResProcess(2)}
-                      disabled={isProcessingHighRes}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                    >
-                      {isProcessingHighRes && highResMultiplier === 2 ? (
-                        <>
-                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                          2x...
-                        </>
-                      ) : (
-                        "Generate 2x"
-                      )}
-                    </Button>
-
-                    <Button
-                      onClick={() => handleHighResProcess(4)}
-                      disabled={isProcessingHighRes}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                    >
-                      {isProcessingHighRes && highResMultiplier === 4 ? (
-                        <>
-                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                          4x...
-                        </>
-                      ) : (
-                        "Generate 4x"
-                      )}
-                    </Button>
-                  </div>
-
-                  {!cloudflareResult?.success && (
-                    <>
-                      {image?.carId && (
-                        <p className="text-xs text-muted-foreground text-center">
-                          Processed image will be associated with this car
-                        </p>
-                      )}
-                      <Button
-                        onClick={handleUploadToCloudflare}
-                        disabled={isUploading}
-                        variant="outline"
-                        className="w-full"
-                      >
-                        {isUploading ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Uploading...
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="mr-2 h-4 w-4" />
-                            Upload to Cloudflare
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  )}
-
-                  {cloudflareResult?.success && (
-                    <Button
-                      onClick={handleViewInGallery}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      View in Gallery
-                    </Button>
-                  )}
-
-                  <Button
-                    onClick={handleReset}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    Reset
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Middle - Original Image */}
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Original Image</Label>
-                {originalDimensions && (
-                  <span className="text-xs text-muted-foreground">
-                    {originalDimensions.width} × {originalDimensions.height}
-                  </span>
-                )}
-              </div>
-              {currentImageUrl && (
-                <div className="mt-2 border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
-                  <div className="relative max-w-full max-h-[600px]">
-                    <Image
-                      src={currentImageUrl}
-                      alt={image?.filename || "Original image"}
-                      width={0}
-                      height={0}
-                      sizes="100vw"
-                      className="w-auto h-auto max-w-full max-h-[600px] object-contain"
-                      style={{ width: "auto", height: "auto" }}
-                      key={currentImageUrl} // Force reload when URL changes
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right side - Processed Image */}
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">
-                  {highResImageUrl
-                    ? `High-Res Image (${highResMultiplier}x)`
-                    : "Processed Image"}
-                </Label>
-                {(highResDimensions || processedDimensions) && (
-                  <span className="text-xs text-muted-foreground">
-                    {highResDimensions
-                      ? `${highResDimensions.width} × ${highResDimensions.height}`
-                      : processedDimensions
-                        ? `${processedDimensions.width} × ${processedDimensions.height}`
-                        : ""}
-                  </span>
-                )}
-              </div>
-              <div className="mt-2 border rounded-lg overflow-hidden bg-muted flex items-center justify-center min-h-[300px]">
-                {highResImageUrl || processedImageUrl ? (
-                  <div className="relative max-w-full max-h-[600px]">
-                    <Image
-                      src={(highResImageUrl || processedImageUrl)!}
-                      alt={
-                        highResImageUrl
-                          ? "High-resolution processed image"
-                          : "Processed image"
-                      }
-                      width={0}
-                      height={0}
-                      sizes="100vw"
-                      className="w-auto h-auto max-w-full max-h-[600px] object-contain"
-                      style={{ width: "auto", height: "auto" }}
-                    />
-                    {highResImageUrl && (
-                      <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
-                        {highResMultiplier}x High-Res
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-                    <div className="text-center">
-                      <Eye className="h-8 w-8 mx-auto mb-2" />
-                      <p className="text-sm">
-                        Processed image will appear here
-                      </p>
+                    <div>
+                      <Label htmlFor="cloudflareQuality" className="text-xs">
+                        Quality (%)
+                      </Label>
+                      <Input
+                        id="cloudflareQuality"
+                        type="number"
+                        value={cloudflareQuality}
+                        onChange={(e) => setCloudflareQuality(e.target.value)}
+                        placeholder="100"
+                        min="1"
+                        max="100"
+                        className="text-sm"
+                      />
                     </div>
                   </div>
-                )}
-              </div>
-
-              {/* Toggle between processed and high-res images */}
-              {processedImageUrl && (
-                <div className="flex gap-2 mt-2">
-                  {highResImageUrl ? (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setHighResImageUrl(null);
-                          setHighResDimensions(null);
-                        }}
-                        className="flex-1 text-xs"
-                      >
-                        Show Standard
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={handleHighResDownload}
-                        className="flex-1 text-xs"
-                      >
-                        <Download className="mr-1 h-3 w-3" />
-                        Download {highResMultiplier}x
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={handleDownload}
-                      className="w-full text-xs"
-                    >
-                      <Download className="mr-1 h-3 w-3" />
-                      Download Standard
-                    </Button>
-                  )}
                 </div>
-              )}
+
+                {/* Debug Section - Test Image Toggle */}
+                <div className="p-2 border border-dashed border-blue-300 rounded bg-blue-50">
+                  <div className="flex items-center gap-2 mb-1">
+                    <input
+                      type="checkbox"
+                      id="useTestImageCanvas"
+                      checked={useTestImage}
+                      onChange={(e) => setUseTestImage(e.target.checked)}
+                      className="rounded"
+                    />
+                    <Label
+                      htmlFor="useTestImageCanvas"
+                      className="text-xs text-blue-700 font-medium"
+                    >
+                      🧪 Use Test Image (Debug Mode)
+                    </Label>
+                  </div>
+                  <p className="text-xs text-blue-600">
+                    Toggle to test with a known-good placeholder image
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
-            Close
-          </Button>
-        </DialogFooter>
+        <ImageProcessingModalFooter
+          enablePreview={enablePreview}
+          galleryId={galleryId}
+          showPreview={showPreview}
+          processedImage={processedImage}
+          isGalleryProcessing={isGalleryProcessing}
+          isReplacing={isReplacing}
+          isProcessing={isProcessing}
+          isProcessingHighRes={isProcessingHighRes}
+          highResMultiplier={highResMultiplier}
+          isUploading={isUploading}
+          processedImageUrl={processedImageUrl}
+          highResImageUrl={highResImageUrl}
+          cloudflareResult={cloudflareResult}
+          onReplaceImage={() => handleReplaceImage()}
+          onSaveToImages={() => handleUploadToCloudflare()}
+          onDownloadLocal={() => handleDownload()}
+          onReset={handleReset}
+          onClose={handleClose}
+          canProcess={!!image}
+          processButtonContent={{
+            idle: {
+              icon: <ZoomIn className="mr-2 h-4 w-4" />,
+              text: "Extend Canvas",
+            },
+            processing: { text: "Extending Canvas..." },
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

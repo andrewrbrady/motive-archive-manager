@@ -19,6 +19,10 @@ export interface FilterState {
   movement?: string;
   tod?: string;
   side?: string;
+  imageType?: string; // "with-id" | "processed" | "all"
+  hasImageId?: boolean; // Filter for images that have imageId
+  sortBy?: string; // "filename" | "createdAt" | "updatedAt"
+  sortDirection?: "asc" | "desc";
 }
 
 export interface FilterOptions {
@@ -34,6 +38,7 @@ export interface ExtendedImageType {
   _id: string;
   url: string;
   filename: string;
+  imageId?: string;
   metadata: {
     angle?: string;
     view?: string;
@@ -42,22 +47,9 @@ export interface ExtendedImageType {
     side?: string;
     description?: string;
     isPrimary?: boolean;
+    imageId?: string;
     [key: string]: any;
   };
   createdAt: string;
   updatedAt: string;
-}
-
-// Generate URL variations for different quality/size options
-export function getUrlVariations(baseUrl: string) {
-  const baseWithoutVariant = baseUrl.replace(/\/[^/]+$/, "");
-  return {
-    original: baseUrl,
-    w1500: `${baseWithoutVariant}/publicw=1500`,
-    w2000: `${baseWithoutVariant}/publicw=2000`,
-    w2000q80: `${baseWithoutVariant}/publicw=2000,q=80`,
-    w3000: `${baseWithoutVariant}/publicw=3000`,
-    w3000q90: `${baseWithoutVariant}/publicw=3000,q=90`,
-    fullQuality: `${baseWithoutVariant}/publicq=100`,
-  };
 }

@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import LazyImage from "@/components/LazyImage";
+import { useAPI } from "@/hooks/useAPI";
 
 interface Gallery {
   _id: string;
@@ -57,6 +58,7 @@ interface CarGalleriesProps {
 }
 
 export default function CarGalleries({ carId }: CarGalleriesProps) {
+  const api = useAPI();
   const [attachedGalleries, setAttachedGalleries] = useState<Gallery[]>([]);
   const [availableGalleries, setAvailableGalleries] = useState<Gallery[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -100,52 +102,58 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
     []
   );
 
-  // Fetch car galleries using the original working endpoint
+  // Individual fetch functions for specific use cases
   const fetchCarGalleries = useCallback(async () => {
-    if (!carId) return;
+    if (!carId || !api) return;
 
+    console.time("CarGalleries-fetchCarGalleries");
     try {
-      const response = await fetch(`/api/cars/${carId}?includeGalleries=true`);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch car galleries");
-      }
-
-      const car = await response.json();
-      console.log("[CarGalleries] Car galleries from API:", car.galleries);
-
+      const car = (await api.get(`cars/${carId}?includeGalleries=true`)) as {
+        galleries?: Gallery[];
+      };
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("[CarGalleries] Car galleries from API:", car.galleries);
       setAttachedGalleries(car.galleries || []);
     } catch (error: any) {
       console.error("[CarGalleries] Error fetching car galleries:", error);
       toast.error("Failed to fetch attached galleries");
       setAttachedGalleries([]);
+    } finally {
+      console.timeEnd("CarGalleries-fetchCarGalleries");
     }
-  }, [carId]);
+  }, [carId, api]);
 
-  const fetchAvailableGalleries = useCallback(async (search = "") => {
-    try {
-      const url = new URL("/api/galleries", window.location.origin);
-      if (search) {
-        url.searchParams.set("search", search);
+  const fetchAvailableGalleries = useCallback(
+    async (search = "") => {
+      if (!api) return;
+
+      // PERFORMANCE: Don't fetch if dialog isn't open
+      if (!isEditDialogOpen && !search) {
+        return;
       }
 
-      const response = await fetch(url.toString());
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch galleries");
+      console.time("CarGalleries-fetchAvailableGalleries");
+      try {
+        const searchParams = search
+          ? `?search=${encodeURIComponent(search)}`
+          : "";
+        const data = (await api.get(`galleries${searchParams}`)) as {
+          galleries?: Gallery[];
+        };
+        // PERFORMANCE: Limit to first 50 galleries for faster loading
+        setAvailableGalleries((data.galleries || []).slice(0, 50));
+      } catch (error: any) {
+        console.error(
+          "[CarGalleries] Error fetching available galleries:",
+          error
+        );
+        toast.error("Failed to fetch available galleries");
+        setAvailableGalleries([]);
+      } finally {
+        console.timeEnd("CarGalleries-fetchAvailableGalleries");
       }
-
-      const data = await response.json();
-      setAvailableGalleries(data.galleries || []);
-    } catch (error: any) {
-      console.error(
-        "[CarGalleries] Error fetching available galleries:",
-        error
-      );
-      toast.error("Failed to fetch available galleries");
-      setAvailableGalleries([]);
-    }
-  }, []);
+    },
+    [api, isEditDialogOpen]
+  );
 
   // Update gallery attachments - improved with better state management
   const updateGalleryAttachments = useCallback(
@@ -154,6 +162,9 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
       operation: "attach" | "detach",
       galleryId: string
     ) => {
+      if (!api) return;
+
+      console.time(`CarGalleries-updateGalleryAttachments-${operation}`);
       try {
         setIsUpdating(true);
         console.log(
@@ -173,34 +184,19 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
           JSON.stringify(requestBody, null, 2)
         );
 
-        const response = await fetch(`/api/cars/${carId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody),
-        });
+        const result = (await api.patch(`cars/${carId}`, requestBody)) as {
+          galleryIds?: string[];
+        };
 
-        if (!response.ok) {
-          const errorData = await response.text();
-          console.error(`[CarGalleries] API error response:`, errorData);
-          throw new Error(
-            `Failed to update gallery attachments: ${response.status} ${response.statusText}`
-          );
-        }
-
-        const result = await response.json();
-        // [REMOVED] // [REMOVED] console.log(`[CarGalleries] API response:`, result);
-        // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Response galleryIds:`, result.galleryIds);
         console.log(
           `[CarGalleries] Response gallery count:`,
           result.galleryIds?.length || 0
         );
 
         // Add a small delay to ensure the database update is complete
-        // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Waiting 500ms before refetch...`);
         await new Promise((resolve) => setTimeout(resolve, 500));
 
         // Refresh attached galleries to get the latest state
-        // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Refetching car galleries...`);
         await fetchCarGalleries();
 
         toast.success(
@@ -215,15 +211,16 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
         throw error;
       } finally {
         setIsUpdating(false);
+        console.timeEnd(`CarGalleries-updateGalleryAttachments-${operation}`);
       }
     },
-    [carId, attachedGalleries, fetchCarGalleries]
+    [carId, attachedGalleries, fetchCarGalleries, api]
   );
 
   // Attach gallery with proper state management
   const attachGallery = useCallback(
     async (galleryId: string) => {
-      // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Attempting to attach gallery ${galleryId}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Attempting to attach gallery ${galleryId}`);
 
       // Prevent double-clicking using Set operations
       if (operationInProgress.has(galleryId) || isUpdating) {
@@ -235,7 +232,7 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
 
       // Check if already attached
       if (attachedGalleries.some((g) => g._id === galleryId)) {
-        // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Gallery ${galleryId} is already attached`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Gallery ${galleryId} is already attached`);
         toast.info("Gallery is already attached");
         return;
       }
@@ -277,7 +274,7 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
   // Detach gallery with proper state management
   const detachGallery = useCallback(
     async (galleryId: string) => {
-      // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Attempting to detach gallery ${galleryId}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Attempting to detach gallery ${galleryId}`);
 
       // Prevent double-clicking using Set operations
       if (operationInProgress.has(galleryId) || isUpdating) {
@@ -289,7 +286,7 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
 
       // Check if actually attached
       if (!attachedGalleries.some((g) => g._id === galleryId)) {
-        // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Gallery ${galleryId} is not attached`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[CarGalleries] Gallery ${galleryId} is not attached`);
         toast.info("Gallery is not attached");
         return;
       }
@@ -336,30 +333,58 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
     return availableGalleries.filter((g) => !attachedIds.has(g._id));
   }, [attachedGalleries, availableGalleries]);
 
-  // Load data when carId changes
+  // Initial load effect with TRULY parallel fetching
   useEffect(() => {
-    if (!carId) return;
+    if (!carId || !api) return;
 
     const loadData = async () => {
       setIsLoading(true);
+      console.time("CarGalleries-fetchCarGalleries");
       try {
-        await Promise.all([fetchCarGalleries(), fetchAvailableGalleries("")]);
+        // PERFORMANCE: Only fetch car galleries initially, not available galleries
+        const carData = (await api.get(
+          `cars/${carId}?includeGalleries=true`
+        )) as {
+          galleries?: Gallery[];
+        };
+
+        console.log(
+          "[CarGalleries] Car galleries from API:",
+          carData.galleries
+        );
+        setAttachedGalleries(carData.galleries || []);
+        // Don't fetch available galleries until dialog is opened
+      } catch (error: any) {
+        console.error("[CarGalleries] Error fetching data:", error);
+        toast.error("Failed to fetch gallery data");
+        setAttachedGalleries([]);
+        setAvailableGalleries([]);
       } finally {
+        console.timeEnd("CarGalleries-fetchCarGalleries");
         setIsLoading(false);
       }
     };
 
     loadData();
-  }, [carId, fetchCarGalleries, fetchAvailableGalleries]);
+  }, [carId, api]);
 
   // Handle search with debouncing
   useEffect(() => {
+    if (!api) return;
+
     const timeoutId = setTimeout(() => {
       fetchAvailableGalleries(searchTerm);
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, fetchAvailableGalleries]);
+  }, [searchTerm, api, fetchAvailableGalleries]);
+
+  // Fetch available galleries when dialog opens
+  useEffect(() => {
+    if (isEditDialogOpen && availableGalleries.length === 0) {
+      fetchAvailableGalleries();
+    }
+  }, [isEditDialogOpen, availableGalleries.length, fetchAvailableGalleries]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -370,16 +395,13 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
     };
   }, []);
 
-  if (isLoading) {
+  // Show loading state when API is not ready or during data loading
+  if (!api || isLoading) {
     return (
-      <div className="space-y-4">
-        <div className="animate-pulse">
-          <div className="h-4 bg-muted rounded w-1/4 mb-4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-muted rounded-lg h-64"></div>
-            ))}
-          </div>
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading galleries...</p>
         </div>
       </div>
     );
@@ -443,6 +465,9 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
                                 width={64}
                                 height={64}
                                 className="w-full h-full object-cover"
+                                priority={false}
+                                loadingVariant="none"
+                                sizes="64px"
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
@@ -557,6 +582,9 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
                                 width={64}
                                 height={64}
                                 className="w-full h-full object-cover"
+                                priority={false}
+                                loadingVariant="none"
+                                sizes="64px"
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
@@ -678,11 +706,13 @@ export default function CarGalleries({ carId }: CarGalleriesProps) {
                   <LazyImage
                     src={gallery.thumbnailImage.url}
                     alt={gallery.name}
-                    width={1600}
-                    height={900}
+                    width={400}
+                    height={225}
                     className="w-full h-full"
-                    priority={index < 3}
+                    priority={index < 2}
                     objectFit="cover"
+                    loadingVariant="none"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   />
                 ) : (
                   <div className="h-full w-full flex items-center justify-center">

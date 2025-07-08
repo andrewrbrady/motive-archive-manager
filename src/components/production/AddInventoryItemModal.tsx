@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { v4 as uuidv4 } from "uuid";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { uploadToCloudflare } from "@/lib/cloudflare";
+import { useAPI } from "@/hooks/useAPI";
 
 // Define a local interface for our upload tracking
 interface FileUploadProgress {
@@ -49,11 +50,17 @@ interface AddInventoryItemModalProps {
   onAdd: (item: Omit<StudioInventoryItem, "id">) => void;
 }
 
+// TypeScript interfaces for API responses
+interface ContainersResponse {
+  containers?: any[];
+}
+
 export default function AddInventoryItemModal({
   isOpen,
   onClose,
   onAdd,
 }: AddInventoryItemModalProps) {
+  const api = useAPI();
   const [formData, setFormData] = useState<Partial<StudioInventoryItem>>({
     name: "",
     category: "Other",
@@ -89,7 +96,7 @@ export default function AddInventoryItemModal({
       fetchContainers();
     } else {
       // Reset form data when modal is closed
-      // [REMOVED] // [REMOVED] console.log("Resetting form data on modal close");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Resetting form data on modal close");
       setFormData({
         name: "",
         category: "Other",
@@ -113,11 +120,11 @@ export default function AddInventoryItemModal({
   }, [isOpen]);
 
   const fetchLocations = async () => {
+    if (!api) return;
+
     try {
       setIsLoadingLocations(true);
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
+      const data = (await api.get("locations")) as LocationResponse[];
       setLocations(data);
     } catch (error) {
       console.error("Error fetching locations:", error);
@@ -127,11 +134,11 @@ export default function AddInventoryItemModal({
   };
 
   const fetchContainers = async () => {
+    if (!api) return;
+
     try {
-      const response = await fetch("/api/containers");
-      if (!response.ok) throw new Error("Failed to fetch containers");
-      const data = await response.json();
-      setContainers(data);
+      const data = (await api.get("containers")) as ContainersResponse;
+      setContainers(Array.isArray(data) ? data : data.containers || []);
     } catch (error) {
       console.error("Error fetching containers:", error);
     }
@@ -162,7 +169,7 @@ export default function AddInventoryItemModal({
     }
 
     // Log the form data before submission
-    // [REMOVED] // [REMOVED] console.log("Submitting form data:", formattedData);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Submitting form data:", formattedData);
 
     // Check if required fields are present
     if (!formattedData.name) {
@@ -231,11 +238,11 @@ export default function AddInventoryItemModal({
 
         setUploadProgress((prev) => [...prev, newProgress]);
 
-        // [REMOVED] // [REMOVED] console.log(`Starting upload for ${file.name}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Starting upload for ${file.name}`);
 
         // Use the fixed uploadToCloudflare function
         const result = await uploadToCloudflare(file);
-        // [REMOVED] // [REMOVED] console.log(`Upload successful for ${file.name}:`, result);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Upload successful for ${file.name}:`, result);
 
         // Update progress with complete status
         const completeProgress: FileUploadProgress = {

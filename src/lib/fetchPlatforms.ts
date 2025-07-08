@@ -18,13 +18,13 @@ export async function fetchPlatforms() {
     const db = client.db("motive_archive");
 
     if (process.env.NODE_ENV !== "production") {
-      // [REMOVED] // [REMOVED] console.log("Fetching platforms from MongoDB...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching platforms from MongoDB...");
     }
 
     const platforms = await db.collection("platforms").find({}).toArray();
 
     if (process.env.NODE_ENV !== "production") {
-      // [REMOVED] // [REMOVED] console.log(`Successfully fetched ${platforms.length} platforms`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Successfully fetched ${platforms.length} platforms`);
     }
 
     return platforms.map((platform) => ({

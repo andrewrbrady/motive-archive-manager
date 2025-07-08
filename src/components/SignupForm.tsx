@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
+import { APIClient } from "@/lib/api-client";
 
 export default function SignupForm() {
   const [email, setEmail] = useState("");
@@ -33,32 +34,19 @@ export default function SignupForm() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      // Use public API for signup since authentication is not required
+      const apiClient = APIClient.getInstance();
+      await apiClient.postPublic("/api/auth/signup", { email, password });
 
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Account created successfully",
-        });
-        window.location.href = "/auth/signin";
-      } else {
-        const error = await response.text();
-        toast({
-          title: "Error",
-          description: error || "Failed to create account",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
+      toast({
+        title: "Success",
+        description: "Account created successfully",
+      });
+      window.location.href = "/auth/signin";
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Something went wrong",
+        description: error.message || "Failed to create account",
         variant: "destructive",
       });
     } finally {

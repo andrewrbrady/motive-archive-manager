@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Car } from "@/types/car";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ import { LoadingSpinner } from "@/components/ui/loading";
 import CarCard from "./CarCard";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAPI } from "@/hooks/useAPI";
 
 interface CarGridSelectorProps {
   // Selection mode
@@ -86,6 +87,7 @@ export function CarGridSelector({
 }: CarGridSelectorProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const api = useAPI();
 
   // Initialize filters from URL params if using URL filters
   const initialFilters: CarFilters = useMemo(() => {
@@ -150,10 +152,10 @@ export function CarGridSelector({
     }
 
     const fetchData = async () => {
+      if (!api) return;
+
       setLoading(true);
       try {
-        const fetchPromises = [];
-
         // Build query params for cars
         const queryParams = new URLSearchParams();
         queryParams.set("page", currentPage.toString());
@@ -166,32 +168,23 @@ export function CarGridSelector({
         if (filters.maxYear) queryParams.set("maxYear", filters.maxYear);
         if (filters.status) queryParams.set("status", filters.status);
 
-        // Always fetch cars
-        fetchPromises.push(fetch(`/api/cars/simple?${queryParams.toString()}`));
+        // Fetch cars
+        const carsData = (await api.get(`cars?${queryParams.toString()}`)) as {
+          cars: Car[];
+          pagination?: { totalCount: number };
+        };
+        setCars(carsData.cars || []);
+        setTotalCount(carsData.pagination?.totalCount || 0);
 
         // Fetch makes if filters are shown and we don't have them yet
         if (showFilters && makes.length === 0) {
-          fetchPromises.push(fetch("/api/cars/makes"));
-        }
-
-        const responses = await Promise.all(fetchPromises);
-
-        // Process cars response
-        const carsResponse = responses[0];
-        if (carsResponse.ok) {
-          const data = await carsResponse.json();
-          setCars(data.cars || []);
-          setTotalCount(data.pagination?.totalCount || 0);
-        } else {
-          throw new Error("Failed to fetch cars");
-        }
-
-        // Process makes response if it exists
-        if (responses.length > 1) {
-          const makesResponse = responses[1];
-          if (makesResponse.ok) {
-            const data = await makesResponse.json();
-            setMakes(data.makes || []);
+          try {
+            const makesData = (await api.get("cars/makes")) as {
+              makes: string[];
+            };
+            setMakes(makesData.makes || []);
+          } catch (makesError) {
+            console.error("Error fetching makes:", makesError);
           }
         }
       } catch (error) {
@@ -204,37 +197,35 @@ export function CarGridSelector({
 
     fetchData();
   }, [
+    api,
     providedCars,
     providedLoading,
+    currentPage,
+    pageSize,
     debouncedSearchQuery,
     filters.make,
     filters.minYear,
     filters.maxYear,
     filters.status,
-    currentPage,
-    pageSize,
     showFilters,
     makes.length,
   ]);
 
-  // Fetch makes separately only if filters are shown and we don't have cars data
+  // Fetch makes when using provided cars and filters are shown
   useEffect(() => {
-    if (!showFilters || makes.length > 0 || !providedCars) return;
+    if (!showFilters || makes.length > 0 || !providedCars || !api) return;
 
     const fetchMakes = async () => {
       try {
-        const response = await fetch("/api/cars/makes");
-        if (response.ok) {
-          const data = await response.json();
-          setMakes(data.makes || []);
-        }
+        const data = (await api.get("cars/makes")) as { makes: string[] };
+        setMakes(data.makes || []);
       } catch (error) {
         console.error("Error fetching makes:", error);
       }
     };
 
     fetchMakes();
-  }, [showFilters, makes.length, providedCars]);
+  }, [api, showFilters, makes.length, providedCars]);
 
   // Filter out excluded cars
   const filteredCars = useMemo(() => {
@@ -349,12 +340,39 @@ export function CarGridSelector({
     }
   };
 
-  const totalPages = Math.ceil(totalCount / pageSize);
-  const hasActiveFilters = Object.values(filters).some((value) => value !== "");
-  const isCarSelected = (carId: string) => selectedCarIds.includes(carId);
-  const allVisibleSelected =
-    filteredCars.length > 0 &&
-    filteredCars.every((car) => isCarSelected(car._id));
+  // Memoized computed values to maintain consistent hook order
+  const totalPages = useMemo(() => {
+    return Math.ceil(totalCount / pageSize);
+  }, [totalCount, pageSize]);
+
+  const hasActiveFilters = useMemo(() => {
+    return Object.values(filters).some((value) => value !== "");
+  }, [filters]);
+
+  const isCarSelected = useCallback(
+    (carId: string) => {
+      return selectedCarIds.includes(carId);
+    },
+    [selectedCarIds]
+  );
+
+  const allVisibleSelected = useMemo(() => {
+    return (
+      filteredCars.length > 0 &&
+      filteredCars.every((car) => isCarSelected(car._id))
+    );
+  }, [filteredCars, isCarSelected]);
+
+  // Handle loading state when API is not available
+  if (!api) {
+    return (
+      <div className={cn("space-y-6", className)}>
+        <div className="flex items-center justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("space-y-6", className)}>

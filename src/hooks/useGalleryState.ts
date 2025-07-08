@@ -1,5 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "react-hot-toast";
+import { useAPI } from "@/hooks/useAPI";
+
+// TypeScript interfaces for API responses
+interface CarResponse {
+  images?: any[];
+}
 
 export type GalleryMode = "editing" | "viewing";
 
@@ -98,6 +104,7 @@ const initialState: GalleryState = {
 
 export const useGalleryState = (carId: string) => {
   const [state, setState] = useState<GalleryState>(initialState);
+  const api = useAPI();
 
   // Use ref to prevent duplicate requests
   const isLoadingRef = useRef(false);
@@ -123,22 +130,15 @@ export const useGalleryState = (carId: string) => {
   }, []);
 
   const synchronizeGalleryState = useCallback(async () => {
-    if (!carId || isLoadingRef.current) return;
+    if (!carId || isLoadingRef.current || !api) return;
 
     try {
       isLoadingRef.current = true;
       setState((prev) => ({ ...prev, isSyncing: true, error: null }));
 
-      const url = new URL(`/api/cars/${carId}`, window.location.origin);
-      url.searchParams.set("includeImages", "true");
-
-      const response = await fetch(url.toString());
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch car data: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await api.get<CarResponse>(
+        `cars/${carId}?includeImages=true`
+      );
       const normalizedImages: NormalizedImage[] = (data.images || []).map(
         normalizeImageData
       );
@@ -152,6 +152,7 @@ export const useGalleryState = (carId: string) => {
       }));
     } catch (error: any) {
       console.error("Error synchronizing gallery state:", error);
+      toast.error("Failed to sync gallery data");
       setState((prev) => ({
         ...prev,
         isLoading: false,
@@ -161,7 +162,7 @@ export const useGalleryState = (carId: string) => {
     } finally {
       isLoadingRef.current = false;
     }
-  }, [carId, normalizeImageData]);
+  }, [carId, normalizeImageData, api]);
 
   const handleModeTransition = useCallback(
     async (targetMode: GalleryMode) => {
@@ -206,10 +207,10 @@ export const useGalleryState = (carId: string) => {
 
   // Load data when carId changes
   useEffect(() => {
-    if (carId) {
+    if (carId && api) {
       synchronizeGalleryState();
     }
-  }, [carId, synchronizeGalleryState]);
+  }, [carId, synchronizeGalleryState, api]);
 
   return {
     state,

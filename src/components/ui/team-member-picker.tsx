@@ -10,6 +10,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChevronsUpDown, Users, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAPI } from "@/hooks/useAPI";
 
 interface User {
   _id: string;
@@ -35,6 +36,7 @@ export function TeamMemberPicker({
   placeholder = "Select team members",
   className,
 }: TeamMemberPickerProps) {
+  const api = useAPI();
   const [users, setUsers] = useState<User[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -42,10 +44,10 @@ export function TeamMemberPicker({
   // Fetch users
   useEffect(() => {
     const fetchUsers = async () => {
+      if (!api) return;
+
       try {
-        const response = await fetch("/api/users");
-        if (!response.ok) throw new Error("Failed to fetch users");
-        const data = await response.json();
+        const data = (await api.get("users")) as any;
 
         // Handle different response formats from the users API
         const usersArray = Array.isArray(data) ? data : data.users || [];
@@ -59,7 +61,7 @@ export function TeamMemberPicker({
     };
 
     fetchUsers();
-  }, []);
+  }, [api]);
 
   const handleMemberToggle = (userId: string) => {
     const userUid = users.find((u) => u._id === userId)?.firebaseUid || userId;

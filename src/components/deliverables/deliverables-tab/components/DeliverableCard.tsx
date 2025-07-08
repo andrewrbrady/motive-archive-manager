@@ -1,23 +1,27 @@
 import React from "react";
-import { Calendar, Clock, ExternalLink, Copy, Trash2 } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  ExternalLink,
+  Copy,
+  Trash2,
+  CheckCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Deliverable } from "@/types/deliverable";
 import { DeliverableActions } from "../types";
 import { safeFormat, formatDeliverableDuration } from "../utils";
 import { StatusSelector } from "../../StatusSelector";
 import YouTubeUploadHelper from "../../YouTubeUploadHelper";
-import EditDeliverableForm from "../../EditDeliverableForm";
+import { PlatformBadges } from "../../PlatformBadges";
+import { useCarDetails } from "@/contexts/CarDetailsContext";
+import { useMediaTypes } from "@/hooks/useMediaTypes";
 
 interface DeliverableCardProps {
   deliverable: Deliverable;
   actions: DeliverableActions;
   onOpenModal: (deliverable: Deliverable) => void;
   showCarInfo?: boolean;
-  carInfo?: {
-    make: string;
-    model: string;
-    year: number;
-  };
 }
 
 export default function DeliverableCard({
@@ -25,8 +29,27 @@ export default function DeliverableCard({
   actions,
   onOpenModal,
   showCarInfo = false,
-  carInfo,
 }: DeliverableCardProps) {
+  const { getCarDetails } = useCarDetails();
+  const { mediaTypes } = useMediaTypes();
+
+  // Get car details from context if needed
+  const carInfo =
+    showCarInfo && deliverable.car_id
+      ? getCarDetails(deliverable.car_id.toString())
+      : null;
+
+  // Get the proper media type name
+  const getMediaTypeName = () => {
+    if (deliverable.mediaTypeId) {
+      const mediaType = mediaTypes.find(
+        (mt) => mt._id.toString() === deliverable.mediaTypeId?.toString()
+      );
+      return mediaType ? mediaType.name : deliverable.type;
+    }
+    return deliverable.type;
+  };
+
   return (
     <div
       className="group relative p-3 bg-[var(--background-primary)] dark:bg-[var(--background-primary)] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] rounded-lg hover:border-[hsl(var(--border-primary))] dark:hover:border-[hsl(var(--border-subtle))] transition-colors cursor-pointer"
@@ -34,15 +57,30 @@ export default function DeliverableCard({
     >
       <div className="flex justify-between items-start gap-3 mb-3">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] truncate mb-1">
-            {deliverable.title}
-          </p>
-          <p className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-            {deliverable.platform} • {deliverable.type}
-          </p>
+          <div className="flex items-center gap-1 mb-1">
+            <p className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] truncate">
+              {deliverable.title}
+            </p>
+          </div>
+          <div className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] flex items-center gap-2">
+            <PlatformBadges
+              platform_id={deliverable.platform_id?.toString()}
+              platform={deliverable.platform}
+              platforms={deliverable.platforms}
+              maxVisible={2}
+              size="sm"
+            />
+            <span>•</span>
+            <span>{getMediaTypeName()}</span>
+          </div>
           {showCarInfo && carInfo && (
             <p className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mt-1">
               {carInfo.year} {carInfo.make} {carInfo.model}
+            </p>
+          )}
+          {showCarInfo && !carInfo && deliverable.car_id && (
+            <p className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mt-1">
+              Loading car details...
             </p>
           )}
         </div>
@@ -104,6 +142,23 @@ export default function DeliverableCard({
         )}
       </div>
 
+      <div className="flex items-center gap-3 text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] mb-2">
+        <div className="flex items-center gap-1">
+          <Calendar className="h-3 w-3 flex-shrink-0" />
+          <span className="truncate">
+            Release:{" "}
+            {deliverable.release_date
+              ? safeFormat(deliverable.release_date, "M/d/yy")
+              : "Not set"}
+          </span>
+          {deliverable.scheduled && (
+            <div title="Scheduled">
+              <CheckCircle className="h-3 w-3 text-green-600 flex-shrink-0" />
+            </div>
+          )}
+        </div>
+      </div>
+
       {deliverable.editor && (
         <div className="text-xs text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] truncate">
           Editor: {deliverable.editor}
@@ -112,11 +167,6 @@ export default function DeliverableCard({
 
       {/* Action buttons for mobile - hidden by default, shown on tap/hover */}
       <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <EditDeliverableForm
-          deliverable={deliverable}
-          onDeliverableUpdated={() => {}}
-          onClose={() => {}}
-        />
         <Button
           variant="ghost"
           size="sm"

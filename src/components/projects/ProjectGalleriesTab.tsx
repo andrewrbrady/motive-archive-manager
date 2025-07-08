@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +30,8 @@ import {
   Eye,
   ExternalLink,
   Unlink,
+  Loader2,
+  ChevronDown,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Project } from "@/types/project";
@@ -37,9 +40,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
-import { useSession } from "@/hooks/useFirebaseAuth";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
+import { useAPI } from "@/hooks/useAPI";
 
 interface Gallery {
   _id: string;
@@ -62,6 +64,7 @@ interface Gallery {
 interface ProjectGalleriesTabProps {
   project: Project;
   onProjectUpdate: () => void;
+  initialGalleries?: Gallery[]; // Optional pre-fetched galleries data for SSR optimization
 }
 
 // Gallery Card Component for Project Galleries
@@ -80,7 +83,7 @@ function ProjectGalleryCard({
       <div className="relative aspect-[16/9]">
         {gallery.thumbnailImage ? (
           <Image
-            src={getFormattedImageUrl(gallery.thumbnailImage.url)}
+            src={fixCloudflareImageUrl(gallery.thumbnailImage.url)}
             alt={gallery.name}
             fill
             className="object-cover"
@@ -167,23 +170,30 @@ function ProjectGalleryCard({
 export function ProjectGalleriesTab({
   project,
   onProjectUpdate,
+  initialGalleries,
 }: ProjectGalleriesTabProps) {
-  const { data: session, status } = useSession();
-  const { authenticatedFetch } = useAuthenticatedFetch();
-  const [galleries, setGalleries] = useState<Gallery[]>([]);
+  const api = useAPI();
+  const [galleries, setGalleries] = useState<Gallery[]>(initialGalleries || []);
   const [availableGalleries, setAvailableGalleries] = useState<Gallery[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!initialGalleries); // Don't show loading if we have initial data
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLinking, setIsLinking] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newGallery, setNewGallery] = useState({
+    name: "",
+    description: "",
+  });
 
   const fetchProjectGalleries = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
-      const response = await authenticatedFetch(
+      const data = (await api.get(
         `/api/projects/${project._id}/galleries`
-      );
-      const data = await response.json();
+      )) as { galleries: Gallery[] };
       setGalleries(data.galleries || []);
     } catch (error) {
       console.error("Error fetching project galleries:", error);
@@ -198,20 +208,11 @@ export function ProjectGalleriesTab({
           description:
             "Please refresh the page and try again. You may need to sign in again.",
           variant: "destructive",
-          action: (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.location.reload()}
-            >
-              Refresh Page
-            </Button>
-          ),
         });
       } else {
         toast({
           title: "Error",
-          description: "Failed to fetch project galleries",
+          description: "Failed to load project galleries",
           variant: "destructive",
         });
       }
@@ -221,69 +222,98 @@ export function ProjectGalleriesTab({
   };
 
   const fetchAvailableGalleries = async () => {
+    if (!api) return;
+
     try {
-      const response = await authenticatedFetch(`/api/galleries?limit=100`);
-      const data = await response.json();
+      const response = (await api.get("/api/galleries")) as
+        | { galleries: Gallery[]; pagination?: any }
+        | Gallery[];
+
+      // Handle both response formats - object with galleries property or plain array
+      const allGalleries = Array.isArray(response)
+        ? response
+        : response.galleries || [];
 
       // Filter out galleries that are already linked to this project
-      const linkedGalleryIds = new Set(galleries.map((g) => g._id));
-      const unlinkedGalleries = data.galleries.filter(
-        (gallery: Gallery) => !linkedGalleryIds.has(gallery._id)
+      const unlinkedGalleries = allGalleries.filter(
+        (gallery) =>
+          !galleries.some((linkedGallery) => linkedGallery._id === gallery._id)
       );
-
       setAvailableGalleries(unlinkedGalleries);
     } catch (error) {
       console.error("Error fetching available galleries:", error);
-
-      // Check if it's an authentication error
-      if (
-        error instanceof Error &&
-        error.message.includes("Not authenticated")
-      ) {
-        toast({
-          title: "Authentication Error",
-          description: "Please refresh the page to continue linking galleries.",
-          variant: "destructive",
-          action: (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.location.reload()}
-            >
-              Refresh Page
-            </Button>
-          ),
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to fetch available galleries",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Error",
+        description: "Failed to load available galleries",
+        variant: "destructive",
+      });
     }
   };
 
+  // Load project galleries when component mounts or project changes
+  // Only fetch if we don't have initial data and API is available
   useEffect(() => {
-    // Only fetch when authenticated
-    if (status === "authenticated" && session?.user && project._id) {
+    if (api && project._id && !initialGalleries) {
       fetchProjectGalleries();
     }
-  }, [status, session, project._id]);
+  }, [api, project._id, initialGalleries]);
 
+  // Load available galleries when link dialog opens
   useEffect(() => {
-    if (isLinkDialogOpen && status === "authenticated" && session?.user) {
+    if (isLinkDialogOpen && api) {
       fetchAvailableGalleries();
     }
-  }, [isLinkDialogOpen, galleries, status, session]);
+  }, [isLinkDialogOpen, galleries, api]);
+
+  const handleCreateGallery = async () => {
+    if (!api) return;
+
+    try {
+      setIsCreating(true);
+
+      // Create the gallery
+      const galleryResponse = (await api.post("/api/galleries", {
+        name: newGallery.name,
+        description: newGallery.description,
+        imageIds: [],
+      })) as Gallery;
+
+      // Automatically link the new gallery to the project
+      await api.post(`/api/projects/${project._id}/galleries`, {
+        galleryId: galleryResponse._id,
+      });
+
+      toast({
+        title: "Success",
+        description: "Gallery created and linked to project successfully",
+      });
+
+      // Reset form and close dialog
+      setNewGallery({ name: "", description: "" });
+      setIsCreateDialogOpen(false);
+
+      // Refresh the galleries list
+      await fetchProjectGalleries();
+      onProjectUpdate(); // Refresh parent data if needed
+    } catch (error) {
+      console.error("Error creating gallery:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create gallery",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   const handleLinkGallery = async (galleryId: string) => {
+    if (!api) return;
+
     try {
       setIsLinking(true);
-      await authenticatedFetch(`/api/projects/${project._id}/galleries`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ galleryId }),
+      await api.post(`/api/projects/${project._id}/galleries`, {
+        galleryId,
       });
 
       toast({
@@ -293,14 +323,13 @@ export function ProjectGalleriesTab({
 
       // Refresh the galleries list
       await fetchProjectGalleries();
-      onProjectUpdate();
       setIsLinkDialogOpen(false);
+      onProjectUpdate(); // Refresh parent data if needed
     } catch (error) {
       console.error("Error linking gallery:", error);
       toast({
         title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to link gallery",
+        description: "Failed to link gallery to project",
         variant: "destructive",
       });
     } finally {
@@ -309,26 +338,24 @@ export function ProjectGalleriesTab({
   };
 
   const handleUnlinkGallery = async (galleryId: string) => {
+    if (!api) return;
+
     try {
-      await authenticatedFetch(
-        `/api/projects/${project._id}/galleries?galleryId=${galleryId}`,
-        { method: "DELETE" }
-      );
+      await api.delete(`/api/projects/${project._id}/galleries/${galleryId}`);
 
       toast({
         title: "Success",
-        description: "Gallery unlinked from project successfully",
+        description: "Gallery unlinked from project",
       });
 
-      // Refresh the galleries list
-      await fetchProjectGalleries();
-      onProjectUpdate();
+      // Remove from local state
+      setGalleries((prev) => prev.filter((g) => g._id !== galleryId));
+      onProjectUpdate(); // Refresh parent data if needed
     } catch (error) {
       console.error("Error unlinking gallery:", error);
       toast({
         title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to unlink gallery",
+        description: "Failed to unlink gallery from project",
         variant: "destructive",
       });
     }
@@ -357,32 +384,6 @@ export function ProjectGalleriesTab({
 
   return (
     <div className="space-y-6">
-      {/* Debug Section - Development Only */}
-      {process.env.NODE_ENV === "development" && (
-        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <h4 className="text-sm font-medium text-yellow-800 mb-2">
-            Debug: Authentication Status
-          </h4>
-          <div className="text-xs text-yellow-700 space-y-1">
-            <div>
-              Authenticated: {status === "authenticated" ? "✅ Yes" : "❌ No"}
-            </div>
-            <div>User ID: {session?.user?.id || "None"}</div>
-            <div>User Email: {session?.user?.email || "None"}</div>
-            {status !== "authenticated" && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => window.location.reload()}
-                className="mt-2"
-              >
-                Refresh Page
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -393,105 +394,186 @@ export function ProjectGalleriesTab({
             Manage galleries linked to this project
           </p>
         </div>
-        <Dialog open={isLinkDialogOpen} onOpenChange={setIsLinkDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Link Gallery
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Link Gallery to Project</DialogTitle>
-              <DialogDescription>
-                Select a gallery to link to this project. Linked galleries will
-                be associated with this project for organization and reference.
-              </DialogDescription>
-            </DialogHeader>
 
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="search">Search Galleries</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary w-4 h-4" />
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
+          {/* Create New Gallery Dialog */}
+          <Dialog
+            open={isCreateDialogOpen}
+            onOpenChange={setIsCreateDialogOpen}
+          >
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Create Gallery
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Create New Gallery</DialogTitle>
+                <DialogDescription>
+                  Create a new gallery that will be automatically linked to this
+                  project.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="gallery-name">Name</Label>
                   <Input
-                    id="search"
-                    placeholder="Search by name or description..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    id="gallery-name"
+                    value={newGallery.name}
+                    onChange={(e) =>
+                      setNewGallery({ ...newGallery, name: e.target.value })
+                    }
+                    placeholder="Enter gallery name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="gallery-description">Description</Label>
+                  <Textarea
+                    id="gallery-description"
+                    value={newGallery.description}
+                    onChange={(e) =>
+                      setNewGallery({
+                        ...newGallery,
+                        description: e.target.value,
+                      })
+                    }
+                    placeholder="Enter gallery description (optional)"
+                    rows={3}
                   />
                 </div>
               </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsCreateDialogOpen(false);
+                    setNewGallery({ name: "", description: "" });
+                  }}
+                  disabled={isCreating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateGallery}
+                  disabled={!newGallery.name.trim() || isCreating}
+                >
+                  {isCreating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create & Link Gallery"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
-              <div className="max-h-96 overflow-y-auto space-y-2">
-                {filteredAvailableGalleries.length === 0 ? (
-                  <div className="text-center py-8 text-text-secondary">
-                    {searchTerm
-                      ? "No galleries found matching your search."
-                      : "No available galleries to link."}
-                  </div>
-                ) : (
-                  filteredAvailableGalleries.map((gallery) => (
-                    <div
-                      key={gallery._id}
-                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/5"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 relative rounded overflow-hidden bg-background-primary">
-                          {gallery.thumbnailImage ? (
-                            <Image
-                              src={getFormattedImageUrl(
-                                gallery.thumbnailImage.url
-                              )}
-                              alt={gallery.name}
-                              fill
-                              className="object-cover"
-                              sizes="48px"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Images className="w-6 h-6 text-text-secondary" />
-                            </div>
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-medium text-text-primary">
-                            {formatGalleryName(gallery)}
-                          </div>
-                          <div className="text-sm text-text-secondary">
-                            {gallery.imageCount} images
-                          </div>
-                          {gallery.description && (
-                            <div className="text-sm text-text-secondary line-clamp-1">
-                              {gallery.description}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => handleLinkGallery(gallery._id)}
-                        disabled={isLinking}
-                      >
-                        {isLinking ? "Linking..." : "Link"}
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsLinkDialogOpen(false)}
-              >
-                Cancel
+          {/* Link Existing Gallery Dialog */}
+          <Dialog open={isLinkDialogOpen} onOpenChange={setIsLinkDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Link Existing
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Link Existing Gallery</DialogTitle>
+                <DialogDescription>
+                  Select a gallery to link to this project. Linked galleries
+                  will be associated with this project for organization and
+                  reference.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="search">Search Galleries</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary w-4 h-4" />
+                    <Input
+                      id="search"
+                      placeholder="Search by name or description..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="max-h-96 overflow-y-auto space-y-2">
+                  {filteredAvailableGalleries.length === 0 ? (
+                    <div className="text-center py-8 text-text-secondary">
+                      {searchTerm
+                        ? "No galleries found matching your search."
+                        : "No available galleries to link."}
+                    </div>
+                  ) : (
+                    filteredAvailableGalleries.map((gallery) => (
+                      <div
+                        key={gallery._id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/5"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 relative rounded overflow-hidden bg-background-primary">
+                            {gallery.thumbnailImage ? (
+                              <Image
+                                src={fixCloudflareImageUrl(
+                                  gallery.thumbnailImage.url
+                                )}
+                                alt={gallery.name}
+                                fill
+                                className="object-cover"
+                                sizes="48px"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Images className="w-6 h-6 text-text-secondary" />
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-medium text-text-primary">
+                              {formatGalleryName(gallery)}
+                            </div>
+                            <div className="text-sm text-text-secondary">
+                              {gallery.imageCount} images
+                            </div>
+                            {gallery.description && (
+                              <div className="text-sm text-text-secondary line-clamp-1">
+                                {gallery.description}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => handleLinkGallery(gallery._id)}
+                          disabled={isLinking}
+                        >
+                          {isLinking ? "Linking..." : "Link"}
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsLinkDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Galleries Grid */}
@@ -503,13 +585,23 @@ export function ProjectGalleriesTab({
               No Galleries Linked
             </h3>
             <p className="text-text-secondary text-center mb-4">
-              This project doesn't have any galleries linked yet. Link galleries
-              to organize and reference image collections for this project.
+              This project doesn't have any galleries linked yet. Create a new
+              gallery or link existing galleries to organize and reference image
+              collections for this project.
             </p>
-            <Button onClick={() => setIsLinkDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Link Your First Gallery
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => setIsCreateDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Create Gallery
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsLinkDialogOpen(true)}
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Link Existing
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (

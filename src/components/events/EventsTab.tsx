@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Event, EventType } from "@/types/event";
 import { toast } from "sonner";
 import ListView from "@/components/events/ListView";
@@ -54,6 +54,7 @@ import { EventTypeSelector } from "./EventTypeSelector";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TeamMemberPicker } from "@/components/ui/team-member-picker";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
+import { useAPI } from "@/hooks/useAPI";
 
 interface Option {
   label: string;
@@ -74,6 +75,7 @@ interface NewEvent {
 export default function EventsTab({ carId }: { carId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const api = useAPI();
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingEvent, setIsAddingEvent] = useState(false);
@@ -112,19 +114,15 @@ export default function EventsTab({ carId }: { carId: string }) {
   };
 
   const fetchEvents = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
-      // [REMOVED] // [REMOVED] console.log("Fetching events for car:", carId); // Debug log
-      const response = await fetch(`/api/cars/${carId}/events`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching events for car:", carId); // Debug log
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Error response:", errorData); // Debug log
-        throw new Error("Failed to fetch events");
-      }
+      const data = (await api.get(`cars/${carId}/events`)) as Event[];
 
-      const data = await response.json();
-      // [REMOVED] // [REMOVED] console.log("Received events data:", data); // Debug log
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Received events data:", data); // Debug log
 
       // Transform the data to match our Event interface
       const transformedEvents: Event[] = data.map((event: any) => ({
@@ -147,24 +145,29 @@ export default function EventsTab({ carId }: { carId: string }) {
         updatedAt: event.updatedAt,
       }));
 
-      // [REMOVED] // [REMOVED] console.log("Transformed events:", transformedEvents); // Debug log
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Transformed events:", transformedEvents); // Debug log
       setEvents(transformedEvents);
     } catch (error) {
       console.error("Error fetching events:", error);
       toast.error("Failed to fetch events");
+      setEvents([]);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchEvents();
-  }, [carId]);
+    if (carId && api) {
+      fetchEvents();
+    }
+  }, [carId, api]);
 
   const handleUpdateEvent = async (
     eventId: string,
     updates: Partial<Event>
   ) => {
+    if (!api) return;
+
     try {
       // Optimistically update local state
       setEvents((currentEvents) =>
@@ -173,18 +176,7 @@ export default function EventsTab({ carId }: { carId: string }) {
         )
       );
 
-      const response = await fetch(`/api/cars/${carId}/events/${eventId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updates),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update event");
-      }
-
+      await api.put(`cars/${carId}/events/${eventId}`, updates);
       toast.success("Event updated successfully");
     } catch (error) {
       // Revert the optimistic update on error
@@ -196,20 +188,15 @@ export default function EventsTab({ carId }: { carId: string }) {
   };
 
   const handleDeleteEvent = async (eventId: string) => {
+    if (!api) return;
+
     try {
       // Optimistically update local state
       setEvents((currentEvents) =>
         currentEvents.filter((event) => event.id !== eventId)
       );
 
-      const response = await fetch(`/api/cars/${carId}/events/${eventId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete event");
-      }
-
+      await api.delete(`cars/${carId}/events/${eventId}`);
       toast.success("Event deleted successfully");
     } catch (error) {
       // Revert the optimistic update on error
@@ -221,25 +208,20 @@ export default function EventsTab({ carId }: { carId: string }) {
   };
 
   const handleAddEvent = async () => {
+    if (!api) return;
+
     try {
-      const response = await fetch(`/api/cars/${carId}/events`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          type: newEvent.type,
-          title: newEvent.title,
-          description: newEvent.description,
-          url: newEvent.url,
-          start: newEvent.start,
-          end: newEvent.end,
-          teamMemberIds: newEvent.teamMemberIds,
-          isAllDay: newEvent.isAllDay,
-        }),
+      await api.post(`cars/${carId}/events`, {
+        type: newEvent.type,
+        title: newEvent.title,
+        description: newEvent.description,
+        url: newEvent.url,
+        start: newEvent.start,
+        end: newEvent.end,
+        teamMemberIds: newEvent.teamMemberIds,
+        isAllDay: newEvent.isAllDay,
       });
 
-      if (!response.ok) throw new Error("Failed to create event");
       await fetchEvents();
       setIsAddingEvent(false);
       setNewEvent({

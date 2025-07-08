@@ -32,6 +32,8 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import ShotListTemplates, { ShotTemplate } from "./ShotListTemplates";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { useAPI } from "@/hooks/useAPI";
+import { toast as hotToast } from "react-hot-toast";
 
 interface Shot extends ShotTemplate {
   id: string;
@@ -52,6 +54,7 @@ interface ShotListProps {
 }
 
 export default function ShotList({ carId }: ShotListProps) {
+  const api = useAPI();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -124,18 +127,21 @@ export default function ShotList({ carId }: ShotListProps) {
   };
 
   const fetchShotLists = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/cars/${carId}/shot-lists`);
-      if (!response.ok) throw new Error("Failed to fetch shot lists");
-      const data = await response.json();
+      const data = await api.get<ShotList[]>(`cars/${carId}/shot-lists`);
       setShotLists(data);
       if (data.length > 0 && !selectedList) {
         setSelectedList(data[0]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching shot lists:", error);
-      toast.error("Failed to fetch shot lists");
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to fetch shot lists";
+      hotToast.error(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -146,55 +152,59 @@ export default function ShotList({ carId }: ShotListProps) {
     description: string;
     shots?: ShotTemplate[];
   }) => {
+    if (!api) return;
+
     try {
-      const response = await fetch(`/api/cars/${carId}/shot-lists`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: data.name,
-          description: data.description,
-          shots: data.shots || [],
-        }),
-      });
+      const requestData = {
+        name: data.name,
+        description: data.description,
+        shots: data.shots || [],
+      };
 
-      if (!response.ok) throw new Error("Failed to create shot list");
+      const newList = await api.post<ShotList>(
+        `cars/${carId}/shot-lists`,
+        requestData
+      );
 
-      const newList = await response.json();
       await fetchShotLists();
       updateUrlParams(newList.id);
+      hotToast.success("Shot list created successfully");
       toast.success("Shot list created successfully");
       setIsAddingList(false);
       listForm.reset();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating shot list:", error);
-      toast.error("Failed to create shot list");
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to create shot list";
+      hotToast.error(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
   const handleDeleteList = async (listId: string) => {
+    if (!api) return;
     if (!confirm("Are you sure you want to delete this shot list?")) return;
 
     try {
-      const response = await fetch(`/api/cars/${carId}/shot-lists/${listId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) throw new Error("Failed to delete shot list");
+      await api.delete(`cars/${carId}/shot-lists/${listId}`);
 
       await fetchShotLists();
       if (selectedList?.id === listId) {
         updateUrlParams(null);
       }
+      hotToast.success("Shot list deleted successfully");
       toast.success("Shot list deleted successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting shot list:", error);
-      toast.error("Failed to delete shot list");
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to delete shot list";
+      hotToast.error(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
   const handleSubmitShot = async (data: Shot) => {
+    if (!api) return;
     if (!selectedList) return;
 
     try {
@@ -204,41 +214,39 @@ export default function ShotList({ carId }: ShotListProps) {
           )
         : [...selectedList.shots, { ...data, id: crypto.randomUUID() }];
 
-      const response = await fetch(
-        `/api/cars/${carId}/shot-lists/${selectedList.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...selectedList,
-            shots: updatedShots,
-          }),
-        }
+      const requestData = {
+        ...selectedList,
+        shots: updatedShots,
+      };
+
+      const updatedList = await api.put<ShotList>(
+        `cars/${carId}/shot-lists/${selectedList.id}`,
+        requestData
       );
-
-      if (!response.ok) throw new Error("Failed to save shot");
-
-      const updatedList = await response.json();
 
       setShotLists((lists) =>
         lists.map((list) => (list.id === selectedList.id ? updatedList : list))
       );
       setSelectedList(updatedList);
 
-      toast.success(
-        editingShot ? "Shot updated successfully" : "Shot added successfully"
-      );
+      const successMessage = editingShot
+        ? "Shot updated successfully"
+        : "Shot added successfully";
+      hotToast.success(successMessage);
+      toast.success(successMessage);
       setEditingShot(null);
       shotForm.reset();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving shot:", error);
-      toast.error("Failed to save shot");
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to save shot";
+      hotToast.error(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
   const handleDeleteShot = async (shotId: string) => {
+    if (!api) return;
     if (!selectedList || !confirm("Are you sure you want to delete this shot?"))
       return;
 
@@ -247,33 +255,29 @@ export default function ShotList({ carId }: ShotListProps) {
         (shot) => shot.id !== shotId
       );
 
-      const response = await fetch(
-        `/api/cars/${carId}/shot-lists/${selectedList.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...selectedList,
-            shots: updatedShots,
-          }),
-        }
+      const requestData = {
+        ...selectedList,
+        shots: updatedShots,
+      };
+
+      const updatedList = await api.put<ShotList>(
+        `cars/${carId}/shot-lists/${selectedList.id}`,
+        requestData
       );
-
-      if (!response.ok) throw new Error("Failed to delete shot");
-
-      const updatedList = await response.json();
 
       setShotLists((lists) =>
         lists.map((list) => (list.id === selectedList.id ? updatedList : list))
       );
       setSelectedList(updatedList);
 
+      hotToast.success("Shot deleted successfully");
       toast.success("Shot deleted successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting shot:", error);
-      toast.error("Failed to delete shot");
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to delete shot";
+      hotToast.error(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
@@ -302,6 +306,7 @@ export default function ShotList({ carId }: ShotListProps) {
   };
 
   const handleToggleComplete = async (shot: Shot) => {
+    if (!api) return;
     if (!selectedList) return;
 
     try {
@@ -309,30 +314,31 @@ export default function ShotList({ carId }: ShotListProps) {
         s.id === shot.id ? { ...s, completed: !s.completed } : s
       );
 
-      const response = await fetch(
-        `/api/cars/${carId}/shot-lists/${selectedList.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...selectedList,
-            shots: updatedShots,
-          }),
-        }
+      const requestData = {
+        ...selectedList,
+        shots: updatedShots,
+      };
+
+      await api.put<ShotList>(
+        `cars/${carId}/shot-lists/${selectedList.id}`,
+        requestData
       );
 
-      if (!response.ok) throw new Error("Failed to update shot status");
-
       await fetchShotLists();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating shot status:", error);
-      toast.error("Failed to update shot status");
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to update shot status";
+      hotToast.error(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
   const handleApplyTemplate = async (templateShots: ShotTemplate[]) => {
+    if (!api) {
+      toast.error("Please select or create a shot list first");
+      return;
+    }
     if (!selectedList) {
       toast.error("Please select or create a shot list first");
       return;
@@ -347,23 +353,15 @@ export default function ShotList({ carId }: ShotListProps) {
 
       const updatedShots = [...selectedList.shots, ...shotsWithIds];
 
-      const response = await fetch(
-        `/api/cars/${carId}/shot-lists/${selectedList.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...selectedList,
-            shots: updatedShots,
-          }),
-        }
-      );
+      const requestData = {
+        ...selectedList,
+        shots: updatedShots,
+      };
 
-      if (!response.ok) {
-        throw new Error("Failed to update shot list");
-      }
+      await api.put<ShotList>(
+        `cars/${carId}/shot-lists/${selectedList.id}`,
+        requestData
+      );
 
       setSelectedList((prev) => {
         if (!prev) return null;
@@ -375,12 +373,20 @@ export default function ShotList({ carId }: ShotListProps) {
 
       setShowTemplates(false);
       await fetchShotLists();
+      hotToast.success("Template applied successfully");
       toast.success("Template applied successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error applying template:", error);
-      toast.error("Failed to apply template");
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to apply template";
+      hotToast.error(errorMessage);
+      toast.error(errorMessage);
     }
   };
+
+  if (!api) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <div className="space-y-4">

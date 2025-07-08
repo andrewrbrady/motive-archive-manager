@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { useAPI } from "@/hooks/useAPI";
 
 interface Message {
   role: "user" | "assistant";
@@ -15,9 +16,13 @@ interface ResearchChatProps {
 }
 
 export default function ResearchChat({ carId }: ResearchChatProps) {
+  const api = useAPI();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Early return if API not ready
+  if (!api) return <LoadingSpinner size="sm" />;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,18 +34,11 @@ export default function ResearchChat({ carId }: ResearchChatProps) {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`/api/cars/${carId}/research/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: messages,
-          prompt: input,
-        }),
-      });
+      const data = (await api.post(`/api/cars/${carId}/research/chat`, {
+        messages: messages,
+        prompt: input,
+      })) as Message;
 
-      if (!response.ok) throw new Error("Failed to get response");
-
-      const data = await response.json();
       setMessages((prev) => [...prev, data]);
     } catch (error) {
       console.error("Error in chat:", error);

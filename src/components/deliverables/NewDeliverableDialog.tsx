@@ -43,6 +43,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 interface Car {
   _id: string;
@@ -64,10 +66,43 @@ interface NewDeliverableDialogProps {
   children: React.ReactNode;
 }
 
+interface CarsListResponse {
+  cars?: Car[];
+}
+
+interface UsersResponse {
+  users?: User[];
+}
+
+interface CreateDeliverableData {
+  car_id: string;
+  title: string;
+  description: string;
+  platform: Platform;
+  type: DeliverableType;
+  duration: number;
+  aspect_ratio: string;
+  editor: string;
+  target_audience: string;
+  music_track: string;
+  tags: string[];
+  priority_level: number;
+  edit_deadline: Date;
+  release_date: Date;
+  status: DeliverableStatus;
+}
+
+interface CreateDeliverableResponse {
+  success: boolean;
+  deliverable?: any;
+  error?: string;
+}
+
 export default function NewDeliverableDialog({
   children,
 }: NewDeliverableDialogProps) {
   const router = useRouter();
+  const api = useAPI();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [cars, setCars] = useState<Car[]>([]);
@@ -93,41 +128,41 @@ export default function NewDeliverableDialog({
   });
 
   useEffect(() => {
+    if (!api || !open) return;
+
     const fetchCars = async () => {
       try {
-        const response = await fetch("/api/cars/list");
-        if (response.ok) {
-          const data = await response.json();
-          setCars(data);
-          setFilteredCars(data);
-        }
-      } catch (error) {
+        const data = await api.get<Car[]>("cars/list");
+        setCars(data || []);
+        setFilteredCars(data || []);
+      } catch (error: any) {
         console.error("Error fetching cars:", error);
+        toast.error("Failed to fetch cars");
       }
     };
 
     const fetchCreatives = async () => {
       try {
-        const response = await fetch("/api/users");
-        if (response.ok) {
-          const data = await response.json();
-          setCreatives(
-            data.filter(
-              (user: User) =>
-                user.status === "active" && user.creativeRoles.length > 0
-            )
-          );
-        }
-      } catch (error) {
+        const data = await api.get<User[]>("users");
+        const activeCreatives = (data || []).filter(
+          (user: User) =>
+            user.status === "active" && user.creativeRoles.length > 0
+        );
+        setCreatives(activeCreatives);
+      } catch (error: any) {
         console.error("Error fetching creatives:", error);
+        toast.error("Failed to fetch creative users");
       }
     };
 
-    if (open) {
-      fetchCars();
-      fetchCreatives();
-    }
-  }, [open]);
+    fetchCars();
+    fetchCreatives();
+  }, [open, api]);
+
+  // Authentication check - don't render if not authenticated
+  if (!api) {
+    return null;
+  }
 
   const filterCars = (search: string) => {
     const searchTerms = search.toLowerCase().split(" ");
@@ -152,38 +187,42 @@ export default function NewDeliverableDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editDeadline || !releaseDate || !formData.car_id) return;
+    if (!editDeadline || !releaseDate || !formData.car_id) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
 
     setLoading(true);
     try {
-      const response = await fetch("/api/deliverables", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...formData,
-          edit_deadline: editDeadline,
-          release_date: releaseDate,
-          status: "not_started" as DeliverableStatus,
-          tags: formData.tags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
-          duration:
-            formData.type === "Photo Gallery" ? 0 : Number(formData.duration),
-          priority_level: Number(formData.priority_level),
-        }),
-      });
+      const createData: CreateDeliverableData = {
+        ...formData,
+        edit_deadline: editDeadline,
+        release_date: releaseDate,
+        status: "not_started" as DeliverableStatus,
+        tags: formData.tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        duration:
+          formData.type === "Photo Gallery" ? 0 : Number(formData.duration),
+        priority_level: Number(formData.priority_level),
+      };
 
-      if (!response.ok) {
-        throw new Error("Failed to create deliverable");
+      const response = await api.post<CreateDeliverableResponse>(
+        "deliverables",
+        createData
+      );
+
+      if (!response.success) {
+        throw new Error(response.error || "Failed to create deliverable");
       }
 
+      toast.success("Deliverable created successfully");
       setOpen(false);
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating deliverable:", error);
+      toast.error(error.message || "Failed to create deliverable");
     } finally {
       setLoading(false);
     }

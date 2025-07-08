@@ -16,19 +16,19 @@ import { ExternalLink, Edit, Trash2 } from "lucide-react";
 import { IYoutubeChannel } from "@/models/youtube_channel";
 import Link from "next/link";
 import Image from "next/image";
+import { useAPI } from "@/hooks/useAPI";
 
 export default function YoutubeChannelList() {
   const [channels, setChannels] = useState<IYoutubeChannel[]>([]);
   const [loading, setLoading] = useState(true);
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
 
   useEffect(() => {
     const fetchChannels = async () => {
       try {
-        const response = await fetch("/api/youtube/channels");
-        if (!response.ok) {
-          throw new Error("Failed to fetch channels");
-        }
-        const data = await response.json();
+        const data = (await api.get("youtube/channels")) as IYoutubeChannel[];
         setChannels(data);
       } catch (error) {
         console.error("Error fetching channels:", error);
@@ -38,7 +38,7 @@ export default function YoutubeChannelList() {
     };
 
     fetchChannels();
-  }, []);
+  }, [api]);
 
   const formatNumber = (num?: number) => {
     if (!num) return "0";

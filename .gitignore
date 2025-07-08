@@ -48,11 +48,28 @@ yarn-error.log*
 cookies.txt
 /temp/
 
+# organized directories - ignore specific temp content
+/temp/backups/
+/temp/*.tmp
+/temp/*.log
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
-# canvas extension
-# extend_canvas (commented out - needed for production deployment)
+# archived C++ programs (moved to archive/cpp-programs/)
+# Note: C++ binaries and source code have been archived to eliminate
+# build complexity and dependencies. See archive/cpp-programs/README.md
 /temp/canvas-service/node_modules/
 archived/
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE and editor files
+.vscode/settings.json
+.cursor/sessions/
+*.swp
+*.swo

@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const segments = url.pathname.split("/");
     const id = segments[segments.length - 1];
 
-    // [REMOVED] // [REMOVED] console.log(`Fetching asset with ID: ${id}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Fetching asset with ID: ${id}`);
 
     const db = await getDatabase();
     const asset = await db.collection("raw_assets").findOne({
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     });
 
     if (!asset) {
-      // [REMOVED] // [REMOVED] console.log(`Asset not found with ID: ${id}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Asset not found with ID: ${id}`);
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 

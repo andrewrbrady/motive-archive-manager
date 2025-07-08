@@ -9,20 +9,69 @@ export function cloudflareImageLoader({
   width,
   quality = 85,
 }: CloudflareImageLoaderProps): string {
-  // For Cloudflare Images URLs, we should NOT transform them further
-  // since they already use named variants like "public", "thumbnail", etc.
-  // But we need to acknowledge the width parameter to satisfy Next.js
+  // For Cloudflare Images URLs, implement proper width-based optimization
   if (
     src.includes("imagedelivery.net") ||
     src.includes("cloudflareimages.com")
   ) {
-    // Return the URL as-is since it's already optimized by Cloudflare
-    // The width parameter is acknowledged but not used since Cloudflare uses named variants
-    return src;
+    // Enhanced URL parsing to handle multiple formats
+    // Format 1: https://imagedelivery.net/account/image-id/public
+    // Format 2: https://imagedelivery.net/account/image-id (no variant)
+    // Format 3: https://imagedelivery.net/account/image-id/existing-params
+
+    const urlPattern =
+      /https:\/\/imagedelivery\.net\/([^\/]+)\/([^\/]+)(?:\/(.+))?$/;
+    const match = src.match(urlPattern);
+
+    if (match) {
+      const [, accountHash, imageId, existingVariant] = match;
+
+      // Cap the maximum width to 1200px for performance
+      const cappedWidth = Math.min(width, 1200);
+
+      // Use Cloudflare's flexible resizing with width and quality parameters
+      const transformations = [`w=${cappedWidth}`];
+
+      if (quality !== 85) {
+        transformations.push(`q=${quality}`);
+      }
+
+      // Apply the same URL transformation logic from fixed modals
+      const transformationString = transformations.join(",");
+
+      // Check if URL already has transformations (contains variant like 'public')
+      if (
+        existingVariant &&
+        (existingVariant === "public" || existingVariant.match(/^[a-zA-Z]+$/))
+      ) {
+        // Replace the last segment (usually 'public') with our parameters
+        return `https://imagedelivery.net/${accountHash}/${imageId}/${transformationString}`;
+      } else if (existingVariant) {
+        // URL has existing transformations, replace them
+        return `https://imagedelivery.net/${accountHash}/${imageId}/${transformationString}`;
+      } else {
+        // URL doesn't have a variant, append transformations
+        return `https://imagedelivery.net/${accountHash}/${imageId}/${transformationString}`;
+      }
+    }
+
+    // If URL doesn't match expected pattern, try to append transformations
+    const transformations = [`w=${Math.min(width, 1200)}`];
+    if (quality !== 85) {
+      transformations.push(`q=${quality}`);
+    }
+
+    // Handle URLs that might not follow standard format
+    if (src.endsWith("/public") || src.match(/\/[a-zA-Z]+$/)) {
+      const urlParts = src.split("/");
+      urlParts[urlParts.length - 1] = transformations.join(",");
+      return urlParts.join("/");
+    } else {
+      return `${src}/${transformations.join(",")}`;
+    }
   }
 
-  // For non-Cloudflare URLs, we could implement width-based optimization here
-  // For now, return as-is (Next.js will handle them)
+  // For non-Cloudflare URLs, return as-is (Next.js will handle them)
   return src;
 }
 
@@ -63,7 +112,7 @@ export const CLOUDFLARE_VARIANTS = {
 
 export function getCloudflareImageUrl(
   imageId: string,
-  variant: keyof typeof CLOUDFLARE_VARIANTS = "medium"
+  variant: keyof typeof CLOUDFLARE_VARIANTS = "public"
 ): string {
   const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID;
   if (!accountId) {

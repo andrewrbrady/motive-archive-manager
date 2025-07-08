@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import { User } from "./UserManagement";
+import { useAPI } from "@/hooks/useAPI";
 
 interface UserFormProps {
   user: User | null;
@@ -39,6 +40,7 @@ const CREATIVE_ROLES = [
 const STATUS_OPTIONS = ["active", "inactive", "suspended"];
 
 export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
+  const api = useAPI();
   const [formData, setFormData] = useState<Partial<User>>(
     user || {
       name: "",
@@ -52,6 +54,15 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!api) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to save user data",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -80,30 +91,21 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
 
       // Determine if we're updating an existing user or creating a new one
       const userId = user?.uid;
-      const url = userId
-        ? `/api/users/${userId}` // Use UID for existing user
-        : `/api/users/index`; // POST to index endpoint for new user invitation
+      let responseData;
 
-      const response = await fetch(url, {
-        method: userId ? "PUT" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(userData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error("API error:", errorData?.error || "Unknown error");
-        throw new Error(errorData?.error || "Failed to save user");
+      if (userId) {
+        // Update existing user
+        responseData = await api.put(`users/${userId}`, userData);
+      } else {
+        // Create new user
+        responseData = await api.post("users/index", userData);
       }
 
-      const responseData = await response.json();
       if (process.env.NODE_ENV !== "production") {
         console.log("API response:", {
           success: !!responseData,
-          hasUid: !!responseData.uid,
-          hasId: !!responseData._id,
+          hasUid: !!(responseData as any)?.uid,
+          hasId: !!(responseData as any)?._id,
         });
       }
 
@@ -116,8 +118,7 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
             JSON.stringify(userData.creativeRoles))
       ) {
         try {
-          // [REMOVED] // [REMOVED] console.log("Refreshing session due to role changes");
-          await fetch("/api/auth/refresh-session");
+          await api.post("auth/refresh-session", {});
         } catch (refreshError) {
           console.error("Error refreshing session:", refreshError);
           // Don't fail the update if this fails
@@ -135,13 +136,13 @@ export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
         // Pass the updated user data back to the parent
         onSubmit({
           ...userData,
-          uid: responseData.uid || userId,
-          _id: responseData._id,
-          createdAt: responseData.createdAt
-            ? new Date(responseData.createdAt)
+          uid: (responseData as any)?.uid || userId,
+          _id: (responseData as any)?._id,
+          createdAt: (responseData as any)?.createdAt
+            ? new Date((responseData as any).createdAt)
             : new Date(),
-          updatedAt: responseData.updatedAt
-            ? new Date(responseData.updatedAt)
+          updatedAt: (responseData as any)?.updatedAt
+            ? new Date((responseData as any).updatedAt)
             : new Date(),
         } as User);
       }

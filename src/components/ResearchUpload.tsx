@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useAPI } from "@/hooks/useAPI";
 import { Button } from "@/components/ui/button";
 import { Upload, Loader2 } from "lucide-react";
 
@@ -13,8 +14,18 @@ export function ResearchUpload({
   carId,
   onUpload,
 }: ResearchUploadProps): JSX.Element {
+  const api = useAPI();
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+
+  // Guard clause for API availability
+  if (!api) {
+    return (
+      <div className="py-2 text-center text-muted-foreground text-sm">
+        Loading...
+      </div>
+    );
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
@@ -34,15 +45,7 @@ export function ResearchUpload({
         formData.append("file", file);
         formData.append("carId", carId);
 
-        const response = await fetch("/api/research/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `Failed to upload ${file.name}`);
-        }
+        await api.upload("research/upload", formData);
       }
 
       // Clear selected files and notify parent

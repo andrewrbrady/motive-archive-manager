@@ -319,7 +319,7 @@ export async function POST(request: NextRequest) {
     if (clientInfo && clientInfo.includeInCaption && clientInfo.handle) {
       clientHandleInstruction = `
 - Be sure to mention the client/dealer handle in the caption: ${clientInfo.handle}`;
-      // [REMOVED] // [REMOVED] console.log("Adding client handle instruction:", clientHandleInstruction);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Adding client handle instruction:", clientHandleInstruction);
     }
 
     // Add description to the prompt instructions
@@ -359,7 +359,7 @@ ${template === "dealer" ? "- Do not include the dealer reference - it will be ad
         );
         try {
           const { db } = await connectToDatabase();
-          console.log("🔍 Database connected successfully");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Database connected successfully");
 
           const systemPromptData = await db
             .collection("systemPrompts")
@@ -520,14 +520,14 @@ Important: End the caption with relevant hashtags on a new line.`;
     }
 
     // Log the final prompt
-    console.log("=== CAR CAPTION GENERATION REQUEST ===");
-    console.log("System Prompt:", systemPrompt);
-    console.log("User Prompt:", userPrompt);
-    console.log("Model:", aiModel);
-    console.log("Temperature:", temperature);
-    console.log("Platform:", platform);
-    console.log("Template:", template);
-    console.log("=== END REQUEST DETAILS ===");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== CAR CAPTION GENERATION REQUEST ===");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("System Prompt:", systemPrompt);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("User Prompt:", userPrompt);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Model:", aiModel);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Temperature:", temperature);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Platform:", platform);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Template:", template);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== END REQUEST DETAILS ===");
 
     console.log("FINAL PROMPT BEING SENT:", {
       userPrompt: userPrompt.substring(0, 300) + "...",

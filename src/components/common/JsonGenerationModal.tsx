@@ -38,6 +38,7 @@ import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { PromptEditModal } from "@/components/projects/caption-generator/PromptEditModal";
 import type { PromptTemplate } from "@/components/projects/caption-generator/types";
 import type { ProviderId } from "@/lib/llmProviders";
+import { useAPI } from "@/hooks/useAPI";
 
 interface JsonGenerationModalProps {
   isOpen: boolean;
@@ -76,6 +77,7 @@ export default function JsonGenerationModal({
   carData,
 }: JsonGenerationModalProps) {
   const { user } = useFirebaseAuth();
+  const api = useAPI();
 
   // Template and generation state
   const [promptTemplates, setPromptTemplates] = useState<ICaptionPrompt[]>([]);
@@ -128,13 +130,13 @@ export default function JsonGenerationModal({
 
   // Fetch JSON prompt templates
   const fetchJsonPrompts = useCallback(async () => {
+    if (!api) return;
+
     try {
       setLoading(true);
-      const response = await fetch("/api/caption-prompts?platform=JSON");
-      if (!response.ok) {
-        throw new Error("Failed to fetch JSON prompt templates");
-      }
-      const prompts = await response.json();
+      const prompts = (await api.get(
+        "caption-prompts?platform=JSON"
+      )) as ICaptionPrompt[];
 
       // Filter for templates that use the "JSON" platform
       const jsonPrompts = prompts.filter(
@@ -145,7 +147,7 @@ export default function JsonGenerationModal({
 
       // Auto-select the first available prompt
       if (jsonPrompts.length > 0) {
-        setSelectedPromptId(jsonPrompts[0]._id);
+        setSelectedPromptId(String(jsonPrompts[0]._id));
       }
     } catch (error) {
       console.error("Error fetching JSON prompts:", error);
@@ -153,7 +155,7 @@ export default function JsonGenerationModal({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [api]);
 
   // Fetch saved JSONs (you'd implement this endpoint)
   const fetchSavedJsons = useCallback(async () => {
@@ -168,6 +170,8 @@ export default function JsonGenerationModal({
 
   // Fetch system prompts with JSON filtering
   const fetchSystemPrompts = useCallback(async () => {
+    if (!api) return;
+
     try {
       setLoadingSystemPrompts(true);
       setSystemPromptError(null);
@@ -179,20 +183,7 @@ export default function JsonGenerationModal({
         return; // Return early instead of throwing error
       }
 
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch("/api/system-prompts/list", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch system prompts");
-      }
-
-      const data = await response.json();
+      const data = (await api.get("system-prompts/list")) as SystemPrompt[];
 
       // Filter for system prompts that contain "JSON" in their name (case-insensitive)
       const jsonSystemPrompts = data.filter(
@@ -202,14 +193,9 @@ export default function JsonGenerationModal({
 
       setSystemPrompts(jsonSystemPrompts);
 
-      // Auto-select the first active system prompt if available
-      const activePrompt = jsonSystemPrompts.find(
-        (prompt: SystemPrompt) => prompt.isActive
-      );
-      if (activePrompt) {
-        setSelectedSystemPromptId(activePrompt._id);
-      } else if (jsonSystemPrompts.length > 0) {
-        setSelectedSystemPromptId(jsonSystemPrompts[0]._id);
+      // Auto-select the first JSON system prompt if available
+      if (jsonSystemPrompts.length > 0) {
+        setSelectedSystemPromptId(String(jsonSystemPrompts[0]._id));
       }
     } catch (error) {
       console.error("Error fetching system prompts:", error);
@@ -221,7 +207,7 @@ export default function JsonGenerationModal({
     } finally {
       setLoadingSystemPrompts(false);
     }
-  }, [user]);
+  }, [user, api]);
 
   // Initialize when modal opens
   useEffect(() => {
@@ -533,6 +519,11 @@ export default function JsonGenerationModal({
 
   // Generate JSON with AI
   const handleGenerate = async () => {
+    if (!api) {
+      toast.error("API not available");
+      return;
+    }
+
     if (!selectedPromptId) {
       toast.error("Please select a prompt template");
       return;
@@ -606,37 +597,11 @@ export default function JsonGenerationModal({
         useMinimalCarData: false,
       };
 
-      // Create timeout for the request
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(
-          () =>
-            reject(
-              new Error("Request timeout - the server took too long to respond")
-            ),
-          55000
-        )
+      const result = await api.post(
+        "openai/generate-project-caption",
+        requestPayload
       );
-
-      const fetchPromise = fetch("/api/openai/generate-project-caption", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestPayload),
-      });
-
-      const response = (await Promise.race([
-        fetchPromise,
-        timeoutPromise,
-      ])) as Response;
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate JSON");
-      }
-
-      const result = await response.json();
-      const cleanedJson = stripCodeFences(result.caption); // Strip markdown code fences
+      const cleanedJson = stripCodeFences((result as any).caption); // Strip markdown code fences
       setGeneratedJson(cleanedJson);
       setViewMode("preview");
       toast.success("JSON generated successfully!");
@@ -734,6 +699,26 @@ export default function JsonGenerationModal({
     const text = isEditingPreview ? previewEditText : generatedJson;
     return stripCodeFences(text);
   };
+
+  // Handle loading state when API is not available
+  if (!api) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="flex items-center gap-2">
+              <Wand2 className="w-5 h-5" />
+              Generate Car JSON with AI
+            </DialogTitle>
+            <DialogDescription>Loading...</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>

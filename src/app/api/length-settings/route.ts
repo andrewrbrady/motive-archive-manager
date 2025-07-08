@@ -34,7 +34,11 @@ const defaultLengthSettings = [
 
 // GET - Fetch length settings for caption generators (public endpoint)
 export async function GET(request: NextRequest): Promise<NextResponse<object>> {
+  const startTime = Date.now();
+
   try {
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔧 Length Settings API: Starting request");
+
     const { db } = await connectToDatabase();
     const settings = await db
       .collection("lengthSettings")
@@ -42,15 +46,31 @@ export async function GET(request: NextRequest): Promise<NextResponse<object>> {
       .sort({ key: 1 })
       .toArray();
 
+    console.log(
+      `🔧 Length Settings API: Found ${settings.length} custom settings`
+    );
+
     // If no custom settings exist, return defaults
     if (settings.length === 0) {
+      console.log(
+        "🔧 Length Settings API: No custom settings found, returning defaults"
+      );
       return NextResponse.json(defaultLengthSettings);
     }
 
+    console.log(
+      `✅ Length Settings API: Returning custom settings (${Date.now() - startTime}ms)`
+    );
     return NextResponse.json(settings);
   } catch (error) {
-    console.error("Error fetching length settings:", error);
+    console.error("💥 Length Settings API: Error fetching length settings:", {
+      error: error instanceof Error ? error.message : String(error),
+      duration: Date.now() - startTime,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
     // Return defaults on error to ensure the app keeps working
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔧 Length Settings API: Returning defaults due to error");
     return NextResponse.json(defaultLengthSettings);
   }
 }

@@ -8,6 +8,7 @@ import { getUnitsForType } from "@/constants/units";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
 
 interface MeasurementValue {
   value: number | null;
@@ -136,6 +137,7 @@ export interface CarEntryFormRef {
 
 const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
   ({ onSubmit, isSubmitting }, ref) => {
+    const api = useAPI();
     const [formData, setFormData] = useState<CarFormData>({
       make: "",
       model: "",
@@ -242,13 +244,14 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
     useEffect(() => {
       // Fetch clients when component mounts
       const fetchClients = async () => {
+        if (!api) {
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API client not available for fetching clients");
+          return;
+        }
+
         try {
-          const response = await fetch("/api/clients");
-          if (!response.ok) {
-            throw new Error(`Failed to fetch clients: ${response.statusText}`);
-          }
-          const data = await response.json();
-          // [REMOVED] // [REMOVED] console.log("Fetched clients:", data);
+          const response = await api.get("/clients");
+          const data = response as any;
           setClients(data.clients || []);
         } catch (error) {
           console.error("Error fetching clients:", error);
@@ -256,7 +259,7 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
         }
       };
       fetchClients();
-    }, []);
+    }, [api]);
 
     const handleChange = (field: string, value: any) => {
       if (field === "dimensions") {
@@ -405,7 +408,7 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
       const errorCodes = String(data.error.code)
         .split(",")
         .map((code) => code.trim());
-      // [REMOVED] // [REMOVED] console.log("Processing error codes:", errorCodes);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Processing error codes:", errorCodes);
 
       // Check if we have position-specific errors
       const positionErrors = data.validationStatus?.possibleValues
@@ -549,6 +552,11 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
         return;
       }
 
+      if (!api) {
+        toast.error("Authentication required for VIN decoding");
+        return;
+      }
+
       // Apply OCR corrections
       const correctedVin = correctVinOCRErrors(formData.vin);
 
@@ -566,7 +574,7 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
       }
 
       if (process.env.NODE_ENV !== "production") {
-        // [REMOVED] // [REMOVED] console.log("Starting VIN decode for:", `***${correctedVin.slice(-4)}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Starting VIN decode for:", `***${correctedVin.slice(-4)}`);
       }
       setIsDecodingVinWithCorrections(true);
 
@@ -579,8 +587,7 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
 
       try {
         toast.loading("Fetching vehicle data from NHTSA...", { id: toastId });
-        const response = await fetch(`/api/vin?vin=${correctedVin}`);
-        const data: VINResponse = await response.json();
+        const data: VINResponse = await api.get(`/vin?vin=${correctedVin}`);
 
         if (process.env.NODE_ENV !== "production") {
           console.log("Received VIN decode response:", {
@@ -665,8 +672,8 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
           doors: data.doors || formData.doors,
         } as typeof formData;
 
-        // [REMOVED] // [REMOVED] console.log("Dimensions data received:", data.dimensions);
-        // [REMOVED] // [REMOVED] console.log("Updated dimensions in form:", updatedFormData.dimensions);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Dimensions data received:", data.dimensions);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Updated dimensions in form:", updatedFormData.dimensions);
 
         // Add AI analysis insights if available
         if ("aiAnalysis" in data) {
@@ -714,6 +721,11 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
         return;
       }
 
+      if (!api) {
+        toast.error("Authentication required for VIN decoding");
+        return;
+      }
+
       if (formData.vin.length !== 17) {
         toast.error("Please enter a valid 17-character VIN");
         return;
@@ -735,8 +747,7 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
 
       try {
         toast.loading("Fetching vehicle data from NHTSA...", { id: toastId });
-        const response = await fetch(`/api/vin?vin=${formData.vin}`);
-        const data: VINResponse = await response.json();
+        const data: VINResponse = await api.get(`/vin?vin=${formData.vin}`);
 
         if (process.env.NODE_ENV !== "production") {
           console.log("Received VIN decode response:", {
@@ -850,10 +861,7 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
           }
         );
       } catch (error) {
-        console.error(
-          "Error decoding VIN:",
-          (error as Error).message || "Unknown error"
-        );
+        console.error("Error decoding VIN:", error);
         toast.error("Failed to decode VIN", { id: toastId });
       } finally {
         setIsDecodingVinWithoutCorrections(false);

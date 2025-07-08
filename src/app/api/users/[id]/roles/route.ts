@@ -11,12 +11,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log("🔒 GET /api/users/[id]/roles: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/users/[id]/roles: Starting request");
 
   // Check authentication and admin role
   const authResult = await verifyAuthMiddleware(request, ["admin"]);
   if (authResult) {
-    console.log("❌ GET /api/users/[id]/roles: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ GET /api/users/[id]/roles: Authentication failed");
     return authResult;
   }
 
@@ -65,12 +65,12 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log("🔒 PUT /api/users/[id]/roles: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 PUT /api/users/[id]/roles: Starting request");
 
   // Check authentication and admin role
   const authResult = await verifyAuthMiddleware(request, ["admin"]);
   if (authResult) {
-    console.log("❌ PUT /api/users/[id]/roles: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ PUT /api/users/[id]/roles: Authentication failed");
     return authResult;
   }
 

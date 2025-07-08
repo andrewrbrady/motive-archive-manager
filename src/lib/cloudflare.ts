@@ -1,6 +1,7 @@
 import { getCache, setCache } from "./cache";
 import { AIImageAnalysis } from "@/types/car";
 import path from "path";
+import { api } from "@/lib/api-client";
 
 export interface ImageMetadata {
   angle?: string;
@@ -50,17 +51,9 @@ export async function getCloudflareImageMetadata(
     }
 
     // If not in cache, fetch from API
-    const response = await fetch(`/api/cloudflare/metadata/${imageId}`);
-
-    if (!response.ok) {
-      console.error(
-        "Failed to fetch Cloudflare image metadata:",
-        await response.text()
-      );
-      return null;
-    }
-
-    const data: CloudflareImageResponse = await response.json();
+    const data = await api.get<CloudflareImageResponse>(
+      `/cloudflare/metadata/${imageId}`
+    );
 
     if (!data.success) {
       console.error("Cloudflare API error:", data.errors);
@@ -81,23 +74,11 @@ export async function updateCloudflareImageMetadata(
   metadata: ImageMetadata
 ): Promise<boolean> {
   try {
-    const response = await fetch(`/api/cloudflare/metadata/${imageId}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ metadata }),
-    });
+    const data = await api.patch<{ success: boolean }>(
+      `/cloudflare/metadata/${imageId}`,
+      { metadata }
+    );
 
-    if (!response.ok) {
-      console.error(
-        "Failed to update Cloudflare image metadata:",
-        await response.text()
-      );
-      return false;
-    }
-
-    const data = await response.json();
     if (data.success) {
       // Update cache with new metadata
       setCache(imageId, metadata);
@@ -156,29 +137,8 @@ export async function uploadToCloudflare(
   formData.append("itemId", "inventory-item"); // Add a default itemId that the endpoint requires
 
   try {
-    // [REMOVED] // [REMOVED] console.log("Sending request to /api/upload");
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      // Try to parse error response
-      const errorData = await response
-        .json()
-        .catch(() => ({ error: "Unknown error" }));
-      console.error("Upload failed:", {
-        status: response.status,
-        statusText: response.statusText,
-        errorData,
-      });
-      throw new Error(
-        `Failed to upload image to Cloudflare: ${response.status} ${response.statusText}`
-      );
-    }
-
-    const result = await response.json();
-    // [REMOVED] // [REMOVED] console.log("Upload response:", result);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Sending request to /api/upload");
+    const result = await api.upload<any>("/upload", formData);
 
     // Extract image ID either from result.id or from imageUrl path
     const imageId =
@@ -196,7 +156,7 @@ export async function uploadToCloudflare(
     // Ensure the URL is properly constructed with /public at the end
     const imageUrl = result.imageUrl || `${baseUrl}/public`;
 
-    // [REMOVED] // [REMOVED] console.log("Final image URL:", imageUrl);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Final image URL:", imageUrl);
 
     return {
       id: imageId,
@@ -215,14 +175,15 @@ export async function uploadToCloudflare(
 }
 
 /**
- * Format a Cloudflare Images URL to ensure it has the correct variant suffix
- * @param url The base Cloudflare image URL
- * @param variant The variant to use (defaults to 'public')
- * @returns Properly formatted Cloudflare image URL
+ * Format a Cloudflare Images URL to return the base URL without variants
+ * This allows Next.js with our custom loader to handle all transformations
+ * @param url The Cloudflare image URL (with or without variant)
+ * @param _variant Deprecated parameter (kept for backward compatibility)
+ * @returns Base Cloudflare image URL without variant
  */
 export function getFormattedImageUrl(
   url: string | null | undefined,
-  variant: string = "public"
+  _variant?: string // Deprecated, kept for backward compatibility
 ): string {
   // Default placeholder for missing images
   const PLACEHOLDER_IMAGE = "https://placehold.co/600x400?text=No+Image";
@@ -238,67 +199,47 @@ export function getFormattedImageUrl(
     return PLACEHOLDER_IMAGE;
   }
 
-  // Log original URL for debugging only in development
-  if (process.env.NODE_ENV === "development") {
-    // [REMOVED] // [REMOVED] console.log(`Formatting image URL: ${url} with variant: ${variant}`);
-  }
-
   try {
     // Handle relative URLs by returning them as-is
     if (url.startsWith("/")) {
-      if (process.env.NODE_ENV === "development") {
-        // [REMOVED] // [REMOVED] console.log(`Detected relative URL: ${url}, returning as-is`);
-      }
       return url;
     }
 
     // Handle placeholder URLs
     if (url.includes("placehold.co")) {
-      return url; // Return placeholder URLs as-is
+      return url;
     }
 
     // Check if it's a Cloudflare Images URL
     if (!url.includes("imagedelivery.net")) {
       // If it's already a complete URL but not from Cloudflare, return as-is
       if (url.startsWith("http")) {
-        if (process.env.NODE_ENV === "development") {
-          // [REMOVED] // [REMOVED] console.log(`Non-Cloudflare URL detected (kept as-is): ${url}`);
-        }
         return url;
       }
 
       // Check if it might be just a Cloudflare ID (UUID format)
       if (url.match(/^[a-f0-9-]{36}$/i)) {
-        const cloudflareUrl = `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${url}/${variant}`;
-        if (process.env.NODE_ENV === "development") {
-          console.log(
-            `Converting Cloudflare ID to URL: ${url} -> ${cloudflareUrl}`
-          );
-        }
+        const cloudflareUrl = `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${url}`;
         return cloudflareUrl;
       }
 
-      if (process.env.NODE_ENV === "development") {
-        console.warn(`Unrecognized URL format: ${url}`);
-      }
+      console.warn(`Unrecognized URL format: ${url}`);
       return url; // Return as-is if format is unrecognized
     }
 
-    // For Cloudflare URLs, remove any existing variant and trailing slashes
+    // For Cloudflare URLs, remove any existing variant and trailing slashes to get base URL
     let baseUrl = url.replace(
-      /\/(public|thumbnail|avatar|medium|large|webp|preview|original)(\/)?$/,
+      /\/(public|thumbnail|avatar|medium|large|webp|preview|original|w=\d+.*)(\/)?$/,
       ""
     );
 
     // Remove any query parameters
     baseUrl = baseUrl.split("?")[0];
 
-    // Ensure the URL is properly formed
+    // Ensure the URL is properly formed as base URL
     const urlPattern = /^https:\/\/imagedelivery\.net\/([^\/]+)\/([^\/]+)$/;
     if (!baseUrl.match(urlPattern)) {
-      if (process.env.NODE_ENV === "development") {
-        console.warn(`[Cloudflare] Malformed image URL: ${url}`);
-      }
+      console.warn(`[Cloudflare] Malformed image URL: ${url}`);
 
       // Try to fix malformed URL if possible
       const matches = url.match(
@@ -308,10 +249,7 @@ export function getFormattedImageUrl(
         const accountHash = matches[1];
         const imageId = matches[2].split("/")[0]; // Get the image ID, removing any variants
 
-        const fixedUrl = `https://imagedelivery.net/${accountHash}/${imageId}/${variant}`;
-        if (process.env.NODE_ENV === "development") {
-          // [REMOVED] // [REMOVED] console.log(`Fixed malformed URL: ${url} -> ${fixedUrl}`);
-        }
+        const fixedUrl = `https://imagedelivery.net/${accountHash}/${imageId}`;
         return fixedUrl;
       }
 
@@ -319,24 +257,8 @@ export function getFormattedImageUrl(
       return url;
     }
 
-    // Add the requested variant
-    const formattedUrl = `${baseUrl}/${variant}`;
-
-    // IMPORTANT: Check if the URL was already formatted correctly before it reached us
-    // If the originalUrl was already in the correct format, return it as-is
-    // This prevents double processing in components that might transform URLs themselves
-    const alreadyFormatted = url.match(new RegExp(`^${baseUrl}/${variant}$`));
-    if (alreadyFormatted) {
-      if (process.env.NODE_ENV === "development") {
-        // [REMOVED] // [REMOVED] console.log(`URL already correctly formatted: ${url}`);
-      }
-      return url;
-    }
-
-    if (process.env.NODE_ENV === "development") {
-      // [REMOVED] // [REMOVED] console.log(`Formatted image URL: ${url} -> ${formattedUrl}`);
-    }
-    return formattedUrl;
+    // Return the base URL without any variant
+    return baseUrl;
   } catch (error) {
     console.error(
       "[Cloudflare] Error formatting image URL:",
@@ -418,14 +340,7 @@ export async function fetchImageById(imageId: string): Promise<string> {
     }
 
     // Make API call to get image by ID
-    const response = await fetch(`/api/images/${imageId}`);
-
-    if (!response.ok) {
-      console.error(`Failed to fetch image ${imageId}:`, response.statusText);
-      return "";
-    }
-
-    const data = await response.json();
+    const data = await api.get<{ url: string }>(`/images/${imageId}`);
 
     // The API already returns a formatted URL
     if (data && data.url) {

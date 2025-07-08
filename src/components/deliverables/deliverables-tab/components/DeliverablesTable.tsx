@@ -8,13 +8,30 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { CheckSquare, Square, Cloud, Share2, Copy, Trash2 } from "lucide-react";
+import {
+  CheckSquare,
+  Square,
+  Cloud,
+  Share2,
+  Copy,
+  Trash2,
+  CheckCircle,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
+} from "lucide-react";
+
 import { Deliverable } from "@/types/deliverable";
 import { DeliverableActions, BatchModeState } from "../types";
 import { safeFormat, formatDeliverableDuration } from "../utils";
 import { StatusSelector } from "../../StatusSelector";
 import YouTubeUploadHelper from "../../YouTubeUploadHelper";
-import EditDeliverableForm from "../../EditDeliverableForm";
+
+import { PlatformBadges } from "../../PlatformBadges";
+import { useCarDetails } from "@/contexts/CarDetailsContext";
+import { MediaTypeSelector } from "../../MediaTypeSelector";
+import { EditorSelector } from "../../EditorSelector";
+import { PlatformSelector } from "../../PlatformSelector";
 
 interface DeliverablesTableProps {
   deliverables: Deliverable[];
@@ -22,11 +39,10 @@ interface DeliverablesTableProps {
   actions: DeliverableActions;
   batchMode: BatchModeState;
   showCarColumn?: boolean;
-  getCarInfo?: (deliverable: Deliverable) => {
-    make: string;
-    model: string;
-    year: number;
-  } | null;
+  onOpenModal?: (deliverable: Deliverable) => void;
+  sortField?: string;
+  sortDirection?: "asc" | "desc";
+  onSort?: (field: string) => void;
 }
 
 export default function DeliverablesTable({
@@ -35,8 +51,13 @@ export default function DeliverablesTable({
   actions,
   batchMode,
   showCarColumn = false,
-  getCarInfo,
+  onOpenModal,
+  sortField,
+  sortDirection,
+  onSort,
 }: DeliverablesTableProps) {
+  const { getCarDetails } = useCarDetails();
+
   const {
     isBatchMode,
     selectedDeliverables,
@@ -44,13 +65,53 @@ export default function DeliverablesTable({
     toggleAllDeliverables,
   } = batchMode;
 
+  // Helper function to render sortable table header
+  const renderSortableHeader = (
+    field: string,
+    label: string,
+    className?: string
+  ) => {
+    if (!onSort) {
+      return <TableHead className={className}>{label}</TableHead>;
+    }
+
+    const isActive = sortField === field;
+    const Icon = isActive
+      ? sortDirection === "asc"
+        ? ChevronUp
+        : ChevronDown
+      : ChevronsUpDown;
+
+    return (
+      <TableHead className={className}>
+        <button
+          className="flex items-center gap-1 hover:text-foreground transition-colors"
+          onClick={() => onSort(field)}
+        >
+          <span>{label}</span>
+          <Icon className="h-3 w-3" />
+        </button>
+      </TableHead>
+    );
+  };
+
   const renderCell = (deliverable: Deliverable, field: keyof Deliverable) => {
     const value = deliverable[field];
 
+    if (field === "title") {
+      return (
+        <div className="cursor-pointer flex items-center gap-1">
+          <span className="truncate">{value?.toString() || ""}</span>
+        </div>
+      );
+    }
+
     if (field === "edit_deadline" || field === "release_date") {
       return (
-        <div className="cursor-pointer">
-          {value ? safeFormat(value, "MMM d, yyyy") : "Not set"}
+        <div className="cursor-pointer flex items-center gap-1">
+          <span className="truncate">
+            {value ? safeFormat(value, "MMM d, yyyy") : "Not set"}
+          </span>
         </div>
       );
     }
@@ -65,14 +126,69 @@ export default function DeliverablesTable({
 
     if (field === "status") {
       return (
-        <StatusSelector
-          deliverableId={deliverable._id?.toString() || ""}
-          initialStatus={deliverable.status}
-          size="sm"
-          onStatusChange={(newStatus) =>
-            actions.onStatusChange(deliverable._id?.toString() || "", newStatus)
-          }
-        />
+        <div onClick={(e) => e.stopPropagation()}>
+          <StatusSelector
+            deliverableId={deliverable._id?.toString() || ""}
+            initialStatus={deliverable.status}
+            size="sm"
+            onStatusChange={(newStatus) =>
+              actions.onStatusChange(
+                deliverable._id?.toString() || "",
+                newStatus
+              )
+            }
+          />
+        </div>
+      );
+    }
+
+    if (field === "scheduled") {
+      return (
+        <div className="cursor-pointer flex justify-center">
+          {deliverable.scheduled ? (
+            <div title="Scheduled">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </div>
+          ) : (
+            <div className="h-4 w-4" />
+          )}
+        </div>
+      );
+    }
+
+    if (field === "mediaType") {
+      return (
+        <div onClick={(e) => e.stopPropagation()}>
+          <MediaTypeSelector
+            deliverableId={deliverable._id?.toString() || ""}
+            initialMediaTypeId={deliverable.mediaTypeId?.toString()}
+            size="sm"
+          />
+        </div>
+      );
+    }
+
+    if (field === "editor") {
+      return (
+        <div onClick={(e) => e.stopPropagation()}>
+          <EditorSelector
+            deliverableId={deliverable._id?.toString() || ""}
+            initialEditor={deliverable.editor}
+            size="sm"
+          />
+        </div>
+      );
+    }
+
+    if (field === "platform") {
+      return (
+        <div onClick={(e) => e.stopPropagation()}>
+          <PlatformSelector
+            deliverableId={deliverable._id?.toString() || ""}
+            initialPlatformId={deliverable.platform_id?.toString()}
+            size="sm"
+          />
+        </div>
       );
     }
 
@@ -80,14 +196,14 @@ export default function DeliverablesTable({
   };
 
   const getColumnCount = () => {
-    let count = 9; // Base columns
+    let count = 10; // Base columns including Media Type and Scheduled columns
     if (isBatchMode) count += 1; // Checkbox column
     if (showCarColumn) count += 1; // Car column
     return count;
   };
 
   return (
-    <div className="hidden md:block rounded-md border w-full overflow-x-auto">
+    <div className="hidden md:block rounded-b-md border border-t-0 w-full overflow-x-auto">
       <Table className="w-full table-fixed">
         <TableHeader>
           <TableRow>
@@ -99,7 +215,7 @@ export default function DeliverablesTable({
                   onClick={toggleAllDeliverables}
                   className="p-0"
                 >
-                  {selectedDeliverables.length === deliverables.length ? (
+                  {isBatchMode ? (
                     <CheckSquare className="h-4 w-4" />
                   ) : (
                     <Square className="h-4 w-4" />
@@ -107,36 +223,58 @@ export default function DeliverablesTable({
                 </Button>
               </TableHead>
             )}
-            <TableHead className="w-[15%] px-2 py-1.5 text-xs font-medium">
-              Title
-            </TableHead>
-            {showCarColumn && (
-              <TableHead className="w-[12%] px-2 py-1.5 text-xs font-medium">
-                Car
-              </TableHead>
+            {renderSortableHeader(
+              "title",
+              "Title",
+              "w-[11%] px-2 py-1.5 text-xs font-medium"
             )}
-            <TableHead className="w-[15%] px-2 py-1.5 text-xs font-medium">
-              Platform
-            </TableHead>
-            <TableHead className="w-[10%] px-2 py-1.5 text-xs font-medium">
-              Type
-            </TableHead>
-            <TableHead className="w-[8%] px-2 py-1.5 text-xs font-medium">
-              Status
-            </TableHead>
-            <TableHead className="w-[6%] px-2 py-1.5 text-xs font-medium">
-              Duration
-            </TableHead>
-            <TableHead className="w-[12%] px-2 py-1.5 text-xs font-medium">
-              Editor
-            </TableHead>
-            <TableHead className="w-[12%] px-2 py-1.5 text-xs font-medium">
-              Deadline
-            </TableHead>
-            <TableHead className="w-[12%] px-2 py-1.5 text-xs font-medium">
-              Release Date
-            </TableHead>
-            <TableHead className="w-[16%] text-right px-2 py-1.5 text-xs font-medium">
+            {showCarColumn &&
+              renderSortableHeader(
+                "car",
+                "Car",
+                "w-[12%] px-2 py-1.5 text-xs font-medium"
+              )}
+            {renderSortableHeader(
+              "platform",
+              "Platform",
+              "w-[10%] px-2 py-1.5 text-xs font-medium"
+            )}
+            {renderSortableHeader(
+              "mediaType",
+              "Media Type",
+              "w-[11%] px-2 py-1.5 text-xs font-medium"
+            )}
+            {renderSortableHeader(
+              "status",
+              "Status",
+              "w-[9%] px-2 py-1.5 text-xs font-medium"
+            )}
+            {renderSortableHeader(
+              "duration",
+              "Duration",
+              "w-[7%] px-2 py-1.5 text-xs font-medium"
+            )}
+            {renderSortableHeader(
+              "editor",
+              "Editor",
+              "w-[10%] px-2 py-1.5 text-xs font-medium"
+            )}
+            {renderSortableHeader(
+              "edit_deadline",
+              "Deadline",
+              "w-[7%] px-2 py-1.5 text-xs font-medium"
+            )}
+            {renderSortableHeader(
+              "release_date",
+              "Release Date",
+              "w-[7%] px-2 py-1.5 text-xs font-medium"
+            )}
+            {renderSortableHeader(
+              "scheduled",
+              "Scheduled",
+              "w-[3%] px-2 py-1.5 text-xs font-medium text-center"
+            )}
+            <TableHead className="w-[5%] text-right px-2 py-1.5 text-xs font-medium">
               Actions
             </TableHead>
           </TableRow>
@@ -162,20 +300,30 @@ export default function DeliverablesTable({
             </TableRow>
           ) : (
             deliverables.map((deliverable) => {
-              const carInfo = getCarInfo?.(deliverable);
+              const carInfo =
+                showCarColumn && deliverable.car_id
+                  ? getCarDetails(deliverable.car_id.toString())
+                  : null;
 
               return (
-                <TableRow key={deliverable._id?.toString()}>
+                <TableRow
+                  key={deliverable._id?.toString()}
+                  className={
+                    onOpenModal ? "cursor-pointer hover:bg-muted/50" : ""
+                  }
+                  onClick={() => onOpenModal?.(deliverable)}
+                >
                   {isBatchMode && (
                     <TableCell className="px-2 py-1.5">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() =>
+                        onClick={(e) => {
+                          e.stopPropagation();
                           toggleDeliverableSelection(
                             deliverable._id?.toString() || ""
-                          )
-                        }
+                          );
+                        }}
                         className="p-0"
                       >
                         {selectedDeliverables.includes(
@@ -206,7 +354,7 @@ export default function DeliverablesTable({
                     {renderCell(deliverable, "platform")}
                   </TableCell>
                   <TableCell className="px-2 py-1.5 text-xs">
-                    {renderCell(deliverable, "type")}
+                    {renderCell(deliverable, "mediaType")}
                   </TableCell>
                   <TableCell className="px-2 py-1.5 text-xs">
                     {renderCell(deliverable, "status")}
@@ -223,51 +371,16 @@ export default function DeliverablesTable({
                   <TableCell className="px-2 py-1.5 text-xs">
                     {renderCell(deliverable, "release_date")}
                   </TableCell>
+                  <TableCell className="px-2 py-1.5 text-xs">
+                    {renderCell(deliverable, "scheduled")}
+                  </TableCell>
                   <TableCell className="px-2 py-1.5">
-                    <div className="flex justify-end items-center gap-1">
+                    <div
+                      className="flex justify-end items-center gap-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {!isBatchMode && (
                         <>
-                          {/* Dropbox Link Icon */}
-                          {deliverable.dropbox_link ? (
-                            <a
-                              href={deliverable.dropbox_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1 text-blue-600 hover:text-blue-800"
-                              title="Open Dropbox"
-                            >
-                              <Cloud className="h-4 w-4" />
-                            </a>
-                          ) : (
-                            <div
-                              className="p-1 text-gray-400"
-                              title="No Dropbox link"
-                            >
-                              <Cloud className="h-4 w-4" />
-                            </div>
-                          )}
-
-                          {/* Social Media Link Icon */}
-                          {deliverable.social_media_link && (
-                            <a
-                              href={deliverable.social_media_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1 text-blue-600 hover:text-blue-800"
-                              title="Open Social Media"
-                            >
-                              <Share2 className="h-4 w-4" />
-                            </a>
-                          )}
-
-                          {/* YouTube Upload Button */}
-                          <YouTubeUploadHelper deliverable={deliverable} />
-
-                          <EditDeliverableForm
-                            deliverable={deliverable}
-                            onDeliverableUpdated={() => {}}
-                            onClose={() => {}}
-                          />
                           <Button
                             variant="ghost"
                             size="sm"

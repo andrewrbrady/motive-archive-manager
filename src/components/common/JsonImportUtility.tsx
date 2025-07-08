@@ -9,7 +9,12 @@ import JsonUploadPasteModal from "./JsonUploadPasteModal";
 export interface JsonImportConfig {
   title: string;
   description?: string;
-  expectedType: "cars" | "events" | "deliverables" | "specifications";
+  expectedType:
+    | "cars"
+    | "events"
+    | "deliverables"
+    | "deliverables-relaxed"
+    | "specifications";
   buttonText?: string;
   buttonVariant?:
     | "default"
@@ -85,6 +90,8 @@ export function JsonImportUtility({
         return "Batch Import Events";
       case "deliverables":
         return "Batch Import Deliverables";
+      case "deliverables-relaxed":
+        return "Batch Import Deliverables (Relaxed)";
       case "specifications":
         return "Import Specifications";
       default:
@@ -102,6 +109,8 @@ export function JsonImportUtility({
         return "Upload a JSON file or paste JSON data to create multiple events at once.";
       case "deliverables":
         return "Upload a JSON file or paste JSON data to create multiple deliverables at once.";
+      case "deliverables-relaxed":
+        return "Upload a JSON file or paste JSON data to create multiple deliverables at once. The JSON should be an array of deliverable objects with minimal validation - only title is required.";
       case "specifications":
         return "Upload a JSON file or paste a JSON object to update specifications.";
       default:
@@ -200,6 +209,30 @@ export function DeliverablesJsonImport({
   const config: JsonImportConfig = {
     title: "Batch Create Deliverables from JSON",
     expectedType: "deliverables",
+  };
+
+  return (
+    <JsonImportUtility
+      config={config}
+      onImport={onImport}
+      disabled={disabled}
+      className={className}
+    />
+  );
+}
+
+export function DeliverablesRelaxedJsonImport({
+  onImport,
+  disabled = false,
+  className = "",
+}: {
+  onImport: (data: any[]) => Promise<void>;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const config: JsonImportConfig = {
+    title: "Batch Create Deliverables from JSON (Relaxed)",
+    expectedType: "deliverables-relaxed",
   };
 
   return (

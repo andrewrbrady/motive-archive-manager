@@ -1,15 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "@/hooks/useFirebaseAuth";
-import { useAuthenticatedFetch } from "@/hooks/useFirebaseAuth";
 import { useRouter } from "next/navigation";
-import {
-  Project,
-  ProjectListResponse,
-  ProjectStatus,
-  ProjectType,
-} from "@/types/project";
+import { Project, ProjectStatus, ProjectType } from "@/types/project";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
@@ -22,129 +16,50 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PageTitle } from "@/components/ui/PageTitle";
-import {
-  Plus,
-  Search,
-  Filter,
-  Calendar,
-  Users,
-  DollarSign,
-  ImageIcon,
-} from "lucide-react";
+import { Plus, Search, Calendar, Users, ImageIcon } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import Image from "next/image";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { useProjects } from "@/lib/hooks/query/useProjects";
+import { toast } from "@/components/ui/use-toast";
+import { ProjectImageDisplay } from "@/components/projects/ProjectImageDisplay";
 
 export default function ProjectsPage() {
   const { data: session, status } = useSession();
-  const { authenticatedFetch } = useAuthenticatedFetch();
   const router = useRouter();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
-  const fetchingRef = useRef(false);
-  const initialLoadRef = useRef(false);
 
-  // State for tracking image loading for each project
-  const [imageStates, setImageStates] = useState<
-    Record<
-      string,
-      {
-        loading: boolean;
-        url: string | null;
-        error: boolean;
-      }
-    >
-  >({});
+  // Use the new React Query hook for projects with image loading
+  const {
+    data: projectsData,
+    isLoading,
+    error,
+    refetch: refreshProjects,
+  } = useProjects({
+    search: search || undefined,
+    status: statusFilter !== "all" ? statusFilter : undefined,
+    type: typeFilter !== "all" ? typeFilter : undefined,
+    includeImages: true, // Always include images for cover photos
+    limit: 50,
+    page: 1,
+  });
 
-  const fetchProjects = async () => {
-    if (fetchingRef.current) {
-      console.log("ProjectsPage: Already fetching, skipping...");
-      return;
-    }
+  const projects = projectsData?.projects || [];
 
-    try {
-      fetchingRef.current = true;
-      console.log("ProjectsPage: Starting to fetch projects...");
-      setLoading(true);
-
-      const params = new URLSearchParams();
-
-      if (search) params.append("search", search);
-      if (statusFilter !== "all") params.append("status", statusFilter);
-      if (typeFilter !== "all") params.append("type", typeFilter);
-
-      // ✅ Request projects WITH their primary images in one call
-      params.append("includeImages", "true");
-
-      const url = `/api/projects?${params.toString()}`;
-      console.log("ProjectsPage: Fetching from URL:", url);
-
-      const response = await authenticatedFetch(url);
-      const data: ProjectListResponse = await response.json();
-      console.log("ProjectsPage: Received data:", {
-        projectsCount: data.projects.length,
-        total: data.total,
-        page: data.page,
-        limit: data.limit,
-      });
-
-      setProjects(data.projects);
-
-      // Initialize image states for projects that have primary images
-      const newImageStates: typeof imageStates = {};
-      data.projects.forEach((project) => {
-        if (project.primaryImageUrl) {
-          newImageStates[project._id!] = {
-            loading: false,
-            url: project.primaryImageUrl,
-            error: false,
-          };
-        } else {
-          newImageStates[project._id!] = {
-            loading: false,
-            url: null,
-            error: false,
-          };
-        }
-      });
-      setImageStates(newImageStates);
-
-      setError(null);
-    } catch (error) {
+  // Handle error state
+  useEffect(() => {
+    if (error) {
       console.error("ProjectsPage: Error fetching projects:", error);
-      setError(error instanceof Error ? error.message : "Unknown error");
-    } finally {
-      setLoading(false);
-      fetchingRef.current = false;
+      toast({
+        title: "Error",
+        description: "Failed to load projects. Please try again.",
+        variant: "destructive",
+      });
     }
-  };
-
-  // Simplified effect - just fetch when we have session
-  useEffect(() => {
-    // Only fetch when authenticated
-    if (
-      status === "authenticated" &&
-      session?.user &&
-      !initialLoadRef.current
-    ) {
-      console.log("ProjectsPage: Initial load - fetching projects");
-      initialLoadRef.current = true;
-      fetchProjects();
-    }
-  }, [status, session]);
-
-  // Search and filter effect
-  useEffect(() => {
-    if (initialLoadRef.current && status === "authenticated" && session?.user) {
-      console.log("ProjectsPage: Search/filter changed, refetching projects");
-      fetchProjects();
-    }
-  }, [search, statusFilter, typeFilter, status, session]);
+  }, [error]);
 
   const getStatusColor = (status: ProjectStatus) => {
     switch (status) {
@@ -176,25 +91,34 @@ export default function ProjectsPage() {
     }
   };
 
-  // Show loading while authentication is being handled by AuthGuard
-  if (status === "loading" || loading) {
+  // Show loading while authentication is being handled
+  if (status === "loading" || (status === "authenticated" && isLoading)) {
     return (
       <div className="min-h-screen bg-background">
         <main className="container-wide px-6 py-8">
           <div className="flex items-center justify-center h-64">
-            <div className="text-lg">Loading projects...</div>
+            <div className="flex flex-col items-center gap-3">
+              <LoadingSpinner size="lg" />
+              <div className="text-lg">Loading projects...</div>
+            </div>
           </div>
         </main>
       </div>
     );
   }
 
+  // Show error state
   if (error) {
     return (
       <div className="min-h-screen bg-background">
         <main className="container-wide px-6 py-8">
           <div className="flex items-center justify-center h-64">
-            <div className="text-lg text-red-600">Error: {error}</div>
+            <div className="text-center space-y-4">
+              <div className="text-lg text-red-600">
+                Error loading projects: {error?.message || "Unknown error"}
+              </div>
+              <Button onClick={() => refreshProjects()}>Try Again</Button>
+            </div>
           </div>
         </main>
       </div>
@@ -270,47 +194,20 @@ export default function ProjectsPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {projects.map((project) => {
-                const imageState = imageStates[project._id!] || {
-                  loading: false,
-                  url: null,
-                  error: false,
-                };
-
                 return (
                   <Card
                     key={project._id}
                     className="cursor-pointer hover:shadow-lg transition-shadow overflow-hidden"
                     onClick={() => router.push(`/projects/${project._id}`)}
                   >
-                    {/* Primary Image */}
+                    {/* Primary Image - Now properly loaded from React Query */}
                     <div className="relative aspect-[16/9]">
-                      {imageState.loading ? (
-                        <div className="w-full h-full bg-muted flex items-center justify-center">
-                          <LoadingSpinner size="lg" />
-                        </div>
-                      ) : imageState.url ? (
-                        <Image
-                          src={imageState.url}
-                          alt={project.title}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                          onError={() => {
-                            setImageStates((prev) => ({
-                              ...prev,
-                              [project._id!]: {
-                                ...prev[project._id!],
-                                error: true,
-                                url: null,
-                              },
-                            }));
-                          }}
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-muted flex items-center justify-center">
-                          <ImageIcon className="h-12 w-12 text-muted-foreground" />
-                        </div>
-                      )}
+                      <ProjectImageDisplay
+                        primaryImageUrl={project.primaryImageUrl}
+                        primaryImageId={project.primaryImageId}
+                        projectTitle={project.title}
+                        className="w-full h-full"
+                      />
                     </div>
 
                     <CardHeader className="pb-2">

@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
       });
 
       // Get YouTube channels
-      console.log("📡 Calling YouTube Channels API with mine=true...");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📡 Calling YouTube Channels API with mine=true...");
       const channelsResponse = await youtube.channels.list({
         part: ["snippet", "statistics", "status", "brandingSettings"],
         mine: true,
@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
 
       // Always check for MotiveArchiveMedia channel access in addition to personal channels
       try {
-        console.log("📡 Checking for MotiveArchiveMedia channel access...");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📡 Checking for MotiveArchiveMedia channel access...");
         const motiveChannelResponse = await youtube.channels.list({
           part: ["snippet", "statistics", "status", "brandingSettings"],
           id: ["UCLG_UKlNif6A19Kaact2otA"], // MotiveArchiveMedia channel ID
@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
         );
 
         if (motiveChannels.length > 0) {
-          console.log("✅ Found MotiveArchiveMedia channel:");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Found MotiveArchiveMedia channel:");
           motiveChannels.forEach((channel, index) => {
             console.log(
               `   Brand Account: "${channel.snippet?.title}" (${channel.id})`
@@ -167,10 +167,10 @@ export async function GET(req: NextRequest) {
             );
           }
         } else {
-          console.log("❌ MotiveArchiveMedia channel not accessible");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ MotiveArchiveMedia channel not accessible");
         }
       } catch (err) {
-        console.log("MotiveArchiveMedia channel check failed:", err);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("MotiveArchiveMedia channel check failed:", err);
       }
 
       // If no channels found, try alternative methods
@@ -197,7 +197,7 @@ export async function GET(req: NextRequest) {
           );
 
           if (motiveChannels.length > 0) {
-            console.log("✅ Found MotiveArchiveMedia channel:");
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Found MotiveArchiveMedia channel:");
             motiveChannels.forEach((channel, index) => {
               console.log(
                 `   ${index + 1}. "${channel.snippet?.title}" (${channel.id})`

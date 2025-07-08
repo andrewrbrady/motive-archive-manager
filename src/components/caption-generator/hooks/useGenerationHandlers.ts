@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import type { CaptionFormState, GenerationContext } from "../types";
+import { useAPI } from "@/hooks/useAPI";
 
 interface GenerationState {
   isGenerating: boolean;
@@ -18,9 +19,15 @@ export function useGenerationHandlers() {
   const [generationState, setGenerationState] = useState<GenerationState>(
     initialGenerationState
   );
+  const api = useAPI();
 
   const generateCaption = useCallback(
     async (context: GenerationContext, formState: CaptionFormState) => {
+      if (!api) {
+        toast.error("Authentication required to generate captions");
+        return;
+      }
+
       setGenerationState((prev) => ({
         ...prev,
         isGenerating: true,
@@ -52,20 +59,10 @@ export function useGenerationHandlers() {
           temperature: formState.temperature,
         };
 
-        const response = await fetch("/api/captions/generate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestBody),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to generate caption");
-        }
-
-        const data = await response.json();
+        const data = await api.post<{ caption: string }>(
+          "/captions/generate",
+          requestBody
+        );
 
         setGenerationState((prev) => ({
           ...prev,
@@ -88,7 +85,7 @@ export function useGenerationHandlers() {
         toast.error(errorMessage);
       }
     },
-    []
+    [api]
   );
 
   const updateGeneratedCaption = useCallback((caption: string) => {

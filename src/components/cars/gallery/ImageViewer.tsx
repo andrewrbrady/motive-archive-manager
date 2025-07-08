@@ -2,7 +2,8 @@ import React from "react";
 import { CloudflareImage } from "@/components/ui/CloudflareImage";
 import { ChevronLeft, ChevronRight, ZoomIn, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ExtendedImageType, getUrlVariations } from "@/types/gallery";
+import { ExtendedImageType } from "@/types/gallery";
+import { getEnhancedImageUrlBySize } from "@/lib/imageUtils";
 
 interface ImageViewerProps {
   currentImage: ExtendedImageType | undefined;
@@ -23,45 +24,48 @@ export function ImageViewer({
   showImageInfo,
   onReanalyze,
 }: ImageViewerProps) {
-  if (!currentImage) {
-    return (
-      <div className="bg-background rounded-lg h-[800px] flex items-center justify-center">
-        <p className="text-muted-foreground">No image selected</p>
-      </div>
-    );
-  }
-
+  // No fallback needed since gallery handles conditional rendering
   return (
-    <div className="bg-background rounded-lg">
-      <div className="relative w-full h-[800px]">
+    <div className="bg-background rounded-lg h-full">
+      <div className="relative w-full h-full">
         <CloudflareImage
-          src={getUrlVariations(currentImage.url).w1500}
-          alt={currentImage.metadata?.description || `Image`}
+          src={getEnhancedImageUrlBySize(currentImage!.url, "large")}
+          alt={currentImage!.metadata?.description || `Image`}
           fill
           className="object-contain"
-          sizes="66vw"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 800px, 1500px"
           priority
         />
 
         {/* Navigation Controls */}
         <button
-          onClick={onPrev}
-          className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Previous button clicked");
+            onPrev();
+          }}
+          className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/60 rounded-full text-white hover:bg-black/80 transition-colors z-10"
           title="Previous image"
         >
-          <ChevronLeft className="w-5 h-5" />
+          <ChevronLeft className="w-6 h-6" />
         </button>
 
         <button
-          onClick={onNext}
-          className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Next button clicked");
+            onNext();
+          }}
+          className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/60 rounded-full text-white hover:bg-black/80 transition-colors z-10"
           title="Next image"
         >
-          <ChevronRight className="w-5 h-5" />
+          <ChevronRight className="w-6 h-6" />
         </button>
 
         {/* Top right controls */}
-        <div className="absolute top-4 right-4 flex gap-2">
+        <div className="absolute top-4 right-4 flex gap-2 z-10">
           <button
             onClick={onToggleInfo}
             className={cn(

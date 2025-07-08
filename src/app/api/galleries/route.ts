@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
+import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 
 // Types
 interface OrderedImage {
@@ -14,115 +15,241 @@ interface Gallery {
   name: string;
   description?: string;
   imageIds: ObjectId[];
+  primaryImageId?: ObjectId;
   orderedImages?: OrderedImage[];
   createdAt: string;
   updatedAt: string;
 }
 
 // GET galleries with pagination
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    // Verify authentication following cars/deliverables pattern
+    const authResult = await verifyAuthMiddleware(request);
+    if (authResult) {
+      return authResult;
+    }
+
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    // Enhanced pagination support with pageSize parameter (max 50 for galleries)
+    const pageSize = Math.min(
+      parseInt(
+        searchParams.get("pageSize") || searchParams.get("limit") || "20"
+      ),
+      50 // Maximum page size for performance
+    );
     const search = searchParams.get("search");
 
-    const skip = (page - 1) * limit;
+    const skip = (page - 1) * pageSize;
 
     // Build query
     const query: any = {};
 
-    // Add search filter
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-      ];
+    // Enhanced search implementation following cars/deliverables pattern
+    if (search && search.trim()) {
+      const searchTerms = search.trim().split(/\s+/).filter(Boolean);
+
+      if (searchTerms.length > 0) {
+        query.$or = [];
+
+        searchTerms.forEach((term) => {
+          // Escape special regex characters to prevent errors
+          const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const searchRegex = new RegExp(escapedTerm, "i");
+
+          // Apply search to primary fields
+          query.$or.push({ name: searchRegex }, { description: searchRegex });
+        });
+
+        // For multi-word searches, also try to match the full search term
+        if (searchTerms.length > 1) {
+          const fullSearchRegex = new RegExp(
+            search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+            "i"
+          );
+          query.$or.push(
+            { name: fullSearchRegex },
+            { description: fullSearchRegex }
+          );
+        }
+      }
     }
 
     const db = await getDatabase();
-    const galleriesCollection = db.collection("galleries");
+    if (!db) {
+      console.error("Failed to get database instance");
+      return NextResponse.json(
+        { error: "Failed to connect to database" },
+        { status: 500 }
+      );
+    }
 
-    // Get total count for pagination
-    const total = await galleriesCollection.countDocuments(query);
+    try {
+      // Get total count for pagination
+      const total = await db.collection("galleries").countDocuments(query);
 
-    // Get paginated galleries
-    const galleries = await galleriesCollection
-      .find(query)
-      .sort({ updatedAt: -1, createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .toArray();
+      // Use aggregation pipeline to populate thumbnailImage from primaryImageId
+      // Following the same pattern as cars API
+      const galleries = await db
+        .collection("galleries")
+        .aggregate([
+          { $match: query },
+          { $sort: { updatedAt: -1, createdAt: -1 } },
+          { $skip: skip },
+          { $limit: pageSize },
 
-    // Get first image for each gallery (using orderedImages if available)
-    const allImageIds = galleries.flatMap((gallery) => {
-      if (gallery.orderedImages?.length) {
-        // Convert string ID to ObjectId if needed
-        const firstOrderedId = gallery.orderedImages[0].id;
-        return [
-          typeof firstOrderedId === "string"
-            ? new ObjectId(firstOrderedId)
-            : firstOrderedId,
-        ];
-      }
-      // Fallback to first image from imageIds
-      return gallery.imageIds.length > 0 ? [gallery.imageIds[0]] : [];
-    });
+          // First, look up the primary image if set
+          {
+            $lookup: {
+              from: "images",
+              let: {
+                primaryId: {
+                  $cond: [
+                    { $ifNull: ["$primaryImageId", false] },
+                    { $toObjectId: "$primaryImageId" },
+                    null,
+                  ],
+                },
+              },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [{ $eq: ["$_id", "$$primaryId"] }],
+                    },
+                  },
+                },
+                { $limit: 1 },
+              ],
+              as: "primaryImage",
+            },
+          },
 
-    const images =
-      allImageIds.length > 0
-        ? await db
-            .collection("images")
-            .find({ _id: { $in: allImageIds } })
-            .toArray()
-        : [];
+          // If no primary image, look up first image from imageIds
+          {
+            $lookup: {
+              from: "images",
+              let: {
+                imageIds: {
+                  $map: {
+                    input: { $ifNull: ["$imageIds", []] },
+                    as: "id",
+                    in: { $toObjectId: "$$id" },
+                  },
+                },
+                hasPrimary: { $gt: [{ $size: "$primaryImage" }, 0] },
+              },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $in: ["$_id", "$$imageIds"] },
+                        { $eq: ["$$hasPrimary", false] },
+                      ],
+                    },
+                  },
+                },
+                { $limit: 1 },
+              ],
+              as: "firstImage",
+            },
+          },
 
-    const imageMap = new Map(images.map((img) => [img._id.toString(), img]));
+          // Combine results into thumbnailImage
+          {
+            $addFields: {
+              thumbnailImage: {
+                $cond: {
+                  if: { $gt: [{ $size: "$primaryImage" }, 0] },
+                  then: { $arrayElemAt: ["$primaryImage", 0] },
+                  else: {
+                    $cond: {
+                      if: { $gt: [{ $size: "$firstImage" }, 0] },
+                      then: { $arrayElemAt: ["$firstImage", 0] },
+                      else: null,
+                    },
+                  },
+                },
+              },
+            },
+          },
 
-    // Process galleries
-    const processedGalleries = galleries.map((gallery) => {
-      // Get the first image ID, handling both string and ObjectId cases
-      const firstImageId = gallery.orderedImages?.length
-        ? typeof gallery.orderedImages[0].id === "string"
-          ? gallery.orderedImages[0].id
-          : gallery.orderedImages[0].id.toString()
-        : gallery.imageIds[0]?.toString();
+          // Format the response
+          {
+            $project: {
+              _id: 1,
+              name: 1,
+              description: 1,
+              imageIds: 1,
+              primaryImageId: 1,
+              orderedImages: 1,
+              createdAt: 1,
+              updatedAt: 1,
+              thumbnailImage: {
+                $cond: {
+                  if: "$thumbnailImage",
+                  then: {
+                    _id: { $toString: "$thumbnailImage._id" },
+                    url: "$thumbnailImage.url",
+                    filename: "$thumbnailImage.filename",
+                  },
+                  else: null,
+                },
+              },
+            },
+          },
+        ])
+        .toArray();
 
-      return {
+      // Process galleries to format URLs and convert ObjectIds to strings
+      const processedGalleries = galleries.map((gallery) => ({
         ...gallery,
         _id: gallery._id.toString(),
         imageIds: gallery.imageIds.map((id: ObjectId) => id.toString()),
+        primaryImageId: gallery.primaryImageId?.toString(),
         orderedImages: gallery.orderedImages?.map((item: OrderedImage) => ({
           id: typeof item.id === "string" ? item.id : item.id.toString(),
           order: item.order,
         })),
-        thumbnailImage: firstImageId
-          ? (() => {
-              const imageData = imageMap.get(firstImageId);
-              const formattedUrl = getFormattedImageUrl(imageData?.url);
-              return formattedUrl
-                ? {
-                    ...imageData,
-                    _id: firstImageId,
-                    url: formattedUrl,
-                  }
-                : null;
-            })()
+        thumbnailImage: gallery.thumbnailImage
+          ? {
+              ...gallery.thumbnailImage,
+              url: fixCloudflareImageUrl(gallery.thumbnailImage.url),
+            }
           : null,
-      };
-    });
+      }));
 
-    const response = {
-      galleries: processedGalleries,
-      pagination: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit),
-      },
-    };
+      const response = NextResponse.json({
+        galleries: processedGalleries,
+        pagination: {
+          total,
+          page,
+          limit: pageSize, // Maintain backward compatibility with 'limit' field
+          pageSize,
+          pages: Math.ceil(total / pageSize),
+        },
+      });
 
-    return NextResponse.json(response);
+      // Add cache headers for better performance following cars/deliverables pattern
+      response.headers.set(
+        "Cache-Control",
+        "public, s-maxage=60, stale-while-revalidate=300"
+      );
+      response.headers.set("ETag", `"galleries-${total}-${page}-${pageSize}"`);
+
+      return response;
+    } catch (dbError) {
+      console.error("Database operation error:", dbError);
+      return NextResponse.json(
+        {
+          error: "Database operation failed",
+          details: dbError instanceof Error ? dbError.message : "Unknown error",
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("[API] Error fetching galleries:", error);
     return NextResponse.json(
@@ -167,6 +294,9 @@ export async function POST(request: Request) {
       name,
       description,
       imageIds: processedImageIds,
+      // Set primaryImageId to first image if available
+      primaryImageId:
+        processedImageIds.length > 0 ? processedImageIds[0] : undefined,
       orderedImages,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -179,6 +309,7 @@ export async function POST(request: Request) {
       _id: result.insertedId.toString(),
       ...gallery,
       imageIds: gallery.imageIds.map((id) => id.toString()),
+      primaryImageId: gallery.primaryImageId?.toString(),
       orderedImages: gallery.orderedImages?.map((item) => ({
         id: item.id.toString(),
         order: item.order,

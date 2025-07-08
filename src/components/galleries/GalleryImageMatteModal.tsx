@@ -4,6 +4,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -11,24 +12,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Loader2,
-  Settings,
-  Cloud,
-  Monitor,
-  Palette,
   Check,
   X,
+  Download,
+  Eye,
+  ZoomIn,
+  RotateCcw,
+  Palette,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
 import { useGalleryImageProcessing } from "@/lib/hooks/useGalleryImageProcessing";
+import { useAPI } from "@/hooks/useAPI";
+import { toast as hotToast } from "react-hot-toast";
 
 interface GalleryImageMatteModalProps {
   isOpen: boolean;
@@ -38,14 +35,36 @@ interface GalleryImageMatteModalProps {
   onImageReplaced?: (originalImageId: string, newImageData: any) => void;
 }
 
-type ProcessingMethod = "cloud" | "local";
-
 interface ProcessedImageData {
   _id: string;
   url: string;
   filename: string;
   metadata: any;
   carId: string;
+}
+
+interface ImageDimensions {
+  width: number;
+  height: number;
+}
+
+interface CreateMatteData {
+  imageUrl: string;
+  canvasWidth: number;
+  canvasHeight: number;
+  paddingPercent: number;
+  matteColor: string;
+  uploadToCloudflare: boolean;
+  originalFilename: string;
+  requestedWidth: number;
+  requestedHeight: number;
+  scaleMultiplier: number;
+}
+
+interface CreateMatteResponse {
+  success?: boolean;
+  processedImageUrl?: string;
+  error?: string;
 }
 
 export function GalleryImageMatteModal({
@@ -55,18 +74,15 @@ export function GalleryImageMatteModal({
   galleryId,
   onImageReplaced,
 }: GalleryImageMatteModalProps) {
+  const api = useAPI();
   const [canvasWidth, setCanvasWidth] = useState<string>("1920");
   const [canvasHeight, setCanvasHeight] = useState<string>("1080");
   const [paddingPercent, setPaddingPercent] = useState<string>("0");
   const [matteColor, setMatteColor] = useState<string>("#000000");
   const [cloudflareWidth, setCloudflareWidth] = useState<string>("2000");
   const [cloudflareQuality, setCloudflareQuality] = useState<string>("100");
-  const [processingMethod, setProcessingMethod] =
-    useState<ProcessingMethod>("cloud");
-  const [originalDimensions, setOriginalDimensions] = useState<{
-    width: number;
-    height: number;
-  } | null>(null);
+  const [originalDimensions, setOriginalDimensions] =
+    useState<ImageDimensions | null>(null);
   const [processedImage, setProcessedImage] =
     useState<ProcessedImageData | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -77,22 +93,6 @@ export function GalleryImageMatteModal({
     isProcessing,
     isReplacing,
   } = useGalleryImageProcessing();
-
-  // Load processing method preference from localStorage
-  useEffect(() => {
-    const savedMethod = localStorage.getItem(
-      "imageMatteMethod"
-    ) as ProcessingMethod;
-    if (savedMethod && (savedMethod === "cloud" || savedMethod === "local")) {
-      setProcessingMethod(savedMethod);
-    }
-  }, []);
-
-  // Save processing method preference to localStorage
-  const handleProcessingMethodChange = (method: ProcessingMethod) => {
-    setProcessingMethod(method);
-    localStorage.setItem("imageMatteMethod", method);
-  };
 
   // Helper function to build enhanced Cloudflare URL
   const getEnhancedImageUrl = (
@@ -113,6 +113,24 @@ export function GalleryImageMatteModal({
     }
 
     return baseUrl.replace(/\/public$/, `/${params.join(",")}`);
+  };
+
+  // Helper function to get original processing URL (without enhancements)
+  const getProcessingImageUrl = (baseUrl: string) => {
+    if (baseUrl.includes("imagedelivery.net")) {
+      // For Cloudflare URLs, use the base URL without any suffix
+      const urlParts = baseUrl.split("/");
+      // Remove any existing variant (like w=2000,q=100 or public)
+      if (
+        urlParts[urlParts.length - 1].includes("=") ||
+        urlParts[urlParts.length - 1] === "public"
+      ) {
+        urlParts.pop();
+      }
+      return urlParts.join("/");
+    }
+    // For other URLs, try to remove any suffix
+    return baseUrl.replace(/\/[^\/]*$/, "");
   };
 
   // Memoize the enhanced image URL
@@ -138,13 +156,56 @@ export function GalleryImageMatteModal({
   const handleProcess = async () => {
     if (!image || !enhancedImageUrl) return;
 
+    // Use original processing URL for API calls, not enhanced URL
+    const processingImageUrl = getProcessingImageUrl(image.url);
+
+    // Test if the processing URL is accessible
+    try {
+      console.log(
+        "🔍 Testing processing URL accessibility:",
+        processingImageUrl
+      );
+      const testResponse = await fetch(processingImageUrl, {
+        method: "HEAD",
+        mode: "no-cors",
+      });
+      console.log("🔍 Processing URL test result:", {
+        url: processingImageUrl,
+        status: testResponse.status,
+        statusText: testResponse.statusText,
+        type: testResponse.type,
+        note:
+          testResponse.type === "opaque"
+            ? "no-cors mode - limited response info available"
+            : "normal response",
+      });
+    } catch (testError) {
+      console.warn("⚠️ Processing URL test failed:", testError);
+    }
+
+    console.log("🎨 Image Matte processing starting:", {
+      originalUrl: image.url,
+      enhancedUrl: enhancedImageUrl.substring(0, 100) + "...",
+      processingUrl: processingImageUrl,
+      urlTransformation: {
+        from: image.url,
+        to: processingImageUrl,
+        isCloudflare: image.url.includes("imagedelivery.net"),
+      },
+      parameters: {
+        canvasWidth: parseInt(canvasWidth),
+        canvasHeight: parseInt(canvasHeight),
+        paddingPercent: parseFloat(paddingPercent),
+        matteColor,
+      },
+    });
+
     const parameters = {
-      imageUrl: enhancedImageUrl,
+      imageUrl: processingImageUrl,
       canvasWidth: parseInt(canvasWidth),
       canvasHeight: parseInt(canvasHeight),
       paddingPercent: parseFloat(paddingPercent),
       matteColor,
-      processingMethod,
       requestedWidth: parseInt(canvasWidth),
       requestedHeight: parseInt(canvasHeight),
       scaleMultiplier: 1,
@@ -158,21 +219,31 @@ export function GalleryImageMatteModal({
     });
 
     if (result) {
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Image Matte processing completed successfully");
       setProcessedImage(result.processedImage);
       setShowPreview(true);
+    } else {
+      console.error("❌ Image Matte processing failed - no result returned");
     }
   };
 
   const handleReplaceImage = async () => {
     if (!image || !processedImage) return;
 
+    // Use original processing URL for API calls, not enhanced URL
+    const processingImageUrl = getProcessingImageUrl(image.url);
+
+    console.log("🔄 Image Matte replacement starting:", {
+      originalUrl: image.url,
+      processingUrl: processingImageUrl,
+    });
+
     const parameters = {
-      imageUrl: enhancedImageUrl,
+      imageUrl: processingImageUrl,
       canvasWidth: parseInt(canvasWidth),
       canvasHeight: parseInt(canvasHeight),
       paddingPercent: parseFloat(paddingPercent),
       matteColor,
-      processingMethod,
       requestedWidth: parseInt(canvasWidth),
       requestedHeight: parseInt(canvasHeight),
       scaleMultiplier: 1,
@@ -186,8 +257,11 @@ export function GalleryImageMatteModal({
     );
 
     if (result && onImageReplaced) {
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Image Matte replacement completed successfully");
       onImageReplaced(result.originalImageId, result.processedImage);
       handleClose();
+    } else {
+      console.error("❌ Image Matte replacement failed");
     }
   };
 
@@ -259,36 +333,6 @@ export function GalleryImageMatteModal({
                   />
                 </div>
               </div>
-            </div>
-
-            {/* Processing Method Settings */}
-            <div className="p-3 border rounded-lg bg-muted/30">
-              <div className="flex items-center gap-2 mb-2">
-                <Settings className="h-4 w-4" />
-                <Label className="text-sm font-medium">Processing Method</Label>
-              </div>
-              <Select
-                value={processingMethod}
-                onValueChange={handleProcessingMethodChange}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select processing method" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cloud">
-                    <div className="flex items-center gap-2">
-                      <Cloud className="h-4 w-4" />
-                      <span>Cloud Run</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="local">
-                    <div className="flex items-center gap-2">
-                      <Monitor className="h-4 w-4" />
-                      <span>Local Binary</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             {/* Canvas Dimensions */}

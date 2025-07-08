@@ -23,6 +23,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
+import { useAPI } from "@/hooks/useAPI";
 
 interface AddContainerModalProps {
   isOpen: boolean;
@@ -41,6 +42,7 @@ export default function AddContainerModal({
   onAdd,
 }: AddContainerModalProps) {
   const { toast } = useToast();
+  const api = useAPI();
   const [formData, setFormData] = useState<{
     name: string;
     type: string;
@@ -55,6 +57,8 @@ export default function AddContainerModal({
   const [locations, setLocations] = useState<LocationResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  if (!api) return <div>Loading...</div>;
+
   // Reset form when modal opens/closes
   useEffect(() => {
     if (isOpen) {
@@ -65,14 +69,12 @@ export default function AddContainerModal({
       });
       fetchLocations();
     }
-  }, [isOpen]);
+  }, [isOpen, api]);
 
   const fetchLocations = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
+      const data = (await api.get("locations")) as LocationResponse[];
       setLocations(data);
     } catch (error) {
       console.error("Error fetching locations:", error);

@@ -1,6 +1,7 @@
 /**
  * Utilities for handling deliverable assignment operations
  */
+import { api } from "@/lib/api-client";
 
 /**
  * Assigns a user to a deliverable or unassigns if userId is null
@@ -32,24 +33,7 @@ export async function assignDeliverable(
     };
 
     // Call the API endpoint
-    const response = await fetch(`/api/cars/${carId}/deliverables/assign`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(request),
-    });
-
-    // Parse the response
-    const responseData = await response.json();
-    // [REMOVED] // [REMOVED] console.log("Assignment response:", responseData);
-
-    // Check if the response was successful
-    if (!response.ok) {
-      throw new Error(
-        responseData.error || "Failed to update deliverable assignment"
-      );
-    }
+    await api.post(`/cars/${carId}/deliverables/assign`, request);
 
     return true;
   } catch (error) {
@@ -59,7 +43,7 @@ export async function assignDeliverable(
 }
 
 /**
- * Batch assigns users to multiple deliverables
+ * Batch assigns users to multiple deliverables - OPTIMIZED for parallel processing
  * @param assignments - Array of assignment operations
  * @returns A promise resolving to an array of results
  */
@@ -71,10 +55,8 @@ export async function batchAssignDeliverables(
     editorName?: string | null;
   }>
 ): Promise<Array<{ deliverableId: string; success: boolean; error?: string }>> {
-  const results = [];
-
-  // Process assignments sequentially to avoid race conditions
-  for (const assignment of assignments) {
+  // OPTIMIZATION: Process assignments in parallel instead of sequentially
+  const assignmentPromises = assignments.map(async (assignment) => {
     try {
       await assignDeliverable(
         assignment.deliverableId,
@@ -82,20 +64,36 @@ export async function batchAssignDeliverables(
         assignment.userId,
         assignment.editorName
       );
-      results.push({
+      return {
         deliverableId: assignment.deliverableId,
         success: true,
-      });
+      };
     } catch (error) {
-      results.push({
+      return {
         deliverableId: assignment.deliverableId,
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
-      });
+      };
     }
-  }
+  });
 
-  return results;
+  // Use Promise.allSettled to handle both success and failure cases
+  const results = await Promise.allSettled(assignmentPromises);
+
+  return results.map((result, index) => {
+    if (result.status === "fulfilled") {
+      return result.value;
+    } else {
+      return {
+        deliverableId: assignments[index].deliverableId,
+        success: false,
+        error:
+          result.reason instanceof Error
+            ? result.reason.message
+            : "Unknown error",
+      };
+    }
+  });
 }
 
 /**

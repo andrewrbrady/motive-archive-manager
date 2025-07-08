@@ -19,9 +19,18 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Car, MoreHorizontal, Search } from "lucide-react";
+import {
+  Plus,
+  Car,
+  MoreHorizontal,
+  Search,
+  Grid3X3,
+  Columns,
+} from "lucide-react";
 import { format } from "date-fns";
 import { Project } from "@/types/project";
 import { toast } from "@/components/ui/use-toast";
@@ -29,9 +38,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
+import { getEnhancedImageUrlBySize } from "@/lib/imageUtils";
 import { CarGridSelector } from "../cars/CarGridSelector";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 interface Car {
   _id: string;
@@ -56,7 +66,10 @@ interface Car {
 interface ProjectCarsTabProps {
   project: Project;
   onProjectUpdate: () => void;
+  initialCars?: Car[]; // Optional pre-fetched cars data for SSR optimization
 }
+
+// ✅ Using centralized image utility from @/lib/imageUtils
 
 // Car Card Component for Project Cars
 function ProjectCarCard({
@@ -66,92 +79,48 @@ function ProjectCarCard({
   car: Car;
   onUnlink: (carId: string) => void;
 }) {
+  const api = useAPI();
   const [primaryImage, setPrimaryImage] = useState<{
     id?: string;
     url: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Simple effect: just fetch the primary image
   useEffect(() => {
-    const findPrimaryImage = () => {
-      setLoading(true);
-
-      // Case 1: We have an array of images
-      if (car.images && Array.isArray(car.images) && car.images.length > 0) {
-        // Try to find the image marked as primary first
-        const primaryImg = car.images.find(
-          (img) =>
-            img.metadata?.isPrimary ||
-            (car.primaryImageId && img._id === car.primaryImageId)
-        );
-
-        // Use primary image if found, otherwise use first image
-        const imageToUse = primaryImg || car.images[0];
-
-        setPrimaryImage({
-          id: imageToUse._id,
-          url: getFormattedImageUrl(imageToUse.url),
-        });
-
+    const loadPrimaryImage = async () => {
+      if (!car.primaryImageId || !api) {
         setLoading(false);
+        setPrimaryImage(null);
         return;
       }
 
-      // Case 2: We have image IDs but no loaded images
-      if (car.imageIds?.length && car.primaryImageId) {
-        // Fetch the primary image
-        const fetchImage = async () => {
-          try {
-            const response = await fetch(`/api/images/${car.primaryImageId}`);
-
-            if (response.ok) {
-              const imageData = await response.json();
-              setPrimaryImage({
-                id: imageData._id,
-                url: getFormattedImageUrl(imageData.url),
-              });
-            } else {
-              // If primary image fetch fails, try the first image
-              if (
-                car.imageIds &&
-                car.imageIds.length > 0 &&
-                car.imageIds[0] !== car.primaryImageId
-              ) {
-                const fallbackResponse = await fetch(
-                  `/api/images/${car.imageIds[0]}`
-                );
-                if (fallbackResponse.ok) {
-                  const fallbackImageData = await fallbackResponse.json();
-                  setPrimaryImage({
-                    id: fallbackImageData._id,
-                    url: getFormattedImageUrl(fallbackImageData.url),
-                  });
-                } else {
-                  setPrimaryImage(null);
-                }
-              } else {
-                setPrimaryImage(null);
-              }
-            }
-          } catch (error) {
-            console.error("Error fetching image:", error);
-            setPrimaryImage(null);
-          } finally {
-            setLoading(false);
-          }
-        };
-
-        fetchImage();
-        return;
+      try {
+        const imageData = (await api.get(
+          `images/${car.primaryImageId}`
+        )) as any;
+        setPrimaryImage({
+          id: imageData._id,
+          url: getEnhancedImageUrlBySize(
+            fixCloudflareImageUrl(imageData.url),
+            "thumbnail"
+          ),
+        });
+      } catch (error) {
+        console.error(`Error loading primary image for car ${car._id}:`, error);
+        setPrimaryImage(null);
       }
 
-      // No images available
       setLoading(false);
-      setPrimaryImage(null);
     };
 
-    findPrimaryImage();
-  }, [car._id, car.imageIds, car.images, car.primaryImageId]);
+    if (api && car.primaryImageId) {
+      loadPrimaryImage();
+    } else {
+      setLoading(false);
+      setPrimaryImage(null);
+    }
+  }, [car._id, car.primaryImageId, api]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -256,37 +225,50 @@ function ProjectCarCard({
 export function ProjectCarsTab({
   project,
   onProjectUpdate,
+  initialCars,
 }: ProjectCarsTabProps) {
-  const { user } = useFirebaseAuth();
-  const [projectCars, setProjectCars] = useState<Car[]>([]);
-  const [loadingProjectCars, setLoadingProjectCars] = useState(false);
+  const api = useAPI();
+  const [projectCars, setProjectCars] = useState<Car[]>(initialCars || []);
+  const [loadingProjectCars, setLoadingProjectCars] = useState(!initialCars); // Don't show loading if we have initial data
   const [isLinkCarOpen, setIsLinkCarOpen] = useState(false);
   const [selectedCarIds, setSelectedCarIds] = useState<string[]>([]);
   const [isLinkingCar, setIsLinkingCar] = useState(false);
+  const [dialogContentReady, setDialogContentReady] = useState(false);
+  const [gridColumns, setGridColumns] = useState(4); // Default to 4 columns
 
   const fetchProjectCars = useCallback(async () => {
     try {
       setLoadingProjectCars(true);
+      console.time("ProjectCarsTab-fetchProjectCars");
 
-      if (!user) {
-        console.log("ProjectCarsTab: No user available for fetchProjectCars");
-        throw new Error("No authenticated user found");
+      if (!api) {
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("ProjectCarsTab: No API available for fetchProjectCars");
+        throw new Error("No authenticated API found");
       }
 
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
+      // ✅ Fix: Include image data in project cars API call
+      const data = (await api.get(
+        `projects/${project._id}/cars?includeImages=true`
+      )) as {
+        cars?: Car[];
+      };
 
-      const response = await fetch(`/api/projects/${project._id}/cars`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      console.log("ProjectCarsTab: Fetched cars data:", {
+        carsCount: data.cars?.length || 0,
+        carsWithImages:
+          data.cars?.filter((car) => car.images?.length).length || 0,
+        carsWithImageIds:
+          data.cars?.filter((car) => car.imageIds?.length).length || 0,
+        sampleCar: data.cars?.[0]
+          ? {
+              id: data.cars[0]._id,
+              hasImages: !!data.cars[0].images?.length,
+              hasImageIds: !!data.cars[0].imageIds?.length,
+              primaryImageId: data.cars[0].primaryImageId,
+            }
+          : null,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch project cars");
-      }
-
-      const data = await response.json();
       setProjectCars(data.cars || []);
     } catch (error) {
       console.error("Error fetching project cars:", error);
@@ -297,15 +279,56 @@ export function ProjectCarsTab({
       });
     } finally {
       setLoadingProjectCars(false);
+      console.timeEnd("ProjectCarsTab-fetchProjectCars");
     }
-  }, [user, project._id]);
+  }, [api, project._id]);
 
-  // Fetch project cars on component mount and when project changes
+  // Fetch project cars on component mount and when project changes - only if no initial data
   useEffect(() => {
-    if (user && project._id) {
+    // ✅ Fix: Add proper API readiness check and avoid race conditions
+    if (!initialCars && project._id) {
+      if (api) {
+        fetchProjectCars();
+      } else {
+        // API not ready yet, keep loading state until it is
+        setLoadingProjectCars(true);
+      }
+    }
+  }, [api, project._id, initialCars, fetchProjectCars]);
+
+  // ✅ Fix: Additional effect to handle API becoming available after initial render
+  useEffect(() => {
+    if (
+      api &&
+      !initialCars &&
+      project._id &&
+      projectCars.length === 0 &&
+      !loadingProjectCars
+    ) {
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("ProjectCarsTab: API became available, fetching cars...");
       fetchProjectCars();
     }
-  }, [fetchProjectCars, user, project._id]);
+  }, [api]);
+
+  // ✅ Fix: Add effect to handle lazy loading scenarios
+  useEffect(() => {
+    // If we're lazy loaded and don't have initial cars, and the API is available, fetch immediately
+    if (api && !initialCars && project._id && projectCars.length === 0) {
+      console.log(
+        "ProjectCarsTab: Component mounted with API ready, fetching cars..."
+      );
+      fetchProjectCars();
+    }
+  }, []); // Run once on mount
+
+  // ✅ Fix: Cleanup dialog state on unmount to prevent react-remove-scroll errors
+  useEffect(() => {
+    return () => {
+      setIsLinkCarOpen(false);
+      setSelectedCarIds([]);
+      setDialogContentReady(false);
+    };
+  }, []);
 
   const handleLinkCars = async () => {
     if (selectedCarIds.length === 0) {
@@ -320,29 +343,14 @@ export function ProjectCarsTab({
     try {
       setIsLinkingCar(true);
 
-      if (!user) {
-        console.log("ProjectCarsTab: No user available for handleLinkCars");
-        throw new Error("No authenticated user found");
+      if (!api) {
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("ProjectCarsTab: No API available for handleLinkCars");
+        throw new Error("No authenticated API found");
       }
-
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
 
       // Link cars one by one (could be optimized with a batch endpoint)
       for (const carId of selectedCarIds) {
-        const response = await fetch(`/api/projects/${project._id}/cars`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ carId }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `Failed to link car ${carId}`);
-        }
+        await api.post(`projects/${project._id}/cars`, { carId });
       }
 
       // Refresh project data and cars
@@ -369,28 +377,12 @@ export function ProjectCarsTab({
 
   const handleUnlinkCar = async (carId: string) => {
     try {
-      if (!user) {
-        console.log("ProjectCarsTab: No user available for handleUnlinkCar");
-        throw new Error("No authenticated user found");
+      if (!api) {
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("ProjectCarsTab: No API available for handleUnlinkCar");
+        throw new Error("No authenticated API found");
       }
 
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch(
-        `/api/projects/${project._id}/cars?carId=${carId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to unlink car");
-      }
+      await api.delete(`projects/${project._id}/cars?carId=${carId}`);
 
       // Refresh project data and cars
       await onProjectUpdate();
@@ -413,78 +405,145 @@ export function ProjectCarsTab({
   // Get currently linked car IDs to exclude from selection
   const linkedCarIds = project?.carIds || [];
 
+  // Generate grid class based on selected column count
+  const getGridClass = (columns: number) => {
+    switch (columns) {
+      case 3:
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
+      case 4:
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
+      case 5:
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5";
+      case 6:
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6";
+      default:
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle>Project Cars</CardTitle>
-          <Dialog
-            open={isLinkCarOpen}
-            onOpenChange={(open) => {
-              setIsLinkCarOpen(open);
-              if (!open) {
-                setSelectedCarIds([]);
-              }
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Link Cars
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-              <DialogHeader>
-                <DialogTitle>Link Cars to Project</DialogTitle>
-                <DialogDescription>
-                  Select cars to link to this project. Use the filters to find
-                  specific cars.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="flex-1 overflow-y-auto">
-                <CarGridSelector
-                  selectionMode="multiple"
-                  selectedCarIds={selectedCarIds}
-                  onCarsSelect={setSelectedCarIds}
-                  excludeCarIds={linkedCarIds}
-                  showFilters={true}
-                  showPagination={true}
-                  pageSize={12}
-                  gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-                />
-              </div>
-
-              <DialogFooter className="flex-shrink-0">
-                <Button
-                  variant="outline"
-                  onClick={() => {
+          <div className="flex items-center gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Columns className="h-4 w-4 mr-2" />
+                  {gridColumns} Columns
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Grid Layout</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {[3, 4, 5, 6].map((columns) => (
+                  <DropdownMenuItem
+                    key={columns}
+                    onClick={() => setGridColumns(columns)}
+                    className={gridColumns === columns ? "bg-gray-100" : ""}
+                  >
+                    <Grid3X3 className="h-4 w-4 mr-2" />
+                    {columns} Columns
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Dialog
+              open={isLinkCarOpen}
+              onOpenChange={(open) => {
+                // ✅ Fix: Add safety check to prevent react-remove-scroll errors
+                try {
+                  setIsLinkCarOpen(open);
+                  if (!open) {
                     setSelectedCarIds([]);
-                    setIsLinkCarOpen(false);
-                  }}
-                >
-                  Cancel
+                    setDialogContentReady(false);
+                  } else {
+                    // Small delay to ensure dialog is properly mounted
+                    setTimeout(() => setDialogContentReady(true), 100);
+                  }
+                } catch (error) {
+                  console.error("Dialog onOpenChange error:", error);
+                  setIsLinkCarOpen(false);
+                  setSelectedCarIds([]);
+                  setDialogContentReady(false);
+                }
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button size="sm" disabled={!api}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Link Cars
                 </Button>
-                <Button
-                  onClick={handleLinkCars}
-                  disabled={isLinkingCar || selectedCarIds.length === 0}
-                >
-                  {isLinkingCar ? (
-                    <>
-                      <LoadingSpinner size="sm" className="mr-2" />
-                      Linking...
-                    </>
-                  ) : (
-                    `Link ${selectedCarIds.length} Car${selectedCarIds.length !== 1 ? "s" : ""}`
+              </DialogTrigger>
+              <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>Link Cars to Project</DialogTitle>
+                  <DialogDescription>
+                    Select cars to link to this project. Use the filters to find
+                    specific cars.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="flex-1 overflow-y-auto">
+                  {/* ✅ Fix: Only render CarGridSelector when dialog is open, API is ready, and content is ready */}
+                  {isLinkCarOpen && api && dialogContentReady && (
+                    <CarGridSelector
+                      selectionMode="multiple"
+                      selectedCarIds={selectedCarIds}
+                      onCarsSelect={setSelectedCarIds}
+                      excludeCarIds={linkedCarIds}
+                      showFilters={true}
+                      showPagination={true}
+                      pageSize={12}
+                      gridClassName="grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+                    />
                   )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                  {isLinkCarOpen && (!api || !dialogContentReady) && (
+                    <div className="flex items-center justify-center h-64">
+                      <LoadingSpinner size="lg" />
+                      <span className="ml-2">Loading car selector...</span>
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter className="flex-shrink-0">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedCarIds([]);
+                      setIsLinkCarOpen(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleLinkCars}
+                    disabled={
+                      isLinkingCar || selectedCarIds.length === 0 || !api
+                    }
+                  >
+                    {isLinkingCar ? (
+                      <>
+                        <LoadingSpinner size="sm" className="mr-2" />
+                        Linking...
+                      </>
+                    ) : (
+                      `Link ${selectedCarIds.length} Car${selectedCarIds.length !== 1 ? "s" : ""}`
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pt-4">
-        {loadingProjectCars ? (
+        {!api ? (
+          <div className="flex items-center justify-center h-32">
+            <LoadingSpinner size="lg" />
+          </div>
+        ) : loadingProjectCars ? (
           <div className="flex items-center justify-center h-32">
             <LoadingSpinner size="lg" />
           </div>
@@ -497,7 +556,7 @@ export function ProjectCarsTab({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className={`grid ${getGridClass(gridColumns)} gap-6`}>
             {projectCars.map((car) => (
               <ProjectCarCard
                 key={car._id}

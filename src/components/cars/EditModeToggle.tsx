@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { Edit } from "lucide-react";
+import { Edit, X } from "lucide-react";
 
 interface EditModeToggleProps {
   isEditMode: boolean;
@@ -14,21 +14,31 @@ export default function EditModeToggle({ isEditMode }: EditModeToggleProps) {
   const toggleEditMode = () => {
     const searchParams = new URLSearchParams(window.location.search);
     if (isEditMode) {
-      searchParams.delete("edit");
+      searchParams.delete("mode");
     } else {
-      searchParams.set("edit", "true");
+      searchParams.set("mode", "edit");
     }
     router.push(`?${searchParams.toString()}`);
   };
 
   return (
     <Button
-      variant="outline"
+      variant={isEditMode ? "default" : "outline"}
       onClick={toggleEditMode}
       title={isEditMode ? "Exit Edit Mode" : "Enter Edit Mode"}
-      className="p-2 text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))] hover:text-[hsl(var(--foreground))] dark:hover:text-[hsl(var(--foreground-subtle))] transition-colors rounded-full hover:bg-[hsl(var(--background))] dark:hover:bg-[hsl(var(--background))] border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))]"
+      className="transition-colors"
     >
-      <Edit className="h-4 w-4" />
+      {isEditMode ? (
+        <>
+          <X className="h-4 w-4 mr-2" />
+          Exit Edit Mode
+        </>
+      ) : (
+        <>
+          <Edit className="h-4 w-4 mr-2" />
+          Edit Mode
+        </>
+      )}
     </Button>
   );
 }

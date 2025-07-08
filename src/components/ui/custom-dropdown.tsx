@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, MapPin } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
 import { LocationResponse } from "@/models/location";
 
 interface DropdownOption {
@@ -37,58 +37,10 @@ export function CustomDropdown({
   className = "",
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState({
-    top: 0,
-    left: 0,
-    width: 0,
-  });
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const selectedOption = options.find((option) => option.value === value);
-
-  // Calculate position when opening
-  useEffect(() => {
-    if (isOpen && triggerRef.current) {
-      const triggerRect = triggerRef.current.getBoundingClientRect();
-
-      // Check if we're inside a modal/dialog
-      const isInModal = triggerRef.current.closest('[role="dialog"]') !== null;
-
-      // Calculate position more accurately for modals
-      let top = triggerRect.bottom + window.scrollY;
-      let left = triggerRect.left + window.scrollX;
-
-      // If in modal, adjust for potential viewport constraints
-      if (isInModal) {
-        // Ensure dropdown doesn't go off-screen
-        const viewportHeight = window.innerHeight;
-        const viewportWidth = window.innerWidth;
-        const dropdownHeight = Math.min(240, options.length * 40 + 20); // Estimate dropdown height
-
-        // If dropdown would go below viewport, position it above the trigger
-        if (top + dropdownHeight > viewportHeight) {
-          top = triggerRect.top + window.scrollY - dropdownHeight - 4;
-        }
-
-        // Ensure dropdown doesn't go off the right edge
-        if (left + triggerRect.width > viewportWidth - 20) {
-          left = viewportWidth - triggerRect.width - 20;
-        }
-
-        // Ensure dropdown doesn't go off the left edge
-        if (left < 20) {
-          left = 20;
-        }
-      }
-
-      setDropdownPosition({
-        top,
-        left,
-        width: Math.max(triggerRect.width, 200), // Minimum width of 200px
-      });
-    }
-  }, [isOpen, options.length]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -108,6 +60,8 @@ export function CustomDropdown({
       return () =>
         document.removeEventListener("mousedown", handleClickOutside);
     }
+
+    return undefined;
   }, [isOpen]);
 
   // Close dropdown on escape key
@@ -122,70 +76,15 @@ export function CustomDropdown({
       document.addEventListener("keydown", handleEscape);
       return () => document.removeEventListener("keydown", handleEscape);
     }
+
+    // Return undefined for all other paths
+    return undefined;
   }, [isOpen]);
 
   const handleSelectOption = (optionValue: string) => {
     onChange(optionValue);
     setIsOpen(false);
   };
-
-  const dropdownContent = isOpen ? (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        pointerEvents: "none",
-        zIndex: 99999, // Higher z-index to ensure it's above modals
-      }}
-      onWheel={(e) => {
-        e.stopPropagation();
-      }}
-    >
-      <div
-        ref={dropdownRef}
-        className="bg-background rounded-lg border border-input shadow-xl overflow-y-auto max-h-60 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
-        style={{
-          position: "absolute",
-          top: dropdownPosition.top,
-          left: dropdownPosition.left,
-          width: dropdownPosition.width,
-          pointerEvents: "auto",
-          maxHeight: "240px", // Explicit max height
-        }}
-        onWheel={(e) => {
-          e.stopPropagation();
-        }}
-        onScroll={(e) => {
-          e.stopPropagation();
-        }}
-      >
-        <div className="py-3 px-2 pb-4">
-          {options.length > 6 && (
-            <div className="text-xs text-muted-foreground text-center mb-2 px-1">
-              Scroll for more options
-            </div>
-          )}
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className="flex w-full items-center gap-3 px-3 py-2.5 text-sm border border-transparent hover:border-white/80 rounded-md disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-300 ease-out hover:shadow-sm mb-1 last:mb-0"
-              onClick={() => handleSelectOption(option.value)}
-              disabled={option.disabled}
-            >
-              {option.icon && (
-                <span className="flex-shrink-0">{option.icon}</span>
-              )}
-              <span className="truncate">{option.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  ) : null;
 
   return (
     <div className={`relative ${className}`}>
@@ -215,9 +114,34 @@ export function CustomDropdown({
         )}
       </button>
 
-      {typeof window !== "undefined" &&
-        dropdownContent &&
-        createPortal(dropdownContent, document.body)}
+      {isOpen && (
+        <div
+          ref={dropdownRef}
+          className="absolute top-full left-0 right-0 z-50 bg-background rounded-lg border border-input shadow-xl overflow-y-auto max-h-60 mt-1"
+        >
+          <div className="py-3 px-2 pb-4">
+            {options.length > 6 && (
+              <div className="text-xs text-muted-foreground text-center mb-2 px-1">
+                Scroll for more options
+              </div>
+            )}
+            {options.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className="flex w-full items-center gap-3 px-3 py-2.5 text-sm border border-transparent hover:border-white/80 rounded-md disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-300 ease-out hover:shadow-sm mb-1 last:mb-0"
+                onClick={() => handleSelectOption(option.value)}
+                disabled={option.disabled}
+              >
+                {option.icon && (
+                  <span className="flex-shrink-0">{option.icon}</span>
+                )}
+                <span className="truncate">{option.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -230,17 +154,17 @@ export function LocationDropdown({
   className = "",
   allowEmpty = true,
 }: LocationDropdownProps) {
+  const api = useAPI();
   const [locations, setLocations] = useState<LocationResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
   const fetchLocations = async () => {
+    if (!api) return;
+
     try {
       setLoading(true);
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-
-      const data = await response.json();
+      const data = (await api.get("locations")) as LocationResponse[];
       setLocations(data || []);
     } catch (error) {
       console.error("Error fetching locations:", error);

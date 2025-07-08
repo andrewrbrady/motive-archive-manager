@@ -34,6 +34,7 @@ import {
 import { toast } from "sonner";
 import { EventType } from "@/types/event";
 import EventTemplateGantt from "./EventTemplateGantt";
+import { useAPI } from "@/hooks/useAPI";
 
 interface EventTemplate {
   type: EventType;
@@ -49,6 +50,10 @@ interface BatchTemplate {
   events: EventTemplate[];
 }
 
+interface EventTemplatesResponse {
+  templates: Record<string, BatchTemplate>;
+}
+
 const formatEventType = (type: string) => {
   return type
     .split("_")
@@ -57,6 +62,7 @@ const formatEventType = (type: string) => {
 };
 
 export default function EventBatchManager() {
+  const api = useAPI();
   const [isOpen, setIsOpen] = useState(false);
   const [templates, setTemplates] = useState<Record<string, BatchTemplate>>({});
   const [editingTemplate, setEditingTemplate] = useState<string | null>(null);
@@ -66,16 +72,15 @@ export default function EventBatchManager() {
   });
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && api) {
       fetchTemplates();
     }
-  }, [isOpen]);
+  }, [isOpen, api]);
 
   const fetchTemplates = async () => {
+    if (!api) return;
     try {
-      const response = await fetch("/api/event-templates");
-      if (!response.ok) throw new Error("Failed to fetch templates");
-      const data = await response.json();
+      const data = (await api.get("event-templates")) as EventTemplatesResponse;
       setTemplates(data.templates);
     } catch (error) {
       console.error("Error fetching templates:", error);
@@ -105,16 +110,10 @@ export default function EventBatchManager() {
       return;
     }
 
-    try {
-      const response = await fetch("/api/event-templates", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newTemplate),
-      });
+    if (!api) return;
 
-      if (!response.ok) throw new Error("Failed to save template");
+    try {
+      await api.post("event-templates", newTemplate);
 
       toast.success("Template saved successfully");
       fetchTemplates();
@@ -129,15 +128,10 @@ export default function EventBatchManager() {
   const deleteTemplate = async (name: string) => {
     if (!confirm("Are you sure you want to delete this template?")) return;
 
-    try {
-      const response = await fetch(
-        `/api/event-templates/${encodeURIComponent(name)}`,
-        {
-          method: "DELETE",
-        }
-      );
+    if (!api) return;
 
-      if (!response.ok) throw new Error("Failed to delete template");
+    try {
+      await api.delete(`event-templates/${encodeURIComponent(name)}`);
 
       toast.success("Template deleted successfully");
       fetchTemplates();
@@ -156,16 +150,10 @@ export default function EventBatchManager() {
       events: [...template.events],
     };
 
-    try {
-      const response = await fetch("/api/event-templates", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(duplicatedTemplate),
-      });
+    if (!api) return;
 
-      if (!response.ok) throw new Error("Failed to duplicate template");
+    try {
+      await api.post("event-templates", duplicatedTemplate);
 
       toast.success("Template duplicated successfully");
       fetchTemplates();

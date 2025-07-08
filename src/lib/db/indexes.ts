@@ -35,5 +35,5 @@ export async function createIndexes(client: MongoClient) {
     }
   }
 
-  // [REMOVED] // [REMOVED] console.log("Successfully created/verified indexes for collections");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Successfully created/verified indexes for collections");
 }

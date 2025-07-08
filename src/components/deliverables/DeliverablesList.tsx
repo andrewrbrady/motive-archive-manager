@@ -38,6 +38,9 @@ import BatchTemplateManager from "./BatchTemplateManager";
 import { LoadingSpinner } from "@/components/ui/loading";
 import BatchAssignmentModal from "./BatchAssignmentModal";
 import FirestoreUserSelector from "@/components/users/FirestoreUserSelector";
+import { useAPI } from "@/hooks/useAPI";
+import { useMediaTypes } from "@/hooks/useMediaTypes";
+import { PlatformBadges } from "./PlatformBadges";
 
 interface Car {
   _id: string;
@@ -53,7 +56,12 @@ interface DeliverableWithCar extends Deliverable {
 }
 
 const formatDuration = (deliverable: Deliverable) => {
-  if (deliverable.type === "Photo Gallery") {
+  // Check if this is a photo gallery type using either new or legacy system
+  const isPhotoGallery = deliverable.mediaTypeId
+    ? false // We'll check this below using media types
+    : deliverable.type === "Photo Gallery";
+
+  if (isPhotoGallery) {
     return "N/A";
   }
   const minutes = Math.floor(deliverable.duration / 60);
@@ -62,6 +70,8 @@ const formatDuration = (deliverable: Deliverable) => {
 };
 
 export default function DeliverablesList() {
+  const api = useAPI();
+  const { mediaTypes } = useMediaTypes();
   const [deliverables, setDeliverables] = useState<DeliverableWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -80,6 +90,31 @@ export default function DeliverablesList() {
   const [selectedCar, setSelectedCar] = useState("");
   const [creativeRole, setCreativeRole] = useState("all");
 
+  // Helper function to get the proper media type name for display
+  const getMediaTypeName = (deliverable: Deliverable) => {
+    if (deliverable.mediaTypeId) {
+      const mediaType = mediaTypes.find(
+        (mt) => mt._id.toString() === deliverable.mediaTypeId?.toString()
+      );
+      return mediaType ? mediaType.name : deliverable.type;
+    }
+    return deliverable.type;
+  };
+
+  // Updated formatDuration to use media type info
+  const formatDeliverableDuration = (deliverable: Deliverable) => {
+    const mediaTypeName = getMediaTypeName(deliverable);
+
+    // Check if this is a photo gallery type
+    if (mediaTypeName === "Photo Gallery") {
+      return "N/A";
+    }
+
+    const minutes = Math.floor(deliverable.duration / 60);
+    const seconds = deliverable.duration % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  };
+
   const CREATIVE_ROLES = [
     "video_editor",
     "photographer",
@@ -91,11 +126,25 @@ export default function DeliverablesList() {
     "storyboard_artist",
   ];
 
+  useEffect(() => {
+    if (!api) return; // Guard inside hook
+    fetchCars();
+  }, [api]);
+
+  useEffect(() => {
+    if (!api) return; // Guard inside hook
+    fetchDeliverables();
+  }, [search, status, platform, editor, type, selectedCar, page, api]);
+
   const fetchCars = async () => {
+    if (!api) {
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("API client not available for fetching cars");
+      return;
+    }
+
     try {
-      const response = await fetch("/api/cars");
-      if (!response.ok) throw new Error("Failed to fetch cars");
-      const data = await response.json();
+      const response = await api.get("/cars");
+      const data = response as any;
       setCars(data.cars);
     } catch (error) {
       console.error("Error fetching cars:", error);
@@ -104,6 +153,11 @@ export default function DeliverablesList() {
   };
 
   const fetchDeliverables = async () => {
+    if (!api) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams();
@@ -116,10 +170,8 @@ export default function DeliverablesList() {
       if (selectedCar) queryParams.append("car_id", selectedCar);
       if (page > 1) queryParams.append("page", page.toString());
 
-      const response = await fetch(`/api/deliverables?${queryParams}`);
-      if (!response.ok) throw new Error("Failed to fetch deliverables");
-
-      const data = await response.json();
+      const response = await api.get(`/deliverables?${queryParams}`);
+      const data = response as any;
       setDeliverables(data.deliverables || []);
       setTotalPages(data.totalPages || 1);
     } catch (error) {
@@ -130,26 +182,16 @@ export default function DeliverablesList() {
     }
   };
 
-  useEffect(() => {
-    fetchCars();
-  }, []);
-
-  useEffect(() => {
-    fetchDeliverables();
-  }, [search, status, platform, editor, type, selectedCar, page]);
-
   const handleDelete = async (id: string, carId: string) => {
     if (!confirm("Are you sure you want to delete this deliverable?")) return;
 
+    if (!api) {
+      toast.error("Authentication required");
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/cars/${carId}/deliverables/${id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete deliverable");
-      }
-
+      await api.delete(`/cars/${carId}/deliverables/${id}`);
       toast.success("Deliverable deleted successfully");
       fetchDeliverables();
     } catch (error) {
@@ -177,20 +219,19 @@ export default function DeliverablesList() {
   };
 
   const handleBatchStatusUpdate = async (newStatus: DeliverableStatus) => {
+    if (!api) {
+      toast.error("Authentication required");
+      return;
+    }
+
     try {
       const promises = selectedDeliverables.map((id) => {
         const deliverable = deliverables.find((d) => d._id?.toString() === id);
         if (!deliverable) return null;
 
-        return fetch(`/api/cars/${deliverable.car_id}/deliverables/${id}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            status: newStatus,
-            updated_at: new Date(),
-          }),
+        return api.put(`/cars/${deliverable.car_id}/deliverables/${id}`, {
+          status: newStatus,
+          updated_at: new Date(),
         });
       });
 
@@ -208,6 +249,11 @@ export default function DeliverablesList() {
     deliverableId: string,
     userId: string | null
   ): Promise<void> => {
+    if (!api) {
+      toast.error("Authentication required");
+      return;
+    }
+
     const deliverable = deliverables.find(
       (d) => d._id?.toString() === deliverableId
     );
@@ -224,23 +270,13 @@ export default function DeliverablesList() {
       // Optimistically update the UI
       setDeliverables(updatedDeliverables);
 
-      const response = await fetch(
-        `/api/cars/${deliverable.car_id}/deliverables/${deliverableId}`,
+      await api.put(
+        `/cars/${deliverable.car_id}/deliverables/${deliverableId}`,
         {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            firebase_uid: userId,
-            updated_at: new Date(),
-          }),
+          firebase_uid: userId,
+          updated_at: new Date(),
         }
       );
-
-      if (!response.ok) {
-        throw new Error("Failed to assign deliverable");
-      }
 
       toast.success("Editor assigned successfully");
     } catch (error) {
@@ -542,9 +578,19 @@ export default function DeliverablesList() {
                         {deliverable.car?.year} {deliverable.car?.make}{" "}
                         {deliverable.car?.model}
                       </TableCell>
-                      <TableCell>{deliverable.platform}</TableCell>
-                      <TableCell>{deliverable.type}</TableCell>
-                      <TableCell>{formatDuration(deliverable)}</TableCell>
+                      <TableCell>
+                        <PlatformBadges
+                          platform_id={deliverable.platform_id?.toString()}
+                          platform={deliverable.platform}
+                          platforms={deliverable.platforms}
+                          maxVisible={1}
+                          size="sm"
+                        />
+                      </TableCell>
+                      <TableCell>{getMediaTypeName(deliverable)}</TableCell>
+                      <TableCell>
+                        {formatDeliverableDuration(deliverable)}
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant={

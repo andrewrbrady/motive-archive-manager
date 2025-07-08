@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { MapPin, Filter } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 interface LocationsFilterProps {
   selectedLocation: string | null;
@@ -21,26 +23,28 @@ export default function LocationsFilter({
   selectedLocation,
   onLocationChange,
 }: LocationsFilterProps) {
+  const api = useAPI();
   const [locations, setLocations] = useState<LocationResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetchLocations();
-  }, []);
+    const fetchLocations = async () => {
+      if (!api) return;
 
-  const fetchLocations = async () => {
-    try {
       setIsLoading(true);
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
-      setLocations(data);
-    } catch (error) {
-      console.error("Error fetching locations:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      try {
+        const data = await api.get<LocationResponse[]>("/locations");
+        setLocations(data);
+      } catch (error) {
+        console.error("Error fetching locations:", error);
+        toast.error("Failed to fetch locations");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLocations();
+  }, [api]);
 
   return (
     <div className="flex items-center gap-2">

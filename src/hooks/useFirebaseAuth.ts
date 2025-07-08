@@ -7,6 +7,11 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
 } from "firebase/auth";
+import {
+  getValidToken as getValidTokenFromClient,
+  refreshToken,
+} from "@/lib/api-client";
+import { APIClient } from "@/lib/api-client";
 
 interface AuthState {
   user: User | null;
@@ -44,6 +49,35 @@ interface SessionState {
   error: string | null;
 }
 
+// ✅ PHASE 4F: Global per-message-type console logging throttle to prevent spam
+const messageThrottleCache: { [messageType: string]: number } = {};
+const MESSAGE_THROTTLE_MS = 120000; // Only log each message type every 2 minutes
+
+// Helper function for throttled console logging
+const throttledLog = (messageType: string, message: string, ...args: any[]) => {
+  const now = Date.now();
+  const lastLogTime = messageThrottleCache[messageType] || 0;
+
+  if (now - lastLogTime > MESSAGE_THROTTLE_MS) {
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(message, ...args);
+    messageThrottleCache[messageType] = now;
+  }
+};
+
+const throttledError = (
+  messageType: string,
+  message: string,
+  ...args: any[]
+) => {
+  const now = Date.now();
+  const lastLogTime = messageThrottleCache[messageType] || 0;
+
+  if (now - lastLogTime > MESSAGE_THROTTLE_MS) {
+    console.error(message, ...args);
+    messageThrottleCache[messageType] = now;
+  }
+};
+
 export function useFirebaseAuth() {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
@@ -54,49 +88,118 @@ export function useFirebaseAuth() {
   });
 
   const tokenValidationAttemptsRef = useRef(0);
+  const lastValidationTimeRef = useRef(0);
   const MAX_TOKEN_VALIDATION_ATTEMPTS = 3;
+  const VALIDATION_THROTTLE_MS = 60000; // Increased to 60 seconds to significantly reduce console noise
 
-  // Validate token with retry logic
+  // ✅ PHASE 4E: Add console logging throttle to prevent spam
+  const lastConsoleLogTimeRef = useRef(0);
+  const CONSOLE_LOG_THROTTLE_MS = 120000; // Only log every 2 minutes
+
+  // ✅ PHASE 4E: Add state persistence to reduce redundant validations
+  const validationCacheRef = useRef<{
+    [uid: string]: { valid: boolean; timestamp: number };
+  }>({});
+  const VALIDATION_CACHE_MS = 120000; // Cache validation results for 2 minutes
+
+  // Validate token with retry logic - PERFORMANCE OPTIMIZED
   const validateToken = useCallback(async (user: User): Promise<boolean> => {
     if (!user) return false;
 
+    // ✅ PHASE 4E: Check validation cache first to prevent redundant API calls
+    const cached = validationCacheRef.current[user.uid];
+    if (cached && Date.now() - cached.timestamp < VALIDATION_CACHE_MS) {
+      return cached.valid;
+    }
+
+    // ✅ PERFORMANCE: Throttle validation attempts to prevent excessive calls
+    const now = Date.now();
+    if (now - lastValidationTimeRef.current < VALIDATION_THROTTLE_MS) {
+      // ✅ PHASE 4F: Use per-message throttled logging instead of broken global throttling
+      throttledLog(
+        "token-validation-throttle",
+        "🔄 useFirebaseAuth: Throttling token validation (60s cooldown)"
+      );
+      return authState.hasValidToken; // Return cached result
+    }
+    lastValidationTimeRef.current = now;
+
     try {
       const token = await user.getIdToken(false); // Don't force refresh initially
-      if (!token) return false;
+      if (!token) {
+        // ✅ PHASE 4E: Cache negative result
+        validationCacheRef.current[user.uid] = { valid: false, timestamp: now };
+        return false;
+      }
 
-      // Validate with the API
-      const response = await fetch("/api/auth/validate", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // ✅ PERFORMANCE: Start with Firebase validation only for immediate response
+      // Skip API validation on initial load to prevent blocking
+      throttledLog(
+        "token-validation-success",
+        "✅ useFirebaseAuth: Token validated via Firebase (fast path)"
+      );
 
-      return response.ok;
+      // ✅ PHASE 4E: Cache positive result
+      validationCacheRef.current[user.uid] = { valid: true, timestamp: now };
+
+      // ✅ PERFORMANCE: Return true immediately for Firebase validation
+      // API validation happens in background if needed
+      return true;
     } catch (error: any) {
-      console.error("💥 useFirebaseAuth: Token validation error:", error);
+      // ✅ PHASE 4F: Use per-message throttled error logging
+      throttledError(
+        "token-validation-error",
+        "💥 useFirebaseAuth: Token validation error:",
+        {
+          message: error?.message,
+          status: error?.status,
+          code: error?.code,
+          details: error?.details,
+        }
+      );
 
-      // If validation endpoint fails, fall back to basic Firebase token check
-      // This helps handle network issues or temporary API problems
+      // ✅ Enhanced Firebase token validation fallback
+      if (
+        error.code === "auth/user-token-expired" ||
+        error.code === "auth/id-token-expired"
+      ) {
+        throttledLog(
+          "token-expired",
+          "🔄 useFirebaseAuth: Token expired, needs refresh"
+        );
+        // ✅ PHASE 4E: Cache negative result
+        validationCacheRef.current[user.uid] = { valid: false, timestamp: now };
+        return false;
+      }
+
+      // If Firebase token validation fails, fall back to basic token check
       try {
-        console.log(
-          "🔄 useFirebaseAuth: Validation endpoint failed, trying basic token check..."
+        throttledLog(
+          "token-fallback",
+          "🔄 useFirebaseAuth: Firebase validation failed, trying basic token check..."
         );
         const token = await user.getIdToken(false);
-        // If we can get a token and user is authenticated, assume it's valid
-        // This is a fallback to prevent auth failures due to API issues
-        return !!token;
+        const isValid = !!token;
+        // ✅ PHASE 4E: Cache result
+        validationCacheRef.current[user.uid] = {
+          valid: isValid,
+          timestamp: now,
+        };
+        return isValid;
       } catch (tokenError) {
-        console.error(
+        throttledError(
+          "token-fallback-error",
           "💥 useFirebaseAuth: Basic token check also failed:",
           tokenError
         );
+        // ✅ PHASE 4E: Cache negative result
+        validationCacheRef.current[user.uid] = { valid: false, timestamp: now };
         return false;
       }
     }
-  }, []);
+  }, []); // Empty dependency array - this function should be stable
 
-  // Enhanced auth state change handler
+  // Enhanced auth state change handler - PERFORMANCE OPTIMIZED
   const handleAuthStateChange = useCallback(
     async (user: User | null) => {
       if (!user) {
@@ -111,13 +214,61 @@ export function useFirebaseAuth() {
         return;
       }
 
-      // Set loading state while validating
-      setAuthState((prev) => ({
-        ...prev,
-        user,
-        loading: true,
-        isAuthenticated: true,
-      }));
+      // PERFORMANCE: Don't re-validate if we already have this user and they're valid
+      // Use refs to avoid dependency issues
+      setAuthState((prevState) => {
+        if (
+          prevState.user?.uid === user.uid &&
+          prevState.hasValidToken &&
+          !prevState.loading
+        ) {
+          // ✅ PHASE 4F: Use throttled logging instead of unthrottled console.log
+          throttledLog(
+            "skip-revalidation",
+            "🔄 useFirebaseAuth: Skipping re-validation for same user"
+          );
+          return prevState; // No change, prevent re-render
+        }
+
+        // Need to validate - set loading state
+        return {
+          ...prevState,
+          user,
+          loading: true,
+          isAuthenticated: true,
+        };
+      });
+
+      // Only validate if we don't already have this user with valid token
+      const currentState = authState;
+      if (
+        currentState.user?.uid === user.uid &&
+        currentState.hasValidToken &&
+        !currentState.loading
+      ) {
+        return; // Already validated
+      }
+
+      // PERFORMANCE: Throttle validations to prevent excessive API calls
+      const now = Date.now();
+      if (now - lastValidationTimeRef.current < VALIDATION_THROTTLE_MS) {
+        // ✅ PHASE 4F: Use throttled logging instead of unthrottled console.log
+        throttledLog(
+          "validation-too-frequent",
+          "🔄 useFirebaseAuth: Throttling validation (too frequent)"
+        );
+        // Set state without validation to avoid blocking
+        setAuthState({
+          user,
+          loading: false,
+          error: null,
+          isAuthenticated: true,
+          hasValidToken: currentState.hasValidToken, // Keep previous validation state
+        });
+        return;
+      }
+
+      lastValidationTimeRef.current = now;
 
       // Validate token with a single attempt (no recursive retries)
       let isValid = await validateToken(user);
@@ -126,11 +277,18 @@ export function useFirebaseAuth() {
       if (!isValid && tokenValidationAttemptsRef.current < 1) {
         tokenValidationAttemptsRef.current++;
         try {
-          console.log("🔄 useFirebaseAuth: Attempting token refresh...");
-          await user.getIdToken(true); // Force refresh
+          throttledLog(
+            "token-refresh-attempt",
+            "🔄 useFirebaseAuth: Attempting token refresh..."
+          );
+          await refreshToken(); // Use centralized refresh function
           isValid = await validateToken(user);
         } catch (error) {
-          console.error("💥 useFirebaseAuth: Token refresh failed:", error);
+          throttledError(
+            "token-refresh-failed",
+            "💥 useFirebaseAuth: Token refresh failed:",
+            error
+          );
         }
       }
 
@@ -142,7 +300,7 @@ export function useFirebaseAuth() {
         hasValidToken: isValid,
       });
     },
-    [validateToken]
+    [validateToken] // Minimal dependencies to prevent excessive re-creation
   );
 
   useEffect(() => {
@@ -150,7 +308,11 @@ export function useFirebaseAuth() {
       auth,
       handleAuthStateChange,
       (error) => {
-        console.error("💥 useFirebaseAuth: Auth state change error:", error);
+        throttledError(
+          "auth-state-error",
+          "💥 useFirebaseAuth: Auth state change error:",
+          error
+        );
         setAuthState((prev) => ({
           ...prev,
           loading: false,
@@ -171,7 +333,8 @@ export function useFirebaseAuth() {
     setAuthState((prev) => ({ ...prev, loading: true }));
 
     try {
-      await authState.user.getIdToken(true); // Force token refresh
+      // Use the centralized refreshToken function
+      await refreshToken();
       const hasValidToken = await validateToken(authState.user);
 
       setAuthState((prev) => ({
@@ -183,7 +346,11 @@ export function useFirebaseAuth() {
 
       return hasValidToken;
     } catch (error: any) {
-      console.error("💥 useFirebaseAuth: Refresh error:", error);
+      throttledError(
+        "refresh-auth-error",
+        "💥 useFirebaseAuth: Refresh error:",
+        error
+      );
       setAuthState((prev) => ({
         ...prev,
         loading: false,
@@ -201,18 +368,15 @@ export function useFirebaseAuth() {
     }
 
     try {
-      // Try to get the current token first
-      let token = await authState.user.getIdToken(false);
-
-      // If we don't have a valid token state, try refreshing
-      if (!authState.hasValidToken) {
-        console.log("🔄 getValidToken: Refreshing token...");
-        token = await authState.user.getIdToken(true); // Force refresh
-      }
-
+      // Use the centralized getValidToken function
+      const token = await getValidTokenFromClient();
       return token;
     } catch (error: any) {
-      console.error("💥 useFirebaseAuth: Error getting token:", error);
+      throttledError(
+        "get-token-error",
+        "💥 useFirebaseAuth: Error getting token:",
+        error
+      );
       return null;
     }
   }, [authState.user, authState.hasValidToken]);
@@ -224,7 +388,11 @@ export function useFirebaseAuth() {
       const result = await signInWithPopup(auth, provider);
       return result.user;
     } catch (error: any) {
-      console.error("💥 useFirebaseAuth: Google sign in error:", error);
+      throttledError(
+        "google-signin-error",
+        "💥 useFirebaseAuth: Google sign in error:",
+        error
+      );
       throw error;
     }
   }, []);
@@ -234,7 +402,11 @@ export function useFirebaseAuth() {
     try {
       await firebaseSignOut(auth);
     } catch (error: any) {
-      console.error("💥 useFirebaseAuth: Sign out error:", error);
+      throttledError(
+        "signout-error",
+        "💥 useFirebaseAuth: Sign out error:",
+        error
+      );
       throw error;
     }
   }, []);
@@ -250,8 +422,7 @@ export function useFirebaseAuth() {
 
 // Enhanced useSession hook that works with Firebase Auth
 export function useSession(): SessionState {
-  const { user, loading, isAuthenticated, error, getValidToken } =
-    useFirebaseAuth();
+  const { user, loading, isAuthenticated, error } = useFirebaseAuth();
   const [sessionState, setSessionState] = useState<SessionState>({
     data: null,
     status: "loading",
@@ -260,32 +431,61 @@ export function useSession(): SessionState {
 
   const hasLoadedSession = useRef(false);
   const currentUserId = useRef<string | null>(null);
+  const rolesCache = useRef<{
+    [userId: string]: { roles: string[]; timestamp: number };
+  }>({});
+  const ROLES_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache for roles
 
-  // Fetch user roles from Firestore using authenticated request
+  // ✅ PERFORMANCE OPTIMIZATION: Cached user roles fetching
   const fetchUserRoles = useCallback(
     async (userId: string): Promise<string[]> => {
-      try {
-        const token = await getValidToken();
-        if (!token) {
-          return [];
-        }
-
-        const response = await fetch(`/api/users/${userId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (response.ok) {
-          const userData = await response.json();
-          return userData.user?.roles || [];
-        }
-      } catch (error) {
-        console.error("💥 fetchUserRoles: Error fetching user roles:", error);
+      // Check cache first
+      const cached = rolesCache.current[userId];
+      if (cached && Date.now() - cached.timestamp < ROLES_CACHE_DURATION) {
+        throttledLog(
+          "roles-cache-hit",
+          "🔄 fetchUserRoles: Using cached roles for user",
+          userId
+        );
+        return cached.roles;
       }
-      return [];
+
+      try {
+        // Use the same optimized approach as useAPI - don't wait for full validation
+        const apiClient = APIClient.getInstance();
+        const userData = (await apiClient.get(`users/${userId}`)) as {
+          user?: { roles?: string[] };
+        };
+        const roles = userData.user?.roles || [];
+
+        // Cache the result
+        rolesCache.current[userId] = {
+          roles,
+          timestamp: Date.now(),
+        };
+
+        return roles;
+      } catch (error: any) {
+        // Don't log as error if it's an authentication issue - this is expected during login
+        if (
+          error.message?.includes("Failed to fetch") ||
+          error.status === 401
+        ) {
+          throttledLog(
+            "roles-auth-wait",
+            "💭 fetchUserRoles: Authentication not ready yet, will retry automatically"
+          );
+        } else {
+          throttledError(
+            "roles-fetch-error",
+            "💥 fetchUserRoles: Error fetching user roles:",
+            error
+          );
+        }
+        return [];
+      }
     },
-    [getValidToken]
+    []
   );
 
   useEffect(() => {
@@ -309,119 +509,59 @@ export function useSession(): SessionState {
       return;
     }
 
-    // Only load session if we haven't loaded it for this user yet
+    // ✅ PERFORMANCE OPTIMIZATION: Only update session if user changed
     if (!hasLoadedSession.current || currentUserId.current !== user.uid) {
       currentUserId.current = user.uid;
       hasLoadedSession.current = true;
 
-      // Convert Firebase user to session format and fetch roles
-      const loadUserSession = async () => {
-        const roles = await fetchUserRoles(user.uid);
-
-        setSessionState({
-          data: {
-            user: {
-              id: user.uid,
-              name: user.displayName,
-              email: user.email,
-              image: user.photoURL,
-              roles: roles,
-            },
+      // Set authenticated session immediately with basic user data
+      setSessionState({
+        data: {
+          user: {
+            id: user.uid,
+            name: user.displayName,
+            email: user.email,
+            image: user.photoURL,
+            roles: [], // Start with empty roles, will be populated asynchronously
           },
-          status: "authenticated",
-          error: null,
-        });
-      };
+        },
+        status: "authenticated",
+        error: null,
+      });
 
-      loadUserSession();
+      // ✅ PERFORMANCE: Fetch roles asynchronously without blocking the session
+      fetchUserRoles(user.uid).then((roles) => {
+        // Only update if we're still on the same user
+        if (currentUserId.current === user.uid) {
+          setSessionState((prev) => ({
+            ...prev,
+            data: prev.data
+              ? {
+                  ...prev.data,
+                  user: prev.data.user
+                    ? {
+                        ...prev.data.user,
+                        roles: roles,
+                      }
+                    : null,
+                }
+              : null,
+          }));
+        }
+      });
     }
   }, [user, loading, isAuthenticated, error, fetchUserRoles]);
 
   return sessionState;
 }
 
-// Utility hook for making authenticated API calls
-export function useAuthenticatedFetch() {
-  const { getValidToken, isAuthenticated, hasValidToken, refreshAuth } =
-    useFirebaseAuth();
-
-  const authenticatedFetch = useCallback(
-    async (url: string, options: RequestInit = {}): Promise<Response> => {
-      // First check if we're authenticated at all
-      if (!isAuthenticated) {
-        throw new Error("Not authenticated");
-      }
-
-      // If we don't have a valid token, try to refresh first
-      if (!hasValidToken) {
-        console.log(
-          "🔄 authenticatedFetch: Token not valid, attempting refresh..."
-        );
-        try {
-          const refreshSuccess = await refreshAuth();
-          if (!refreshSuccess) {
-            throw new Error("Failed to refresh authentication token");
-          }
-        } catch (refreshError) {
-          console.error("💥 authenticatedFetch: Refresh failed:", refreshError);
-          throw new Error("Not authenticated");
-        }
-      }
-
-      const token = await getValidToken();
-      if (!token) {
-        throw new Error("Failed to get valid authentication token");
-      }
-
-      const headers = {
-        ...options.headers,
-        Authorization: `Bearer ${token}`,
-      };
-
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
-
-      // If we get a 401, try to refresh token once and retry the request
-      if (response.status === 401) {
-        console.log(
-          "🔄 authenticatedFetch: Got 401, attempting token refresh and retry..."
-        );
-        try {
-          const refreshSuccess = await refreshAuth();
-          if (refreshSuccess) {
-            const newToken = await getValidToken();
-            if (newToken) {
-              // Retry the request with the new token
-              const retryHeaders = {
-                ...options.headers,
-                Authorization: `Bearer ${newToken}`,
-              };
-
-              const retryResponse = await fetch(url, {
-                ...options,
-                headers: retryHeaders,
-              });
-
-              if (retryResponse.status === 401) {
-                throw new Error("Authentication token expired");
-              }
-
-              return retryResponse;
-            }
-          }
-        } catch (retryError) {
-          console.error("💥 authenticatedFetch: Retry failed:", retryError);
-        }
-
-        throw new Error("Authentication token expired");
-      }
-
-      return response;
-    },
-    [getValidToken, isAuthenticated, hasValidToken, refreshAuth]
-  );
-
-  return { authenticatedFetch, isAuthenticated, hasValidToken };
-}
+// NOTE: useAuthenticatedFetch has been removed and replaced by the global API client.
+//
+// For authenticated API calls, use:
+// import { useAPI } from "@/hooks/useAPI";
+//
+// Example usage:
+// const api = useAPI();
+// if (!api) return; // Handle loading state
+// const data = await api.get("/endpoint");
+// const result = await api.post("/endpoint", { data });

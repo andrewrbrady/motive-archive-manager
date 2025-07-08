@@ -1,12 +1,36 @@
 @import "react-big-calendar/lib/css/react-big-calendar.css";
 
-/* Calendar container */
+/* 
+ * CALENDAR EVENT DISPLAY FIXES - FORCE MORE EVENTS
+ * 
+ * React-big-calendar has conservative space calculations that limit
+ * how many events are displayed, showing "+X more" instead of actual events.
+ * 
+ * This CSS forces the library to display more events by:
+ * - Setting huge minimum heights on all calendar containers (600px+ rows)
+ * - Disabling the "show more" button completely  
+ * - Overriding popupOffset to 100+ events
+ * - Making the library think it has infinite vertical space
+ * - Keeping individual events compact (18px height) to fit more
+ * 
+ * Key insight: The library calculates available space from container heights,
+ * so we make containers huge but keep events small to maximize count.
+ * 
+ * Height Hierarchy (top to bottom):
+ * - Month view: 800px min    (tells library total space available)
+ * - Month rows: 600px min    (tells library space per week) 
+ * - Row content: 550px min   (tells library space for events)
+ * - Event container: 500px   (where events actually render)
+ * - Row segments: 400px min  (per-day space calculation)
+ * - Individual events: 18px  (compact size = more events fit)
+ */
+
+/* Calendar container - ALLOW growth for events */
 .events-calendar {
   @apply text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))];
   position: relative;
-  height: 100%;
-  overflow: hidden;
   border: none !important;
+  /* Height and overflow controlled by rules below */
 }
 
 .dark .events-calendar {
@@ -29,6 +53,10 @@
   border-radius: 4px;
   overflow: hidden;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 800px !important;
+  height: auto !important;
 }
 
 /* Cell borders */
@@ -145,15 +173,17 @@
 /* Event display optimizations */
 .events-calendar .rbc-event {
   @apply shadow-sm transition-all duration-200;
-  min-height: 22px !important;
-  margin: 0 0 2px 0 !important;
-  padding: 2px 4px !important;
-  border-radius: 4px !important;
-  font-size: 0.8125rem !important;
+  min-height: 18px !important;
+  height: auto !important;
+  margin: 1px 0 !important;
+  padding: 1px 3px !important;
+  border-radius: 3px !important;
+  font-size: 0.7rem !important;
   line-height: 1.2 !important;
   border: none !important;
   color: white !important;
   opacity: 0.9 !important;
+  /* Grid layout handles width - removed max-width restriction */
 }
 
 .events-calendar .rbc-event:hover {
@@ -166,11 +196,12 @@
 }
 
 .events-calendar .rbc-event-content {
-  padding: 2px 4px !important;
+  height: 16px !important;
+  line-height: 1.2 !important;
+  padding: 1px 3px !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  height: 20px !important;
   font-weight: 500;
 }
 
@@ -181,34 +212,34 @@
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5) !important;
 }
 
-/* Month row height optimization */
+/* Month row height optimization - CRITICAL: Huge height for more events */
 .events-calendar .rbc-month-row {
-  min-height: 160px;
+  min-height: 600px !important;
+  height: auto !important;
+  max-height: none !important;
 }
 
 .events-calendar .rbc-row-content {
-  margin-top: 4px;
+  margin-top: 2px;
+  position: relative;
+  z-index: 12;
+  min-height: 550px !important; /* MASSIVE: Library calculates available space from this */
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  flex: 1 !important;
 }
 
-/* Date cell optimization */
+/* Date cells */
 .events-calendar .rbc-date-cell {
-  padding: 1px 2px;
+  padding: 2px 4px;
   font-size: 0.75rem;
+  font-weight: 500;
+  text-align: right;
+  position: relative;
 }
 
-/* More link optimization */
-.events-calendar .rbc-show-more {
-  font-size: 0.75rem;
-  padding: 0 2px;
-  margin: 0;
-  height: 18px;
-  line-height: 18px;
-  background-color: transparent;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  @apply text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))];
-}
+/* Show more link styling handled in grid section below */
 
 /* Toolbar styles */
 .events-calendar .rbc-toolbar {
@@ -237,7 +268,7 @@
 
 /* Fullscreen optimizations */
 .fullscreen-calendar .rbc-month-row {
-  min-height: 240px;
+  min-height: 500px;
 }
 
 .fullscreen-calendar .rbc-event {
@@ -248,21 +279,20 @@
 }
 
 .fullscreen-calendar .rbc-event-content {
-  height: 22px !important;
+  height: 18px !important;
 }
 
-/* Increase row segment height */
+.fullscreen-calendar .rbc-month-row .rbc-row-content {
+  min-height: 450px !important;
+}
+
+/* Row segments - let library control layout */
 .events-calendar .rbc-row-segment {
-  padding: 0 2px;
-}
-
-/* Adjust row content spacing */
-.events-calendar .rbc-row-content {
-  margin-top: 2px;
-}
-
-.events-calendar .rbc-row-segment .rbc-event-content {
-  height: 20px !important;
+  position: relative;
+  min-height: 400px !important; /* HUGE: Per-day space calculation */
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
 }
 
 /* Compact event rows */
@@ -271,7 +301,7 @@
 }
 
 .events-calendar .rbc-event-row {
-  margin-bottom: 1px !important;
+  margin-bottom: 0px !important;
 }
 
 /* Week view optimizations */
@@ -340,7 +370,7 @@
 
 /* Fix events in the time cells */
 .events-calendar .rbc-events-container {
-  margin-right: 0 !important;
+  margin-right: 10px !important;
 }
 
 .events-calendar .rbc-day-slot .rbc-events-container {
@@ -369,7 +399,7 @@
 .events-calendar .rbc-month-view {
   height: calc(100vh - 220px) !important;
   min-height: 700px !important;
-  overflow: hidden;
+  overflow: visible; /* FIXED: Changed from hidden to visible to allow proper event display */
 }
 
 /* Time label styling */
@@ -378,9 +408,9 @@
   padding-right: 8px;
 }
 
-/* Event container z-index adjustments */
+/* Event container z-index adjustments - CRITICAL for event display */
 .events-calendar .rbc-events-container {
-  z-index: 1 !important;
+  z-index: 10 !important; /* FIXED: Increased z-index to ensure events appear above date cells */
 }
 
 /* Fix week view event containers */
@@ -404,7 +434,7 @@
 }
 
 .events-calendar .rbc-row-content {
-  z-index: 3 !important;
+  z-index: 12 !important; /* FIXED: Updated to match other row-content rule for consistency */
   position: relative !important;
 }
 
@@ -474,7 +504,7 @@
 
 /* Fix for time/date alignment */
 .events-calendar .rbc-row-content {
-  z-index: 5 !important;
+  z-index: 12 !important; /* FIXED: Increased to ensure event containers are visible */
 }
 
 .events-calendar .rbc-time-header-content .rbc-header {
@@ -542,4 +572,92 @@
 
 .events-calendar .rbc-time-view .rbc-row-segment {
   padding: 0 2px !important;
+}
+
+/* Enhanced popup styling for better event overflow handling */
+.events-calendar .rbc-overlay {
+  @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] border border-[hsl(var(--border))] shadow-lg rounded-md;
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+  min-width: 200px;
+}
+
+.events-calendar .rbc-overlay-header {
+  @apply bg-[hsl(var(--muted))] dark:bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] font-medium;
+  padding: 8px 12px;
+  border-bottom: 1px solid hsl(var(--border));
+  font-size: 0.875rem;
+}
+
+/* Date cell styling handled in grid section above */
+
+/* Row content styling handled in grid section above */
+
+/* Reduce spacing between event rows */
+.events-calendar .rbc-event-row {
+  margin-bottom: 0px !important;
+}
+
+/* Allow more events to stack in day cells */
+.events-calendar .rbc-day-bg {
+  position: relative;
+}
+
+.events-calendar .rbc-events-container {
+  margin-right: 10px !important;
+}
+
+/* Date cell styling - now using grid layout instead of absolute positioning */
+
+.dark .events-calendar .rbc-date-cell {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* Today date number special styling */
+.events-calendar .rbc-today .rbc-date-cell {
+  background: hsl(var(--info) / 0.9);
+  color: white;
+  font-weight: 600;
+}
+
+/* Off-range date styling */
+.events-calendar .rbc-off-range .rbc-date-cell {
+  opacity: 0.5;
+}
+
+/* Grid-based layout maximizes space automatically */
+
+/* Show more styling handled in grid section above */
+/* Events now use full grid cell width */
+
+/* Force library to show more events by making it think there's infinite space */
+
+/* Event container - give it lots of space */
+.events-calendar .rbc-addons-dnd-row-body {
+  position: relative;
+  min-height: 500px !important; /* HUGE: This is where events actually render */
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* Override show more calculations */
+.events-calendar .rbc-show-more {
+  display: none !important; /* HIDE: Never show "show more" button */
+}
+
+/* Override any height calculations that limit events */
+.events-calendar .rbc-row-segment .rbc-event {
+  display: block !important; /* FORCE: All events visible */
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Ensure the calendar can grow to accommodate all events */
+.events-calendar {
+  height: auto !important; /* ALLOW: Calendar to grow as needed */
+  min-height: 800px !important;
+  max-height: none !important;
+  overflow: visible !important;
 }

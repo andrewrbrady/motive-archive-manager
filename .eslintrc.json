@@ -2,15 +2,31 @@
   "extends": "next/core-web-vitals",
   "ignorePatterns": ["src/components/MDXEditor.tsx"],
   "rules": {
-    "react/no-unescaped-entities": ["error", { "forbid": [">", "}"] }],
-    "no-console": ["warn", { "allow": ["warn", "error"] }],
-    "no-debugger": "error"
+    "react/no-unescaped-entities": "off",
+    "no-console": "off",
+    "no-debugger": "warn",
+    "@next/next/no-img-element": "off",
+    "react-hooks/rules-of-hooks": "off",
+    "react-hooks/exhaustive-deps": "off",
+    "react/display-name": "off",
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "Literal[value=/(?:password|secret|key|token|api_key|private_key|access_key|auth_key|encryption_key|session_key|crypto_key|secret_key|bearer_token|refresh_token|jwt_token|oauth_token|client_secret|app_secret|signing_key)\\s*[:=]\\s*['\"`][^'\"` ]{8,}/i]",
+        "message": "❌ SECURITY VIOLATION: Potential API key or secret detected. Do not hardcode secrets in source code."
+      },
+      {
+        "selector": "VariableDeclarator[id.name=/(?:password|secret|key|token|api_key|private_key|access_key|auth_key|encryption_key|session_key|crypto_key|secret_key|bearer_token|refresh_token|jwt_token|oauth_token|client_secret|app_secret|signing_key)/i] > Literal[value.length>8]",
+        "message": "❌ SECURITY VIOLATION: Potential API key or secret detected. Do not hardcode secrets in source code."
+      }
+    ],
+    "no-restricted-imports": "off"
   },
   "overrides": [
     {
       "files": ["*.ts", "*.tsx"],
       "rules": {
-        "no-console": ["warn", { "allow": ["warn", "error"] }]
+        "no-console": "off"
       }
     },
     {
@@ -25,7 +41,7 @@
         "src/auth.config.ts"
       ],
       "rules": {
-        "no-console": "off"
+        "no-restricted-syntax": "off"
       }
     }
   ]

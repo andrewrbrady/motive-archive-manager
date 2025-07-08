@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exec } from "child_process";
-import { promisify } from "util";
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import sharp from "sharp";
-
-const execAsync = promisify(exec);
 
 interface LivePreviewRequest {
   cachedImagePath: string;
@@ -63,27 +59,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if the C++ binary exists
-    const binaryPath = path.join(process.cwd(), "image_cropper");
-    if (!fs.existsSync(binaryPath)) {
-      return NextResponse.json(
-        {
-          error:
-            "Image cropper binary not found. Please run the build script to compile the C++ tools.",
-        },
-        { status: 500 }
-      );
-    }
-
-    // Create preview output directory
-    const previewDir = path.join(process.cwd(), "temp", "live-previews");
-    if (!fs.existsSync(previewDir)) {
-      fs.mkdirSync(previewDir, { recursive: true });
-    }
-
-    const previewId = uuidv4();
-    const outputPath = path.join(previewDir, `preview_${previewId}.jpg`);
-
     try {
       // Get actual dimensions of the cached image
       const imageMetadata = await sharp(cachedImagePath).metadata();
@@ -123,7 +98,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Validate scaled crop area
+      // Validate and adjust scaled crop area to ensure it fits within image boundaries
       if (
         scaledCropX < 0 ||
         scaledCropY < 0 ||
@@ -149,54 +124,37 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Execute the C++ cropper for preview
-      const command = [
-        binaryPath,
-        "--input",
-        `"${cachedImagePath}"`,
-        "--output",
-        `"${outputPath}"`,
-        "--crop-x",
-        scaledCropX.toString(),
-        "--crop-y",
-        scaledCropY.toString(),
-        "--crop-width",
-        scaledCropWidth.toString(),
-        "--crop-height",
-        scaledCropHeight.toString(),
-        "--output-width",
-        outputWidth.toString(),
-        "--output-height",
-        outputHeight.toString(),
-        "--scale",
-        scale.toString(),
-      ].join(" ");
-
-      console.log("Executing preview command:", command);
-
-      const { stdout, stderr } = await execAsync(command, {
-        timeout: 10000, // 10 second timeout for previews
+      console.log("Using Sharp for image cropping:", {
+        input: cachedImagePath,
+        crop: {
+          left: scaledCropX,
+          top: scaledCropY,
+          width: scaledCropWidth,
+          height: scaledCropHeight,
+        },
+        resize: { width: outputWidth, height: outputHeight },
       });
 
-      if (stderr && !stderr.includes("Warning")) {
-        console.error("Preview command stderr:", stderr);
-        throw new Error(`Preview generation failed: ${stderr}`);
-      }
+      // Use Sharp to crop and resize the image
+      const croppedImageBuffer = await sharp(cachedImagePath)
+        .extract({
+          left: scaledCropX,
+          top: scaledCropY,
+          width: scaledCropWidth,
+          height: scaledCropHeight,
+        })
+        .resize(outputWidth, outputHeight, {
+          fit: "fill",
+          background: { r: 255, g: 255, b: 255, alpha: 1 }, // White background
+        })
+        .jpeg({ quality: 90 })
+        .toBuffer();
 
-      // Check if output file was created
-      if (!fs.existsSync(outputPath)) {
-        throw new Error("Preview output file was not created");
-      }
-
-      // Read the preview image and convert to base64
-      const previewImageBuffer = fs.readFileSync(outputPath);
-      const previewImageData = previewImageBuffer.toString("base64");
-
-      // Clean up preview file immediately
-      fs.unlinkSync(outputPath);
+      // Convert to base64 for preview
+      const previewImageData = croppedImageBuffer.toString("base64");
 
       const processingTime = Date.now() - startTime;
-      console.log(`Preview generated in ${processingTime}ms`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Preview generated in ${processingTime}ms using Sharp`);
 
       return NextResponse.json({
         success: true,
@@ -212,15 +170,6 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (error) {
-      // Clean up on error
-      try {
-        if (fs.existsSync(outputPath)) {
-          fs.unlinkSync(outputPath);
-        }
-      } catch (cleanupError) {
-        console.error("Error cleaning up preview file:", cleanupError);
-      }
-
       throw error;
     }
   } catch (error) {

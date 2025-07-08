@@ -13,6 +13,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { useAPI } from "@/hooks/useAPI";
 
 export type Platform =
   | "instagram_reels"
@@ -286,6 +287,10 @@ const DEFAULT_TEMPLATES: Omit<ScriptTemplate, "_id">[] = [
 export default function ScriptTemplates({
   onApplyTemplate,
 }: ScriptTemplatesProps) {
+  const api = useAPI();
+
+  if (!api) return <div>Loading...</div>;
+
   const [templates, setTemplates] = useState<ScriptTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] =
     useState<ScriptTemplate | null>(null);
@@ -294,62 +299,39 @@ export default function ScriptTemplates({
 
   const createDefaultTemplates = async () => {
     try {
-      const results = await Promise.all(
-        DEFAULT_TEMPLATES.map(async (template) => {
-          const templateWithDefaults = {
-            ...template,
-            platforms: template.platforms || [],
-            aspectRatio: template.aspectRatio || "16:9",
-          };
-
-          const response = await fetch("/api/script-templates", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(templateWithDefaults),
-          });
-
-          if (!response.ok) {
-            throw new Error(`Failed to create template: ${template.name}`);
-          }
-
-          return response.json();
-        })
-      );
-
-      setTemplates(results);
-      setIsLoading(false);
+      await api.post("script-templates", {
+        templates: DEFAULT_TEMPLATES,
+      });
+      toast.success("Default templates created successfully");
+      await fetchTemplates();
     } catch (error) {
       console.error("Error creating default templates:", error);
       toast.error("Failed to create default templates");
-      setIsLoading(false);
     }
   };
 
   const fetchTemplates = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/script-templates");
-      if (!response.ok) throw new Error("Failed to fetch templates");
-      const data = await response.json();
+      const data = (await api.get("script-templates")) as ScriptTemplate[];
 
-      if (data.length === 0) {
-        await createDefaultTemplates();
-      } else {
+      if (Array.isArray(data) && data.length > 0) {
         setTemplates(data);
-        setIsLoading(false);
+      } else {
+        // No templates found, create defaults
+        await createDefaultTemplates();
       }
     } catch (error) {
       console.error("Error fetching templates:", error);
-      toast.error("Failed to fetch templates");
+      toast.error("Failed to load templates");
+    } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
     fetchTemplates();
-  }, []);
+  }, [api]);
 
   const handleAddRow = () => {
     if (!selectedTemplate) return;
@@ -396,16 +378,9 @@ export default function ScriptTemplates({
     if (!selectedTemplate) return;
 
     try {
-      const method = selectedTemplate._id ? "PUT" : "POST";
-      const response = await fetch("/api/script-templates", {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(selectedTemplate),
+      await api.post("script-templates", {
+        template: selectedTemplate,
       });
-
-      if (!response.ok) throw new Error("Failed to save template");
 
       toast.success("Template saved successfully");
       await fetchTemplates();
@@ -420,14 +395,7 @@ export default function ScriptTemplates({
     if (!confirm("Are you sure you want to delete this template?")) return;
 
     try {
-      const response = await fetch(
-        `/api/script-templates?templateId=${templateId}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) throw new Error("Failed to delete template");
+      await api.delete(`script-templates?templateId=${templateId}`);
 
       toast.success("Template deleted successfully");
       await fetchTemplates();

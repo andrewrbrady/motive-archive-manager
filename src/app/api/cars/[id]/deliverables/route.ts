@@ -12,11 +12,11 @@ export async function GET(
 ) {
   try {
     const resolvedParams = await params;
-    // [REMOVED] // [REMOVED] console.log("Car-specific API - Querying for car ID:", resolvedParams.id);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car-specific API - Querying for car ID:", resolvedParams.id);
 
     const db = await getDatabase();
-    // [REMOVED] // [REMOVED] console.log("Car-specific API - Database name:", db.databaseName);
-    // [REMOVED] // [REMOVED] console.log("Car-specific API - Querying collection: deliverables");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car-specific API - Database name:", db.databaseName);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car-specific API - Querying collection: deliverables");
 
     // Validate that the id is a proper MongoDB ObjectId
     if (!/^[0-9a-fA-F]{24}$/.test(resolvedParams.id)) {
@@ -33,12 +33,12 @@ export async function GET(
       .sort({ edit_deadline: 1 })
       .toArray();
 
-    // [REMOVED] // [REMOVED] console.log("Car-specific API - Found deliverables:", deliverables.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car-specific API - Found deliverables:", deliverables.length);
     console.log(
       "Car-specific API - Deliverable IDs:",
       deliverables.map((d) => d._id)
     );
-    // [REMOVED] // [REMOVED] console.log("Car-specific API - Sample deliverable:", deliverables[0]);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car-specific API - Sample deliverable:", deliverables[0]);
 
     return NextResponse.json(deliverables);
   } catch (error) {
@@ -89,54 +89,6 @@ export async function POST(request: Request) {
           error instanceof Error
             ? error.message
             : "Failed to create deliverable",
-      },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PUT(request: Request) {
-  try {
-    const url = new URL(request.url);
-    const pathParts = url.pathname.split("/");
-    const deliverableId = pathParts[pathParts.length - 1];
-
-    if (!deliverableId) {
-      return NextResponse.json(
-        { error: "Deliverable ID is required" },
-        { status: 400 }
-      );
-    }
-
-    const db = await getDatabase();
-    const data = await request.json();
-    const { _id, car_id, ...updateData } = data;
-
-    const updateFields = {
-      ...updateData,
-      updated_at: new Date(),
-    };
-
-    const result = await db
-      .collection("deliverables")
-      .updateOne({ _id: new ObjectId(deliverableId) }, { $set: updateFields });
-
-    if (result.matchedCount === 0) {
-      return NextResponse.json(
-        { error: "Deliverable not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error updating deliverable:", error);
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to update deliverable",
       },
       { status: 500 }
     );
@@ -201,7 +153,7 @@ export async function OPTIONS(request: Request) {
   return new NextResponse(null, {
     status: 204,
     headers: {
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
       "Access-Control-Allow-Origin": "*",
     },

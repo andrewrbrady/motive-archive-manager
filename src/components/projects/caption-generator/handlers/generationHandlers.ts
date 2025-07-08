@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { toast } from "@/components/ui/use-toast";
+import { useAPI } from "@/hooks/useAPI";
 import type { FormState } from "./formHandlers";
 import type { ProjectEvent, LengthSetting } from "../types";
 import type { BaTCarDetails } from "@/types/car-page";
@@ -27,6 +28,7 @@ export interface GenerationContext {
 
 // Generation handlers
 export function useGenerationHandlers() {
+  const api = useAPI();
   const [generationState, setGenerationState] = useState<GenerationState>({
     isGenerating: false,
     generatedCaption: "",
@@ -34,8 +36,8 @@ export function useGenerationHandlers() {
   });
 
   const updateGenerationState = useCallback(
-    (updates: Partial<GenerationState>) => {
-      setGenerationState((prev) => ({ ...prev, ...updates }));
+    (update: Partial<GenerationState>) => {
+      setGenerationState((prev) => ({ ...prev, ...update }));
     },
     []
   );
@@ -51,7 +53,9 @@ export function useGenerationHandlers() {
       }
 
       if (!context.derivedLength) {
-        return "Selected prompt template does not have a valid length setting";
+        console.warn(
+          "🚨 Car Copywriter: Selected prompt template does not have a valid length setting. Using fallback default."
+        );
       }
 
       if (!formState.context.trim()) {
@@ -68,42 +72,58 @@ export function useGenerationHandlers() {
       context: GenerationContext,
       formState: FormState
     ): Promise<string | null> => {
-      // Validate inputs
-      const validationError = validateGeneration(context, formState);
-      if (validationError) {
-        updateGenerationState({
-          error: validationError,
-          isGenerating: false,
+      if (!api) {
+        toast({
+          title: "Error",
+          description: "Authentication required to generate captions",
+          variant: "destructive",
         });
         return null;
       }
 
-      updateGenerationState({
-        isGenerating: true,
-        error: null,
-        generatedCaption: "",
-      });
+      // Prepare context for reuse
+      const contextToUse = formState.additionalContext
+        ? `${formState.context}\n\nAdditional context: ${formState.additionalContext}`
+        : formState.context;
 
-      try {
-        // Prepare car details for the API
-        const combinedCarDetails = {
-          count: context.selectedCarIds.length,
+      // Build client info if needed
+      const clientInfo = context.clientHandle
+        ? {
+            handle: context.clientHandle,
+            includeInCaption: true,
+          }
+        : null;
+
+      // Process car details appropriately
+      let combinedCarDetails;
+      if (Array.isArray(context.carDetails) && context.carDetails.length > 0) {
+        combinedCarDetails = {
           cars: context.carDetails,
-          makes: [...new Set(context.carDetails.map((car) => car.make))],
-          years: [...new Set(context.carDetails.map((car) => car.year))].sort(),
-          colors: [
-            ...new Set(
-              context.carDetails
-                .map((car) => car.color)
-                .filter((color) => color)
-            ),
-          ],
+          count: context.carDetails.length,
+          useMinimal: context.useMinimalCarData,
         };
+      } else {
+        // Handle case where carDetails might not be an array or might be empty
+        console.warn(
+          "Car details not provided or invalid:",
+          context.carDetails
+        );
+        combinedCarDetails = {
+          cars: [],
+          count: 0,
+          useMinimal: context.useMinimalCarData,
+        };
+      }
 
-        // Prepare event details for the API
-        const combinedEventDetails = {
-          count: context.selectedEventIds.length,
+      // Process event details
+      let combinedEventDetails = null;
+      if (
+        Array.isArray(context.eventDetails) &&
+        context.eventDetails.length > 0
+      ) {
+        combinedEventDetails = {
           events: context.eventDetails,
+          count: context.eventDetails.length,
           types: [...new Set(context.eventDetails.map((event) => event.type))],
           upcomingEvents: context.eventDetails.filter(
             (event) => new Date(event.start) > new Date()
@@ -112,136 +132,226 @@ export function useGenerationHandlers() {
             (event) => new Date(event.start) <= new Date()
           ),
         };
+      }
 
-        // Determine context to use
-        let contextToUse = formState.context;
+      // Prepare the request payload
+      const requestPayload: any = {
+        platform: formState.platform,
+        context: contextToUse,
+        clientInfo,
+        carDetails: combinedCarDetails,
+        eventDetails: combinedEventDetails,
+        temperature: formState.temperature,
+        tone: formState.tone,
+        style: formState.style,
+        length: context.derivedLength?.key || "standard",
+        template: formState.context, // This might need adjustment based on your API
+        aiModel: formState.model,
+        projectId: context.projectId,
+        selectedCarIds: context.selectedCarIds,
+        selectedEventIds: context.selectedEventIds,
+        systemPromptId: context.selectedSystemPromptId,
+        useMinimalCarData: context.useMinimalCarData,
+      };
 
-        // Client info handling
-        const clientInfo = context.clientHandle
-          ? {
-              handle: context.clientHandle,
-              includeInCaption: true,
+      // If we have custom edited LLM text, include it in the request
+      if (context.editableLLMText && context.editableLLMText.trim()) {
+        requestPayload.customLLMText = context.editableLLMText;
+      }
+
+      // Phase 3B optimization: Convert blocking await to non-blocking for UI responsiveness
+      updateGenerationState({
+        isGenerating: true,
+        error: null,
+        generatedCaption: "",
+      });
+
+      // Provide immediate feedback that generation started
+      toast({
+        title: "Starting generation...",
+        description: "Caption generation is starting in background",
+      });
+
+      // Execute generation in background
+      const generateOperation = async () => {
+        try {
+          // Generate new caption text
+          const data = (await api.post(
+            "openai/generate-project-caption",
+            requestPayload
+          )) as any;
+          const caption = data.caption;
+
+          updateGenerationState({
+            generatedCaption: caption,
+            isGenerating: false,
+          });
+
+          toast({
+            title: "Success",
+            description:
+              context.editableLLMText && context.editableLLMText.trim()
+                ? "Caption generated using your custom LLM input"
+                : `Caption generated successfully${data.processingTime ? ` in ${(data.processingTime / 1000).toFixed(1)}s` : ""}`,
+          });
+
+          return caption;
+        } catch (error: any) {
+          console.error("Error generating caption:", error);
+
+          let errorMessage = "Failed to generate caption";
+
+          // Handle different types of errors
+          if (error instanceof Error) {
+            if (
+              error.message.includes("timeout") ||
+              error.message.includes("Timeout")
+            ) {
+              errorMessage =
+                "The caption generation timed out. This can happen with complex prompts or when the AI service is busy. Please try again.";
+            } else if (error.message.includes("Failed to fetch")) {
+              errorMessage =
+                "Network error - please check your connection and try again.";
+            } else {
+              errorMessage = error.message;
             }
-          : null;
-
-        // Prepare the request payload
-        const requestPayload: any = {
-          platform: formState.platform,
-          context: contextToUse,
-          clientInfo,
-          carDetails: combinedCarDetails,
-          eventDetails: combinedEventDetails,
-          temperature: formState.temperature,
-          tone: formState.tone,
-          style: formState.style,
-          length: context.derivedLength!.key,
-          template: formState.context, // This might need adjustment based on your API
-          aiModel: formState.model,
-          projectId: context.projectId,
-          selectedCarIds: context.selectedCarIds,
-          selectedEventIds: context.selectedEventIds,
-          systemPromptId: context.selectedSystemPromptId,
-          useMinimalCarData: context.useMinimalCarData,
-        };
-
-        // If we have custom edited LLM text, include it in the request
-        if (context.editableLLMText && context.editableLLMText.trim()) {
-          requestPayload.customLLMText = context.editableLLMText;
-        }
-
-        // Create timeout for the entire request (55 seconds to stay under Vercel's 60s limit)
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(
-                  "Request timeout - the server took too long to respond"
-                )
-              ),
-            55000
-          )
-        );
-
-        // Generate new caption text
-        const fetchPromise = fetch("/api/openai/generate-project-caption", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestPayload),
-        });
-
-        const response = (await Promise.race([
-          fetchPromise,
-          timeoutPromise,
-        ])) as Response;
-
-        if (!response.ok) {
-          const errorData = await response.json();
-
-          // Handle specific timeout errors
-          if (response.status === 408) {
-            throw new Error(
-              "The caption generation timed out. Please try again with a simpler prompt or fewer details."
-            );
           }
 
-          throw new Error(errorData.error || "Failed to generate caption");
+          updateGenerationState({
+            error: errorMessage,
+            isGenerating: false,
+            generatedCaption: "",
+          });
+
+          toast({
+            title: "Error",
+            description: errorMessage,
+            variant: "destructive",
+          });
+
+          return null;
+        }
+      };
+
+      // Execute operation in background
+      setTimeout(generateOperation, 0);
+
+      return null; // Immediate return since we're async
+    },
+    [api, updateGenerationState]
+  );
+
+  // New streaming generation function
+  const generateCaptionStream = useCallback(
+    async (context: GenerationContext, formState: FormState): Promise<void> => {
+      if (!api) {
+        toast({
+          title: "Error",
+          description: "Authentication required to generate captions",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Prepare the same request payload as the regular generation
+      const contextToUse = formState.additionalContext
+        ? `${formState.context}\n\nAdditional context: ${formState.additionalContext}`
+        : formState.context;
+
+      const requestPayload = {
+        platform: formState.platform,
+        context: contextToUse,
+        temperature: formState.temperature,
+        tone: formState.tone,
+        style: formState.style,
+        length: context.derivedLength?.key || "standard",
+        aiModel: formState.model,
+        projectId: context.projectId,
+        selectedCarIds: context.selectedCarIds,
+        selectedEventIds: context.selectedEventIds,
+        systemPromptId: context.selectedSystemPromptId,
+        useMinimalCarData: context.useMinimalCarData,
+        customLLMText: context.editableLLMText,
+      };
+
+      updateGenerationState({
+        isGenerating: true,
+        error: null,
+        generatedCaption: "",
+      });
+
+      try {
+        // Make streaming request
+        const response = await fetch(
+          "/api/openai/generate-project-caption-stream",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestPayload),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data = await response.json();
-        const caption = data.caption;
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error("No response body reader available");
+        }
 
+        const decoder = new TextDecoder();
+        let accumulator = "";
+
+        toast({
+          title: "Streaming...",
+          description: "Caption is being generated in real-time",
+        });
+
+        // Read the stream
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          accumulator += chunk;
+
+          // Update the caption in real-time
+          updateGenerationState({
+            generatedCaption: accumulator,
+            isGenerating: true, // Still generating
+          });
+        }
+
+        // Mark as complete
         updateGenerationState({
-          generatedCaption: caption,
           isGenerating: false,
         });
 
         toast({
           title: "Success",
-          description:
-            context.editableLLMText && context.editableLLMText.trim()
-              ? "Caption generated using your custom LLM input"
-              : `Caption generated successfully${data.processingTime ? ` in ${(data.processingTime / 1000).toFixed(1)}s` : ""}`,
+          description: "Caption generated successfully with streaming",
         });
-
-        return caption;
       } catch (error: any) {
-        console.error("Error generating caption:", error);
-
-        let errorMessage = "Failed to generate caption";
-
-        // Handle different types of errors
-        if (error instanceof Error) {
-          if (
-            error.message.includes("timeout") ||
-            error.message.includes("Timeout")
-          ) {
-            errorMessage =
-              "The caption generation timed out. This can happen with complex prompts or when the AI service is busy. Please try again.";
-          } else if (error.message.includes("Failed to fetch")) {
-            errorMessage =
-              "Network error - please check your connection and try again.";
-          } else {
-            errorMessage = error.message;
-          }
-        }
+        console.error("Error in streaming generation:", error);
 
         updateGenerationState({
-          error: errorMessage,
+          error: error.message || "Failed to generate streaming caption",
           isGenerating: false,
+          generatedCaption: "",
         });
 
         toast({
           title: "Error",
-          description: errorMessage,
+          description: "Failed to generate streaming caption",
           variant: "destructive",
         });
-
-        return null;
       }
     },
-    [validateGeneration, updateGenerationState]
+    [api, updateGenerationState]
   );
 
   const clearGeneration = useCallback(() => {
@@ -272,11 +382,13 @@ export function useGenerationHandlers() {
     setError,
     validateGeneration,
     updateGeneratedCaption,
+    generateCaptionStream,
   };
 }
 
 // Hook for saving captions
-export function useCaptionSaver(user?: any) {
+export function useCaptionSaver() {
+  const api = useAPI();
   const [isSaving, setIsSaving] = useState(false);
 
   const saveCaption = useCallback(
@@ -288,57 +400,52 @@ export function useCaptionSaver(user?: any) {
       carIds: string[] = [],
       eventIds: string[] = []
     ): Promise<boolean> => {
-      if (!caption) return false;
+      if (!caption || !api) return false;
 
       setIsSaving(true);
-      try {
-        if (!user) {
-          throw new Error("No authenticated user found");
-        }
 
-        // Get the Firebase ID token
-        const token = await user.getIdToken();
+      // Phase 3C FIX: Convert blocking await to non-blocking pattern
+      toast({
+        title: "Saving...",
+        description: "Caption is being saved in background",
+      });
 
-        const response = await fetch(`/api/projects/${projectId}/captions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+      // Execute save operation in background - truly non-blocking
+      const saveOperation = () => {
+        api
+          .post(`projects/${projectId}/captions`, {
             caption,
             platform,
             context: context || "",
             carIds,
             eventIds,
-          }),
-        });
+          })
+          .then(() => {
+            toast({
+              title: "Success",
+              description: "Caption saved successfully",
+            });
+          })
+          .catch((error) => {
+            console.error("Error saving caption:", error);
+            toast({
+              title: "Error",
+              description: "Failed to save caption",
+              variant: "destructive",
+            });
+          })
+          .finally(() => {
+            setIsSaving(false);
+          });
+      };
 
-        if (!response.ok) {
-          throw new Error("Failed to save caption");
-        }
+      // Start background operation
+      setTimeout(saveOperation, 0);
 
-        const responseData = await response.json();
-
-        toast({
-          title: "Success",
-          description: "Caption saved successfully",
-        });
-
-        return true;
-      } catch (error) {
-        console.error("Error saving caption:", error);
-        toast({
-          title: "Error",
-          description: "Failed to save caption",
-          variant: "destructive",
-        });
-        return false;
-      } finally {
-        setIsSaving(false);
-      }
+      // Return immediately with optimistic success
+      return true;
     },
-    [user]
+    [api]
   );
 
   return {
@@ -348,7 +455,8 @@ export function useCaptionSaver(user?: any) {
 }
 
 // Hook for managing saved captions
-export function useSavedCaptions(user?: any) {
+export function useSavedCaptions() {
+  const api = useAPI();
   const [savedCaptions, setSavedCaptions] = useState<any[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
@@ -388,31 +496,19 @@ export function useSavedCaptions(user?: any) {
 
   const handleSaveEdit = useCallback(
     async (projectId: string, captionId: string) => {
+      if (!api) return false;
+
       try {
-        if (!user) {
-          throw new Error("No authenticated user found");
-        }
+        // Keep edit mode open while saving
+        toast({
+          title: "Saving...",
+          description: "Updating caption...",
+        });
 
-        // Get the Firebase ID token
-        const token = await user.getIdToken();
-
-        const response = await fetch(
-          `/api/projects/${projectId}/captions?id=${captionId}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              caption: editingText,
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to update caption");
-        }
+        // Make the API call and wait for it to complete
+        await api.patch(`projects/${projectId}/captions?id=${captionId}`, {
+          caption: editingText,
+        });
 
         // Update local state
         setSavedCaptions((prev) =>
@@ -423,6 +519,7 @@ export function useSavedCaptions(user?: any) {
           )
         );
 
+        // Only close edit mode after successful save
         setEditingCaptionId(null);
         setEditingText("");
 
@@ -439,58 +536,56 @@ export function useSavedCaptions(user?: any) {
           description: "Failed to update caption",
           variant: "destructive",
         });
+
+        // Keep edit mode open on error so user can try again
         return false;
       }
     },
-    [editingText, user]
+    [api, editingText]
   );
 
   const handleDeleteCaption = useCallback(
     async (projectId: string, captionId: string) => {
-      try {
-        if (!user) {
-          throw new Error("No authenticated user found");
-        }
+      if (!api) return false;
 
-        // Get the Firebase ID token
-        const token = await user.getIdToken();
+      // Phase 3C FIX: Convert blocking await to non-blocking pattern
+      toast({
+        title: "Deleting...",
+        description: "Caption is being deleted in background",
+      });
 
-        const response = await fetch(
-          `/api/projects/${projectId}/captions?id=${captionId}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+      // Execute delete operation in background - truly non-blocking
+      const deleteOperation = () => {
+        api
+          .delete(`projects/${projectId}/captions?id=${captionId}`)
+          .then(() => {
+            // Update local state
+            setSavedCaptions((prev) =>
+              prev.filter((caption) => caption._id !== captionId)
+            );
 
-        if (!response.ok) {
-          throw new Error("Failed to delete caption");
-        }
+            toast({
+              title: "Success",
+              description: "Caption deleted successfully",
+            });
+          })
+          .catch((error) => {
+            console.error("Error deleting caption:", error);
+            toast({
+              title: "Error",
+              description: "Failed to delete caption",
+              variant: "destructive",
+            });
+          });
+      };
 
-        // Update local state
-        setSavedCaptions((prev) =>
-          prev.filter((caption) => caption._id !== captionId)
-        );
+      // Start background operation
+      setTimeout(deleteOperation, 0);
 
-        toast({
-          title: "Success",
-          description: "Caption deleted successfully",
-        });
-
-        return true;
-      } catch (error) {
-        console.error("Error deleting caption:", error);
-        toast({
-          title: "Error",
-          description: "Failed to delete caption",
-          variant: "destructive",
-        });
-        return false;
-      }
+      // Return immediately with optimistic success
+      return true;
     },
-    [user]
+    [api]
   );
 
   const handleEditTextChange = useCallback((text: string) => {

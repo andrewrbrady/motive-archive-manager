@@ -72,17 +72,29 @@ export async function GET(request: Request) {
       // Modified pipeline to include both car and hard drive data
       const pipeline = [
         { $match: query },
-        // First add a stage to ensure carIds is a valid array
+        // First add a stage to ensure carIds is a valid array and convert to ObjectIds
         {
           $addFields: {
             safeCarIds: {
               $cond: {
                 if: { $isArray: "$carIds" },
                 then: {
-                  $filter: {
-                    input: "$carIds",
+                  $map: {
+                    input: {
+                      $filter: {
+                        input: "$carIds",
+                        as: "id",
+                        cond: { $ne: ["$$id", null] },
+                      },
+                    },
                     as: "id",
-                    cond: { $ne: ["$$id", null] },
+                    in: {
+                      $cond: {
+                        if: { $eq: [{ $type: "$$id" }, "string"] },
+                        then: { $toObjectId: "$$id" },
+                        else: "$$id",
+                      },
+                    },
                   },
                 },
                 else: [],
@@ -93,10 +105,22 @@ export async function GET(request: Request) {
               $cond: {
                 if: { $isArray: "$hardDriveIds" },
                 then: {
-                  $filter: {
-                    input: "$hardDriveIds",
+                  $map: {
+                    input: {
+                      $filter: {
+                        input: "$hardDriveIds",
+                        as: "id",
+                        cond: { $ne: ["$$id", null] },
+                      },
+                    },
                     as: "id",
-                    cond: { $ne: ["$$id", null] },
+                    in: {
+                      $cond: {
+                        if: { $eq: [{ $type: "$$id" }, "string"] },
+                        then: { $toObjectId: "$$id" },
+                        else: "$$id",
+                      },
+                    },
                   },
                 },
                 else: [],
@@ -135,7 +159,7 @@ export async function GET(request: Request) {
             as: "cars",
           },
         },
-        // Add lookup for hard drives
+        // Add lookup for hard drives - fix collection name and ensure proper matching
         {
           $lookup: {
             from: "hard_drives",
@@ -158,6 +182,7 @@ export async function GET(request: Request) {
                   name: 1,
                   label: 1,
                   type: 1,
+                  systemName: 1,
                 },
               },
             ],
@@ -171,9 +196,79 @@ export async function GET(request: Request) {
 
       const rawAssets = await rawCollection.aggregate(pipeline).toArray();
 
+      // Add debugging to understand lookup issues
+      console.log("Raw assets pipeline result sample:", {
+        totalAssets: rawAssets.length,
+        firstAsset: rawAssets[0]
+          ? {
+              _id: rawAssets[0]._id,
+              hardDriveIds: rawAssets[0].hardDriveIds,
+              carIds: rawAssets[0].carIds,
+              hardDrivesCount: rawAssets[0].hardDrives?.length || 0,
+              carsCount: rawAssets[0].cars?.length || 0,
+              hardDrives: rawAssets[0].hardDrives,
+              cars: rawAssets[0].cars,
+            }
+          : null,
+      });
+
+      // Additional debugging for lookup issues
+      console.log("MongoDB Aggregation Debug Info:");
+
+      // Check if hard_drives collection exists and has data
+      const hardDrivesCollection = db.collection("hard_drives");
+      const hardDrivesCount = await hardDrivesCollection.countDocuments();
+      console.log(`Hard drives collection count: ${hardDrivesCount}`);
+
+      // Check if cars collection exists and has data
+      const carsCollection = db.collection("cars");
+      const carsCount = await carsCollection.countDocuments();
+      console.log(`Cars collection count: ${carsCount}`);
+
+      // Sample a few assets to understand the data structure
+      const sampleAssets = rawAssets.slice(0, 3);
+      for (let i = 0; i < sampleAssets.length; i++) {
+        const asset = sampleAssets[i];
+        console.log(`Asset ${i + 1} debug:`, {
+          _id: asset._id,
+          hardDriveIds: asset.hardDriveIds,
+          safeHardDriveIds: asset.safeHardDriveIds,
+          hardDrivesFound: asset.hardDrives?.length || 0,
+          carIds: asset.carIds,
+          safeCarIds: asset.safeCarIds,
+          carsFound: asset.cars?.length || 0,
+        });
+
+        // Check if the hardDriveIds actually exist in the hard_drives collection
+        if (asset.safeHardDriveIds && asset.safeHardDriveIds.length > 0) {
+          const foundDrives = await hardDrivesCollection
+            .find({
+              _id: { $in: asset.safeHardDriveIds },
+            })
+            .toArray();
+          console.log(
+            `Asset ${i + 1} - Hard drives that exist in DB:`,
+            foundDrives.map((d) => ({ _id: d._id, label: d.label }))
+          );
+        }
+
+        // Check if the carIds actually exist in the cars collection
+        if (asset.safeCarIds && asset.safeCarIds.length > 0) {
+          const foundCars = await carsCollection
+            .find({
+              _id: { $in: asset.safeCarIds },
+            })
+            .toArray();
+          console.log(
+            `Asset ${i + 1} - Cars that exist in DB:`,
+            foundCars.map((c) => ({ _id: c._id, make: c.make, model: c.model }))
+          );
+        }
+      }
+
       // Update debug info
       debugInfo.returnedCount = rawAssets.length;
-      // [REMOVED] // [REMOVED] console.log(`Returning ${rawAssets.length} raw assets for page ${page}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Returning ${rawAssets.length} raw assets for page ${page}`);
 
       // Ensure assets is always an array, even if the database returns null or undefined
       const safelyTypedAssets = Array.isArray(rawAssets) ? rawAssets : [];

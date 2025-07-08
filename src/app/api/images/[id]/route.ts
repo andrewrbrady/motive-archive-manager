@@ -3,9 +3,9 @@ export const dynamic = "force-dynamic";
 export const revalidate = 3600; // Revalidate every hour
 
 import { NextResponse } from "next/server";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { getDatabase, getMongoClient } from "@/lib/mongodb";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { createStaticResponse } from "@/lib/cache-utils";
-import { getMongoClient, getDatabase } from "@/lib/mongodb";
 
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
 
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const segments = url.pathname.split("/");
     id = segments[segments.length - 1];
 
-    // [REMOVED] // [REMOVED] console.log(`[Image API] GET request for image ID: ${id}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Image API] GET request for image ID: ${id}`);
 
     // Validate ObjectId
     if (!ObjectId.isValid(id)) {
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     // Try to use getDatabase first for pool connection
     let db;
     try {
-      // [REMOVED] // [REMOVED] console.log(`[Image API] Connecting to database using getDatabase()`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Image API] Connecting to database using getDatabase()`);
       db = await getDatabase();
     } catch (dbError) {
       console.error(
@@ -44,26 +44,26 @@ export async function GET(request: Request) {
       db = client.db(DB_NAME);
     }
 
-    // [REMOVED] // [REMOVED] console.log(`[Image API] Fetching image with ID: ${id}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Image API] Fetching image with ID: ${id}`);
 
     // Find the image in the database
     const image = await db.collection("images").findOne({ _id: objectId });
 
     if (!image) {
-      // [REMOVED] // [REMOVED] console.log(`[Image API] Image not found with ID: ${id}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Image API] Image not found with ID: ${id}`);
 
       // Try finding by cloudflareId as fallback
-      // [REMOVED] // [REMOVED] console.log(`[Image API] Trying to find image by cloudflareId: ${id}`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Image API] Trying to find image by cloudflareId: ${id}`);
       const imageByCloudflareId = await db.collection("images").findOne({
         cloudflareId: id,
       });
 
       if (imageByCloudflareId) {
-        // [REMOVED] // [REMOVED] console.log(`[Image API] Found image by cloudflareId: ${id}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Image API] Found image by cloudflareId: ${id}`);
 
         // Format the image URL with appropriate variant based on metadata
         const variant = determineImageVariant(imageByCloudflareId);
-        const imageUrl = getFormattedImageUrl(imageByCloudflareId.url, variant);
+        const imageUrl = fixCloudflareImageUrl(imageByCloudflareId.url);
 
         // Return the formatted response with cache headers
         return createStaticResponse({
@@ -118,8 +118,8 @@ export async function GET(request: Request) {
     let imageUrl;
 
     try {
-      imageUrl = getFormattedImageUrl(image.url, variant);
-      // [REMOVED] // [REMOVED] console.log(`[Image API] Formatted URL for image ${id}: ${imageUrl}`);
+      imageUrl = fixCloudflareImageUrl(image.url);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Image API] Formatted URL for image ${id}: ${imageUrl}`);
     } catch (urlError) {
       console.error(`[Image API] Error formatting URL: ${urlError}`);
       imageUrl =
@@ -157,7 +157,7 @@ export async function GET(request: Request) {
       variant,
     };
 
-    // [REMOVED] // [REMOVED] console.log(`[Image API] Successfully returning image data for ${id}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[Image API] Successfully returning image data for ${id}`);
     return createStaticResponse(response);
   } catch (error) {
     console.error(`[Image API] Error processing image ${id}:`, error);
@@ -187,18 +187,19 @@ export async function GET(request: Request) {
 function determineImageVariant(image: any): string {
   const metadata = image.metadata || {};
 
-  // Use thumbnail for small preview images
+  // Use thumbnail only for explicitly marked thumbnail/preview images
   if (metadata.isPreview || metadata.isThumbnail) {
     return "thumbnail";
   }
 
-  // Use medium for gallery views
+  // Use medium for gallery views (better quality than thumbnail)
   if (metadata.isGallery) {
     return "medium";
   }
 
-  // Default to public variant for full-size images
-  return "public";
+  // Default to medium variant for better quality (was 'public' before)
+  // This ensures gallery images get better quality by default
+  return "medium";
 }
 
 /**

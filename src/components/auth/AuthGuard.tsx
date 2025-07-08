@@ -124,7 +124,7 @@ export function AdminGuard({ children, fallbackComponent }: AdminGuardProps) {
     }
 
     if (status === "unauthenticated" && !isRedirecting) {
-      console.log("AdminGuard: User unauthenticated, redirecting to signin");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("AdminGuard: User unauthenticated, redirecting to signin");
       setIsRedirecting(true);
       router.push("/auth/signin");
     } else if (
@@ -141,14 +141,14 @@ export function AdminGuard({ children, fallbackComponent }: AdminGuardProps) {
       // Don't redirect immediately, show unauthorized message first
       const timeoutId = setTimeout(() => {
         if (!isRedirecting) {
-          console.log("AdminGuard: Redirecting to unauthorized page");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("AdminGuard: Redirecting to unauthorized page");
           setIsRedirecting(true);
           router.push("/unauthorized");
         }
       }, 3000); // Show message for 3 seconds before redirecting
       setUnauthorizedTimeoutId(timeoutId);
     } else if (status === "authenticated" && (isAdmin || isAdminBypass)) {
-      console.log("AdminGuard: User has admin access, showing content");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("AdminGuard: User has admin access, showing content");
     }
   }, [
     status,

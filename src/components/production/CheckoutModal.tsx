@@ -15,7 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
 
 interface User {
   _id: string;
@@ -45,6 +48,7 @@ export default function CheckoutModal({
   mode,
   onSave,
 }: CheckoutModalProps) {
+  const api = useAPI();
   const [checkedOutTo, setCheckedOutTo] = useState<string>("");
   const [expectedReturnDate, setExpectedReturnDate] = useState<
     Date | undefined
@@ -55,11 +59,11 @@ export default function CheckoutModal({
 
   useEffect(() => {
     const fetchUsers = async () => {
+      if (!api) return;
+
       setIsLoadingUsers(true);
       try {
-        const response = await fetch("/api/users");
-        if (!response.ok) throw new Error("Failed to fetch users");
-        const data = await response.json();
+        const data = await api.get<User[]>("/users");
         // API returns an array of users directly
         setUsers(
           data.filter(
@@ -68,6 +72,7 @@ export default function CheckoutModal({
         );
       } catch (error) {
         console.error("Error fetching users:", error);
+        toast.error("Failed to fetch users");
       } finally {
         setIsLoadingUsers(false);
       }
@@ -76,7 +81,7 @@ export default function CheckoutModal({
     if (isOpen && mode === "checkout") {
       fetchUsers();
     }
-  }, [isOpen, mode]);
+  }, [isOpen, mode, api]);
 
   const handleSubmit = async () => {
     setIsLoading(true);
@@ -231,8 +236,8 @@ export default function CheckoutModal({
               {isLoading
                 ? `${mode === "checkout" ? "Checking Out" : "Checking In"}...`
                 : mode === "checkout"
-                ? "Check Out"
-                : "Check In"}
+                  ? "Check Out"
+                  : "Check In"}
             </Button>
           </div>
         </Dialog.Panel>

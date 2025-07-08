@@ -8,12 +8,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log("🔒 GET /api/system-prompts/[id]: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/system-prompts/[id]: Starting request");
 
   // Check authentication (no admin role required - system prompts are needed for caption generation)
   const authResult = await verifyAuthMiddleware(request, []);
   if (authResult) {
-    console.log("❌ GET /api/system-prompts/[id]: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ GET /api/system-prompts/[id]: Authentication failed");
     return authResult;
   }
 
@@ -39,7 +39,7 @@ export async function GET(
       );
     }
 
-    console.log("✅ GET /api/system-prompts/[id]: Successfully fetched prompt");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ GET /api/system-prompts/[id]: Successfully fetched prompt");
     return NextResponse.json(systemPrompt);
   } catch (error) {
     console.error(

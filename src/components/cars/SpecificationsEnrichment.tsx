@@ -2,6 +2,26 @@ import React from "react";
 import { Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EnrichmentProgress } from "@/components/ui/EnrichmentProgress";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
+
+interface EnrichmentResponse {
+  success?: boolean;
+  data?: any;
+  progress?: {
+    step: number;
+    currentStep: string;
+    status: "pending" | "processing" | "complete" | "error";
+    error?: string;
+    details?: {
+      searchTermsGenerated?: number;
+      additionalSearchesCompleted?: number;
+      fieldsUpdated?: number;
+      protectedFieldsPreserved?: string[];
+    };
+  };
+  error?: string;
+}
 
 interface EnrichmentState {
   isEnriching: boolean;
@@ -29,6 +49,7 @@ export function SpecificationsEnrichment({
   carId,
   onEnrichComplete,
 }: SpecificationsEnrichmentProps) {
+  const api = useAPI();
   const [state, setState] = React.useState<EnrichmentState>({
     isEnriching: false,
     showProgress: false,
@@ -38,6 +59,11 @@ export function SpecificationsEnrichment({
       status: "pending",
     },
   });
+
+  // Authentication guard
+  if (!api) {
+    return null;
+  }
 
   const handleEnrichData = async () => {
     setState((prev) => ({
@@ -52,22 +78,24 @@ export function SpecificationsEnrichment({
     }));
 
     try {
-      const response = await fetch(`/api/cars/${carId}/enrich`, {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to enrich car data");
-      }
-
-      const data = await response.json();
+      const data = await api.post<EnrichmentResponse>(
+        `cars/${carId}/enrich`,
+        {}
+      );
 
       if (data.success && data.data) {
         // Update progress based on backend response
         if (data.progress) {
+          const { step, currentStep, status, error, details } = data.progress;
           setState((prev) => ({
             ...prev,
-            progress: data.progress,
+            progress: {
+              step,
+              currentStep,
+              status,
+              error,
+              details,
+            },
           }));
         } else {
           setState((prev) => ({
@@ -83,6 +111,7 @@ export function SpecificationsEnrichment({
         // Add a small delay to ensure database write is complete
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
+        toast.success("Car data enriched successfully");
         onEnrichComplete();
       } else {
         const errorMessage = data.error || "Failed to enrich car data";
@@ -95,8 +124,9 @@ export function SpecificationsEnrichment({
             error: errorMessage,
           },
         }));
+        toast.error(errorMessage);
       }
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to enrich car data";
       setState((prev) => ({
@@ -108,6 +138,7 @@ export function SpecificationsEnrichment({
           error: errorMessage,
         },
       }));
+      toast.error(errorMessage);
     } finally {
       // Keep isEnriching true for a moment to show completion state
       setTimeout(() => {

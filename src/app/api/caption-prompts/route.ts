@@ -148,7 +148,8 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   await dbConnect();
   try {
-    const { id } = await request.json();
+    const searchParams = request.nextUrl.searchParams;
+    const id = searchParams.get("id");
 
     if (!id) {
       return NextResponse.json(

@@ -111,16 +111,55 @@
 .fc .fc-col-header-cell {
   @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] font-medium;
   border-color: rgb(209 213 219) !important; /* gray-300 */
+  text-align: center !important;
+  vertical-align: middle !important;
+  padding: 8px 4px !important;
+}
+
+/* Fix day header content alignment */
+.fc .fc-col-header-cell-cushion {
+  padding: 8px 4px !important;
+  text-align: center !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
 }
 
 /* Override default FullCalendar table borders */
 .fc-theme-standard .fc-scrollgrid {
   border-color: rgb(209 213 219) !important; /* gray-300 */
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
 }
 
 .fc-theme-standard td,
 .fc-theme-standard th {
   border-color: rgb(209 213 219) !important; /* gray-300 */
+  border-width: 1px !important;
+  border-style: solid !important;
+}
+
+/* Ensure vertical borders are visible and aligned */
+.fc .fc-daygrid-day-frame {
+  min-height: 100px !important;
+  border-right: 1px solid rgb(209 213 219) !important;
+}
+
+.fc .fc-daygrid-day-top {
+  padding: 4px !important;
+}
+
+/* Fix table border collapse issues */
+.fc table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+/* Ensure proper border display on all day cells */
+.fc .fc-daygrid-day {
+  border-right: 1px solid rgb(209 213 219) !important;
+  border-bottom: 1px solid rgb(209 213 219) !important;
 }
 
 /* Dark mode overrides for table borders */
@@ -137,13 +176,29 @@
   border-color: rgb(75 85 99) !important; /* gray-600 */
 }
 
+/* Dark mode border fixes */
+.dark .fc .fc-daygrid-day-frame {
+  border-right: 1px solid rgb(75 85 99) !important; /* gray-600 */
+}
+
+.dark .fc .fc-daygrid-day {
+  border-right: 1px solid rgb(75 85 99) !important; /* gray-600 */
+  border-bottom: 1px solid rgb(75 85 99) !important; /* gray-600 */
+}
+
 /* Day grid styling */
 .fc .fc-daygrid-day {
   @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))];
+  position: relative !important;
+  min-height: 120px !important;
 }
 
 .fc .fc-daygrid-day-number {
   @apply text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))];
+  padding: 4px 8px !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+  display: block !important;
 }
 
 .fc .fc-daygrid-day.fc-day-today {
@@ -447,4 +502,49 @@
 
 .fc .fc-filtersButton-button:focus {
   @apply outline-none ring-2 ring-[hsl(var(--ring))] ring-offset-2 ring-offset-[hsl(var(--background))];
+}
+
+/* Calendar layout improvements */
+/* Ensure table layout is properly rendered */
+.fc .fc-scrollgrid-section-body table {
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+/* Fix column width distribution for month view */
+.fc .fc-col-header-cell,
+.fc .fc-daygrid-day {
+  width: 14.285714% !important; /* 100% / 7 days */
+  box-sizing: border-box !important;
+}
+
+/* Ensure header row alignment */
+.fc .fc-scrollgrid-section-header table {
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+/* Fix for month view header alignment */
+.fc-dayGridMonth-view .fc-col-header {
+  width: 100% !important;
+}
+
+/* Fix scrollgrid layout */
+.fc .fc-scrollgrid {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+/* Prevent border cutting issues */
+.fc .fc-scrollgrid-section {
+  position: relative !important;
+}
+
+.fc .fc-scrollgrid-section-header {
+  border-bottom: 1px solid rgb(209 213 219) !important;
+}
+
+.dark .fc .fc-scrollgrid-section-header {
+  border-bottom: 1px solid rgb(75 85 99) !important;
 }

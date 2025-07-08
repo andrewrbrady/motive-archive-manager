@@ -9,7 +9,14 @@ import { Trash2 } from "lucide-react";
 import { MotiveLogo } from "@/components/ui/MotiveLogo";
 import { cn } from "@/lib/utils";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
+import { useAPI } from "@/hooks/useAPI";
+import { Badge } from "@/components/ui/badge";
+
+// Helper function to build enhanced Cloudflare URL for car card thumbnails
+import { getEnhancedImageUrl } from "@/lib/imageUtils";
+
+// Using centralized getEnhancedImageUrl function from @/lib/imageUtils
 
 interface CarCardProps {
   car: Car;
@@ -21,7 +28,7 @@ const CarCard = memo(function CarCard({
   currentSearchParams,
 }: CarCardProps) {
   if (process.env.NODE_ENV !== "production") {
-    // [REMOVED] // [REMOVED] console.log("CarCard: Component rendering with car:", car._id);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("CarCard: Component rendering with car:", car._id);
     console.log("CarCard: Full car data:", {
       id: car._id,
       hasMake: !!car.make,
@@ -34,8 +41,9 @@ const CarCard = memo(function CarCard({
     });
   }
 
+  const api = useAPI();
   const [primaryImage, setPrimaryImage] = useState<{
-    id?: string;
+    id: string;
     url: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,70 +51,81 @@ const CarCard = memo(function CarCard({
   useEffect(() => {
     // Simplified image selection logic
     const findPrimaryImage = () => {
-      setLoading(true);
+      // ✅ Removed console.log to prevent infinite loops
 
-      // Case 1: We have an array of images
-      if (car.images && Array.isArray(car.images) && car.images.length > 0) {
-        // Try to find the image marked as primary first
-        const primaryImg = car.images.find(
-          (img) =>
-            // Check for explicit primary flag in metadata
-            img.metadata?.isPrimary ||
-            // Or check against primaryImageId
-            (car.primaryImageId && img._id === car.primaryImageId)
-        );
+      // Case 1: We have loaded images with URLs
+      if (car.images && car.images.length > 0) {
+        const primary = car.images.find((img) => img.metadata?.isPrimary);
+        if (primary) {
+          const baseUrl = fixCloudflareImageUrl(primary.url);
+          const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
 
-        // Use primary image if found, otherwise use first image
-        const imageToUse = primaryImg || car.images[0];
+          // ✅ Removed console.log to prevent infinite loops
 
-        setPrimaryImage({
-          id: imageToUse._id,
-          url: getFormattedImageUrl(imageToUse.url),
-        });
+          setPrimaryImage({
+            id: primary._id,
+            url: enhancedUrl,
+          });
+        } else {
+          // Use first image if no primary is marked
+          const baseUrl = fixCloudflareImageUrl(car.images[0].url);
+          const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
 
+          // ✅ Removed console.log to prevent infinite loops
+
+          setPrimaryImage({
+            id: car.images[0]._id,
+            url: enhancedUrl,
+          });
+        }
         setLoading(false);
         return;
       }
 
-      // Case 2: We have image IDs but no loaded images
-      if (car.imageIds?.length && car.primaryImageId) {
-        // Fetch the primary image
+      // Case 2: We have image IDs but no loaded images - fetch using authenticated API
+      if (car.imageIds?.length && car.primaryImageId && api) {
+        // Fetch the primary image using authenticated API
         const fetchImage = async () => {
           try {
-            const response = await fetch(`/api/images/${car.primaryImageId}`);
+            const imageData = await api.get(`images/${car.primaryImageId}`);
+            const baseUrl = fixCloudflareImageUrl((imageData as any).url);
+            const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
 
-            if (response.ok) {
-              const imageData = await response.json();
-              setPrimaryImage({
-                id: imageData._id,
-                url: getFormattedImageUrl(imageData.url),
-              });
-            } else {
-              // If primary image fetch fails, try the first image
-              if (
-                car.imageIds &&
-                car.imageIds.length > 0 &&
-                car.imageIds[0] !== car.primaryImageId
-              ) {
-                const fallbackResponse = await fetch(
-                  `/api/images/${car.imageIds[0]}`
+            // ✅ Removed console.log to prevent infinite loops
+
+            setPrimaryImage({
+              id: (imageData as any)._id,
+              url: enhancedUrl,
+            });
+          } catch (error) {
+            // If primary image fetch fails, try the first image
+            if (
+              car.imageIds &&
+              car.imageIds.length > 0 &&
+              car.imageIds[0] !== car.primaryImageId
+            ) {
+              try {
+                const fallbackImageData = await api.get(
+                  `images/${car.imageIds[0]}`
                 );
-                if (fallbackResponse.ok) {
-                  const fallbackImageData = await fallbackResponse.json();
-                  setPrimaryImage({
-                    id: fallbackImageData._id,
-                    url: getFormattedImageUrl(fallbackImageData.url),
-                  });
-                } else {
-                  setPrimaryImage(null);
-                }
-              } else {
+                const baseUrl = fixCloudflareImageUrl(
+                  (fallbackImageData as any).url
+                );
+                const enhancedUrl = getEnhancedImageUrl(baseUrl, "400", "85");
+
+                // ✅ Removed console.log to prevent infinite loops
+
+                setPrimaryImage({
+                  id: (fallbackImageData as any)._id,
+                  url: enhancedUrl,
+                });
+              } catch (fallbackError) {
+                console.error("Error fetching fallback image:", fallbackError);
                 setPrimaryImage(null);
               }
+            } else {
+              setPrimaryImage(null);
             }
-          } catch (error) {
-            console.error("Error fetching image:", error);
-            setPrimaryImage(null);
           } finally {
             setLoading(false);
           }
@@ -122,9 +141,9 @@ const CarCard = memo(function CarCard({
     };
 
     findPrimaryImage();
-  }, [car._id, car.imageIds, car.images, car.primaryImageId]);
+  }, [car._id, car.imageIds, car.images, car.primaryImageId, api]);
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDelete = (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent navigation
 
     if (
@@ -135,21 +154,28 @@ const CarCard = memo(function CarCard({
       return;
     }
 
-    try {
-      const response = await fetch(`/api/cars/${car._id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete car");
-      }
-
-      // Refresh the page to update the list
-      window.location.reload();
-    } catch (error) {
-      console.error("Error deleting car:", error);
-      alert("Failed to delete car. Please try again.");
+    if (!api) {
+      alert("Authentication not ready. Please try again.");
+      return;
     }
+
+    // Immediate optimistic feedback
+    alert("Deleting car in background...");
+
+    // Background delete operation - non-blocking
+    const deleteOperation = async () => {
+      try {
+        await api.delete(`cars/${car._id}`);
+        // Refresh the page to update the list
+        window.location.reload();
+      } catch (error) {
+        console.error("Error deleting car:", error);
+        alert("Failed to delete car. Please try again.");
+      }
+    };
+
+    // Execute delete in background - non-blocking
+    setTimeout(deleteOperation, 0);
   };
 
   // Helper function to safely format mileage

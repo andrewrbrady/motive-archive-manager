@@ -24,6 +24,32 @@ interface ImageCardProps {
   onImageView?: (image: ImageData) => void;
 }
 
+// Helper function to build enhanced Cloudflare URL for thumbnails - FIXED
+const getThumbnailImageUrl = (baseUrl: string) => {
+  if (!baseUrl.includes("imagedelivery.net")) {
+    return baseUrl;
+  }
+
+  // Map 600px to the appropriate named variant (medium: 600x400)
+  const targetVariant = "medium";
+
+  const urlParts = baseUrl.split("/");
+
+  // If URL already has a variant, replace it
+  if (urlParts.length >= 5) {
+    const lastPart = urlParts[urlParts.length - 1];
+
+    // If it's a named variant or flexible variant, replace it
+    if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+      urlParts[urlParts.length - 1] = targetVariant;
+      return urlParts.join("/");
+    }
+  }
+
+  // URL doesn't have a variant, append the named variant
+  return `${baseUrl}/${targetVariant}`;
+};
+
 export function ImageCard({
   image,
   onSelect,
@@ -41,11 +67,31 @@ export function ImageCard({
   const handleCopyUrl = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent triggering the card click
     try {
-      await navigator.clipboard.writeText(image.url);
+      // Normalize to medium variant for consistent quality
+      let urlToCopy = image.url;
+
+      if (image.url.includes("imagedelivery.net")) {
+        // Always use medium variant for clipboard copy
+        const urlParts = image.url.split("/");
+        const lastPart = urlParts[urlParts.length - 1];
+
+        // Check if the last part is a variant (alphabetic or has parameters)
+        if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+          // Replace with medium variant
+          urlParts[urlParts.length - 1] = "medium";
+        } else {
+          // No variant specified, append medium
+          urlParts.push("medium");
+        }
+
+        urlToCopy = urlParts.join("/");
+      }
+
+      await navigator.clipboard.writeText(urlToCopy);
       setCopiedUrl(true);
       toast({
         title: "Copied!",
-        description: "Image URL copied to clipboard",
+        description: "Image URL (medium quality) copied to clipboard",
       });
       setTimeout(() => setCopiedUrl(false), 2000);
     } catch (err) {
@@ -76,26 +122,39 @@ export function ImageCard({
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
-    // [REMOVED] // [REMOVED] console.log("Delete button clicked for image:", image);
+  const handleDelete = (e: React.MouseEvent) => {
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Delete button clicked for image:", image);
     e.stopPropagation();
     if (!onDelete) return;
+
+    // Immediate optimistic feedback
     setIsDeleting(true);
-    try {
-      await onDelete(image);
-      toast({
-        title: "Deleted!",
-        description: "Image deleted successfully",
-      });
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to delete image",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeleting(false);
-    }
+    toast({
+      title: "Deleting...",
+      description: "Image deletion in progress",
+    });
+
+    // Background delete operation - non-blocking
+    const deleteOperation = async () => {
+      try {
+        await onDelete(image);
+        toast({
+          title: "Deleted!",
+          description: "Image deleted successfully",
+        });
+      } catch (err) {
+        toast({
+          title: "Error",
+          description: "Failed to delete image",
+          variant: "destructive",
+        });
+      } finally {
+        setIsDeleting(false);
+      }
+    };
+
+    // Execute delete in background - non-blocking
+    setTimeout(deleteOperation, 0);
   };
 
   const handleCanvasExtension = (e: React.MouseEvent) => {
@@ -114,7 +173,7 @@ export function ImageCard({
   };
 
   if (onDelete) {
-    // [REMOVED] // [REMOVED] console.log("Rendering delete button for image:", image);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Rendering delete button for image:", image);
   }
 
   return (
@@ -183,7 +242,7 @@ export function ImageCard({
         )}
       </div>
       <Image
-        src={image.url}
+        src={getThumbnailImageUrl(image.url)}
         alt={image.filename || "Car image"}
         width={0}
         height={0}

@@ -1,14 +1,21 @@
 "use client";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageTitle } from "@/components/ui/PageTitle";
-import { UploadIcon } from "lucide-react";
+import Navbar from "@/components/layout/navbar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/use-toast";
+import { Upload, CheckCircle, XCircle, FileText } from "lucide-react";
+import { useAPI } from "@/hooks/useAPI";
 
-export default function ImportRawAssets() {
+export default function RawImportPage() {
   const router = useRouter();
+  const api = useAPI();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [results, setResults] = useState<any[]>([]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -21,65 +28,96 @@ export default function ImportRawAssets() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!file) return;
+  const handleImport = async () => {
+    if (!api) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to import raw data",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!file) {
+      toast({
+        title: "Error",
+        description: "Please select a file to import",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
-    setError(null);
+    setResults([]);
 
     try {
-      const text = await file.text();
-      const rows = text.split("\n").map((row) => row.split(","));
-      const headers = rows[0];
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const text = e.target?.result as string;
+        const data = text.split("\n").filter((line) => line.trim());
 
-      // Convert CSV to array of objects
-      const data = rows.slice(1).map((row) => {
-        const obj: { [key: string]: string } = {};
-        headers.forEach((header, index) => {
-          obj[header.trim()] = row[index]?.trim() || "";
-        });
-        return obj;
+        const response = (await api.post("/raw/import", {
+          data: data,
+          preserveExisting: true,
+        })) as any;
+
+        setResults(response.results || []);
+
+        if (response.success) {
+          toast({
+            title: "Success",
+            description: `Import completed: ${response.imported || 0} items processed`,
+          });
+          router.push("/production?tab=raw-assets");
+        } else {
+          toast({
+            title: "Warning",
+            description: "Import completed with some errors",
+            variant: "destructive",
+          });
+        }
+      };
+
+      reader.readAsText(file);
+    } catch (error: any) {
+      console.error("Import error:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to import raw data",
+        variant: "destructive",
       });
-
-      // Send to API
-      const response = await fetch("/api/raw/import", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to import data");
-      }
-
-      const result = await response.json();
-      if (result.success) {
-        router.push("/production?tab=raw-assets");
-      } else {
-        throw new Error(result.error || "Failed to import data");
-      }
-    } catch (err) {
-      console.error("Error importing data:", err);
-      setError(err instanceof Error ? err.message : "Failed to import data");
     } finally {
       setLoading(false);
     }
   };
 
+  if (!api) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="container mx-auto px-4 py-8">
+          <div className="text-center mt-8">
+            <h1 className="text-3xl font-bold mb-4">Authentication Required</h1>
+            <p className="text-muted-foreground">
+              Please log in to import raw data
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      {/* <Navbar /> */}
+      <Navbar />
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-2xl font-bold mb-6">Import Raw Assets</h1>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleImport} className="space-y-6">
             <div className="border-2 border-dashed border-zinc-300 rounded-lg p-8">
               <div className="flex flex-col items-center justify-center text-center">
-                <UploadIcon className="w-12 h-12 text-zinc-400 mb-4" />
+                <Upload className="w-12 h-12 text-zinc-400 mb-4" />
                 <p className="text-lg font-medium mb-2">Upload CSV File</p>
                 <p className="text-sm text-zinc-500 mb-4">
                   Select a CSV file containing your raw assets data
@@ -116,7 +154,6 @@ export default function ImportRawAssets() {
           </form>
         </div>
       </main>
-      {/* <Footer /> */}
     </div>
   );
 }

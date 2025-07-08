@@ -24,18 +24,18 @@ export async function GET(request: Request) {
 
     const db = await getDatabase();
     const carId = id;
-    // [REMOVED] // [REMOVED] console.log("Fetching events for car ID:", carId); // Debug log
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching events for car ID:", carId); // Debug log
 
     const eventModel = new EventModel(db);
     const events = await eventModel.findByCarId(carId);
-    // [REMOVED] // [REMOVED] console.log("Found events from database:", events); // Debug log
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Found events from database:", events); // Debug log
 
     // Transform the events to match the Event interface
     const transformedEvents = events.map((event) =>
       eventModel.transformToApiEvent(event)
     );
 
-    // [REMOVED] // [REMOVED] console.log("Transformed events:", transformedEvents); // Debug log
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Transformed events:", transformedEvents); // Debug log
     return NextResponse.json(transformedEvents);
   } catch (error) {
     console.error("Error fetching events:", error);
@@ -50,12 +50,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log("🔒 POST /api/cars/[id]/events: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 POST /api/cars/[id]/events: Starting request");
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
   if (authResult) {
-    console.log("❌ POST /api/cars/[id]/events: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ POST /api/cars/[id]/events: Authentication failed");
     return authResult;
   }
 

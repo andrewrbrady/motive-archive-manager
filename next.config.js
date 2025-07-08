@@ -6,20 +6,13 @@ const nextConfig = {
     "@tanstack/react-query",
     "@tanstack/react-query-devtools",
   ],
-  outputFileTracingIncludes: {
-    "/api/images/extend-canvas": [
-      "./extend_canvas",
-      "./extend_canvas_linux",
-      "./extend_canvas_macos",
-    ],
-  },
   // Skip static optimization for API routes
   generateBuildId: async () => {
     // Return a unique build ID to prevent caching issues
     return `build-${Date.now()}`;
   },
   images: {
-    // Use custom Cloudflare loader to handle Cloudflare Images URLs
+    // Enable custom loader to bypass Vercel optimization
     loader: "custom",
     loaderFile: "./src/lib/cloudflare-image-loader.ts",
 
@@ -42,15 +35,15 @@ const nextConfig = {
       },
     ],
 
-    // Standard device sizes for responsive images
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    // More conservative device sizes to reduce transformations
+    deviceSizes: [640, 828, 1200, 1920],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
 
-    // Let Cloudflare handle format optimization
+    // Limit formats to reduce transformations
     formats: ["image/webp"],
 
-    // Standard cache TTL
-    minimumCacheTTL: 60,
+    // Longer cache TTL to reduce reprocessing
+    minimumCacheTTL: 2592000, // 30 days
   },
   // Add webpack configuration for Node.js modules
   webpack: (config, { isServer }) => {
@@ -64,6 +57,17 @@ const nextConfig = {
         net: false,
         tls: false,
         child_process: false,
+        // MongoDB driver specific fallbacks
+        dns: false,
+        crypto: false,
+        stream: false,
+        http: false,
+        https: false,
+        url: false,
+        assert: false,
+        util: false,
+        zlib: false,
+        "timers/promises": false,
       };
     }
     return config;

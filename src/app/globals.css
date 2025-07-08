@@ -79,6 +79,8 @@
     --deliverable-other: 220 9% 46%; /* gray-500 */
     --deliverable-deadline: 0 74% 50%; /* red-600 */
     --deliverable-release: 263 70% 58%; /* violet-600 */
+    --deliverable-deadline-scheduled: 142 76% 36%; /* green-600 - scheduled deadline */
+    --deliverable-release-scheduled: 142 69% 58%; /* green-500 - scheduled release */
 
     /* Calendar Status Colors */
     --status-not-started: var(--destructive);
@@ -240,8 +242,8 @@ body.landing-page {
   display: flex;
   flex-direction: column;
   flex: 1 0 0;
-  overflow: hidden;
-  min-height: 180px;
+  overflow: visible; /* Allow events to display and rows to grow */
+  min-height: 180px; /* Balanced height for more events while maintaining usability */
   @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
 }
 
@@ -254,6 +256,7 @@ body.landing-page {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  min-height: 300px;
 }
 
 .rbc-row {
@@ -271,7 +274,7 @@ body.landing-page {
 .rbc-row-bg {
   display: flex;
   flex: 1 0 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .rbc-day-bg {
@@ -632,12 +635,12 @@ body.landing-page {
 }
 
 .events-calendar .rbc-event {
-  min-height: 22px !important;
-  margin: 0 0 2px 0 !important;
-  padding: 2px 4px !important;
-  border-radius: 4px !important;
-  font-size: 0.8125rem !important;
-  line-height: 1.2 !important;
+  min-height: 18px !important;
+  margin: 0 0 1px 0 !important;
+  padding: 1px 3px !important;
+  border-radius: 3px !important;
+  font-size: 0.7rem !important;
+  line-height: 1 !important;
   border: none !important;
   color: white !important;
   opacity: 0.9 !important;
@@ -653,11 +656,11 @@ body.landing-page {
 }
 
 .events-calendar .rbc-event-content {
-  padding: 2px 4px !important;
+  padding: 1px 3px !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  height: 20px !important;
+  height: 18px !important;
   font-weight: 500;
 }
 
@@ -668,19 +671,70 @@ body.landing-page {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5) !important;
 }
 
-/* Month row height optimization */
+/* Month row optimization - balanced height for more events while maintaining drag/drop */
 .events-calendar .rbc-month-row {
-  min-height: 180px;
+  min-height: 180px; /* Balanced: enough space for ~8-10 events while keeping cells reasonable */
+  overflow: visible; /* Let rows grow if needed */
 }
 
 .events-calendar .rbc-row-content {
   margin-top: 4px;
+  min-height: 160px; /* Give content area breathing room for event calculations */
 }
 
 /* Date cell optimization */
 .events-calendar .rbc-date-cell {
   padding: 1px 2px;
   font-size: 0.75rem;
+}
+
+/* Calendar layout fixes - balanced approach for events and drag/drop */
+
+/* Optimize event spacing within taller cells */
+.events-calendar .rbc-event {
+  margin: 1px 0; /* Slight spacing between events */
+  min-height: 18px; /* Compact events to fit more */
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+/* Ensure drag handles work properly */
+.events-calendar .rbc-addons-dnd .rbc-event {
+  cursor: grab;
+}
+
+.events-calendar .rbc-addons-dnd .rbc-event:active {
+  cursor: grabbing;
+}
+
+/* Show more link styling - appears after ~10-15 events */
+.events-calendar .rbc-show-more {
+  display: block;
+  font-size: 0.7rem;
+  padding: 2px 4px;
+  margin: 2px 0;
+  background-color: hsl(var(--muted) / 0.3);
+  border-radius: 2px;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.events-calendar .rbc-show-more:hover {
+  background-color: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+}
+
+/* Ensure drag and drop zones work properly */
+.events-calendar .rbc-day-bg {
+  /* Day backgrounds should accept drops */
+  position: relative;
+}
+
+.events-calendar .rbc-events-container {
+  /* Event containers should be positioned for proper drag/drop */
+  position: relative;
+  z-index: 2;
 }
 
 /* Make sure the calendar container takes up available space */
@@ -709,19 +763,6 @@ body.landing-page {
   display: flex;
   flex-direction: column;
   min-height: 600px;
-}
-
-/* Ensure month rows expand proportionally */
-.events-calendar .rbc-month-row {
-  flex: 1 0 0;
-  min-height: 180px;
-}
-
-/* Ensure the content area expands properly */
-.events-calendar .rbc-row-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
 }
 
 /* Week view events styling */

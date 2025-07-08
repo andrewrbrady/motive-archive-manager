@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/navbar";
 import { PlusIcon, TrashIcon } from "lucide-react";
 import Papa from "papaparse";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "@/components/ui/use-toast";
 
 interface LocationPair {
   key: string;
@@ -25,6 +27,7 @@ interface CSVRow {
 
 const AddAssetPage: React.FC = () => {
   const router = useRouter();
+  const api = useAPI();
   const [name, setName] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [locations, setLocations] = useState<LocationPair[]>([
@@ -136,33 +139,38 @@ const AddAssetPage: React.FC = () => {
   };
 
   const handleAssetSubmit = async (asset: Asset) => {
-    const response = await fetch("/api/assets", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(asset),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to add asset");
+    if (!api) {
+      throw new Error("Authentication required to add asset");
     }
 
-    return response.json();
+    const response = await api.post("/assets", asset);
+    return response;
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (!api) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to add assets",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     setError("");
 
-    const locationObject = locations.reduce((acc, { key, value }) => {
-      if (key.trim() !== "") {
-        acc[key.trim()] = value.trim();
-      }
-      return acc;
-    }, {} as { [key: string]: string });
+    const locationObject = locations.reduce(
+      (acc, { key, value }) => {
+        if (key.trim() !== "") {
+          acc[key.trim()] = value.trim();
+        }
+        return acc;
+      },
+      {} as { [key: string]: string }
+    );
 
     const asset: Asset = {
       name,
@@ -172,13 +180,37 @@ const AddAssetPage: React.FC = () => {
 
     try {
       await handleAssetSubmit(asset);
+      toast({
+        title: "Success",
+        description: "Asset added successfully",
+      });
       router.push("/raw");
-    } catch {
-      setError("An unexpected error occurred");
+    } catch (error: any) {
+      console.error("Error adding asset:", error);
+      setError(error.message || "An unexpected error occurred");
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add asset",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
+
+  if (!api) {
+    return (
+      <>
+        <Navbar />
+        <div className="container mx-auto px-4 py-24">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold mb-6">Authentication Required</h1>
+            <p className="text-muted-foreground">Please log in to add assets</p>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

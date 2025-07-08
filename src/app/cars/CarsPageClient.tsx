@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useAPI } from "@/hooks/useAPI";
 
 // Interface for client data with string IDs instead of ObjectIds
 export interface ClientWithStringId {
@@ -109,6 +110,9 @@ export default function CarsPageClient({
   const [clients, setClients] = useState<ClientWithStringId[]>(initialClients);
   const [isLoading, setIsLoading] = useState(shouldFetchData);
   const [isDataLoading, setIsDataLoading] = useState(false); // Separate loading state for data only
+
+  // Authentication
+  const api = useAPI();
 
   // State for inline filters
   const [searchQuery, setSearchQuery] = useState(filters.search || "");
@@ -209,7 +213,7 @@ export default function CarsPageClient({
 
   // Fetch data on client side if needed
   useEffect(() => {
-    if (!shouldFetchData) return;
+    if (!shouldFetchData || !api) return;
 
     const fetchData = async () => {
       // Only show full loading on initial load (when we have no cars)
@@ -239,92 +243,105 @@ export default function CarsPageClient({
         if (debouncedMinYear) queryParams.set("minYear", debouncedMinYear);
         if (debouncedMaxYear) queryParams.set("maxYear", debouncedMaxYear);
 
-        // Fetch cars, makes, and clients in parallel
+        // Fetch cars, makes, and clients in parallel using authenticated API
+        console.log("🔍 Making API calls:", {
+          carsURL: `cars?${queryParams.toString()}`,
+          makesURL: "cars/makes",
+          clientsURL: "clients",
+        });
+
         const [carsResponse, makesResponse, clientsResponse] =
           await Promise.all([
-            fetch(`/api/cars/simple?${queryParams.toString()}`),
-            fetch("/api/cars/makes"),
-            fetch("/api/clients"),
+            api.get(`cars?${queryParams.toString()}`),
+            api.get("cars/makes"),
+            api.get("clients"),
           ]);
 
-        if (carsResponse.ok) {
-          const carsData = await carsResponse.json();
-          const carsArray = carsData.cars || [];
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ API calls completed successfully");
 
-          // Ensure all cars have valid _id fields and filter out any duplicates
-          const validCars = carsArray
-            .filter((car: any) => car && car._id)
-            .map((car: any, index: number) => ({
+        // Process cars data
+        const carsData = carsResponse as any;
+        const carsArray = carsData.cars || [];
+
+        // Ensure all cars have valid _id fields and filter out any duplicates
+        const validCars = carsArray
+          .filter((car: any) => car && car._id)
+          .map((car: any, index: number) => ({
+            ...car,
+            _id: car._id.toString(),
+            // Add fallback ID if _id is somehow invalid
+            uniqueKey: car._id?.toString() || `car-${index}-${Date.now()}`,
+          }));
+
+        setCars(validCars);
+        setTotalPages(carsData.pagination?.totalPages || 1);
+        setTotalCount(carsData.pagination?.totalCount || 0);
+
+        // Debug logging to help identify key issues
+        if (process.env.NODE_ENV !== "production") {
+          console.log("CarsPageClient: Cars loaded:", {
+            count: validCars.length,
+            hasValidIds: validCars.every((car: any) => car._id),
+            uniqueIds:
+              new Set(validCars.map((car: any) => car._id)).size ===
+              validCars.length,
+            sampleIds: validCars.slice(0, 3).map((car: any) => car._id),
+          });
+        }
+
+        // Process makes data
+        const makesData = makesResponse as any;
+        const makesArray = makesData.makes || [];
+
+        // Debug logging for makes
+        if (process.env.NODE_ENV !== "production") {
+          console.log("CarsPageClient: Makes loaded:", {
+            count: makesArray.length,
+            hasValidIds: makesArray.every((make: any) => make._id),
+            hasValidNames: makesArray.every((make: any) => make.name),
+            uniqueIds:
+              new Set(makesArray.map((make: any) => make._id)).size ===
+              makesArray.length,
+            uniqueNames:
+              new Set(makesArray.map((make: any) => make.name)).size ===
+              makesArray.length,
+            sampleMakes: makesArray
+              .slice(0, 3)
+              .map((make: any) => ({ id: make._id, name: make.name })),
+          });
+        }
+
+        setMakes(makesArray);
+
+        // Process clients data
+        const clientsData = clientsResponse as any;
+        // Format clients data
+        const formattedClients = (clientsData.clients || []).map(
+          (client: any) => ({
+            ...client,
+            _id: client._id.toString(),
+            primaryContactId: client.primaryContactId?.toString(),
+            documents: (client.documents || []).map((doc: any) => ({
+              ...doc,
+              _id: doc._id.toString(),
+            })),
+            cars: (client.cars || []).map((car: any) => ({
               ...car,
               _id: car._id.toString(),
-              // Add fallback ID if _id is somehow invalid
-              uniqueKey: car._id?.toString() || `car-${index}-${Date.now()}`,
-            }));
-
-          setCars(validCars);
-          setTotalPages(carsData.pagination?.totalPages || 1);
-          setTotalCount(carsData.pagination?.totalCount || 0);
-
-          // Debug logging to help identify key issues
-          if (process.env.NODE_ENV !== "production") {
-            console.log("CarsPageClient: Cars loaded:", {
-              count: validCars.length,
-              hasValidIds: validCars.every((car: any) => car._id),
-              uniqueIds:
-                new Set(validCars.map((car: any) => car._id)).size ===
-                validCars.length,
-              sampleIds: validCars.slice(0, 3).map((car: any) => car._id),
-            });
-          }
-        }
-
-        if (makesResponse.ok) {
-          const makesData = await makesResponse.json();
-          const makesArray = makesData.makes || [];
-
-          // Debug logging for makes
-          if (process.env.NODE_ENV !== "production") {
-            console.log("CarsPageClient: Makes loaded:", {
-              count: makesArray.length,
-              hasValidIds: makesArray.every((make: any) => make._id),
-              hasValidNames: makesArray.every((make: any) => make.name),
-              uniqueIds:
-                new Set(makesArray.map((make: any) => make._id)).size ===
-                makesArray.length,
-              uniqueNames:
-                new Set(makesArray.map((make: any) => make.name)).size ===
-                makesArray.length,
-              sampleMakes: makesArray
-                .slice(0, 3)
-                .map((make: any) => ({ id: make._id, name: make.name })),
-            });
-          }
-
-          setMakes(makesArray);
-        }
-
-        if (clientsResponse.ok) {
-          const clientsData = await clientsResponse.json();
-          // Format clients data
-          const formattedClients = (clientsData.clients || []).map(
-            (client: any) => ({
-              ...client,
-              _id: client._id.toString(),
-              primaryContactId: client.primaryContactId?.toString(),
-              documents: (client.documents || []).map((doc: any) => ({
-                ...doc,
-                _id: doc._id.toString(),
-              })),
-              cars: (client.cars || []).map((car: any) => ({
-                ...car,
-                _id: car._id.toString(),
-              })),
-            })
-          );
-          setClients(formattedClients);
-        }
+            })),
+          })
+        );
+        setClients(formattedClients);
       } catch (error) {
         console.error("Error fetching data:", error);
+        console.error("Error details:", {
+          message: error instanceof Error ? error.message : "Unknown error",
+          stack: error instanceof Error ? error.stack : "No stack trace",
+          errorType: typeof error,
+          errorConstructor: error?.constructor?.name,
+          stringified: JSON.stringify(error),
+          errorKeys: error ? Object.keys(error) : [],
+        });
       } finally {
         setIsLoading(false);
         setIsDataLoading(false);
@@ -334,6 +351,7 @@ export default function CarsPageClient({
     fetchData();
   }, [
     shouldFetchData,
+    api,
     currentPage,
     pageSize,
     filters,
@@ -343,6 +361,17 @@ export default function CarsPageClient({
     debouncedMinYear,
     debouncedMaxYear,
   ]);
+
+  // Show loading state if not authenticated yet
+  if (shouldFetchData && !api) {
+    return (
+      <CarsErrorBoundary>
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <LoadingSpinner size="lg" />
+        </div>
+      </CarsErrorBoundary>
+    );
+  }
 
   // Build the current search params string
   const currentSearchParams = new URLSearchParams({

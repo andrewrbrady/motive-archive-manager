@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import NewMakeDialog from "@/components/makes/NewMakeDialog";
+import { useAPI } from "@/hooks/useAPI";
 
 interface MakesPageClientProps {
   makes: Make[];
@@ -25,21 +26,18 @@ interface MakesPageClientProps {
 export default function MakesPageClient({
   makes: initialMakes,
 }: MakesPageClientProps) {
+  const api = useAPI();
   const [makes, setMakes] = useState(initialMakes);
   const [isNewMakeDialogOpen, setIsNewMakeDialogOpen] = useState(false);
   const router = useRouter();
+
+  if (!api) return <div>Loading...</div>;
 
   const handleDelete = async (makeId: string) => {
     if (!confirm("Are you sure you want to delete this make?")) return;
 
     try {
-      const response = await fetch(`/api/makes?id=${makeId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete make");
-      }
+      await api.delete(`makes?id=${makeId}`);
 
       setMakes(makes.filter((make) => make._id !== makeId));
       toast.success("Make deleted successfully");
@@ -52,19 +50,8 @@ export default function MakesPageClient({
 
   const handleCreate = async (newMake: Partial<Make>) => {
     try {
-      const response = await fetch("/api/makes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newMake),
-      });
+      const createdMake = (await api.post("makes", newMake)) as Make;
 
-      if (!response.ok) {
-        throw new Error("Failed to create make");
-      }
-
-      const createdMake = await response.json();
       setMakes([...makes, createdMake]);
       setIsNewMakeDialogOpen(false);
       toast.success("Make created successfully");

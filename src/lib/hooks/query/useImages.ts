@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { QueryClient } from "@tanstack/react-query";
 import { getFormattedImageUrl, getPlaceholderImageUrl } from "@/lib/cloudflare";
+import { api } from "@/lib/api-client";
 
 export interface ImageMetadata {
   angle?: string;
@@ -70,13 +71,9 @@ export function useCarImages(carId: string) {
     queryFn: async () => {
       try {
         // Use only the dedicated images endpoint with pagination
-        const response = await fetch(`/api/cars/${carId}/images?limit=500`);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch images: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await api.get<{ images: any[] }>(
+          `/cars/${carId}/images?limit=500`
+        );
 
         // If we have images from the images endpoint, return them
         if (
@@ -134,11 +131,11 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("files", file);
         formData.append("carId", carId);
 
         if (vehicleInfo) {
-          formData.append("vehicleInfo", JSON.stringify(vehicleInfo));
+          formData.append("metadata", JSON.stringify(vehicleInfo));
         }
 
         // Create progress tracking object with detailed step tracking
@@ -166,26 +163,70 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
         }
 
         try {
-          const response = await fetch(`/api/cloudflare/images`, {
+          const response = await fetch("/api/images/upload", {
             method: "POST",
             body: formData,
           });
 
           if (!response.ok) {
-            throw new Error(`Upload failed: ${response.status}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(
+              errorData.error || `Upload failed: ${response.statusText}`
+            );
           }
 
-          const result = await response.json();
+          const data = await response.json();
 
-          // Add the new image to our uploadedImages array
-          uploadedImages.push(result.image);
+          if (!data.success || !data.images || data.images.length === 0) {
+            throw new Error(
+              data.error || "No images were uploaded successfully"
+            );
+          }
+
+          const uploadedImage = data.images[0];
+          let imageUrl = uploadedImage.url;
+
+          if (
+            imageUrl &&
+            imageUrl.includes("imagedelivery.net") &&
+            !imageUrl.match(
+              /\/(public|thumbnail|avatar|medium|large|webp|preview|original|w=\d+)$/
+            )
+          ) {
+            imageUrl = `${imageUrl}/w=200,h=200,fit=cover`;
+          }
+
+          // Create ImageType object matching expected format
+          const processedImage: ImageType = {
+            id: uploadedImage._id || uploadedImage.id,
+            url: imageUrl,
+            filename: uploadedImage.filename || file.name,
+            metadata: uploadedImage.metadata || {},
+            variants: uploadedImage.variants || {},
+            createdAt: uploadedImage.createdAt || new Date().toISOString(),
+            updatedAt: uploadedImage.updatedAt || new Date().toISOString(),
+          };
+
+          uploadedImages.push(processedImage);
 
           progress[i] = {
             ...progress[i],
             progress: 100,
             status: "complete",
-            imageUrl: result.image.url,
-            metadata: result.image.metadata,
+            imageUrl: imageUrl,
+            metadata: processedImage.metadata,
+            stepProgress: {
+              cloudflare: {
+                status: "complete",
+                progress: 100,
+                message: "Upload complete",
+              },
+              openai: {
+                status: "complete",
+                progress: 100,
+                message: "Analysis complete",
+              },
+            },
           };
 
           if (onProgress) {
@@ -197,6 +238,18 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
             ...progress[i],
             status: "error",
             error: error instanceof Error ? error.message : "Upload failed",
+            stepProgress: {
+              cloudflare: {
+                status: "error",
+                progress: 0,
+                message: "Upload failed",
+              },
+              openai: {
+                status: "error",
+                progress: 0,
+                message: "Analysis failed",
+              },
+            },
           };
           if (onProgress) {
             onProgress([...progress]);
@@ -208,11 +261,9 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
       return uploadedImages;
     },
     onSuccess: (newImages) => {
-      // Update the cache with the new images
       queryClient.setQueryData(
         ["carImages", carId],
         (old: ImageType[] = []) => {
-          // Filter out any duplicates and merge with existing images
           const existingIds = new Set(old.map((img) => img.id));
           const uniqueNewImages = newImages.filter(
             (img) => !existingIds.has(img.id)
@@ -239,7 +290,7 @@ export const useDeleteImages = (carId: string, queryClient: QueryClient) => {
       cloudflareIds?: string[];
       deleteFromStorage?: boolean;
     }) => {
-      // [REMOVED] // [REMOVED] console.log(`Deleting ${imageIds.length} images (MongoDB IDs)`, imageIds);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Deleting ${imageIds.length} images (MongoDB IDs)`, imageIds);
 
       // If cloudflareIds array is empty, use the imageIds array as-is
       // If it's provided, use that specific array for deletion from storage
@@ -268,49 +319,23 @@ export const useDeleteImages = (carId: string, queryClient: QueryClient) => {
           isUserInitiated: true,
         };
 
-        // [REMOVED] // [REMOVED] console.log("Sending deletion payload:", payload);
-
-        // Use a timeout to prevent hanging requests
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Sending deletion payload:", payload);
 
         try {
-          // Attempt to delete using the cars API endpoint
-          const response = await fetch(
-            `/api/cars/${carId}/images?t=${timestamp}&cb=${cacheBuster}`,
+          // Use the API client for authenticated deletion
+          const data = await api.deleteWithBody(
+            `/cars/${carId}/images?t=${timestamp}&cb=${cacheBuster}`,
+            payload,
             {
-              method: "DELETE",
               headers: {
-                "Content-Type": "application/json",
                 "X-User-Initiated": "true",
                 "X-Request-Time": timestamp.toString(),
                 "X-Request-ID": batchId,
               },
-              body: JSON.stringify(payload),
-              signal: controller.signal,
             }
           );
 
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            console.error("Error deleting images:", {
-              status: response.status,
-              statusText: response.statusText,
-              data: errorData,
-            });
-
-            throw new Error(
-              `Failed to delete images (${response.status}): ${
-                errorData.error || response.statusText
-              }`
-            );
-          }
-
-          // Parse response
-          const data = await response.json();
-          // [REMOVED] // [REMOVED] console.log("Delete successful:", data);
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Delete successful:", data);
           return data;
         } catch (error) {
           console.error("Error in delete operation:", error);
@@ -368,22 +393,9 @@ export function useSetPrimaryImage(carId: string) {
 
   return useMutation({
     mutationFn: async (imageId: string) => {
-      const response = await fetch(`/api/cars/${carId}/thumbnail`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          primaryImageId: imageId,
-        }),
+      return await api.put(`/cars/${carId}/thumbnail`, {
+        primaryImageId: imageId,
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to set primary image");
-      }
-
-      return await response.json();
     },
     onSuccess: () => {
       // Invalidate car query to update the primary image

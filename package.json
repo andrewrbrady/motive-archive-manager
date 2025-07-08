@@ -8,11 +8,10 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "npm run build:cpp && next build",
-    "build:cpp": "./build-cpp.sh",
+    "build": "next build",
     "build:safe": "npm run check:console-logs && next build",
     "build:production": "npm run fix:console-logs && next build",
-    "start": "node start-server.js",
+    "start": "node scripts/start-server.js",
     "start:next": "next start",
     "start:standalone": "node .next/standalone/server.js",
     "check-env": "node scripts/check-env.js",
@@ -55,7 +54,10 @@
     "cleanup-users": "tsx src/scripts/cleanup-mongodb-refs.ts",
     "migrate:string-to-objectids": "node scripts/migrate-string-ids-to-objectids.js",
     "migrate:string-to-objectids:dry-run": "node scripts/migrate-string-ids-to-objectids.js --dry-run",
-    "migrate:cloudflare-images": "tsx scripts/migrate-to-cloudflare-images.ts"
+    "migrate:cloudflare-images": "tsx scripts/migrate-to-cloudflare-images.ts",
+    "debug:run": "tsx",
+    "debug:node": "node --loader ts-node/esm",
+    "debug:cjs": "node"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.36.3",
@@ -83,6 +85,7 @@
     "@radix-ui/react-accordion": "^1.2.10",
     "@radix-ui/react-alert-dialog": "^1.1.4",
     "@radix-ui/react-avatar": "^1.1.3",
+    "@radix-ui/react-collapsible": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.7",
     "@radix-ui/react-dropdown-menu": "^2.1.7",
     "@radix-ui/react-form": "^0.1.2",
@@ -103,6 +106,8 @@
     "@radix-ui/react-toggle": "1.1.2",
     "@radix-ui/react-toggle-group": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.8",
+    "@react-email/components": "^0.0.27",
+    "@react-email/render": "^1.0.1",
     "@sendgrid/mail": "^8.1.4",
     "@shadcn/ui": "^0.0.4",
     "@tanstack/react-query": "^5.70.0",

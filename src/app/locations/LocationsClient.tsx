@@ -13,6 +13,7 @@ import { LoadingSpinner } from "@/components/ui/loading";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { FilterContainer } from "@/components/ui/FilterContainer";
 import { ListContainer } from "@/components/ui/ListContainer";
+import { useAPI } from "@/hooks/useAPI";
 
 interface LocationsClientProps {
   initialLocations?: Location[];
@@ -21,6 +22,7 @@ interface LocationsClientProps {
 export default function LocationsClient({
   initialLocations,
 }: LocationsClientProps) {
+  const api = useAPI();
   const [locations, setLocations] = useState<LocationResponse[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<
     LocationResponse[]
@@ -34,8 +36,10 @@ export default function LocationsClient({
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    fetchLocations();
-  }, []);
+    if (api) {
+      fetchLocations();
+    }
+  }, [api]);
 
   useEffect(() => {
     filterLocations();
@@ -64,11 +68,11 @@ export default function LocationsClient({
   };
 
   const fetchLocations = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
+      const data = (await api.get("locations")) as LocationResponse[];
       setLocations(data);
       setFilteredLocations(data);
     } catch (error) {
@@ -81,17 +85,13 @@ export default function LocationsClient({
   const handleAddLocation = async (
     newLocation: Omit<LocationResponse, "id" | "createdAt" | "updatedAt">
   ) => {
-    try {
-      const response = await fetch("/api/locations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newLocation),
-      });
+    if (!api) return;
 
-      if (!response.ok) throw new Error("Failed to add location");
-      const data = await response.json();
+    try {
+      const data = (await api.post(
+        "locations",
+        newLocation
+      )) as LocationResponse;
       setLocations([...locations, data]);
       setIsAddModalOpen(false);
     } catch (error) {
@@ -100,17 +100,13 @@ export default function LocationsClient({
   };
 
   const handleEditLocation = async (updatedLocation: LocationResponse) => {
-    try {
-      const response = await fetch(`/api/locations/${updatedLocation.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedLocation),
-      });
+    if (!api) return;
 
-      if (!response.ok) throw new Error("Failed to update location");
-      const data = await response.json();
+    try {
+      const data = (await api.put(
+        `locations/${updatedLocation.id}`,
+        updatedLocation
+      )) as LocationResponse;
 
       setLocations(
         locations.map((location) => (location.id === data.id ? data : location))
@@ -124,14 +120,10 @@ export default function LocationsClient({
   };
 
   const handleDeleteLocation = async () => {
-    if (!selectedLocation) return;
+    if (!selectedLocation || !api) return;
 
     try {
-      const response = await fetch(`/api/locations/${selectedLocation.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) throw new Error("Failed to delete location");
+      await api.delete(`locations/${selectedLocation.id}`);
 
       setLocations(
         locations.filter((location) => location.id !== selectedLocation.id)

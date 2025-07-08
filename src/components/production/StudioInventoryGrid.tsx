@@ -26,6 +26,8 @@ import { useToast } from "@/components/ui/use-toast";
 import EditInventoryItemModal from "./EditInventoryItemModal";
 import { BatchImageUploadModal } from "./BatchImageUploadModal";
 import { uploadToCloudflare } from "@/lib/cloudflare";
+import { useSession } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
 
 interface StudioInventoryGridProps {
   items: StudioInventoryItem[];
@@ -48,6 +50,8 @@ export default function StudioInventoryGrid({
   isSelectionMode,
   isEditMode,
 }: StudioInventoryGridProps) {
+  const { data: session, status } = useSession();
+  const api = useAPI();
   const { toast } = useToast();
   const [draggedOverItem, setDraggedOverItem] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -67,9 +71,11 @@ export default function StudioInventoryGrid({
 
   // Fetch locations when component mounts
   useEffect(() => {
-    fetchLocations();
-    fetchContainers();
-  }, []);
+    if (status === "authenticated" && session?.user && api) {
+      fetchLocations();
+      fetchContainers();
+    }
+  }, [status, session, api]);
 
   // Reset edited items when edit mode changes
   useEffect(() => {
@@ -79,10 +85,10 @@ export default function StudioInventoryGrid({
   }, [isEditMode]);
 
   const fetchLocations = async () => {
+    if (!api) return;
+
     try {
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
+      const data = (await api.get("/locations")) as any[];
 
       // Convert array to record for easy lookup
       const locationsRecord: Record<string, any> = {};
@@ -97,10 +103,10 @@ export default function StudioInventoryGrid({
   };
 
   const fetchContainers = async () => {
+    if (!api) return;
+
     try {
-      const response = await fetch("/api/containers");
-      if (!response.ok) throw new Error("Failed to fetch containers");
-      const data = await response.json();
+      const data = (await api.get("/containers")) as any[];
       setContainers(data);
     } catch (error) {
       console.error("Error fetching containers:", error);
@@ -149,6 +155,15 @@ export default function StudioInventoryGrid({
   );
 
   const handleSaveAllEdits = async () => {
+    if (!api) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to save changes",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSaving(true);
     const itemsToUpdate = Object.keys(editedItems);
 
@@ -173,16 +188,9 @@ export default function StudioInventoryGrid({
             ...editedItems[id],
           };
 
-          return fetch(`/api/studio_inventory/${id}`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(updatedItem),
-          }).then((response) => {
-            if (!response.ok) throw new Error(`Failed to update item ${id}`);
-            return updatedItem;
-          });
+          return api
+            .put(`/studio_inventory/${id}`, updatedItem)
+            .then(() => updatedItem);
         })
         .filter(Boolean);
 
@@ -288,7 +296,7 @@ export default function StudioInventoryGrid({
 
         // Use the uploadToCloudflare function instead of direct fetch
         const result = await uploadToCloudflare(imageFile);
-        // [REMOVED] // [REMOVED] console.log("Upload success response:", result);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Upload success response:", result);
 
         // Use the image URL from the result
         const imageUrl = result.url;
@@ -438,11 +446,11 @@ export default function StudioInventoryGrid({
                   isSelectionMode
                     ? () => toggleItemSelection(item.id)
                     : isEditMode
-                    ? () => {
-                        setCurrentDragItem(item);
-                        fileInputRef.current?.click(); // Open file dialog on click
-                      }
-                    : undefined
+                      ? () => {
+                          setCurrentDragItem(item);
+                          fileInputRef.current?.click(); // Open file dialog on click
+                        }
+                      : undefined
                 }
                 onDragOver={(e) => isEditMode && handleDragOver(e, item)}
                 onDragEnter={(e) => isEditMode && handleDragEnter(e, item)}

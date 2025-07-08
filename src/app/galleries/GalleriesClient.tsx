@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+  startTransition,
+} from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   useGalleries,
@@ -41,11 +48,16 @@ import { PageTitle } from "@/components/ui/PageTitle";
 import LazyImage from "@/components/LazyImage";
 import Pagination from "@/components/ui/pagination";
 import { useDebounce } from "use-debounce";
+import { CloudflareImage } from "@/components/ui/CloudflareImage";
 
 export default function GalleriesClient() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  // Add mounted ref for cleanup guard - initialize as false, set to true in useEffect
+  const mounted = useRef(false);
+  const debouncedSearchRef = useRef<any>(null);
 
   // Extract search params or use defaults
   const page = Number(searchParams?.get("page") || "1");
@@ -61,6 +73,18 @@ export default function GalleriesClient() {
 
   // Zoom control state with localStorage persistence
   const [zoomLevel, setZoomLevel] = useState(3); // Always start with default
+
+  // Mounted ref cleanup - CRITICAL: Set mounted to true only after component mounts
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      // Cancel any pending debounced operations immediately
+      if (debouncedSearchRef.current?.cancel) {
+        debouncedSearchRef.current.cancel();
+      }
+    };
+  }, []);
 
   // Load zoom level from localStorage after hydration
   useEffect(() => {
@@ -116,25 +140,79 @@ export default function GalleriesClient() {
     description: "",
   });
 
-  // Handle search with debounce
-  const [debouncedSetSearch] = useDebounce((value: string) => {
-    const params = new URLSearchParams(searchParams?.toString() || "");
-    params.set("page", "1"); // Reset to first page on new search
+  // Handle search with debounce - ENHANCED MOUNTED CHECK
+  const [debouncedSetSearch, debouncedSetSearchState] = useDebounce(
+    useCallback(
+      (value: string) => {
+        // DOUBLE CHECK: Component must be mounted AND React must allow updates
+        if (!mounted.current) {
+          console.log(
+            "🛡️ Preventing debounced search update - component unmounted"
+          );
+          return;
+        }
 
-    if (value) {
-      params.set("search", value);
-    } else {
-      params.delete("search");
+        try {
+          const params = new URLSearchParams(searchParams?.toString() || "");
+          params.set("page", "1"); // Reset to first page on new search
+
+          if (value) {
+            params.set("search", value);
+          } else {
+            params.delete("search");
+          }
+
+          router.push(`${pathname}?${params.toString()}`, { scroll: false });
+        } catch (error) {
+          console.warn(
+            "🛡️ Router navigation failed (component may be unmounted):",
+            error
+          );
+        }
+      },
+      [router, pathname, searchParams]
+    ), // Stable dependencies
+    500,
+    {
+      leading: false,
+      trailing: true,
     }
+  );
 
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
-  }, 500);
+  // Store the debounced function reference for cleanup
+  useEffect(() => {
+    debouncedSearchRef.current = { cancel: debouncedSetSearchState.cancel };
 
-  // Handle search input
-  const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchInput(e.target.value);
-    debouncedSetSearch(e.target.value);
-  };
+    // Additional cleanup - cancel any pending operations when dependencies change
+    return () => {
+      if (debouncedSetSearchState?.cancel) {
+        debouncedSetSearchState.cancel();
+      }
+    };
+  }, [debouncedSetSearchState]);
+
+  // Handle search input - make it more defensive
+  const handleSearchInput = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      // Check if component is still mounted before any state updates
+      if (!mounted.current) {
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🛡️ Preventing search input update - component unmounted");
+        return;
+      }
+
+      const value = e.target.value;
+
+      // Use startTransition to make this a non-urgent update
+      startTransition(() => {
+        if (mounted.current) {
+          setSearchInput(value);
+        }
+      });
+
+      debouncedSetSearch(value);
+    },
+    [debouncedSetSearch]
+  );
 
   // Handle pagination
   const handlePageChange = (newPage: number) => {
@@ -216,7 +294,7 @@ export default function GalleriesClient() {
     <div className="min-h-screen bg-background">
       <main className="container-wide px-6 py-8">
         <div className="space-y-6 sm:space-y-8">
-          <PageTitle title="Galleries" count={data?.pagination.total} />
+          <PageTitle title="Galleries" count={data?.pagination?.total} />
 
           <div className="space-y-4">
             {/* Search and Controls Row */}
@@ -370,7 +448,7 @@ export default function GalleriesClient() {
           ) : data?.galleries && data.galleries.length > 0 ? (
             <>
               <div className={getGridClasses()}>
-                {data.galleries.map((gallery) => (
+                {data.galleries.map((gallery, index) => (
                   <div
                     key={gallery._id}
                     className="group relative bg-card border rounded-lg overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer"
@@ -378,11 +456,16 @@ export default function GalleriesClient() {
                   >
                     {/* Gallery Image */}
                     <div className="aspect-video bg-muted relative overflow-hidden">
-                      {gallery.thumbnailImage ? (
-                        <LazyImage
+                      {gallery.thumbnailImage?.url ? (
+                        <CloudflareImage
                           src={gallery.thumbnailImage.url}
                           alt={gallery.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          fill
+                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                          className="object-cover group-hover:scale-105 transition-transform duration-200"
+                          priority={index < 8}
+                          isAboveFold={index < 8}
+                          showError={true}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-muted">
@@ -455,27 +538,30 @@ export default function GalleriesClient() {
               </div>
 
               {/* Pagination */}
-              {data.pagination && data.pagination.pages > 1 && (
+              {data?.pagination && data.pagination.pages > 1 && (
                 <div className="mt-8 space-y-4">
                   {/* Pagination Info */}
                   <div className="flex justify-center">
                     <p className="text-sm text-muted-foreground">
                       Showing{" "}
-                      {(data.pagination.page - 1) * data.pagination.limit + 1}{" "}
+                      {((data.pagination?.page ?? 1) - 1) *
+                        (data.pagination?.limit ?? 20) +
+                        1}{" "}
                       to{" "}
                       {Math.min(
-                        data.pagination.page * data.pagination.limit,
-                        data.pagination.total
+                        (data.pagination?.page ?? 1) *
+                          (data.pagination?.limit ?? 20),
+                        data.pagination?.total ?? 0
                       )}{" "}
-                      of {data.pagination.total} galleries
+                      of {data.pagination?.total ?? 0} galleries
                     </p>
                   </div>
 
                   {/* Pagination Controls */}
                   <Pagination
                     className="flex justify-center"
-                    currentPage={data.pagination.page}
-                    totalPages={data.pagination.pages}
+                    currentPage={data.pagination?.page ?? 1}
+                    totalPages={data.pagination?.pages ?? 1}
                     onPageChange={handlePageChange}
                   />
                 </div>

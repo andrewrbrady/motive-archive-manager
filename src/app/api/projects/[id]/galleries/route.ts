@@ -16,12 +16,12 @@ export async function GET(
   request: NextRequest,
   { params }: ProjectGalleriesRouteParams
 ) {
-  console.log("🔒 GET /api/projects/[id]/galleries: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/projects/[id]/galleries: Starting request");
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
   if (authResult) {
-    console.log("❌ GET /api/projects/[id]/galleries: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ GET /api/projects/[id]/galleries: Authentication failed");
     return authResult;
   }
 
@@ -154,12 +154,12 @@ export async function POST(
   request: NextRequest,
   { params }: ProjectGalleriesRouteParams
 ) {
-  console.log("🔒 POST /api/projects/[id]/galleries: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 POST /api/projects/[id]/galleries: Starting request");
 
   // Check authentication
   const authResult = await verifyAuthMiddleware(request);
   if (authResult) {
-    console.log("❌ POST /api/projects/[id]/galleries: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ POST /api/projects/[id]/galleries: Authentication failed");
     return authResult;
   }
 

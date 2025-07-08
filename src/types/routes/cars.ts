@@ -195,9 +195,9 @@ export interface StandardizedCar {
   specifications?: Car["specifications"];
   features?: string[];
   imageIds: string[];
+  primaryImageId?: string;
   images: Array<{
     _id: string;
-    car_id: string;
     url: string;
     filename: string;
     metadata: ImageMetadata;
@@ -227,6 +227,66 @@ export interface StandardizedCar {
   tags?: string[];
   createdAt: string;
   updatedAt: string;
+  // Additional detailed specifications for copywriter
+  engine?: {
+    type?: string;
+    displacement?: {
+      value: number;
+      unit: string;
+    };
+    power?: {
+      hp: number;
+      kW: number;
+      ps: number;
+    };
+    torque?: {
+      "lb-ft": number;
+      Nm: number;
+    };
+    features?: string[];
+    configuration?: string;
+    cylinders?: number;
+    fuelType?: string;
+    manufacturer?: string;
+  };
+  transmission?: {
+    type: string;
+    speeds?: number;
+  };
+  performance?: {
+    "0_to_60_mph"?: {
+      value: number;
+      unit: string;
+    };
+    top_speed?: {
+      value: number;
+      unit: string;
+    };
+  };
+  interior_features?: {
+    seats?: number;
+    upholstery?: string;
+    features?: string[];
+  };
+  interior_color?: string;
+  condition?: string;
+  location?: string;
+  doors?: number;
+  safety?: {
+    tpms?: {
+      type: string;
+      present: boolean;
+    };
+    [key: string]: any;
+  };
+  type?: string;
+  aiAnalysis?: {
+    [key: string]: {
+      value: string;
+      confidence: "confirmed" | "inferred" | "suggested";
+      source: string;
+    };
+  };
 }
 
 /**

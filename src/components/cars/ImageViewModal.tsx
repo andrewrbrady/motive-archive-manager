@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   X,
   Download,
@@ -19,9 +20,12 @@ import {
   ExternalLink,
   Palette,
   Crop,
+  Search,
+  Filter,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
+import { getEnhancedImageUrl } from "@/lib/imageUtils";
 
 interface ImageViewModalProps {
   isOpen: boolean;
@@ -37,6 +41,231 @@ interface ImageViewModalProps {
 interface ImageDimensions {
   width: number;
   height: number;
+}
+
+// Flexible metadata display component
+function MetadataDisplay({ metadata }: { metadata: any }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+
+  if (!metadata || Object.keys(metadata).length === 0) {
+    return (
+      <div className="text-center text-muted-foreground py-8">
+        No metadata available
+      </div>
+    );
+  }
+
+  const metadataEntries = Object.entries(metadata);
+  const filteredEntries = searchTerm
+    ? metadataEntries.filter(
+        ([key, value]) =>
+          key.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          String(value).toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : metadataEntries;
+
+  const formatValue = (value: any): React.ReactNode => {
+    if (value === null || value === undefined) {
+      return <span className="text-muted-foreground italic">null</span>;
+    }
+
+    if (typeof value === "boolean") {
+      return (
+        <Badge variant={value ? "default" : "secondary"}>
+          {value ? "Yes" : "No"}
+        </Badge>
+      );
+    }
+
+    if (typeof value === "number") {
+      return <span className="font-mono">{value.toLocaleString()}</span>;
+    }
+
+    if (typeof value === "string") {
+      // Handle URLs
+      if (value.startsWith("http")) {
+        return (
+          <a
+            href={value}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-800 underline break-all"
+          >
+            {value}
+          </a>
+        );
+      }
+
+      // Handle very long strings
+      if (value.length > 100) {
+        return (
+          <div className="space-y-2">
+            <div className="bg-muted/50 p-2 rounded text-xs font-mono break-all max-h-32 overflow-y-auto">
+              {value}
+            </div>
+          </div>
+        );
+      }
+
+      return <span className="break-all">{value}</span>;
+    }
+
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        return (
+          <span className="text-muted-foreground italic">Empty array</span>
+        );
+      }
+
+      return (
+        <div className="space-y-1">
+          {value.map((item, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                {index + 1}
+              </Badge>
+              <span className="text-xs">{formatValue(item)}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (typeof value === "object") {
+      return (
+        <div className="bg-muted/50 p-2 rounded text-xs font-mono break-all max-h-32 overflow-y-auto">
+          <pre>{JSON.stringify(value, null, 2)}</pre>
+        </div>
+      );
+    }
+
+    return <span className="break-all">{String(value)}</span>;
+  };
+
+  const formatKey = (key: string): string => {
+    // Convert camelCase/snake_case to Title Case
+    return key
+      .replace(/([A-Z])/g, " $1")
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase())
+      .trim();
+  };
+
+  const getPriorityOrder = (key: string): number => {
+    // Define priority order for common fields
+    const priorities: { [key: string]: number } = {
+      description: 1,
+      category: 2,
+      angle: 3,
+      view: 4,
+      movement: 5,
+      tod: 6,
+      side: 7,
+      primary_subject: 8,
+      content_type: 9,
+      style: 10,
+      usage_context: 11,
+      dominant_colors: 12,
+      has_text: 13,
+      has_brand_elements: 14,
+      width: 15,
+      height: 16,
+      size: 17,
+      format: 18,
+      isPrimary: 100, // Show isPrimary at the end
+    };
+
+    return priorities[key] || 50; // Default priority for unknown fields
+  };
+
+  // Sort entries by priority, then alphabetically
+  const sortedEntries = filteredEntries.sort(([keyA], [keyB]) => {
+    const priorityA = getPriorityOrder(keyA);
+    const priorityB = getPriorityOrder(keyB);
+
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+
+    return keyA.localeCompare(keyB);
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* Search/Filter controls */}
+      {metadataEntries.length > 5 && (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowSearch(!showSearch)}
+            className="h-8"
+          >
+            <Search className="h-4 w-4" />
+          </Button>
+          {showSearch && (
+            <Input
+              placeholder="Search metadata..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-8 text-xs"
+            />
+          )}
+          {searchTerm && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSearchTerm("")}
+              className="h-8"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Metadata entries */}
+      <div className="space-y-3">
+        {sortedEntries.length === 0 ? (
+          <div className="text-center text-muted-foreground py-4">
+            No metadata matches your search
+          </div>
+        ) : (
+          sortedEntries.map(([key, value]) => (
+            <div key={key} className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-xs font-medium">
+                  {formatKey(key)}:
+                </span>
+                {typeof value === "object" && !Array.isArray(value) && (
+                  <Badge variant="outline" className="text-xs">
+                    Object
+                  </Badge>
+                )}
+                {Array.isArray(value) && (
+                  <Badge variant="outline" className="text-xs">
+                    Array ({value.length})
+                  </Badge>
+                )}
+              </div>
+              <div className="bg-muted/50 p-2 rounded text-xs">
+                {formatValue(value)}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Metadata summary */}
+      <div className="pt-2 border-t">
+        <div className="text-xs text-muted-foreground">
+          {filteredEntries.length} of {metadataEntries.length} fields
+          {searchTerm && ` matching "${searchTerm}"`}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function ImageViewModal({
@@ -60,20 +289,9 @@ export function ImageViewModal({
   const hasNext = currentIndex < images.length - 1;
 
   // Helper function to get original full-resolution image URL
+  // Use centralized high-resolution URL transformation
   const getOriginalImageUrl = (url: string) => {
-    // If it's a Cloudflare URL, request maximum resolution
-    if (url.includes("imagedelivery.net")) {
-      // Instead of using /public, use explicit high-resolution parameters
-      // This ensures we get the largest possible version
-      const parts = url.split("/");
-
-      // Replace the last part with high-resolution parameters
-      // w=5000 requests up to 5000px width, q=100 requests maximum quality
-      parts[parts.length - 1] = "w=5000,q=100";
-      return parts.join("/");
-    }
-
-    return url;
+    return getEnhancedImageUrl(url, "3000", "90"); // Maps to highres variant (3000px)
   };
 
   // Get the full-resolution URL for modal display
@@ -96,11 +314,31 @@ export function ImageViewModal({
   const handleCopyUrl = async () => {
     if (!image?.url) return;
     try {
-      await navigator.clipboard.writeText(image.url);
+      // Normalize to medium variant for consistent quality
+      let urlToCopy = image.url;
+
+      if (image.url.includes("imagedelivery.net")) {
+        // Always use medium variant for clipboard copy
+        const urlParts = image.url.split("/");
+        const lastPart = urlParts[urlParts.length - 1];
+
+        // Check if the last part is a variant (alphabetic or has parameters)
+        if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+          // Replace with medium variant
+          urlParts[urlParts.length - 1] = "medium";
+        } else {
+          // No variant specified, append medium
+          urlParts.push("medium");
+        }
+
+        urlToCopy = urlParts.join("/");
+      }
+
+      await navigator.clipboard.writeText(urlToCopy);
       setCopiedUrl(true);
       toast({
         title: "Copied!",
-        description: "Image URL copied to clipboard",
+        description: "Image URL (medium quality) copied to clipboard",
       });
       setTimeout(() => setCopiedUrl(false), 2000);
     } catch (err) {
@@ -287,7 +525,7 @@ export function ImageViewModal({
                 src={fullResImageUrl || image.url}
                 alt={image.filename || "Image"}
                 fill
-                sizes="60vw"
+                sizes="(max-width: 768px) 95vw, (max-width: 1200px) 800px, 1200px"
                 className="object-contain"
               />
             </div>
@@ -332,26 +570,13 @@ export function ImageViewModal({
                 </div>
               </div>
 
-              {/* Metadata */}
+              {/* Flexible Metadata Display */}
               {image.metadata && Object.keys(image.metadata).length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
                     Metadata
                   </h4>
-                  <div className="space-y-3">
-                    {Object.entries(image.metadata).map(([key, value]) => (
-                      <div key={key} className="space-y-1">
-                        <span className="text-muted-foreground capitalize text-xs font-medium">
-                          {key.replace(/([A-Z])/g, " $1").trim()}:
-                        </span>
-                        <div className="bg-muted/50 p-2 rounded text-xs font-mono break-all max-h-32 overflow-y-auto">
-                          {typeof value === "object"
-                            ? JSON.stringify(value, null, 2)
-                            : String(value)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <MetadataDisplay metadata={image.metadata} />
                 </div>
               )}
             </div>

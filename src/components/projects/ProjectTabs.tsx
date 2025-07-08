@@ -9,8 +9,43 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Suspense, lazy, useState, useEffect } from "react";
-import { Project } from "@/types/project";
+import { Project, ProjectTimeline } from "@/types/project";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { Event } from "@/types/event";
+
+// Define types for SSR optimization (compatible with both tab interfaces)
+interface EventCar {
+  _id: string;
+  make: string;
+  model: string;
+  year: number;
+  primaryImageId?: string;
+}
+
+interface ProjectCar {
+  _id: string;
+  make: string;
+  model: string;
+  year?: number;
+  color?: string;
+  vin?: string;
+  status: string;
+  primaryImageId?: string;
+  imageIds?: string[];
+  images?: Array<{
+    _id: string;
+    url: string;
+    metadata?: {
+      isPrimary?: boolean;
+    };
+  }>;
+  createdAt: string;
+}
+
+interface EventWithCar extends Event {
+  car?: EventCar;
+  isAttached?: boolean;
+}
 
 // Lazy load heavy tab components
 const ProjectOverviewTab = lazy(() =>
@@ -42,13 +77,34 @@ const ProjectGalleriesTab = lazy(() =>
     default: m.ProjectGalleriesTab,
   }))
 );
-const ProjectCopywriter = lazy(() =>
-  import("./ProjectCopywriter").then((m) => ({ default: m.ProjectCopywriter }))
+const ProjectImageGallery = lazy(() =>
+  import("./ProjectImageGallery").then((m) => ({
+    default: m.ProjectImageGallery,
+  }))
+);
+const UnifiedCopywriter = lazy(() =>
+  import("../copywriting/UnifiedCopywriter").then((m) => ({
+    default: m.UnifiedCopywriter,
+  }))
 );
 const ProjectEventsTab = lazy(() => import("./ProjectEventsTab"));
 const ProjectCalendarTab = lazy(() =>
   import("./ProjectCalendarTab").then((m) => ({
     default: m.ProjectCalendarTab,
+  }))
+);
+
+// Add AI Chat Tab
+const AIChatTab = lazy(() =>
+  import("../ai-chat/AIChatTab").then((m) => ({
+    default: m.AIChatTab,
+  }))
+);
+
+// Add Content Studio Tab
+const ContentStudioTab = lazy(() =>
+  import("../content-studio/ContentStudioTab").then((m) => ({
+    default: m.ContentStudioTab,
   }))
 );
 
@@ -64,6 +120,13 @@ interface ProjectTabsProps {
   onTabChange: (tab: string) => void;
   memberDetails: Record<string, MemberDetails>;
   onProjectUpdate: () => void;
+  preloadedEvents?: EventWithCar[]; // Optional pre-fetched events data for SSR optimization
+  preloadedCars?: ProjectCar[]; // Optional pre-fetched cars data for SSR optimization
+  preloadedGalleries?: any[]; // Optional pre-fetched galleries data for SSR optimization
+  preloadedAssets?: any[]; // Optional pre-fetched assets data for SSR optimization
+  preloadedDeliverables?: any[]; // Optional pre-fetched deliverables data for SSR optimization
+  preloadedTimelineData?: ProjectTimeline; // Optional pre-fetched timeline data for SSR optimization
+  preloadedCopywriterData?: { cars: any[]; events: any[]; captions: any[] }; // Optional pre-fetched copywriter data for SSR optimization
 }
 
 // Define tab configuration
@@ -73,10 +136,13 @@ const tabs = [
   { value: "events", label: "Events" },
   { value: "team", label: "Team" },
   { value: "cars", label: "Cars" },
+  { value: "images", label: "Images" },
   { value: "galleries", label: "Galleries" },
   { value: "assets", label: "Assets" },
   { value: "deliverables", label: "Deliverables" },
   { value: "copywriter", label: "Copywriter" },
+  { value: "content-studio", label: "Content Studio" },
+  { value: "ai-chat", label: "AI Assistant" },
   { value: "calendar", label: "Calendar" },
 ];
 
@@ -89,12 +155,43 @@ export function ProjectTabs({
   onTabChange,
   memberDetails,
   onProjectUpdate,
+  preloadedEvents,
+  preloadedCars,
+  preloadedGalleries,
+  preloadedAssets,
+  preloadedDeliverables,
+  preloadedTimelineData,
+  preloadedCopywriterData,
 }: ProjectTabsProps) {
   const [hasLoadedTab, setHasLoadedTab] = useState<Record<string, boolean>>({
-    overview: true, // Always load overview first
+    overview: true, // Always load overview
+    // Preload critical tabs that are most commonly accessed
+    events: true,
+    cars: true,
+    images: true,
   });
 
-  // Mark tab as loaded when it becomes active
+  // Preload remaining tabs after initial render for better UX
+  useEffect(() => {
+    const preloadTimer = setTimeout(() => {
+      setHasLoadedTab((prev) => ({
+        ...prev,
+        timeline: true,
+        team: true,
+        galleries: true,
+        assets: true,
+        deliverables: true,
+        copywriter: true,
+        "content-studio": true,
+        "ai-chat": true,
+        calendar: true,
+      }));
+    }, 1000); // Preload after 1 second
+
+    return () => clearTimeout(preloadTimer);
+  }, []);
+
+  // Mark tab as loaded when it becomes active (fallback)
   useEffect(() => {
     if (activeTab && !hasLoadedTab[activeTab]) {
       setHasLoadedTab((prev) => ({
@@ -138,7 +235,7 @@ export function ProjectTabs({
         onValueChange={onTabChange}
         className="hidden lg:block space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-10 bg-transparent border rounded-md h-auto p-1 gap-1">
+        <TabsList className="grid w-full grid-cols-12 bg-transparent border rounded-md h-auto p-1 gap-1">
           {tabs.map((tab) => (
             <TabsTrigger
               key={tab.value}
@@ -167,13 +264,17 @@ export function ProjectTabs({
             <ProjectTimelineTab
               project={project}
               onProjectUpdate={onProjectUpdate}
+              initialTimelineData={preloadedTimelineData}
             />
           </Suspense>
         )}
 
         {activeTab === "events" && hasLoadedTab.events && (
           <Suspense fallback={<TabLoadingFallback />}>
-            <ProjectEventsTab projectId={project._id!} />
+            <ProjectEventsTab
+              projectId={project._id!}
+              initialEvents={preloadedEvents}
+            />
           </Suspense>
         )}
 
@@ -192,6 +293,16 @@ export function ProjectTabs({
             <ProjectCarsTab
               project={project}
               onProjectUpdate={onProjectUpdate}
+              initialCars={preloadedCars}
+            />
+          </Suspense>
+        )}
+
+        {activeTab === "images" && hasLoadedTab.images && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ProjectImageGallery
+              projectId={project._id!}
+              projectInfo={project}
             />
           </Suspense>
         )}
@@ -201,6 +312,7 @@ export function ProjectTabs({
             <ProjectGalleriesTab
               project={project}
               onProjectUpdate={onProjectUpdate}
+              initialGalleries={preloadedGalleries}
             />
           </Suspense>
         )}
@@ -210,6 +322,7 @@ export function ProjectTabs({
             <ProjectAssetsTab
               project={project}
               onProjectUpdate={onProjectUpdate}
+              initialAssets={preloadedAssets}
             />
           </Suspense>
         )}
@@ -220,15 +333,41 @@ export function ProjectTabs({
               project={project}
               memberDetails={memberDetails}
               onProjectUpdate={onProjectUpdate}
+              initialDeliverables={preloadedDeliverables}
             />
           </Suspense>
         )}
 
         {activeTab === "copywriter" && hasLoadedTab.copywriter && (
           <Suspense fallback={<TabLoadingFallback />}>
-            <ProjectCopywriter
-              project={project}
+            <UnifiedCopywriter
+              projectId={project._id!}
+              title="Project Copywriter"
+              allowMultipleCars={true}
+              allowEventSelection={true}
+              allowMinimalCarData={true}
               onProjectUpdate={onProjectUpdate}
+              initialCopywriterData={preloadedCopywriterData}
+            />
+          </Suspense>
+        )}
+
+        {activeTab === "content-studio" && hasLoadedTab["content-studio"] && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ContentStudioTab
+              projectId={project._id!}
+              projectInfo={project}
+              onUpdate={onProjectUpdate}
+            />
+          </Suspense>
+        )}
+
+        {activeTab === "ai-chat" && hasLoadedTab["ai-chat"] && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <AIChatTab
+              entityType="project"
+              entityId={project._id!}
+              entityInfo={project}
             />
           </Suspense>
         )}

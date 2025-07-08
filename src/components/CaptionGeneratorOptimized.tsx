@@ -30,7 +30,7 @@ export default function CaptionGeneratorOptimized({
   // Track renders for performance monitoring
   useEffect(() => {
     setRenderCount((prev) => prev + 1);
-    console.log(`CaptionGeneratorOptimized render #${renderCount + 1}`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`CaptionGeneratorOptimized render #${renderCount + 1}`);
   });
 
   // Memoized component to prevent unnecessary re-renders

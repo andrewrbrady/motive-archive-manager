@@ -14,6 +14,11 @@ function formatCarSpecifications(
   carDetails: any,
   useMinimalCarData: boolean = false
 ): string {
+  // Handle empty or null car details
+  if (!carDetails || carDetails.count === 0) {
+    return "No vehicle specifications provided for this project.";
+  }
+
   const projectSpecs: string[] = [];
 
   // Project overview
@@ -134,7 +139,7 @@ function getMaxTokensForLength(length: string): number {
 export async function POST(request: NextRequest) {
   try {
     const startTime = Date.now();
-    console.log("Project Caption API started at:", new Date().toISOString());
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Project Caption API started at:", new Date().toISOString());
 
     const {
       platform,
@@ -175,9 +180,12 @@ export async function POST(request: NextRequest) {
       useMinimalCarData,
     });
 
-    if (!platform || !carDetails || !aiModel) {
+    if (!platform || !aiModel) {
       return NextResponse.json(
-        { error: "Missing required parameters" },
+        {
+          error:
+            "Missing required parameters: platform and aiModel are required",
+        },
         { status: 400 }
       );
     }
@@ -213,7 +221,7 @@ export async function POST(request: NextRequest) {
         );
         try {
           const { db } = await connectToDatabase();
-          console.log("🔍 Database connected successfully");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Database connected successfully");
 
           const systemPromptData = await db
             .collection("systemPrompts")
@@ -289,7 +297,7 @@ export async function POST(request: NextRequest) {
 
     // Check elapsed time before proceeding to LLM generation
     const elapsedTime = Date.now() - startTime;
-    console.log(`Time elapsed before LLM generation: ${elapsedTime}ms`);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Time elapsed before LLM generation: ${elapsedTime}ms`);
 
     if (elapsedTime > 45000) {
       // If we're already at 45 seconds, abort
@@ -304,16 +312,16 @@ export async function POST(request: NextRequest) {
 
     // If custom LLM text is provided, use it directly
     if (customLLMText && customLLMText.trim()) {
-      console.log("Using custom LLM text provided by user");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Using custom LLM text provided by user");
       const userPrompt = customLLMText.trim();
 
-      console.log("=== PROJECT CAPTION GENERATION REQUEST (CUSTOM) ===");
-      console.log("System Prompt:", systemPrompt);
-      console.log("User Prompt (Custom):", userPrompt);
-      console.log("Model:", aiModel);
-      console.log("Temperature:", temperature);
-      console.log("Length:", length);
-      console.log("=== END REQUEST DETAILS ===");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== PROJECT CAPTION GENERATION REQUEST (CUSTOM) ===");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("System Prompt:", systemPrompt);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("User Prompt (Custom):", userPrompt);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Model:", aiModel);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Temperature:", temperature);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Length:", length);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== END REQUEST DETAILS ===");
 
       // Generate the caption with custom text and timeout
       const maxTokens = getMaxTokensForLength(length);
@@ -360,7 +368,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Otherwise, build the standard auto-generated user prompt
-    console.log("Building auto-generated user prompt");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Building auto-generated user prompt");
 
     // Add additional context/instructions at the top if provided
     if (context) {
@@ -466,13 +474,13 @@ export async function POST(request: NextRequest) {
 
     const userPrompt = userPromptParts.join("\n");
 
-    console.log("=== PROJECT CAPTION GENERATION REQUEST ===");
-    console.log("System Prompt:", systemPrompt);
-    console.log("User Prompt:", userPrompt);
-    console.log("Model:", aiModel);
-    console.log("Temperature:", temperature);
-    console.log("Length:", length);
-    console.log("=== END REQUEST DETAILS ===");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== PROJECT CAPTION GENERATION REQUEST ===");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("System Prompt:", systemPrompt);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("User Prompt:", userPrompt);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Model:", aiModel);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Temperature:", temperature);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Length:", length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("=== END REQUEST DETAILS ===");
 
     // Generate the caption with timeout
     const maxTokens = getMaxTokensForLength(length);

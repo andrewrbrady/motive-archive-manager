@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { BatchTemplate } from "@/types/deliverable";
+
+// Define batch interface locally
+interface DeliverableTemplate {
+  title: string;
+  platform_id?: string;
+  platform?: string; // Legacy field
+  mediaTypeId?: string;
+  type?: string; // Legacy field
+  duration?: number;
+  aspect_ratio: string;
+}
+
+interface BatchTemplate {
+  name: string;
+  templates: DeliverableTemplate[];
+}
 
 export async function GET() {
   try {
@@ -8,16 +23,19 @@ export async function GET() {
     const templates = await db.collection("batch_templates").find({}).toArray();
 
     // Convert array to record with name as key, ensuring type safety
-    const templatesRecord = templates.reduce((acc, template) => {
-      // Convert MongoDB document to BatchTemplate, preserving _id
-      const batchTemplate: BatchTemplate & { _id?: any } = {
-        _id: template._id,
-        name: template.name,
-        templates: template.templates,
-      };
-      acc[template.name] = batchTemplate;
-      return acc;
-    }, {} as Record<string, BatchTemplate & { _id?: any }>);
+    const templatesRecord = templates.reduce(
+      (acc, template) => {
+        // Convert MongoDB document to BatchTemplate, preserving _id
+        const batchTemplate: BatchTemplate & { _id?: any } = {
+          _id: template._id,
+          name: template.name,
+          templates: template.templates,
+        };
+        acc[template.name] = batchTemplate;
+        return acc;
+      },
+      {} as Record<string, BatchTemplate & { _id?: any }>
+    );
 
     return NextResponse.json({ templates: templatesRecord });
   } catch (error) {

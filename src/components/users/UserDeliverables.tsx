@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -24,30 +25,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { toast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { Deliverable } from "@/types/deliverable";
+import { Car } from "@/types/car";
+import { toast } from "@/components/ui/use-toast";
+import { useAPI } from "@/hooks/useAPI";
+import { useMediaTypes } from "@/hooks/useMediaTypes";
 import { LoadingSpinner } from "@/components/ui/loading";
-
-interface Car {
-  _id: string;
-  make: string;
-  model: string;
-  year: number;
-}
-
-interface Deliverable {
-  _id: string;
-  title: string;
-  platform: string;
-  type: string;
-  status: string;
-  edit_deadline: string;
-  release_date: string;
-  car?: Car;
-}
+import { PlatformBadges } from "@/components/deliverables/PlatformBadges";
 
 interface UserDeliverablesProps {
   userName: string;
+}
+
+// Extended Deliverable type with populated car data
+interface DeliverableWithCar extends Deliverable {
+  car?: Car;
 }
 
 const PLATFORMS = [
@@ -74,19 +69,45 @@ const TYPES = [
 const STATUSES = ["not_started", "in_progress", "done"];
 
 export default function UserDeliverables({ userName }: UserDeliverablesProps) {
-  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+  const [deliverables, setDeliverables] = useState<DeliverableWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [platform, setPlatform] = useState("all");
   const [type, setType] = useState("all");
 
+  const api = useAPI();
+  const { mediaTypes } = useMediaTypes();
+
+  // Helper function to get the proper media type name for display
+  const getMediaTypeName = (deliverable: Deliverable) => {
+    if (deliverable.mediaTypeId) {
+      const mediaType = mediaTypes.find(
+        (mt) => mt._id.toString() === deliverable.mediaTypeId?.toString()
+      );
+      return mediaType ? mediaType.name : deliverable.type;
+    }
+    return deliverable.type;
+  };
+
+  if (!api) {
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-2">
+          <LoadingSpinner size="sm" />
+          <span>Loading...</span>
+        </CardContent>
+      </Card>
+    );
+  }
+
   useEffect(() => {
     const fetchDeliverables = async () => {
+      setIsLoading(true);
       try {
         const params = new URLSearchParams({
-          editor: userName,
-          sortField: "edit_deadline",
+          firebase_uid: userName,
+          sortField: "updated_at",
           sortDirection: "asc",
         });
 
@@ -95,11 +116,9 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
         if (platform && platform !== "all") params.append("platform", platform);
         if (type && type !== "all") params.append("type", type);
 
-        const response = await fetch(`/api/deliverables?${params}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch deliverables");
-        }
-        const data = await response.json();
+        const data = (await api.get(`deliverables?${params}`)) as {
+          deliverables: DeliverableWithCar[];
+        };
         setDeliverables(data.deliverables);
       } catch (error) {
         console.error("Error fetching deliverables:", error);
@@ -116,7 +135,7 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
     if (userName) {
       fetchDeliverables();
     }
-  }, [userName, search, status, platform, type]);
+  }, [userName, search, status, platform, type, api]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -138,11 +157,12 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
       .join(" ");
   };
 
-  const formatDate = (dateString: string | undefined | null) => {
-    if (!dateString) return "No date set";
+  const formatDate = (dateInput: string | Date | undefined | null) => {
+    if (!dateInput) return "No date set";
 
     try {
-      const date = new Date(dateString);
+      const date =
+        typeof dateInput === "string" ? new Date(dateInput) : dateInput;
       // Check if the date is valid
       if (isNaN(date.getTime())) {
         return "Invalid date";
@@ -186,64 +206,67 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
                 className="w-full"
               />
             </div>
+
             <div className="space-y-2">
               <label
-                htmlFor="status"
+                htmlFor="status-filter"
                 className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]"
               >
                 Status
               </label>
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger id="status">
-                  <SelectValue placeholder="All statuses" />
+                <SelectTrigger id="status-filter">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  {STATUSES.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {formatStatus(status)}
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  {STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {formatStatus(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
               <label
-                htmlFor="platform"
+                htmlFor="platform-filter"
                 className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]"
               >
                 Platform
               </label>
               <Select value={platform} onValueChange={setPlatform}>
-                <SelectTrigger id="platform">
-                  <SelectValue placeholder="All platforms" />
+                <SelectTrigger id="platform-filter">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All platforms</SelectItem>
-                  {PLATFORMS.map((platform) => (
-                    <SelectItem key={platform} value={platform}>
-                      {platform}
+                  <SelectItem value="all">All Platforms</SelectItem>
+                  {PLATFORMS.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
               <label
-                htmlFor="type"
+                htmlFor="type-filter"
                 className="text-sm font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))]"
               >
-                Type
+                Media Type
               </label>
               <Select value={type} onValueChange={setType}>
-                <SelectTrigger id="type">
-                  <SelectValue placeholder="All types" />
+                <SelectTrigger id="type-filter">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All types</SelectItem>
-                  {TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
+                  <SelectItem value="all">All Types</SelectItem>
+                  {TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -263,7 +286,7 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
                 <TableRow>
                   <TableHead>Title</TableHead>
                   <TableHead>Car</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead>Media Type</TableHead>
                   <TableHead>Platform</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Edit Deadline</TableHead>
@@ -272,7 +295,7 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
               </TableHeader>
               <TableBody>
                 {deliverables.map((deliverable) => (
-                  <TableRow key={deliverable._id}>
+                  <TableRow key={deliverable._id?.toString()}>
                     <TableCell className="font-medium">
                       {deliverable.title}
                     </TableCell>
@@ -281,8 +304,16 @@ export default function UserDeliverables({ userName }: UserDeliverablesProps) {
                         ? `${deliverable.car.year} ${deliverable.car.make} ${deliverable.car.model}`
                         : "N/A"}
                     </TableCell>
-                    <TableCell>{deliverable.type}</TableCell>
-                    <TableCell>{deliverable.platform}</TableCell>
+                    <TableCell>{getMediaTypeName(deliverable)}</TableCell>
+                    <TableCell>
+                      <PlatformBadges
+                        platform_id={deliverable.platform_id?.toString()}
+                        platform={deliverable.platform}
+                        platforms={deliverable.platforms}
+                        maxVisible={1}
+                        size="sm"
+                      />
+                    </TableCell>
                     <TableCell>
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(

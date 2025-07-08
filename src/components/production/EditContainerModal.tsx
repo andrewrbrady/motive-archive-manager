@@ -22,6 +22,14 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { useAPI } from "@/hooks/useAPI";
+import { toast } from "react-hot-toast";
+import { LoadingContainer } from "@/components/ui/loading-container";
+
+// TypeScript interfaces for API responses
+interface LocationsResponse {
+  data?: LocationResponse[];
+}
 
 interface EditContainerModalProps {
   isOpen: boolean;
@@ -36,6 +44,7 @@ export default function EditContainerModal({
   onSave,
   container,
 }: EditContainerModalProps) {
+  const api = useAPI();
   const [formData, setFormData] = useState<Partial<ContainerResponse>>({});
   const [locations, setLocations] = useState<LocationResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,20 +60,22 @@ export default function EditContainerModal({
 
   // Fetch locations when the modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && api) {
       fetchLocations();
     }
-  }, [isOpen]);
+  }, [isOpen, api]);
 
   const fetchLocations = async () => {
+    if (!api) return;
+
     try {
       setIsLoading(true);
-      const response = await fetch("/api/locations");
-      if (!response.ok) throw new Error("Failed to fetch locations");
-      const data = await response.json();
+      const response = await api.get("locations");
+      const data = Array.isArray(response) ? response : [];
       setLocations(data);
     } catch (error) {
       console.error("Error fetching locations:", error);
+      toast.error("Failed to fetch locations");
     } finally {
       setIsLoading(false);
     }
@@ -96,6 +107,19 @@ export default function EditContainerModal({
     } as ContainerResponse);
     onClose();
   };
+
+  // Show loading state if API not ready
+  if (!api) {
+    return (
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="sm:max-w-md">
+          <div className="h-64 flex items-center justify-center">
+            <LoadingContainer />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>

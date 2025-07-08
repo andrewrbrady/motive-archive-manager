@@ -3,9 +3,37 @@ import { NextRequest, NextResponse } from "next/server";
 import { MongoClient, ObjectId, UpdateFilter } from "mongodb";
 import { getDatabase, getMongoClient } from "@/lib/mongodb";
 import { DB_NAME } from "@/constants";
-import { getFormattedImageUrl } from "@/lib/cloudflare";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 
-export const dynamic = "force-dynamic";
+// ✅ PERFORMANCE FIX: Images change less frequently
+export const revalidate = 600; // 10 minutes
+
+// Rate limiting to prevent infinite loops
+const requestCounts = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW = 10000; // 10 seconds
+const MAX_REQUESTS_PER_WINDOW = 20; // Max 20 requests per 10 seconds per car
+
+function checkRateLimit(carId: string): boolean {
+  const now = Date.now();
+  const key = `car-${carId}`;
+  const current = requestCounts.get(key);
+
+  if (!current || now > current.resetTime) {
+    // Reset window
+    requestCounts.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+
+  if (current.count >= MAX_REQUESTS_PER_WINDOW) {
+    console.warn(
+      `🚨 Rate limit exceeded for car ${carId}: ${current.count} requests in ${RATE_LIMIT_WINDOW}ms`
+    );
+    return false;
+  }
+
+  current.count++;
+  return true;
+}
 
 interface ImageData {
   imageUrl: string;
@@ -26,7 +54,7 @@ interface Image {
 
 interface CarDocument {
   _id: ObjectId;
-  imageIds: string[];
+  imageIds: ObjectId[];
   updatedAt?: string;
   images?: Image[];
 }
@@ -44,15 +72,79 @@ async function getCloudflareAuth() {
 
 // GET images for a car
 export async function GET(request: Request) {
+  const startTime = Date.now();
+
+  const url = new URL(request.url);
+  const segments = url.pathname.split("/");
+  const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/images
+
   try {
-    const url = new URL(request.url);
-    const segments = url.pathname.split("/");
-    const id = segments[segments.length - 2]; // -2 because URL is /cars/[id]/images
+    // Rate limiting check first
+    if (!checkRateLimit(id)) {
+      return NextResponse.json(
+        {
+          error: "Rate limit exceeded. Too many requests in a short time.",
+          rateLimited: true,
+          retryAfter: 10,
+        },
+        { status: 429 }
+      );
+    }
 
     // Parse query parameters
     const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || "20");
-    const skip = (page - 1) * limit;
+    const limit = parseInt(url.searchParams.get("limit") || "50");
+    const skip =
+      parseInt(url.searchParams.get("skip") || "0") || (page - 1) * limit;
+
+    // Add logging for debugging infinite loop issues
+    console.log(
+      `🔍 Image API Request - CarId: ${id}, Page: ${page}, Limit: ${limit}, Skip: ${skip}`
+    );
+
+    // Validate pagination parameters to prevent infinite loops
+    if (page < 1) {
+      return NextResponse.json(
+        { error: "Invalid page number. Page must be 1 or greater." },
+        { status: 400 }
+      );
+    }
+
+    if (limit < 1 || limit > 200) {
+      return NextResponse.json(
+        { error: "Invalid limit. Limit must be between 1 and 200." },
+        { status: 400 }
+      );
+    }
+
+    if (skip < 0) {
+      return NextResponse.json(
+        { error: "Invalid skip value. Skip must be 0 or greater." },
+        { status: 400 }
+      );
+    }
+
+    // Safeguard against potentially infinite loops - if skip is extremely high, likely a bug
+    if (skip > 10000) {
+      console.warn(
+        `⚠️ Extremely high skip value detected: ${skip} for car ${id}. Possible infinite loop.`
+      );
+      return NextResponse.json(
+        {
+          error: "Skip value too high. This might indicate a pagination issue.",
+          pagination: {
+            totalImages: 0,
+            totalPages: 0,
+            currentPage: 1,
+            itemsPerPage: limit,
+            startIndex: 1,
+            endIndex: 0,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
     const category = url.searchParams.get("category");
     const search = url.searchParams.get("search");
     const angle = url.searchParams.get("angle");
@@ -60,6 +152,9 @@ export async function GET(request: Request) {
     const timeOfDay = url.searchParams.get("timeOfDay");
     const view = url.searchParams.get("view");
     const side = url.searchParams.get("side");
+    const imageType = url.searchParams.get("imageType");
+    const sort = url.searchParams.get("sort") || "updatedAt";
+    const sortDirection = url.searchParams.get("sortDirection") || "desc";
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -71,68 +166,150 @@ export async function GET(request: Request) {
     const db = await getDatabase();
     const carObjectId = new ObjectId(id);
 
-    // Build query for filtering
+    // PERFORMANCE OPTIMIZATION: Build optimized query with proper indexing
     const query: any = { carId: carObjectId };
 
-    // Add metadata filters
+    // Add metadata filters with support for nested metadata
     if (category) query["metadata.category"] = category;
-    if (angle) query["metadata.angle"] = angle;
-    if (movement) query["metadata.movement"] = movement;
-    if (timeOfDay) query["metadata.tod"] = timeOfDay;
-    if (view) query["metadata.view"] = view;
-    if (side) query["metadata.side"] = side;
 
-    // Add search filter
+    // Collect filter conditions to combine with AND
+    const filterConditions = [];
+
+    if (angle) {
+      filterConditions.push({
+        $or: [
+          { "metadata.angle": angle },
+          { "metadata.originalImage.metadata.angle": angle },
+        ],
+      });
+    }
+
+    if (movement) {
+      filterConditions.push({
+        $or: [
+          { "metadata.movement": movement },
+          { "metadata.originalImage.metadata.movement": movement },
+        ],
+      });
+    }
+
+    if (timeOfDay) {
+      filterConditions.push({
+        $or: [
+          { "metadata.tod": timeOfDay },
+          { "metadata.originalImage.metadata.tod": timeOfDay },
+        ],
+      });
+    }
+
+    if (view) {
+      filterConditions.push({
+        $or: [
+          { "metadata.view": view },
+          { "metadata.originalImage.metadata.view": view },
+        ],
+      });
+    }
+
+    if (side) {
+      filterConditions.push({
+        $or: [
+          { "metadata.side": side },
+          { "metadata.originalImage.metadata.side": side },
+        ],
+      });
+    }
+
+    // Handle imageType filter for original vs processed images
+    if (imageType) {
+      if (imageType === "with-id") {
+        // Show only original images (those WITHOUT originalImage metadata)
+        filterConditions.push({
+          "metadata.originalImage": { $exists: false },
+        });
+      } else if (imageType === "processed") {
+        // Show only processed images (those WITH originalImage metadata)
+        filterConditions.push({
+          "metadata.originalImage": { $exists: true },
+        });
+      }
+    }
+
+    // Combine filter conditions with AND
+    if (filterConditions.length > 0) {
+      query.$and = (query.$and || []).concat(filterConditions);
+    }
+
+    // Handle search separately
     if (search) {
-      query.$or = [
+      const searchConditions = [
         { filename: { $regex: search, $options: "i" } },
         { "metadata.description": { $regex: search, $options: "i" } },
       ];
+
+      // Add search as an additional AND condition
+      query.$and = (query.$and || []).concat([{ $or: searchConditions }]);
     }
 
-    // First, check if the car exists and if it has imageIds
-    const car = await db.collection("cars").findOne({ _id: carObjectId });
+    // PERFORMANCE OPTIMIZATION: Use parallel queries for better performance
+    const [car, totalImages, images] = await Promise.all([
+      // Get car info
+      db.collection("cars").findOne(
+        { _id: carObjectId },
+        {
+          projection: { imageIds: 1, primaryImageId: 1 },
+        }
+      ),
+
+      // Count total matching images
+      db.collection("images").countDocuments(query),
+
+      // Get paginated images with optimized projection and dynamic sorting
+      db
+        .collection("images")
+        .find(query, {
+          projection: {
+            cloudflareId: 1,
+            url: 1,
+            filename: 1,
+            metadata: 1,
+            carId: 1,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        })
+        .sort({
+          [sort]: sortDirection === "asc" ? 1 : -1,
+          // Add secondary sort to ensure consistency
+          ...(sort !== "createdAt" && { createdAt: -1 }),
+        })
+        .skip(skip)
+        .limit(limit)
+        .toArray(),
+    ]);
 
     if (!car) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    // Count total existing images for pagination metadata
-    const totalImages = await db.collection("images").countDocuments(query);
-    console.log(
-      `Found ${totalImages} existing image documents in the database`
-    );
-
-    // Check if we need to create image documents from imageIds
+    // PERFORMANCE OPTIMIZATION: Only create missing documents if really needed
     if (
       totalImages === 0 &&
       car.imageIds &&
       Array.isArray(car.imageIds) &&
       car.imageIds.length > 0
     ) {
-      console.log(
-        `Car ${id} has ${car.imageIds.length} imageIds but no image documents. Creating them now.`
-      );
-
-      // Create image documents from imageIds
+      // Create image documents from imageIds (batched for performance)
       const now = new Date().toISOString();
       const imageDocuments = car.imageIds
         .map((imgId: string) => {
           try {
-            if (!imgId) {
-              return null;
-            }
+            if (!imgId) return null;
 
             let imgObjectId;
-
             if (ObjectId.isValid(imgId)) {
               imgObjectId = new ObjectId(imgId);
             } else {
-              console.log(
-                `Invalid ObjectId format for ${imgId}, using as string ID`
-              );
-              // If it's not a valid ObjectId, we can still use it as the cloudflareId
-              // Just create a new ObjectId for the document ID
               imgObjectId = new ObjectId();
             }
 
@@ -150,74 +327,118 @@ export async function GET(request: Request) {
               updatedAt: now,
             };
           } catch (error) {
-            console.error(
-              `Error creating image document for ID ${imgId}:`,
-              error
-            );
             return null;
           }
         })
         .filter((doc): doc is NonNullable<typeof doc> => doc !== null);
 
-      console.log(
-        `Prepared ${imageDocuments.length} image documents for insertion`
-      );
-
       if (imageDocuments.length > 0) {
         try {
-          // Use insertMany with ordered: false to continue even if some inserts fail
-          const insertResult = await db
-            .collection("images")
-            .insertMany(imageDocuments, { ordered: false });
-          console.log(
-            `Created ${insertResult.insertedCount} image documents from imageIds`
-          );
+          await db.collection("images").insertMany(imageDocuments, {
+            ordered: false,
+            // PERFORMANCE: Use unacknowledged writes for better performance
+            writeConcern: { w: 0 },
+          });
         } catch (error: any) {
-          // Some inserts might fail due to duplicate keys, which is fine
-          if (error.code === 11000) {
-          } else {
+          // Ignore duplicate key errors
+          if (error.code !== 11000) {
             console.error("Error creating image documents:", error);
           }
         }
       }
+
+      // Re-fetch images after creation with dynamic sorting
+      const newImages = await db
+        .collection("images")
+        .find(query, {
+          projection: {
+            cloudflareId: 1,
+            url: 1,
+            filename: 1,
+            metadata: 1,
+            carId: 1,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        })
+        .sort({
+          [sort]: sortDirection === "asc" ? 1 : -1,
+          // Add secondary sort to ensure consistency
+          ...(sort !== "createdAt" && { createdAt: -1 }),
+        })
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+
+      // Process images with our utility function
+      const processedImages = newImages.map((image) => ({
+        ...image,
+        _id: image._id.toString(),
+        carId: image.carId.toString(),
+        url: fixCloudflareImageUrl(image.url),
+      }));
+
+      const newTotalImages = await db
+        .collection("images")
+        .countDocuments(query);
+      const totalPages = Math.ceil(newTotalImages / limit);
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      return NextResponse.json({
+        images: processedImages,
+        pagination: {
+          totalImages: newTotalImages,
+          totalPages,
+          currentPage: page,
+          itemsPerPage: limit,
+          startIndex: skip + 1,
+          endIndex: Math.min(skip + limit, newTotalImages),
+        },
+        debug: {
+          queryDuration: `${duration}ms`,
+          cacheStatus: "created_documents",
+        },
+      });
     }
 
-    // Get paginated images
-    console.log(
-      `Fetching paginated images: page=${page}, limit=${limit}, skip=${skip}`
-    );
-    const images = await db
-      .collection("images")
-      .find(query)
-      .sort({ updatedAt: -1, createdAt: -1 }) // Show most recently updated/created first
-      .skip(skip)
-      .limit(limit)
-      .toArray();
-
-    // Process images with our utility function
+    // PERFORMANCE OPTIMIZATION: Streamlined image processing
     const processedImages = images.map((image) => ({
       ...image,
       _id: image._id.toString(),
       carId: image.carId.toString(),
-      url: getFormattedImageUrl(image.url),
+      url: fixCloudflareImageUrl(image.url),
     }));
 
     // Calculate pagination metadata
     const totalPages = Math.ceil(totalImages / limit);
 
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+
     return NextResponse.json({
       images: processedImages,
       pagination: {
-        currentPage: page,
-        totalPages,
         totalImages,
-        limit,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1,
+        totalPages,
+        currentPage: page,
+        itemsPerPage: limit,
+        startIndex: skip + 1,
+        endIndex: Math.min(skip + limit, totalImages),
+      },
+      debug: {
+        queryDuration: `${duration}ms`,
+        cacheStatus: "existing_documents",
       },
     });
   } catch (error) {
-    console.error("Error fetching car images:", error);
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    console.error(
+      `💥 GET /cars/${id}/images failed after ${duration}ms:`,
+      error
+    );
     return NextResponse.json(
       {
         error: `Failed to fetch car images: ${
@@ -295,9 +516,9 @@ export async function POST(request: Request) {
       imageDoc.cloudflareId
     );
 
-    // Update the car document with the new image ID (use our MongoDB ObjectId)
+    // Update the car document with the new image ID (use ObjectId, not string)
     const updateDoc: UpdateFilter<CarDocument> = {
-      $push: { imageIds: imageObjectId.toString() },
+      $push: { imageIds: imageObjectId },
       $set: { updatedAt: new Date().toISOString() },
     };
 
@@ -376,14 +597,14 @@ export async function DELETE(request: Request) {
 
     try {
       session = client.startSession();
-      // [REMOVED] // [REMOVED] console.log("MongoDB session started");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("MongoDB session started");
 
       // Start a transaction
       let result = null;
 
       try {
         session.startTransaction();
-        // [REMOVED] // [REMOVED] console.log("Transaction started");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Transaction started");
 
         // Convert carId to ObjectId
         const carObjectId = new ObjectId(id);
@@ -442,12 +663,12 @@ export async function DELETE(request: Request) {
           query.cloudflareId = { $in: cloudflareIds };
         }
 
-        // [REMOVED] // [REMOVED] console.log("Image lookup query:", JSON.stringify(query));
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Image lookup query:", JSON.stringify(query));
 
         // Find all matching image documents
         imageDocs = await db.collection("images").find(query).toArray();
 
-        // [REMOVED] // [REMOVED] console.log(`Found ${imageDocs.length} image documents to delete`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Found ${imageDocs.length} image documents to delete`);
 
         // Extract the ObjectIds from the found documents
         const foundImageObjectIds = imageDocs.map((doc) => doc._id);
@@ -498,18 +719,18 @@ export async function DELETE(request: Request) {
           { session }
         );
 
-        // [REMOVED] // [REMOVED] console.log("Car update result:", updateResult);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Car update result:", updateResult);
 
         // Delete the image documents
         const deleteImagesResult = await db
           .collection("images")
           .deleteMany({ _id: { $in: foundImageObjectIds } }, { session });
 
-        // [REMOVED] // [REMOVED] console.log("Delete images result:", deleteImagesResult);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Delete images result:", deleteImagesResult);
 
         // Commit the transaction
         await session.commitTransaction();
-        // [REMOVED] // [REMOVED] console.log("Transaction committed successfully");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Transaction committed successfully");
 
         // Delete from Cloudflare if requested
         const cloudflareResults: any[] = [];
@@ -600,7 +821,7 @@ export async function DELETE(request: Request) {
         // Abort transaction on error
         if (session.inTransaction()) {
           await session.abortTransaction();
-          // [REMOVED] // [REMOVED] console.log("Transaction aborted due to error");
+          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Transaction aborted due to error");
         }
         throw txError;
       }
@@ -608,7 +829,7 @@ export async function DELETE(request: Request) {
       // End session if it exists
       if (session) {
         await session.endSession();
-        // [REMOVED] // [REMOVED] console.log("MongoDB session ended");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("MongoDB session ended");
       }
     }
   } catch (error) {

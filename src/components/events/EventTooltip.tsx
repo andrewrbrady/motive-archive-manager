@@ -9,6 +9,7 @@ import { CalendarIcon, Clock, User } from "lucide-react";
 import { format } from "date-fns";
 import { Event } from "@/types/event";
 import { cn } from "@/lib/utils";
+import { formatEventDateShort } from "@/lib/dateUtils";
 
 interface EventTooltipProps {
   children: React.ReactNode;
@@ -58,7 +59,7 @@ export default function EventTooltip({ children, event }: EventTooltipProps) {
             <div className="space-y-2">
               <div className="flex items-center text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(new Date(event.start), "MMM d, yyyy")}
+                {formatEventDateShort(event.start)}
               </div>
               <div className="flex items-center text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
                 <Clock className="mr-2 h-4 w-4" />

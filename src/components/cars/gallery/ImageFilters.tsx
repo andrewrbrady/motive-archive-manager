@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -8,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Plus } from "lucide-react";
+import { X, Plus, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { FilterState, FilterOptions } from "@/types/gallery";
 
 interface ImageFiltersProps {
@@ -28,21 +29,38 @@ export function ImageFilters({
   onSearchChange,
   onUploadClick,
 }: ImageFiltersProps) {
-  const handleFilterChange = (type: string, value: string) => {
-    const newFilters = { ...filters };
-    if (value === "" || value === "all") {
-      delete newFilters[type as keyof FilterState];
-    } else {
-      newFilters[type as keyof FilterState] = value;
-    }
-    onFiltersChange(newFilters);
+  // Only log when filters actually change
+  const handleFilterChange = useCallback(
+    (type: string, value: string) => {
+      const newFilters = { ...filters };
+      if ((newFilters as any)[type] === value) {
+        delete (newFilters as any)[type];
+      } else {
+        (newFilters as any)[type] = value;
+      }
+      onFiltersChange(newFilters);
+    },
+    [filters, onFiltersChange]
+  );
+
+  const handleImageTypeChange = (value: string) => {
+    handleFilterChange("imageType", value);
   };
 
   const clearFilters = () => {
-    onFiltersChange({});
+    onFiltersChange({
+      sortBy: "filename",
+      sortDirection: "asc",
+    }); // Keep default sorting but clear all other filters
+    onSearchChange(""); // Also clear search query
   };
 
-  const hasActiveFilters = Object.values(filters).some(Boolean);
+  // Check for active filters (excluding default sort settings)
+  const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
+    if (key === "sortBy" && (value === "filename" || !value)) return false;
+    if (key === "sortDirection" && (value === "asc" || !value)) return false;
+    return Boolean(value);
+  });
 
   return (
     <div className="flex items-center justify-between gap-4">
@@ -56,6 +74,21 @@ export function ImageFilters({
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
+        {/* Image Type filter */}
+        <Select
+          value={filters.imageType || "all"}
+          onValueChange={handleImageTypeChange}
+        >
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Image Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All images</SelectItem>
+            <SelectItem value="with-id">With Image ID</SelectItem>
+            <SelectItem value="processed">Processed Only</SelectItem>
+          </SelectContent>
+        </Select>
+
         {/* Angle filter */}
         <Select
           value={filters.angle || "all"}
@@ -145,6 +178,42 @@ export function ImageFilters({
             ))}
           </SelectContent>
         </Select>
+
+        {/* Sorting controls */}
+        <div className="flex items-center gap-1">
+          <Select
+            value={filters.sortBy || "filename"}
+            onValueChange={(value) => handleFilterChange("sortBy", value)}
+          >
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="filename">Filename</SelectItem>
+              <SelectItem value="createdAt">Date Added</SelectItem>
+              <SelectItem value="updatedAt">Last Updated</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              handleFilterChange(
+                "sortDirection",
+                filters.sortDirection === "asc" ? "desc" : "asc"
+              )
+            }
+            title={`Sort ${filters.sortDirection === "asc" ? "descending" : "ascending"}`}
+            className="px-2"
+          >
+            {filters.sortDirection === "asc" ? (
+              <ArrowUp className="h-4 w-4" />
+            ) : (
+              <ArrowDown className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
 
         {/* Clear filters button */}
         {hasActiveFilters && (

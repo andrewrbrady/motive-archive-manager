@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAPI } from "@/hooks/useAPI";
 
 interface YouTubeUploadHelperProps {
   deliverable: Deliverable;
@@ -60,9 +61,43 @@ interface CarCaption {
   createdAt: string;
 }
 
+interface CaptionsResponse {
+  captions: CarCaption[];
+}
+
+interface YouTubeAuthResponse {
+  auth_url?: string;
+  error?: string;
+}
+
+interface YouTubeUploadData {
+  deliverable_id: string;
+  title: string;
+  description: string;
+  tags: string[];
+  privacy_status: string;
+}
+
+interface YouTubeUploadResponse {
+  success?: boolean;
+  youtube_url?: string;
+  video_id?: string;
+  requires_auth?: boolean;
+  auth_url?: string;
+  setup_required?: boolean;
+  details?: string;
+  error?: string;
+}
+
+interface LogoutResponse {
+  success?: boolean;
+  error?: string;
+}
+
 const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
   deliverable,
 }) => {
+  const api = useAPI();
   const [isOpen, setIsOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(false);
@@ -86,96 +121,28 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
   const [useCustomDescription, setUseCustomDescription] = useState(true);
   const [editableCaption, setEditableCaption] = useState<string>("");
 
-  // Check YouTube authentication status
-  const checkAuthStatus = async () => {
-    setIsCheckingAuth(true);
-    try {
-      const response = await fetch("/api/youtube/auth/status");
-      const data = await response.json();
-      setAuthStatus(data);
-    } catch (error) {
-      console.error("Error checking auth status:", error);
-      setAuthStatus({ isAuthenticated: false, channels: [] });
-    } finally {
-      setIsCheckingAuth(false);
-    }
-  };
-
-  // Fetch captions for the car
-  const fetchCaptions = async () => {
-    if (!deliverable.car_id) {
-      console.log("No car_id available for fetching captions");
-      return;
-    }
-
-    setLoadingCaptions(true);
-    try {
-      const response = await fetch(`/api/cars/${deliverable.car_id}/captions`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch captions");
-      }
-      const data = await response.json();
-      setCaptions(data.captions || []);
-    } catch (error) {
-      console.error("Error fetching captions:", error);
-      setCaptions([]);
-    } finally {
-      setLoadingCaptions(false);
-    }
-  };
-
-  // Handle YouTube authentication
-  const handleAuthenticate = async () => {
-    try {
-      // Store the current upload intent so we can resume after auth
-      sessionStorage.setItem(
-        "youtube_upload_deliverable_id",
-        deliverable._id?.toString() || ""
-      );
-      sessionStorage.setItem("youtube_upload_title", title);
-      sessionStorage.setItem("youtube_upload_description", description);
-      sessionStorage.setItem("youtube_upload_tags", tags);
-
-      // Show detailed user guidance before redirect
-      toast(
-        "🎯 IMPORTANT: To upload to the MotiveArchiveMedia channel:\n\n" +
-          "1. On the next screen, you'll see 'Choose an account'\n" +
-          "2. Look for the MotiveArchiveMedia Google account (NOT your personal account)\n" +
-          "3. If you don't see it, click 'Use another account' and sign in with the brand account credentials\n" +
-          "4. Make sure you're authenticating AS the brand account, not your personal account",
-        {
-          duration: 12000,
-          style: {
-            backgroundColor: "#dc2626",
-            color: "white",
-            fontSize: "14px",
-            lineHeight: "1.4",
-            whiteSpace: "pre-line",
-            maxWidth: "500px",
-          },
-        }
-      );
-
-      // Get auth URL from API
-      const response = await fetch("/api/youtube/auth/start");
-      const data = await response.json();
-
-      if (data.auth_url) {
-        // Longer delay to let user read the detailed guidance
-        setTimeout(() => {
-          window.location.href = data.auth_url;
-        }, 3000);
-      } else {
-        toast.error("Failed to start authentication");
-      }
-    } catch (error) {
-      console.error("Authentication error:", error);
-      toast.error("Failed to start authentication");
-    }
-  };
-
   // Resume upload after authentication (if coming back from auth)
   useEffect(() => {
+    if (!api) return;
+
+    // Listen for popup messages
+    const handleMessage = (event: MessageEvent) => {
+      // Verify origin for security
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data.type === "youtube-auth-success") {
+        // Authentication successful via popup
+        checkAuthStatus();
+        toast.success("YouTube authentication successful!");
+      } else if (event.data.type === "youtube-auth-error") {
+        // Authentication failed via popup
+        toast.error(`Authentication failed: ${event.data.error}`);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    // Handle redirect-based authentication
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("youtube_auth_success") === "true") {
       const storedDeliverableId = sessionStorage.getItem(
@@ -199,60 +166,253 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
         sessionStorage.removeItem("youtube_upload_description");
         sessionStorage.removeItem("youtube_upload_tags");
 
-        // Open the upload dialog
-        setIsOpen(true);
+        // Check if modal should be reopened
+        const shouldOpenModal = urlParams.get("youtube_modal_open") === "true";
+        if (shouldOpenModal) {
+          setIsOpen(true);
+        }
 
-        // Clean URL
-        window.history.replaceState({}, "", window.location.pathname);
+        // Clear the URL parameters
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+
+        toast.success("YouTube authentication successful!");
       }
     }
-  }, [deliverable._id]);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+  }, [deliverable._id, api]);
+
+  // Authentication check - don't render if not authenticated
+  if (!api) {
+    return null;
+  }
+
+  // Check YouTube authentication status
+  const checkAuthStatus = async () => {
+    setIsCheckingAuth(true);
+    try {
+      const data = await api.get<YouTubeAuthStatus>("youtube/auth/status");
+      setAuthStatus(data);
+    } catch (error: any) {
+      console.error("Error checking auth status:", error);
+      toast.error("Failed to check YouTube authentication status");
+      setAuthStatus({ isAuthenticated: false, channels: [] });
+    } finally {
+      setIsCheckingAuth(false);
+    }
+  };
+
+  // Fetch captions for the car
+  const fetchCaptions = async () => {
+    if (!deliverable.car_id) {
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("No car_id available for fetching captions");
+      return;
+    }
+
+    setLoadingCaptions(true);
+    try {
+      const data = await api.get<CaptionsResponse>(
+        `cars/${deliverable.car_id}/captions`
+      );
+      setCaptions(data.captions || []);
+    } catch (error: any) {
+      console.error("Error fetching captions:", error);
+      toast.error("Failed to fetch captions");
+      setCaptions([]);
+    } finally {
+      setLoadingCaptions(false);
+    }
+  };
+
+  // Handle YouTube authentication
+  const handleAuthenticate = async () => {
+    try {
+      // Store the current upload intent so we can resume after auth
+      sessionStorage.setItem(
+        "youtube_upload_deliverable_id",
+        deliverable._id?.toString() || ""
+      );
+      sessionStorage.setItem("youtube_upload_title", title);
+      sessionStorage.setItem("youtube_upload_description", description);
+      sessionStorage.setItem("youtube_upload_tags", tags);
+
+      // Get auth URL from API
+      const data = await api.get<YouTubeAuthResponse>("youtube/auth/start");
+
+      if (data.auth_url) {
+        // Try popup authentication first
+        try {
+          toast("Opening authentication popup...", { icon: "ℹ️" });
+          const authResult = await authenticateWithPopup(data.auth_url);
+          if (authResult.success) {
+            // Re-check auth status and continue with upload
+            await checkAuthStatus();
+            toast.success("YouTube authentication successful!");
+            return;
+          }
+        } catch (popupError: any) {
+          console.warn(
+            "Popup authentication failed, falling back to redirect:",
+            popupError
+          );
+          if (popupError?.message?.includes("blocked")) {
+            toast.error(
+              "Popup was blocked by browser. Falling back to redirect method..."
+            );
+          } else {
+            toast.error(
+              "Popup authentication failed. Trying redirect method..."
+            );
+          }
+        }
+
+        // Fallback to redirect method if popup fails
+        toast(
+          "🎯 IMPORTANT: To upload to the MotiveArchiveMedia channel:\n\n" +
+            "1. On the next screen, you'll see 'Choose an account'\n" +
+            "2. Look for the MotiveArchiveMedia Google account (NOT your personal account)\n" +
+            "3. If you don't see it, click 'Use another account' and sign in with the brand account credentials\n" +
+            "4. Make sure you're authenticating AS the brand account, not your personal account",
+          {
+            duration: 12000,
+            style: {
+              backgroundColor: "#dc2626",
+              color: "white",
+              fontSize: "14px",
+              lineHeight: "1.4",
+              whiteSpace: "pre-line",
+              maxWidth: "500px",
+            },
+          }
+        );
+
+        // Store current page state for better redirect using cookies
+        document.cookie = `youtube_auth_return_url=${encodeURIComponent(window.location.href)}; path=/; max-age=3600`;
+        document.cookie = `youtube_auth_modal_open=true; path=/; max-age=3600`;
+
+        setTimeout(() => {
+          window.location.href = data.auth_url!;
+        }, 3000);
+      } else {
+        toast.error("Failed to start authentication");
+      }
+    } catch (error: any) {
+      console.error("Authentication error:", error);
+      toast.error("Failed to start authentication");
+    }
+  };
+
+  // Popup authentication method
+  const authenticateWithPopup = (
+    authUrl: string
+  ): Promise<{ success: boolean }> => {
+    return new Promise((resolve, reject) => {
+      // Add popup parameter to auth URL for better detection
+      const popupAuthUrl = authUrl.includes("?")
+        ? `${authUrl}&popup=true`
+        : `${authUrl}?popup=true`;
+
+      // Open popup window
+      const popup = window.open(
+        popupAuthUrl,
+        "youtube-auth",
+        "width=500,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no"
+      );
+
+      if (!popup) {
+        reject(new Error("Popup blocked by browser"));
+        return;
+      }
+
+      // Listen for messages from popup
+      const handleMessage = (event: MessageEvent) => {
+        // Verify origin for security
+        if (event.origin !== window.location.origin) return;
+
+        if (event.data.type === "youtube-auth-success") {
+          window.removeEventListener("message", handleMessage);
+          resolve({ success: true });
+        } else if (event.data.type === "youtube-auth-error") {
+          window.removeEventListener("message", handleMessage);
+          reject(new Error(`Authentication failed: ${event.data.error}`));
+        }
+      };
+
+      window.addEventListener("message", handleMessage);
+
+      // Poll for popup closure
+      const pollTimer = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(pollTimer);
+          window.removeEventListener("message", handleMessage);
+          reject(new Error("Authentication cancelled - popup was closed"));
+          return;
+        }
+      }, 1000);
+
+      // Timeout after 5 minutes
+      setTimeout(() => {
+        clearInterval(pollTimer);
+        window.removeEventListener("message", handleMessage);
+        if (!popup.closed) {
+          popup.close();
+        }
+        reject(new Error("Authentication timeout"));
+      }, 300000);
+    });
+  };
 
   const handleUpload = async () => {
-    if (!authStatus.isAuthenticated) {
-      toast.error("Please authenticate with YouTube first");
+    if (!title.trim()) {
+      toast.error("Please provide a title");
+      return;
+    }
+
+    if (!deliverable._id) {
+      toast.error("Deliverable ID is missing. Cannot upload to YouTube.");
       return;
     }
 
     setIsUploading(true);
-
     try {
-      console.log("Starting YouTube upload for deliverable:", deliverable._id);
-      console.log("Dropbox link:", deliverable.dropbox_link);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Starting YouTube upload for deliverable:", deliverable._id);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Dropbox link:", deliverable.dropbox_link);
 
-      const response = await fetch("/api/youtube/upload", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          deliverable_id: deliverable._id,
-          title: title,
-          description: getDescriptionForUpload(),
-          tags: tags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
-          privacy_status: "private", // Default to private for user uploads
-        }),
-      });
+      const deliverableId = String(deliverable._id!);
 
-      const result = await response.json();
+      const uploadData: YouTubeUploadData = {
+        deliverable_id: deliverableId,
+        title: title,
+        description: getDescriptionForUpload(),
+        tags: tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        privacy_status: "private", // Default to private for user uploads
+      };
 
-      if (!response.ok) {
+      const response = await api.post<YouTubeUploadResponse>(
+        "youtube/upload",
+        uploadData
+      );
+
+      if (!response.success) {
         // Handle authentication errors
-        if (response.status === 401) {
-          if (result.requires_auth || result.auth_url) {
-            toast.error("YouTube authentication required");
-            return;
-          } else if (result.setup_required) {
-            toast.error("YouTube setup required");
-            return;
-          }
+        if (response.requires_auth || response.auth_url) {
+          toast.error("YouTube authentication required");
+          return;
+        } else if (response.setup_required) {
+          toast.error("YouTube setup required");
+          return;
         }
 
         // Handle other errors
-        const errorMessage = result.details || result.error || "Upload failed";
+        const errorMessage =
+          response.details || response.error || "Upload failed";
         console.error("YouTube upload error:", errorMessage);
 
         // Handle specific "no YouTube channels" error
@@ -267,15 +427,15 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
         throw new Error(errorMessage);
       }
 
-      console.log("YouTube upload successful:", result);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("YouTube upload successful:", response);
       toast.success(
-        `Video uploaded to YouTube successfully! ${result.youtube_url ? `\nVideo ID: ${result.video_id}` : ""}`
+        `Video uploaded to YouTube successfully! ${response.youtube_url ? `\nVideo ID: ${response.video_id}` : ""}`
       );
       setIsOpen(false);
 
       // Refresh the page to show updated social media link
       window.location.reload();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload error:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to upload video"
@@ -345,7 +505,7 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
       sessionStorage.removeItem("youtube_upload_tags");
 
       // Clear cookies by making a request to clear them server-side
-      await fetch("/api/youtube/auth/logout", { method: "POST" });
+      await api.post("/youtube/auth/logout", {});
 
       // Reset auth status
       setAuthStatus({ isAuthenticated: false, channels: [] });
@@ -362,14 +522,15 @@ const YouTubeUploadHelper: React.FC<YouTubeUploadHelperProps> = ({
   return (
     <>
       <Button
-        variant="ghost"
+        variant="outline"
         size="sm"
         onClick={handleClick}
         disabled={isCheckingAuth}
-        className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-950"
+        className="text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-950 border-red-200 dark:border-red-800 flex-1"
         title="Upload to YouTube"
       >
-        <Play className="h-4 w-4" />
+        <Play className="h-4 w-4 mr-2" />
+        Upload to YouTube
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>

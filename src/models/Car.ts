@@ -81,8 +81,14 @@ const Car =
           ]),
         },
         // Array of ObjectIds referencing documents in the 'images' collection
-        // This is the preferred way to store image references
-        imageIds: [String],
+        // UPDATED: Now enforces ObjectId type for data consistency
+        // Migration completed 2025-06-01 to convert existing strings to ObjectIds
+        imageIds: [
+          {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Image",
+          },
+        ],
         // Reference to the primary image for this car
         primaryImageId: {
           type: mongoose.Schema.Types.ObjectId,

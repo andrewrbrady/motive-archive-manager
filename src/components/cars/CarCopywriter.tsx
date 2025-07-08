@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { CarSelection } from "../projects/caption-generator/CarSelection";
 import { EventSelection } from "../projects/caption-generator/EventSelection";
 import { SystemPromptSelection } from "../projects/caption-generator/SystemPromptSelection";
+import { BrandToneSelection } from "../projects/caption-generator/BrandToneSelection";
 import { CaptionPreview } from "../projects/caption-generator/CaptionPreview";
 import { GenerationControls } from "../projects/caption-generator/GenerationControls";
 import { PromptEditModal } from "../projects/caption-generator/PromptEditModal";
@@ -29,6 +30,8 @@ import type { ProviderId } from "@/lib/llmProviders";
 import type { BaTCarDetails } from "@/types/car-page";
 import type { Event } from "@/types/event";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useAPI } from "@/hooks/useAPI";
+import { useBrandTones } from "@/hooks/useBrandTones";
 
 interface CarCopywriterProps {
   carId: string;
@@ -45,6 +48,7 @@ interface CarSavedCaption {
 
 export function CarCopywriter({ carId }: CarCopywriterProps) {
   const { user } = useFirebaseAuth();
+  const api = useAPI();
 
   // Car-specific state
   const [carDetails, setCarDetails] = useState<BaTCarDetails | null>(null);
@@ -57,6 +61,8 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
   const [eventDetails, setEventDetails] = useState<ProjectEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
+  const [eventsLimit, setEventsLimit] = useState(10);
+  const [eventsHasMore, setEventsHasMore] = useState(false);
 
   // System prompts state
   const [systemPrompts, setSystemPrompts] = useState<any[]>([]);
@@ -70,11 +76,21 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
   // Length settings state
   const [lengthSettings, setLengthSettings] = useState<any[]>([]);
 
-  // Saved captions state - managed locally
+  // Brand tone state - Phase 2A
+  const [selectedBrandToneId, setSelectedBrandToneId] = useState<string>("");
+  const {
+    brandTones,
+    isLoading: loadingBrandTones,
+    error: brandToneError,
+  } = useBrandTones();
+
+  // Saved captions state - managed locally with pagination
   const [savedCaptions, setSavedCaptions] = useState<CarSavedCaption[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>("");
+  const [captionsLimit, setCaptionsLimit] = useState(5);
+  const [captionsHasMore, setCaptionsHasMore] = useState(false);
 
   // Content view mode state
   const [contentViewMode, setContentViewMode] = useState<"preview" | "saved">(
@@ -95,11 +111,45 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
   });
 
   // Derive length from selected prompt template (using promptHandlers state)
-  const derivedLength = promptHandlers.selectedPrompt
-    ? lengthSettings.find(
-        (l) => l.key === promptHandlers.selectedPrompt?.length
-      ) || null
-    : null;
+  const derivedLength = useMemo(() => {
+    if (!promptHandlers.selectedPrompt) return null;
+
+    // Try to find matching length setting
+    const matchedLength = lengthSettings.find(
+      (l) => l.key === promptHandlers.selectedPrompt?.length
+    );
+
+    if (matchedLength) return matchedLength;
+
+    // Fallback: try to find "standard" as default
+    const standardLength = lengthSettings.find((l) => l.key === "standard");
+
+    if (standardLength) {
+      console.warn(
+        `🚨 CarCopywriter: Prompt template "${promptHandlers.selectedPrompt.name}" has invalid length "${promptHandlers.selectedPrompt.length}". Falling back to "standard".`
+      );
+      return standardLength;
+    }
+
+    // Last resort: use first available length setting
+    if (lengthSettings.length > 0) {
+      console.warn(
+        `🚨 CarCopywriter: No "standard" length found. Using first available: "${lengthSettings[0].key}"`
+      );
+      return lengthSettings[0];
+    }
+
+    // Ultimate fallback: create a default length setting
+    console.error(
+      "🚨 CarCopywriter: No length settings available. Using hardcoded default."
+    );
+    return {
+      key: "standard",
+      name: "Standard",
+      description: "2-3 lines",
+      instructions: "Write a standard length caption of 2-3 lines.",
+    };
+  }, [promptHandlers.selectedPrompt, lengthSettings]);
 
   // Generation handlers - must be called before any early returns
   const { generationState, generateCaption, updateGeneratedCaption } =
@@ -158,6 +208,21 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     if (systemPrompt) {
       llmText += `SYSTEM PROMPT: ${systemPrompt.name}\n`;
       llmText += `${systemPrompt.prompt}\n\n`;
+    }
+
+    // Add brand tone instructions (Phase 2B: AI Prompt Integration)
+    if (selectedBrandToneId && selectedBrandToneId !== "default") {
+      const selectedBrandTone = brandTones.find(
+        (tone) => tone._id === selectedBrandToneId
+      );
+      if (selectedBrandTone) {
+        llmText += `BRAND TONE: ${selectedBrandTone.name}\n`;
+        llmText += `TONE INSTRUCTIONS: ${selectedBrandTone.tone_instructions}\n`;
+        if (selectedBrandTone.example_phrases.length > 0) {
+          llmText += `EXAMPLE PHRASES: ${selectedBrandTone.example_phrases.join(", ")}\n`;
+        }
+        llmText += `\n`;
+      }
     }
 
     // Add form context
@@ -235,14 +300,21 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     carDetails,
     selectedSystemPromptId,
     systemPrompts,
-    formState,
+    selectedBrandToneId,
+    brandTones,
+    formState.context,
+    formState.additionalContext,
     eventDetails,
+    formState.platform,
+    formState.tone,
+    formState.style,
     derivedLength,
+    formState.model,
+    formState.temperature,
   ]);
 
   const handleShowPreviewToggle = useCallback(() => {
     if (!showPreview) {
-      // Generate the LLM text when opening preview
       const generatedText = buildLLMText();
       setEditableLLMText(generatedText);
     }
@@ -279,204 +351,6 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     [formHandlers, formState.additionalContext]
   );
 
-  // Fetch car details
-  const fetchCarDetails = useCallback(async () => {
-    try {
-      setLoadingCar(true);
-      setCarError(null);
-
-      const response = await fetch(`/api/cars/${carId}`);
-      if (!response.ok) throw new Error("Failed to fetch car details");
-
-      const data = await response.json();
-
-      // Convert to BaTCarDetails format
-      const baTCarDetails: BaTCarDetails = {
-        _id: data._id,
-        year: data.year || 0,
-        make: data.make || "",
-        model: data.model || "",
-        color: data.color,
-        mileage: data.mileage,
-        engine: data.engine
-          ? {
-              type: data.engine.type,
-              displacement: data.engine.displacement,
-              power: data.engine.power
-                ? {
-                    hp: data.engine.power.hp || 0,
-                  }
-                : undefined,
-            }
-          : undefined,
-        transmission: data.transmission || { type: "" },
-        vin: data.vin,
-        condition: data.condition,
-        interior_color: data.interior_color,
-        interior_features: data.interior_features
-          ? {
-              seats: data.interior_features.seats || 0,
-              upholstery: data.interior_features.upholstery,
-            }
-          : undefined,
-        description: data.description,
-      };
-
-      setCarDetails(baTCarDetails);
-
-      // Try to get clientId from car details
-      const clientId = data.client || data.clientId || data.clientInfo?._id;
-      if (clientId) {
-        const clientRes = await fetch(`/api/clients/${clientId}`);
-        if (clientRes.ok) {
-          const client = await clientRes.json();
-          if (client.socialMedia?.instagram) {
-            setClientHandle(
-              `@${client.socialMedia.instagram.replace(/^@/, "")}`
-            );
-          } else {
-            setClientHandle(null);
-          }
-        } else {
-          setClientHandle(null);
-        }
-      } else {
-        setClientHandle(null);
-      }
-    } catch (error) {
-      console.error("Error fetching car details:", error);
-      setCarError(
-        error instanceof Error ? error.message : "Failed to fetch car details"
-      );
-      setClientHandle(null);
-    } finally {
-      setLoadingCar(false);
-    }
-  }, [carId]);
-
-  // Fetch car events
-  const fetchCarEvents = useCallback(async () => {
-    try {
-      setLoadingEvents(true);
-      const response = await fetch(`/api/cars/${carId}/events`);
-      if (!response.ok) throw new Error("Failed to fetch car events");
-
-      const data: Event[] = await response.json();
-
-      // Convert Event[] to ProjectEvent[] format for compatibility
-      const projectEvents: ProjectEvent[] = data.map((event) => ({
-        id: event.id,
-        car_id: event.car_id,
-        project_id: event.project_id,
-        type: event.type,
-        title: event.title,
-        description: event.description,
-        start: event.start,
-        end: event.end,
-        isAllDay: event.isAllDay,
-        teamMemberIds: event.teamMemberIds,
-        locationId: event.locationId,
-        primaryImageId: event.primaryImageId,
-        imageIds: event.imageIds,
-        createdAt: event.createdAt,
-        updatedAt: event.updatedAt,
-      }));
-
-      setCarEvents(projectEvents);
-    } catch (error) {
-      console.error("Error fetching car events:", error);
-      // Don't show error toast for events as they're optional
-    } finally {
-      setLoadingEvents(false);
-    }
-  }, [carId]);
-
-  // Fetch event details when selected events change
-  const fetchEventDetails = useCallback(async () => {
-    try {
-      const eventDetailsData = selectedEventIds
-        .map((eventId) => {
-          return carEvents.find((event) => event.id === eventId);
-        })
-        .filter(Boolean) as ProjectEvent[];
-
-      setEventDetails(eventDetailsData);
-    } catch (error) {
-      console.error("Error fetching event details:", error);
-    }
-  }, [selectedEventIds, carEvents]);
-
-  // System prompts fetch function
-  const fetchSystemPrompts = useCallback(async () => {
-    try {
-      setLoadingSystemPrompts(true);
-      setSystemPromptError(null);
-
-      if (!user) {
-        console.log(
-          "CarCopywriter: No user available for fetchSystemPrompts, skipping..."
-        );
-        return; // Return early instead of throwing error
-      }
-
-      // Get the Firebase ID token
-      const token = await user.getIdToken();
-
-      const response = await fetch("/api/system-prompts/list", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) throw new Error("Failed to fetch system prompts");
-
-      const data = await response.json();
-      setSystemPrompts(Array.isArray(data) ? data : []);
-
-      // Auto-select the first active system prompt if available
-      const activePrompt = data.find((prompt: any) => prompt.isActive);
-      if (activePrompt) {
-        setSelectedSystemPromptId(activePrompt._id);
-      } else if (data.length > 0) {
-        setSelectedSystemPromptId(data[0]._id);
-      }
-    } catch (error) {
-      console.error("Error fetching system prompts:", error);
-      setSystemPromptError(
-        error instanceof Error
-          ? error.message
-          : "Failed to fetch system prompts"
-      );
-    } finally {
-      setLoadingSystemPrompts(false);
-    }
-  }, [user]);
-
-  // Fetch length settings
-  const fetchLengthSettings = useCallback(async () => {
-    try {
-      const response = await fetch("/api/length-settings");
-      if (!response.ok) throw new Error("Failed to fetch length settings");
-
-      const data = await response.json();
-      setLengthSettings(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Error fetching length settings:", error);
-    }
-  }, []);
-
-  // Fetch saved captions
-  const fetchSavedCaptions = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/captions?carId=${carId}`);
-      if (!response.ok) throw new Error("Failed to fetch captions");
-
-      const captions = await response.json();
-      setSavedCaptions(captions);
-    } catch (error) {
-      console.error("Error fetching captions:", error);
-    }
-  }, [carId]);
-
   // Event selection handlers
   const handleEventSelection = useCallback((eventId: string) => {
     setSelectedEventIds((prev) => {
@@ -496,39 +370,126 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     }
   }, [selectedEventIds.length, carEvents]);
 
-  // Initialize data on mount
-  useEffect(() => {
-    fetchCarDetails();
-    fetchCarEvents();
-    fetchLengthSettings();
-    fetchSavedCaptions();
+  // Performance monitoring utility
+  const logAPIPerformance = useCallback(
+    (endpoint: string, startTime: number, data: any) => {
+      const duration = performance.now() - startTime;
+      const sizeInBytes = JSON.stringify(data).length;
+      const sizeInKB = (sizeInBytes / 1024).toFixed(2);
+
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚀 API Performance - ${endpoint}:`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`   Duration: ${duration.toFixed(2)}ms`);
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`   Payload Size: ${sizeInKB}KB (${sizeInBytes} bytes)`);
+      console.log(
+        `   Items Count: ${Array.isArray(data) ? data.length : "N/A"}`
+      );
+
+      // Flag potentially heavy responses
+      if (duration > 1000) {
+        console.warn(
+          `⚠️  Slow API call detected: ${endpoint} took ${duration.toFixed(2)}ms`
+        );
+      }
+      if (sizeInBytes > 100000) {
+        // 100KB threshold
+        console.warn(
+          `⚠️  Large payload detected: ${endpoint} returned ${sizeInKB}KB`
+        );
+      }
+    },
+    []
+  );
+
+  // Load more events function
+  const loadMoreEvents = useCallback(async () => {
+    if (!api || loadingEvents || !eventsHasMore) return;
+
+    setLoadingEvents(true);
+    try {
+      const startTime = performance.now();
+      const newLimit = eventsLimit + 10;
+      const additionalEvents = (await api.get(
+        `cars/${carId}/events?limit=${newLimit}&skip=${eventsLimit}`
+      )) as ProjectEvent[];
+      logAPIPerformance(
+        `cars/${carId}/events (load more)`,
+        startTime,
+        additionalEvents
+      );
+
+      if (additionalEvents.length === 0) {
+        setEventsHasMore(false);
+      } else {
+        setCarEvents((prev) => [...prev, ...additionalEvents]);
+        setEventsLimit(newLimit);
+        setEventsHasMore(additionalEvents.length === 10); // Has more if we got full batch
+      }
+    } catch (error) {
+      console.error("Error loading more events:", error);
+    } finally {
+      setLoadingEvents(false);
+    }
   }, [
-    fetchCarDetails,
-    fetchCarEvents,
-    fetchLengthSettings,
-    fetchSavedCaptions,
+    api,
+    carId,
+    loadingEvents,
+    eventsHasMore,
+    eventsLimit,
+    logAPIPerformance,
   ]);
 
-  // Fetch system prompts only when user is available
-  useEffect(() => {
-    if (user) {
-      fetchSystemPrompts();
-    }
-  }, [user, fetchSystemPrompts]);
+  // Load more captions function
+  const loadMoreCaptions = useCallback(async () => {
+    if (!api || !captionsHasMore) return;
 
-  // Fetch prompts when component mounts - separate useEffect to avoid dependency issues
-  useEffect(() => {
-    promptHandlers.fetchPrompts();
-  }, []);
+    try {
+      const startTime = performance.now();
+      const newLimit = captionsLimit + 5;
+      const additionalCaptions = (await api.get(
+        `captions?carId=${carId}&limit=${newLimit}&skip=${captionsLimit}&sort=-createdAt`
+      )) as CarSavedCaption[];
+      logAPIPerformance(`captions (load more)`, startTime, additionalCaptions);
+
+      if (additionalCaptions.length === 0) {
+        setCaptionsHasMore(false);
+      } else {
+        setSavedCaptions((prev) => [...prev, ...additionalCaptions]);
+        setCaptionsLimit(newLimit);
+        setCaptionsHasMore(additionalCaptions.length === 5); // Has more if we got full batch
+      }
+    } catch (error) {
+      console.error("Error loading more captions:", error);
+    }
+  }, [api, carId, captionsHasMore, captionsLimit, logAPIPerformance]);
+
+  // Helper function to refetch saved captions when needed
+  const fetchSavedCaptions = useCallback(async () => {
+    if (!api) return;
+
+    try {
+      const data = (await api.get(
+        `captions?carId=${carId}`
+      )) as CarSavedCaption[];
+      setSavedCaptions(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error fetching captions:", error);
+    }
+  }, [api, carId]);
 
   // Fetch event details when selected events change
-  useEffect(() => {
-    if (selectedEventIds.length > 0) {
-      fetchEventDetails();
-    } else {
-      setEventDetails([]);
+  const fetchEventDetails = useCallback(async () => {
+    try {
+      const eventDetailsData = selectedEventIds
+        .map((eventId) => {
+          return carEvents.find((event) => event.id === eventId);
+        })
+        .filter(Boolean) as ProjectEvent[];
+
+      setEventDetails(eventDetailsData);
+    } catch (error) {
+      console.error("Error fetching event details:", error);
     }
-  }, [selectedEventIds, fetchEventDetails]);
+  }, [selectedEventIds, carEvents]);
 
   // Handle system prompt change
   const handleSystemPromptChange = useCallback((promptId: string) => {
@@ -546,6 +507,7 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
           color: carDetails.color,
           vin: carDetails.vin,
           status: "available", // Default status for individual car
+          primaryImageId: (carDetails as any).primaryImageId,
           createdAt: new Date().toISOString(), // Default createdAt
         },
       ]
@@ -573,26 +535,18 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
   };
 
   const handleSaveContent = async () => {
+    if (!carDetails || !api) return;
+
     const contentToSave = generationState.generatedCaption;
-    if (!contentToSave || !carDetails) return;
+    if (!contentToSave.trim()) return;
 
     try {
-      const response = await fetch("/api/captions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          platform: formState.platform,
-          carId: carDetails._id,
-          context: formState.context,
-          caption: contentToSave,
-        }),
+      await api.post("captions", {
+        platform: formState.platform,
+        carId: carDetails._id,
+        context: formState.context,
+        caption: contentToSave,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to save caption");
-      }
 
       toast({
         title: "Success",
@@ -618,25 +572,28 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
   };
 
   const handleDeleteContent = async (contentId: string) => {
-    try {
-      const response = await fetch(
-        `/api/captions?id=${contentId}&carId=${carDetails?._id}`,
-        {
-          method: "DELETE",
-        }
-      );
+    if (!api) return;
 
-      if (!response.ok) {
-        throw new Error("Failed to delete caption");
-      }
+    try {
+      await api.delete(`captions/${contentId}?carId=${carDetails?._id}`);
 
       toast({
         title: "Success",
         description: "Caption deleted successfully",
       });
 
-      // Refresh saved captions
-      await fetchSavedCaptions();
+      // Refresh saved captions by fetching them again
+      try {
+        const refreshedCaptions = (await api.get(
+          `captions?carId=${carId}&limit=${captionsLimit}&sort=-createdAt`
+        )) as CarSavedCaption[];
+        setSavedCaptions(
+          Array.isArray(refreshedCaptions) ? refreshedCaptions : []
+        );
+        setCaptionsHasMore((refreshedCaptions || []).length === captionsLimit);
+      } catch (refreshError) {
+        console.error("Error refreshing captions:", refreshError);
+      }
     } catch (error) {
       console.error("Error deleting caption:", error);
       toast({
@@ -648,35 +605,37 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
   };
 
   const handleSaveEdit = async (contentId: string) => {
+    if (!api) return;
+
     try {
       const captionToEdit = savedCaptions.find((c) => c._id === contentId);
       if (!captionToEdit) {
         throw new Error("Caption not found");
       }
 
-      const response = await fetch(`/api/captions?id=${contentId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          caption: editingText,
-          platform: captionToEdit.platform,
-          context: captionToEdit.context || "",
-        }),
+      await api.patch(`captions/${contentId}`, {
+        caption: editingText,
+        platform: captionToEdit.platform,
+        context: captionToEdit.context || "",
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to update caption");
-      }
 
       toast({
         title: "Success",
         description: "Caption updated successfully",
       });
 
-      // Refresh saved captions
-      await fetchSavedCaptions();
+      // Refresh saved captions by fetching them again
+      try {
+        const refreshedCaptions = (await api.get(
+          `captions?carId=${carId}&limit=${captionsLimit}&sort=-createdAt`
+        )) as CarSavedCaption[];
+        setSavedCaptions(
+          Array.isArray(refreshedCaptions) ? refreshedCaptions : []
+        );
+        setCaptionsHasMore((refreshedCaptions || []).length === captionsLimit);
+      } catch (refreshError) {
+        console.error("Error refreshing captions:", refreshError);
+      }
       handleCancelEdit();
     } catch (error) {
       console.error("Error updating caption:", error);
@@ -701,6 +660,175 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
       createdAt: caption.createdAt,
     })
   );
+
+  // Main data fetching effect
+  useEffect(() => {
+    if (!api || !carId) return;
+
+    const fetchAllData = async () => {
+      console.time("CarCopywriter-parallel-fetch");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🎯 Starting CarCopywriter data fetch for car: ${carId}`);
+
+      try {
+        // OPTIMIZATION 1 & 2: Add limits to events and captions API calls
+        // OPTIMIZATION 3: Remove client handle from Promise.all() to make it truly non-blocking
+        const parallelFetchStart = performance.now();
+
+        const [
+          carData,
+          carEventsData,
+          systemPromptsData,
+          lengthSettingsData,
+          savedCaptionsData,
+        ] = await Promise.all([
+          // Car details
+          (async () => {
+            const start = performance.now();
+            const data = (await api.get(`cars/${carId}`)) as BaTCarDetails & {
+              client?: string;
+              clientId?: string;
+              clientInfo?: { _id: string };
+            };
+            logAPIPerformance(`cars/${carId}`, start, data);
+            return data;
+          })(),
+
+          // Events with limit - OPTIMIZATION 1
+          (async () => {
+            const start = performance.now();
+            const data = (await api.get(
+              `cars/${carId}/events?limit=${eventsLimit}`
+            )) as ProjectEvent[];
+            logAPIPerformance(`cars/${carId}/events`, start, data);
+            return data;
+          })(),
+
+          // System prompts
+          (async () => {
+            const start = performance.now();
+            const data = (await api.get("system-prompts/list")) as any[];
+            logAPIPerformance("system-prompts/list", start, data);
+            return data;
+          })(),
+
+          // Length settings
+          (async () => {
+            const start = performance.now();
+            const data = (await api.get("length-settings")) as any[];
+            logAPIPerformance("length-settings", start, data);
+            return data;
+          })(),
+
+          // Captions with pagination - OPTIMIZATION 2
+          (async () => {
+            const start = performance.now();
+            const data = (await api.get(
+              `captions?carId=${carId}&limit=${captionsLimit}&sort=-createdAt`
+            )) as CarSavedCaption[];
+            logAPIPerformance(`captions`, start, data);
+            return data;
+          })(),
+        ]);
+
+        const parallelFetchDuration = performance.now() - parallelFetchStart;
+        console.log(
+          `⚡ Parallel fetch completed in: ${parallelFetchDuration.toFixed(2)}ms`
+        );
+
+        // Process car data
+        setCarDetails(carData);
+        setCarError(null);
+
+        // OPTIMIZATION 1: Remove frontend slicing since we now limit on API
+        // Check if there are more events to load
+        setCarEvents(carEventsData || []);
+        setEventsHasMore((carEventsData || []).length === eventsLimit);
+
+        // PERFORMANCE: Filter active prompts on frontend
+        const allPrompts = Array.isArray(systemPromptsData)
+          ? systemPromptsData
+          : [];
+        setSystemPrompts(allPrompts);
+        const activePrompt = allPrompts.find((prompt: any) => prompt.isActive);
+        if (activePrompt) {
+          setSelectedSystemPromptId(activePrompt._id);
+        } else if (allPrompts.length > 0) {
+          setSelectedSystemPromptId(allPrompts[0]._id);
+        }
+
+        // Process length settings
+        setLengthSettings(
+          Array.isArray(lengthSettingsData) ? lengthSettingsData : []
+        );
+
+        // OPTIMIZATION 2: Remove frontend slicing since we now paginate on API
+        // Check if there are more captions to load
+        setSavedCaptions(
+          Array.isArray(savedCaptionsData) ? savedCaptionsData : []
+        );
+        setCaptionsHasMore((savedCaptionsData || []).length === captionsLimit);
+
+        // OPTIMIZATION 3: Fetch client handle asynchronously and truly non-blocking
+        // Move this outside Promise.all() and make it completely independent
+        const clientId =
+          carData.client || carData.clientId || carData.clientInfo?._id;
+        if (clientId) {
+          // Fetch client handle completely independently without blocking main UI
+          const fetchClientHandle = async () => {
+            try {
+              const clientStart = performance.now();
+              const client = (await api.get(`clients/${clientId}`)) as any;
+              logAPIPerformance(`clients/${clientId}`, clientStart, client);
+
+              if (client.socialMedia?.instagram) {
+                setClientHandle(
+                  `@${client.socialMedia.instagram.replace(/^@/, "")}`
+                );
+              }
+            } catch (clientError) {
+              console.error("Error fetching client handle:", clientError);
+              setClientHandle(null);
+            }
+          };
+
+          // Start client fetch immediately without waiting
+          fetchClientHandle();
+        }
+      } catch (error) {
+        console.error("Error in parallel fetch:", error);
+        setCarError("Failed to fetch car data");
+      } finally {
+        console.timeEnd("CarCopywriter-parallel-fetch");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ CarCopywriter data fetch completed for car: ${carId}`);
+        setLoadingCar(false);
+        setLoadingEvents(false);
+        setLoadingSystemPrompts(false);
+      }
+    };
+
+    fetchAllData();
+  }, [api, carId, eventsLimit, captionsLimit, logAPIPerformance]);
+
+  // Fetch prompts separately to avoid conflicts with other prompt management
+  useEffect(() => {
+    promptHandlers.fetchPrompts();
+  }, [promptHandlers.fetchPrompts]);
+
+  // Fetch event details when selected events change
+  useEffect(() => {
+    if (selectedEventIds.length > 0) {
+      fetchEventDetails();
+    } else {
+      setEventDetails([]);
+    }
+  }, [selectedEventIds, fetchEventDetails]);
+
+  // Loading check moved to the end - after all hooks have been called
+  if (!api) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">Loading...</div>
+    );
+  }
 
   if (loadingCar) {
     return (
@@ -745,6 +873,8 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
             loadingEvents={loadingEvents}
             onEventSelection={handleEventSelection}
             onSelectAllEvents={handleSelectAllEvents}
+            hasMoreEvents={eventsHasMore}
+            onLoadMoreEvents={loadMoreEvents}
           />
 
           {/* System Prompt Selection */}
@@ -754,6 +884,15 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
             loadingSystemPrompts={loadingSystemPrompts}
             systemPromptError={systemPromptError}
             onSystemPromptChange={handleSystemPromptChange}
+          />
+
+          {/* Brand Tone Selection - Phase 2A */}
+          <BrandToneSelection
+            brandTones={brandTones}
+            selectedBrandToneId={selectedBrandToneId}
+            loadingBrandTones={loadingBrandTones}
+            brandToneError={brandToneError ? String(brandToneError) : null}
+            onBrandToneChange={setSelectedBrandToneId}
           />
 
           {/* Generation Controls */}
@@ -812,6 +951,9 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
             onEditTextChange={handleEditTextChange}
             onDeleteCaption={handleDeleteContent}
             onUpdatePreviewCaption={handleUpdatePreviewContent}
+            hasMoreCaptions={captionsHasMore}
+            onLoadMoreCaptions={loadMoreCaptions}
+            loadingCaptions={false}
           />
         </div>
       </div>

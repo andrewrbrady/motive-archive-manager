@@ -38,8 +38,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log("Listing files in Dropbox folder:", folderUrl);
-    console.log("Access token configured:", accessToken ? "Yes" : "No");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Listing files in Dropbox folder:", folderUrl);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Access token configured:", accessToken ? "Yes" : "No");
 
     // Get folder contents using Dropbox API
     const folderContents = await getDropboxFolderContents(
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
 
 // POST /api/dropbox/folder/import - Import images from Dropbox folder to Cloudflare
 export async function POST(request: NextRequest) {
-  console.log("POST /api/dropbox/folder/import - Import endpoint called"); // Debug log
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("POST /api/dropbox/folder/import - Import endpoint called"); // Debug log
 
   try {
     const { folderUrl, selectedImages, inspectionId } = await request.json();
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
 
     for (const imagePath of selectedImages) {
       try {
-        console.log(`Processing image: ${imagePath}`);
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Processing image: ${imagePath}`);
 
         // Create a direct download link for this specific file
         const downloadUrl = await createDirectDownloadLink(
@@ -222,8 +222,8 @@ async function getDropboxFolderContents(
   accessToken: string
 ): Promise<DropboxFolderResponse | null> {
   try {
-    console.log("Getting Dropbox folder contents for:", folderUrl);
-    console.log("Access token length:", accessToken.length);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Getting Dropbox folder contents for:", folderUrl);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Access token length:", accessToken.length);
     console.log(
       "Access token starts with:",
       accessToken.substring(0, 10) + "..."
@@ -244,7 +244,7 @@ async function getDropboxFolderContents(
       }
     );
 
-    console.log("Metadata response status:", metadataResponse.status);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Metadata response status:", metadataResponse.status);
     console.log(
       "Metadata response headers:",
       Object.fromEntries(metadataResponse.headers.entries())
@@ -261,7 +261,7 @@ async function getDropboxFolderContents(
     }
 
     const metadata = await metadataResponse.json();
-    console.log("Shared link metadata received:", metadata);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Shared link metadata received:", metadata);
 
     // Check if this is a folder
     if (metadata[".tag"] !== "folder") {
@@ -291,7 +291,7 @@ async function getDropboxFolderContents(
       }
     );
 
-    console.log("List folder response status:", listResponse.status);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("List folder response status:", listResponse.status);
 
     if (!listResponse.ok) {
       const errorText = await listResponse.text();
@@ -303,7 +303,7 @@ async function getDropboxFolderContents(
     }
 
     const listData = await listResponse.json();
-    console.log("Folder contents received:", listData);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Folder contents received:", listData);
 
     // Convert the response to our format
     const entries = listData.entries.map((entry: any) => ({
@@ -337,7 +337,7 @@ async function createFolderContentFromUrl(
 ): Promise<DropboxFolderResponse | null> {
   // For now, return empty but valid structure
   // In a real implementation, you might need to use web scraping or a different approach
-  console.log("Creating folder content structure for:", folderUrl);
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Creating folder content structure for:", folderUrl);
 
   return {
     entries: [], // Empty for now - user will need to manually enter file names
@@ -348,7 +348,7 @@ async function createFolderContentFromUrl(
 async function createMockFolderData(
   folderUrl: string
 ): Promise<DropboxFolderResponse | null> {
-  console.log("Creating mock folder data for testing...");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Creating mock folder data for testing...");
 
   // Return some mock image files for testing the UI
   const mockFiles = [
@@ -401,7 +401,7 @@ async function createDirectDownloadLink(
     const baseUrl = folderUrl.replace("?dl=0", "").replace("&dl=0", "");
     const downloadUrl = `${baseUrl}/${encodeURIComponent(filename)}?dl=1`;
 
-    console.log("Created direct download URL:", downloadUrl);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Created direct download URL:", downloadUrl);
     return downloadUrl;
   } catch (error) {
     console.error("Error creating direct download link:", error);
@@ -411,7 +411,7 @@ async function createDirectDownloadLink(
 
 async function downloadFileFromUrl(url: string): Promise<Buffer | null> {
   try {
-    console.log("Downloading file from URL:", url);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Downloading file from URL:", url);
 
     const response = await fetch(url, {
       method: "GET",
@@ -430,7 +430,7 @@ async function downloadFileFromUrl(url: string): Promise<Buffer | null> {
     }
 
     const arrayBuffer = await response.arrayBuffer();
-    console.log("Downloaded file size:", arrayBuffer.byteLength);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Downloaded file size:", arrayBuffer.byteLength);
     return Buffer.from(arrayBuffer);
   } catch (error) {
     console.error("Error downloading from URL:", error);
@@ -443,7 +443,7 @@ async function downloadDropboxFile(
   accessToken: string
 ): Promise<Buffer | null> {
   try {
-    console.log("Downloading file from Dropbox:", filePath);
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Downloading file from Dropbox:", filePath);
 
     // For shared folder files, we need to use the sharing/get_shared_link_file endpoint
     // or the files/download endpoint with shared link
@@ -462,14 +462,14 @@ async function downloadDropboxFile(
       );
 
       if (response.ok) {
-        console.log("Direct file download successful");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Direct file download successful");
         const arrayBuffer = await response.arrayBuffer();
         return Buffer.from(arrayBuffer);
       } else {
-        console.log("Direct download failed, trying shared link approach");
+        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Direct download failed, trying shared link approach");
       }
     } catch (error) {
-      console.log("Direct download error, trying shared link approach");
+      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Direct download error, trying shared link approach");
     }
 
     // Method 2: Try to construct a direct download URL from the shared folder

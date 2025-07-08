@@ -1,11 +1,11 @@
-import useSWR from "swr";
-import { fetcher } from "@/lib/fetcher";
+import { useAPIQuery } from "@/hooks/useAPIQuery";
 
 export interface Gallery {
   _id: string;
   name: string;
   description?: string;
   imageIds: string[];
+  primaryImageId?: string;
   thumbnailImage?: {
     _id: string;
     url: string;
@@ -42,9 +42,11 @@ export function useGalleries(options: UseGalleriesOptions = {}) {
     queryParams.append("search", search);
   }
 
-  const { data, error, isLoading } = useSWR<GalleriesResponse>(
+  const { data, error, isLoading } = useAPIQuery<GalleriesResponse>(
     `/api/galleries?${queryParams}`,
-    fetcher
+    {
+      staleTime: 30 * 1000, // 30 seconds - galleries don't change super frequently
+    }
   );
 
   return {

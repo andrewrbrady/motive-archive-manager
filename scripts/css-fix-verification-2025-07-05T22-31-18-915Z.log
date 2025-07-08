@@ -1,0 +1,70 @@
+
+CSS CORRUPTION FIX VERIFICATION RESULTS
+Generated: 2025-07-05T22:31:18.916Z
+
+=== ORIGINAL CSS ===
+
+.email-container {
+  color: #1a1a1a;
+  background-color: #ffffff;
+  text-align: center;
+  border-color: #ff0000;
+  text-decoration-color: #abcdef;
+}
+
+#badIdSelector {
+  color: #000000;
+  background: #cccccc;
+}
+
+.header {
+  color: #333333;
+  background-color: #f5f5f5;
+}
+
+.header:hover {
+  background-color: #e0e0e0;
+}
+
+.test-class {
+  color: #123456;
+  background-color: #789abc;
+  border: 1px solid #def012;
+}
+
+[data-attribute] {
+  color: #456789;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Roboto');
+
+
+=== FINAL PROCESSED CSS ===
+
+.email-container {
+  color: #1a1a1a;
+  background-color: #ffffff;
+  text-align: center;
+  border-color: #ff0000;
+  text-decoration-color: #abcdef;
+}
+
+
+
+.header {
+  color: #333333;
+  background-color: #f5f5f5;
+}
+
+.
+
+.test-class {
+  color: #123456;
+  background-color: #789abc;
+  border: 1px solid #def012;
+}
+
+
+
+
+

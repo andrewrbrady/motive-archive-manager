@@ -13,17 +13,17 @@ const allowedMethods = ["GET", "POST"];
  * Fetches users from Firestore with caching
  */
 export async function GET(request: NextRequest) {
-  console.log("🔒 GET /api/users: Starting request");
+  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/users: Starting request");
 
   // Check authentication and admin role
   const authResult = await verifyAuthMiddleware(request, ["admin"]);
   if (authResult) {
-    console.log("❌ GET /api/users: Authentication failed");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ GET /api/users: Authentication failed");
     return authResult;
   }
 
   try {
-    console.log("🔒 GET /api/users: Authentication successful, fetching users");
+    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 GET /api/users: Authentication successful, fetching users");
 
     // Use cached users function which handles filtering and proper data structure
     const firestoreUsers = await getUsers();

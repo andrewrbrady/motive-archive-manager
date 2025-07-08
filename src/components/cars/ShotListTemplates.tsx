@@ -28,6 +28,7 @@ import {
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import Image from "next/image";
+import { useAPI } from "@/hooks/useAPI";
 
 export interface ShotTemplate {
   title: string;
@@ -55,6 +56,7 @@ export default function ShotListTemplates({
   onApplyTemplate,
   isEmbedded = false,
 }: ShotListTemplatesProps) {
+  const api = useAPI();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
@@ -76,16 +78,16 @@ export default function ShotListTemplates({
     },
   });
 
+  if (!api) return <div>Loading...</div>;
+
   useEffect(() => {
     fetchTemplates();
-  }, []);
+  }, [api]);
 
   const fetchTemplates = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/shot-templates");
-      if (!response.ok) throw new Error("Failed to fetch templates");
-      const data = await response.json();
+      const data = await api.get<Template[]>("shot-templates");
       setTemplates(data);
     } catch (error) {
       console.error("Error fetching templates:", error);
@@ -98,20 +100,12 @@ export default function ShotListTemplates({
   const handleSubmit = async (data: Template) => {
     try {
       const isEditing = !!editingTemplate;
-      const endpoint = isEditing
-        ? `/api/shot-templates/${editingTemplate.id}`
-        : "/api/shot-templates";
-      const method = isEditing ? "PUT" : "POST";
 
-      const response = await fetch(endpoint, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) throw new Error("Failed to save template");
+      if (isEditing) {
+        await api.put(`shot-templates/${editingTemplate.id}`, data);
+      } else {
+        await api.post("shot-templates", data);
+      }
 
       await fetchTemplates();
       toast.success(
@@ -132,12 +126,7 @@ export default function ShotListTemplates({
     if (!confirm("Are you sure you want to delete this template?")) return;
 
     try {
-      const response = await fetch(`/api/shot-templates/${templateId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) throw new Error("Failed to delete template");
-
+      await api.delete(`shot-templates/${templateId}`);
       await fetchTemplates();
       toast.success("Template deleted successfully");
     } catch (error) {
@@ -196,16 +185,10 @@ export default function ShotListTemplates({
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("/api/cloudflare/images", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to upload thumbnail");
-      }
-
-      const data = await response.json();
+      const data = await api.upload<{ imageUrl: string }>(
+        "cloudflare/images",
+        formData
+      );
       const imageUrl = data.imageUrl;
 
       // Update the form with the new thumbnail URL
