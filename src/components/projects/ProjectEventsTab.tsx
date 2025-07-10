@@ -39,6 +39,7 @@ import {
   Copy,
   Grid3X3,
   FileJson,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -815,6 +816,7 @@ function AttachEventDialog({
   const api = useAPI();
   const [availableEvents, setAvailableEvents] = useState<EventWithCar[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState({
     type: "all",
@@ -834,41 +836,90 @@ function AttachEventDialog({
 
   const fetchAvailableEvents = async () => {
     if (!api) {
-      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("No API available for fetching available events");
+      console.error("❌ API client not available - user not authenticated");
+      setError("Authentication required. Please sign in and try again.");
+      setIsLoading(false);
       return;
     }
 
     try {
       setIsLoading(true);
+      setError(null);
+      console.log("🔍 DEBUG: Starting to fetch available events");
 
       const queryParams = new URLSearchParams();
+      // Set a high limit to get all events for the attach modal
+      queryParams.append("limit", "1000"); // Get up to 1000 events
+      queryParams.append("pageSize", "1000"); // Alternative parameter name
+
       if (filters.type && filters.type !== "all") {
         queryParams.append("type", filters.type);
       }
 
       // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
-      const data = (await api.get(
-        `events?${queryParams.toString()}`
-      )) as Event[];
+      const eventsResponse = await api.get(`events?${queryParams.toString()}`);
+      // Handle both array response and object response with events property
+      let data: Event[] = [];
+      if (Array.isArray(eventsResponse)) {
+        data = eventsResponse as Event[];
+      } else if (
+        eventsResponse &&
+        typeof eventsResponse === "object" &&
+        "events" in eventsResponse
+      ) {
+        data = (eventsResponse as any).events || [];
+      } else {
+        data = [];
+      }
 
       // Filter out events that are already attached to this project
       let projectEvents: Event[] = [];
       try {
         // ✅ FIXED: Replace manual fetch() with useAPI() - removes NUCLEAR AUTH violation
-        projectEvents = (await api.get(
+        const projectEventsResponse = await api.get(
           `projects/${projectId}/events`
-        )) as Event[];
+        );
+        // Handle both array response and object response with events property
+        if (Array.isArray(projectEventsResponse)) {
+          projectEvents = projectEventsResponse as Event[];
+        } else if (
+          projectEventsResponse &&
+          typeof projectEventsResponse === "object" &&
+          "events" in projectEventsResponse
+        ) {
+          projectEvents = (projectEventsResponse as any).events || [];
+        } else {
+          projectEvents = [];
+        }
       } catch (error) {
         console.warn("Could not fetch project events for filtering:", error);
         // Continue without filtering - better to show all events than none
+        projectEvents = [];
       }
 
       const attachedEventIds = new Set(projectEvents.map((e: Event) => e.id));
 
+      // Debug logging to understand what's happening
+      console.log("🔍 DEBUG: All events fetched:", data.length);
+      console.log("🔍 DEBUG: Project events:", projectEvents.length);
+      console.log("🔍 DEBUG: Looking for event ID: 686d6224dc1f14e26c3d697a");
+      console.log(
+        "🔍 DEBUG: Event with car_id 6784b0e37a85711f907ba1e6:",
+        data.find((e) => e.car_id === "6784b0e37a85711f907ba1e6")
+      );
+
       // Fetch car information for events that have car_id in parallel
       const eventsWithCars = await Promise.all(
         data
-          .filter((event: Event) => !attachedEventIds.has(event.id))
+          .filter((event: Event) => {
+            const isAttached = attachedEventIds.has(event.id);
+            if (event.car_id === "6784b0e37a85711f907ba1e6") {
+              console.log(
+                `🔍 DEBUG: Event ${event.id} (${event.title}) - isAttached: ${isAttached}`
+              );
+            }
+            return !isAttached;
+          })
           .map(async (event: Event) => {
             try {
               if (event.car_id) {
@@ -887,7 +938,12 @@ function AttachEventDialog({
       setAvailableEvents(eventsWithCars);
     } catch (error) {
       console.error("Error fetching available events:", error);
-      toast.error("Failed to fetch available events");
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch available events";
+      setError(errorMessage);
+      toast.error(errorMessage);
       setAvailableEvents([]); // Set empty array on error
     } finally {
       setIsLoading(false);
@@ -930,8 +986,10 @@ function AttachEventDialog({
   const filteredEvents = availableEvents.filter((event) => {
     const matchesSearch =
       !filters.search ||
-      event.title.toLowerCase().includes(filters.search.toLowerCase()) ||
-      event.description?.toLowerCase().includes(filters.search.toLowerCase());
+      (event.title &&
+        event.title.toLowerCase().includes(filters.search.toLowerCase())) ||
+      (event.description &&
+        event.description.toLowerCase().includes(filters.search.toLowerCase()));
 
     return matchesSearch;
   });
@@ -988,6 +1046,26 @@ function AttachEventDialog({
             {isLoading ? (
               <div className="flex items-center justify-center h-64">
                 <div className="text-lg">Loading events...</div>
+              </div>
+            ) : error ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <AlertTriangle className="w-12 h-12 mx-auto text-red-500 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2 text-red-600">
+                    Error Loading Events
+                  </h3>
+                  <p className="text-muted-foreground mb-4">{error}</p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setError(null);
+                      fetchAvailableEvents();
+                    }}
+                    size="sm"
+                  >
+                    Try Again
+                  </Button>
+                </div>
               </div>
             ) : filteredEvents.length === 0 ? (
               <div className="flex items-center justify-center h-64">
