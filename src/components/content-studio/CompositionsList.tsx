@@ -26,12 +26,14 @@ interface CompositionsListProps {
   carId?: string;
   projectId?: string;
   onLoadComposition: (composition: LoadedComposition) => void;
+  onRefetch?: (refetchFn: () => void) => void;
 }
 
 export function CompositionsList({
   carId,
   projectId,
   onLoadComposition,
+  onRefetch,
 }: CompositionsListProps) {
   const { toast } = useToast();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -60,6 +62,13 @@ export function CompositionsList({
   });
 
   const compositions = compositionsData?.compositions || [];
+
+  // Expose refetch function to parent component
+  React.useEffect(() => {
+    if (onRefetch) {
+      onRefetch(refetch);
+    }
+  }, [onRefetch, refetch]);
 
   const handleDelete = async (compositionId: string) => {
     if (!confirm("Are you sure you want to delete this composition?")) {

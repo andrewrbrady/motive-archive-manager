@@ -1,16 +1,17 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Loader2, ImageIcon, RefreshCw, Plus, X } from "lucide-react";
+import { Loader2, ImageIcon, RefreshCw, Plus, X, Search } from "lucide-react";
 
 interface GalleryImageProps {
   image: any;
@@ -140,6 +141,7 @@ interface ImageGalleryPopupProps {
 /**
  * ImageGalleryPopup - Popup version of ImageGallery for toolbar integration
  * Provides same functionality as ImageGallery but in a convenient popup format
+ * Enhanced with larger size and search functionality
  */
 export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
   function ImageGalleryPopup({
@@ -152,6 +154,7 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
     children,
   }) {
     const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
 
     const handleAddImage = useCallback(
       (imageUrl: string, altText?: string) => {
@@ -161,11 +164,58 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
       [onAddImage]
     );
 
+    // Filter images based on search term
+    const filteredImages = useMemo(() => {
+      if (!searchTerm.trim()) return finalImages;
+
+      const searchLower = searchTerm.toLowerCase();
+      return finalImages.filter((image: any) => {
+        // Basic fields
+        const alt = (image.alt || "").toLowerCase();
+        const galleryName = (image.galleryName || "").toLowerCase();
+        const fileName = (image.fileName || image.filename || "").toLowerCase();
+        const url = (image.url || "").toLowerCase();
+
+        // Metadata fields
+        const description = (
+          image.metadata?.description ||
+          image.description ||
+          ""
+        ).toLowerCase();
+        const angle = (
+          image.metadata?.angle ||
+          image.angle ||
+          ""
+        ).toLowerCase();
+        const movement = (
+          image.metadata?.movement ||
+          image.movement ||
+          ""
+        ).toLowerCase();
+        const tod = (image.metadata?.tod || image.tod || "").toLowerCase();
+        const view = (image.metadata?.view || image.view || "").toLowerCase();
+        const side = (image.metadata?.side || image.side || "").toLowerCase();
+
+        return (
+          alt.includes(searchLower) ||
+          galleryName.includes(searchLower) ||
+          fileName.includes(searchLower) ||
+          url.includes(searchLower) ||
+          description.includes(searchLower) ||
+          angle.includes(searchLower) ||
+          movement.includes(searchLower) ||
+          tod.includes(searchLower) ||
+          view.includes(searchLower) ||
+          side.includes(searchLower)
+        );
+      });
+    }, [finalImages, searchTerm]);
+
     return (
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>{children}</PopoverTrigger>
         <PopoverContent
-          className="w-96 max-w-[90vw] p-0"
+          className="w-[800px] max-w-[95vw] p-0"
           side="top"
           align="center"
           sideOffset={10}
@@ -178,7 +228,7 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
                   <span>Add Images</span>
                   {finalImages.length > 0 && (
                     <Badge variant="outline" className="bg-transparent text-xs">
-                      {finalImages.length} images
+                      {filteredImages.length} of {finalImages.length} images
                     </Badge>
                   )}
                 </div>
@@ -211,24 +261,59 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
               )}
             </CardHeader>
             <CardContent className="p-4 pt-0">
+              {/* Search Bar */}
+              {finalImages.length > 0 && (
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search images by name, gallery, description, angle, movement, time of day..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 h-9 text-sm"
+                  />
+                  {searchTerm && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSearchTerm("")}
+                      className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0 hover:bg-muted/20"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              )}
+
               {loadingImages ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin" />
                   <span className="ml-2 text-sm">Loading images...</span>
                 </div>
               ) : finalImages && finalImages.length > 0 ? (
-                <ScrollArea className="h-80">
-                  <div className="grid grid-cols-2 gap-2">
-                    {finalImages.map((image: any, index: number) => (
-                      <GalleryImage
-                        key={`gallery-popup-image-${image.id || "no-id"}-${index}`}
-                        image={image}
-                        index={index}
-                        onAddImage={handleAddImage}
-                      />
-                    ))}
-                  </div>
-                </ScrollArea>
+                <>
+                  {filteredImages.length > 0 ? (
+                    <ScrollArea className="h-96">
+                      <div className="grid grid-cols-4 gap-3">
+                        {filteredImages.map((image: any, index: number) => (
+                          <GalleryImage
+                            key={`gallery-popup-image-${image.id || "no-id"}-${index}`}
+                            image={image}
+                            index={index}
+                            onAddImage={handleAddImage}
+                          />
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No images match your search</p>
+                      <p className="text-xs mt-1">
+                        Try a different search term or clear the filter
+                      </p>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <ImageIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />

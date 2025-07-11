@@ -1,18 +1,19 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Palette, FileText, Sparkles, Info, Archive } from "lucide-react";
+import { FileText, Mail, Newspaper, Info, Archive } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 
 import { CopySelector } from "./CopySelector";
-import { BlockComposer } from "./BlockComposer";
+import { EmailComposer } from "./EmailComposer";
+import { NewsComposer } from "./NewsComposer";
 import { CompositionsList } from "./CompositionsList";
 import {
   ContentStudioTabProps,
@@ -46,15 +47,78 @@ export function ContentStudioTab({
   const [activeTemplate, setActiveTemplate] = useState<ContentTemplate | null>(
     null
   );
-  const [activeTab, setActiveTab] = useState<string>("copy-selection");
+  const [activeTab, setActiveTab] = useState<string>("email-composer");
   const [loadedComposition, setLoadedComposition] =
     useState<LoadedComposition | null>(null);
   const [isLoadingComposition, setIsLoadingComposition] = useState(false);
+  const isIntentionallyClearing = useRef(false);
+  const compositionsRefetch = useRef<(() => void) | null>(null);
+  const previousContext = useRef<{ carId?: string; projectId?: string } | null>(
+    null
+  );
+
+  // Generate a unique key for localStorage based on context
+  const workingStateKey = `content-studio-working-state-${
+    projectId ? `project-${projectId}` : `car-${carId}`
+  }`;
 
   // Determine context (car vs project mode)
   const isProjectMode = Boolean(projectId);
   const entityId = projectId || carId;
   const entityInfo = projectInfo || carInfo;
+
+  // Save working state to localStorage
+  const saveWorkingState = useCallback(() => {
+    if (
+      !loadedComposition &&
+      (blocks.length > 0 || selectedCopies.length > 0)
+    ) {
+      const workingState = {
+        blocks,
+        selectedCopies,
+        activeTemplate,
+        activeTab,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(workingStateKey, JSON.stringify(workingState));
+    }
+  }, [
+    blocks,
+    selectedCopies,
+    activeTemplate,
+    activeTab,
+    loadedComposition,
+    workingStateKey,
+  ]);
+
+  // Restore working state from localStorage
+  const restoreWorkingState = useCallback(() => {
+    try {
+      const saved = localStorage.getItem(workingStateKey);
+      if (saved) {
+        const workingState = JSON.parse(saved);
+        // Only restore if it's recent (within 24 hours)
+        if (
+          workingState.timestamp &&
+          Date.now() - workingState.timestamp < 24 * 60 * 60 * 1000
+        ) {
+          setBlocks(workingState.blocks || []);
+          setSelectedCopies(workingState.selectedCopies || []);
+          setActiveTemplate(workingState.activeTemplate || null);
+          setActiveTab(workingState.activeTab || "email-composer");
+          return true;
+        }
+      }
+    } catch (error) {
+      console.error("Error restoring working state:", error);
+    }
+    return false;
+  }, [workingStateKey]);
+
+  // Clear working state from localStorage
+  const clearWorkingState = useCallback(() => {
+    localStorage.removeItem(workingStateKey);
+  }, [workingStateKey]);
 
   // Function to update URL with composition ID
   const updateUrlWithComposition = useCallback(
@@ -95,11 +159,14 @@ export function ContentStudioTab({
           setSelectedCopies(composition.metadata.selectedCopies);
         }
 
-        // Switch to the block composer tab
-        setActiveTab("block-composer");
+        // Switch to the email composer tab by default
+        setActiveTab("email-composer");
 
         // Update URL with composition ID
         updateUrlWithComposition(compositionId);
+
+        // Clear working state since we're now editing a saved composition
+        clearWorkingState();
       } catch (error) {
         console.error("Error loading composition:", error);
         toast({
@@ -115,7 +182,7 @@ export function ContentStudioTab({
         setIsLoadingComposition(false);
       }
     },
-    [toast, updateUrlWithComposition]
+    [toast, updateUrlWithComposition, clearWorkingState]
   );
 
   // Check URL for composition ID on mount and when search params change
@@ -123,6 +190,14 @@ export function ContentStudioTab({
     if (!searchParams) return;
 
     const compositionId = searchParams.get("composition");
+
+    // Don't load if we're intentionally clearing
+    if (isIntentionallyClearing.current) {
+      isIntentionallyClearing.current = false;
+      return;
+    }
+
+    // Only load if we have a composition ID, no loaded composition, not loading
     if (compositionId && !loadedComposition && !isLoadingComposition) {
       loadCompositionById(compositionId);
     }
@@ -133,17 +208,56 @@ export function ContentStudioTab({
     loadCompositionById,
   ]);
 
-  // Handle copy selection from the CopySelector
+  // Save working state when it changes (but not when loading a saved composition)
+  useEffect(() => {
+    if (!loadedComposition) {
+      saveWorkingState();
+    }
+  }, [
+    blocks,
+    selectedCopies,
+    activeTemplate,
+    activeTab,
+    loadedComposition,
+    saveWorkingState,
+  ]);
+
+  // Handle copy selection from the LoadModal (replace current content)
   const handleCopySelect = useCallback(
     (copies: SelectedCopy[]) => {
-      setSelectedCopies(copies);
+      // Set flag to prevent URL effect from reloading
+      isIntentionallyClearing.current = true;
 
-      // Auto-advance to composer if copies are selected
-      if (copies.length > 0 && activeTab === "copy-selection") {
-        setActiveTab("block-composer");
-      }
+      setSelectedCopies(copies);
+      // Clear any loaded composition when loading new copy
+      setLoadedComposition(null);
+      setBlocks([]);
+      // Clear URL composition parameter
+      updateUrlWithComposition(null);
     },
-    [activeTab]
+    [updateUrlWithComposition]
+  );
+
+  // Handle creating new composition with copy
+  const handleCreateNewWithCopy = useCallback(
+    (copies: SelectedCopy[]) => {
+      // Set flag to prevent URL effect from reloading
+      isIntentionallyClearing.current = true;
+
+      // Clear everything to start fresh
+      setSelectedCopies(copies);
+      setLoadedComposition(null);
+      setBlocks([]);
+      setActiveTemplate(null);
+      // Clear URL composition parameter
+      updateUrlWithComposition(null);
+
+      toast({
+        title: "New Composition Started",
+        description: "Created a fresh composition with the selected copy.",
+      });
+    },
+    [updateUrlWithComposition, toast]
   );
 
   // Handle block changes from the BlockComposer
@@ -174,38 +288,95 @@ export function ContentStudioTab({
         setSelectedCopies(composition.metadata.selectedCopies);
       }
 
-      // Switch to the block composer tab
-      setActiveTab("block-composer");
+      // Switch to the appropriate composer tab based on composition type
+      const composerType = composition.metadata?.composerType || "email";
+      setActiveTab(
+        composerType === "email" ? "email-composer" : "news-composer"
+      );
 
       // Update URL with composition ID
       updateUrlWithComposition(composition._id);
+
+      // Clear working state since we're now editing a saved composition
+      clearWorkingState();
     },
-    [updateUrlWithComposition]
+    [updateUrlWithComposition, clearWorkingState]
   );
 
   // Clear loaded composition when starting fresh
   const handleClearComposition = useCallback(() => {
+    // Set flag to prevent URL effect from reloading
+    isIntentionallyClearing.current = true;
+
     setLoadedComposition(null);
     setBlocks([]);
     setSelectedCopies([]);
     setActiveTemplate(null);
-    setActiveTab("copy-selection");
+    // Stay on current tab instead of switching to copy-selection
 
-    // Remove composition from URL
+    // Clear composition from URL
     updateUrlWithComposition(null);
-  }, [updateUrlWithComposition]);
+
+    // Clear working state
+    clearWorkingState();
+  }, [updateUrlWithComposition, clearWorkingState]);
+
+  // Handle when a composition is saved
+  const handleCompositionSaved = useCallback(
+    (composition: LoadedComposition) => {
+      // Refresh the saved compositions list
+      if (compositionsRefetch.current) {
+        compositionsRefetch.current();
+      }
+    },
+    []
+  );
+
+  // Handle when CompositionsList provides its refetch function
+  const handleCompositionsRefetch = useCallback((refetchFn: () => void) => {
+    compositionsRefetch.current = refetchFn;
+  }, []);
+
+  // Restore working state on initial load
+  useEffect(() => {
+    // Only restore if we don't have a composition in the URL and no loaded composition
+    if (!searchParams?.get("composition") && !loadedComposition) {
+      const restored = restoreWorkingState();
+      if (restored) {
+        toast({
+          title: "Work Restored",
+          description:
+            "Your previous work has been restored from your last session.",
+        });
+      }
+    }
+  }, []); // Run only once on mount
 
   // Reset state when switching contexts
   React.useEffect(() => {
-    setSelectedCopies([]);
-    setBlocks([]);
-    setActiveTemplate(null);
-    setLoadedComposition(null);
-    setActiveTab("copy-selection");
+    const currentContext = { carId, projectId };
 
-    // Clear composition from URL when switching contexts
-    updateUrlWithComposition(null);
-  }, [carId, projectId, updateUrlWithComposition]);
+    // Only clear state if context has actually changed (not on initial mount)
+    if (
+      previousContext.current &&
+      (previousContext.current.carId !== currentContext.carId ||
+        previousContext.current.projectId !== currentContext.projectId)
+    ) {
+      setSelectedCopies([]);
+      setBlocks([]);
+      setActiveTemplate(null);
+      setLoadedComposition(null);
+      setActiveTab("email-composer");
+
+      // Clear composition from URL when switching contexts
+      updateUrlWithComposition(null);
+      // Clear working state when switching contexts
+      clearWorkingState();
+    }
+
+    // Update the previous context
+    previousContext.current = currentContext;
+  }, [carId, projectId, updateUrlWithComposition, clearWorkingState]);
 
   return (
     <div className="space-y-6">
@@ -213,7 +384,7 @@ export function ContentStudioTab({
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <div className="flex items-center space-x-2">
-            <Palette className="h-5 w-5 text-primary" />
+            <FileText className="h-5 w-5 text-primary" />
             <h2 className="text-2xl font-semibold tracking-tight">
               Content Studio
             </h2>
@@ -265,30 +436,30 @@ export function ContentStudioTab({
         onValueChange={setActiveTab}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger
-            value="copy-selection"
+            value="email-composer"
             className="flex items-center space-x-2"
           >
-            <FileText className="h-4 w-4" />
-            <span>Copy Selection</span>
-            {selectedCopies.length > 0 && (
+            <Mail className="h-4 w-4" />
+            <span>Email Composer</span>
+            {activeTab === "email-composer" && blocks.length > 0 && (
               <Badge
                 variant="secondary"
                 className="ml-1 h-5 w-5 rounded-full p-0 text-xs"
               >
-                {selectedCopies.length}
+                {blocks.length}
               </Badge>
             )}
           </TabsTrigger>
 
           <TabsTrigger
-            value="block-composer"
+            value="news-composer"
             className="flex items-center space-x-2"
           >
-            <Palette className="h-4 w-4" />
-            <span>Block Composer</span>
-            {blocks.length > 0 && (
+            <Newspaper className="h-4 w-4" />
+            <span>News Composer</span>
+            {activeTab === "news-composer" && blocks.length > 0 && (
               <Badge
                 variant="secondary"
                 className="ml-1 h-5 w-5 rounded-full p-0 text-xs"
@@ -305,29 +476,11 @@ export function ContentStudioTab({
             <Archive className="h-4 w-4" />
             <span>Saved</span>
           </TabsTrigger>
-
-          <TabsTrigger
-            value="preview"
-            className="flex items-center space-x-2 hidden lg:flex"
-          >
-            <Sparkles className="h-4 w-4" />
-            <span>Preview</span>
-          </TabsTrigger>
         </TabsList>
 
-        {/* Copy Selection Tab */}
-        <TabsContent value="copy-selection" className="space-y-6">
-          <CopySelector
-            carId={carId}
-            projectId={projectId}
-            onCopySelect={handleCopySelect}
-            selectedCopies={selectedCopies}
-          />
-        </TabsContent>
-
-        {/* Block Composer Tab */}
-        <TabsContent value="block-composer" className="space-y-6">
-          <BlockComposer
+        {/* Email Composer Tab */}
+        <TabsContent value="email-composer" className="space-y-6">
+          <EmailComposer
             selectedCopies={selectedCopies}
             blocks={blocks}
             onBlocksChange={handleBlocksChange}
@@ -336,6 +489,28 @@ export function ContentStudioTab({
             loadedComposition={loadedComposition}
             carId={carId}
             projectId={projectId}
+            onLoadCopy={handleCopySelect}
+            onLoadComposition={handleLoadComposition}
+            onCreateNewWithCopy={handleCreateNewWithCopy}
+            onCompositionSaved={handleCompositionSaved}
+          />
+        </TabsContent>
+
+        {/* News Composer Tab */}
+        <TabsContent value="news-composer" className="space-y-6">
+          <NewsComposer
+            selectedCopies={selectedCopies}
+            blocks={blocks}
+            onBlocksChange={handleBlocksChange}
+            template={activeTemplate || undefined}
+            onTemplateChange={handleTemplateChange}
+            loadedComposition={loadedComposition}
+            carId={carId}
+            projectId={projectId}
+            onLoadCopy={handleCopySelect}
+            onLoadComposition={handleLoadComposition}
+            onCreateNewWithCopy={handleCreateNewWithCopy}
+            onCompositionSaved={handleCompositionSaved}
           />
         </TabsContent>
 
@@ -345,37 +520,8 @@ export function ContentStudioTab({
             carId={carId}
             projectId={projectId}
             onLoadComposition={handleLoadComposition}
+            onRefetch={handleCompositionsRefetch}
           />
-        </TabsContent>
-
-        {/* Preview Tab (placeholder for future phases) */}
-        <TabsContent value="preview" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Sparkles className="h-5 w-5" />
-                <span>Content Preview</span>
-                <Badge variant="outline">Coming Soon</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-center py-12 text-center">
-                <div className="space-y-4">
-                  <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
-                    <Sparkles className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Preview Coming Soon</h3>
-                    <p className="text-sm text-muted-foreground max-w-md">
-                      Live preview of your enhanced content will be available in
-                      future phases, including email template rendering and
-                      export functionality.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>
