@@ -43,7 +43,7 @@ import {
   invalidateStylesheetCache,
 } from "@/hooks/useStylesheetData";
 
-import { api } from "@/lib/api-client";
+import { useAPI } from "@/hooks/useAPI";
 import {
   BlockComposerProps,
   ContentBlock,
@@ -139,6 +139,7 @@ export function BaseComposer({
   supportsFrontmatter = false,
 }: BaseComposerProps) {
   const { toast } = useToast();
+  const api = useAPI();
 
   // State management
   const [isSaving, setIsSaving] = useState(false);
@@ -383,6 +384,21 @@ export function BaseComposer({
   // Save composition functionality
   const saveComposition = useCallback(
     async (name: string) => {
+      console.log("🔄 Starting save:", {
+        name,
+        hasAPI: !!api,
+        loadedCompositionId: loadedComposition?._id,
+      });
+
+      if (!api) {
+        toast({
+          title: "Error",
+          description: "API client not available. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setIsSaving(true);
 
       try {
@@ -401,32 +417,98 @@ export function BaseComposer({
           },
         };
 
+        console.log("📦 Sending data:", { name, blocksCount: blocks.length });
+
         let response;
         if (loadedComposition) {
-          // Update existing composition
+          console.log(
+            "🔄 Updating existing composition:",
+            loadedComposition._id
+          );
+          console.log(
+            "🔄 Frontend - Making PUT request to:",
+            `/api/content-studio/compositions/${loadedComposition._id}`
+          );
+          console.log(
+            "🔄 Frontend - Request payload:",
+            JSON.stringify(compositionData, null, 2)
+          );
+          console.log("🔄 Frontend - API client instance:", !!api);
+
           response = await api.put(
             `/api/content-studio/compositions/${loadedComposition._id}`,
             compositionData
           );
+
+          console.log(
+            "✅ Frontend - PUT request completed, response:",
+            response
+          );
         } else {
-          // Create new composition
+          console.log("🆕 Creating new composition");
+          console.log(
+            "🆕 Frontend - Making POST request to:",
+            "/api/content-studio/compositions"
+          );
+          console.log(
+            "🆕 Frontend - Request payload:",
+            JSON.stringify(compositionData, null, 2)
+          );
+
           response = await api.post(
             "/api/content-studio/compositions",
             compositionData
           );
+
+          console.log(
+            "✅ Frontend - POST request completed, response:",
+            response
+          );
         }
 
-        // Update the composition name in state
+        console.log("✅ API response:", response);
+
         setCompositionName(name);
 
-        // Notify parent component that a composition was saved
         if (onCompositionSaved) {
-          // For new compositions, create a mock LoadedComposition object
-          const savedComposition: LoadedComposition = loadedComposition || {
-            _id:
-              (response as any)?._id ||
-              (response as any)?.id ||
-              "new-composition",
+          // Extract the composition ID correctly based on whether it's a new or existing composition
+          let compositionId: string;
+
+          if (loadedComposition) {
+            // For updates, use the existing composition ID
+            compositionId = loadedComposition._id;
+            console.log(
+              "✅ Frontend - Using existing composition ID:",
+              compositionId
+            );
+          } else {
+            // For new compositions, extract ID from API response
+            // The POST API returns { success: true, id: ObjectId, message: "..." }
+            compositionId =
+              (response as any)?.id?.toString() ||
+              (response as any)?._id?.toString();
+            console.log(
+              "✅ Frontend - Extracted new composition ID from response:",
+              {
+                responseId: (response as any)?.id,
+                responseIdString: (response as any)?.id?.toString(),
+                finalId: compositionId,
+              }
+            );
+
+            if (!compositionId) {
+              console.error(
+                "❌ Frontend - Failed to extract composition ID from response:",
+                response
+              );
+              throw new Error(
+                "Failed to get composition ID from server response"
+              );
+            }
+          }
+
+          const savedComposition: LoadedComposition = {
+            _id: compositionId,
             name,
             type: composerType,
             blocks,
@@ -439,9 +521,16 @@ export function BaseComposer({
               carId: effectiveCarId,
               ...(supportsFrontmatter && { frontmatter }),
             },
-            createdAt: new Date().toISOString(),
+            createdAt: loadedComposition?.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
+
+          console.log("🔔 Frontend - Calling onCompositionSaved with:", {
+            compositionId: savedComposition._id,
+            compositionName: savedComposition.name,
+            isUpdate: !!loadedComposition,
+          });
+
           onCompositionSaved(savedComposition);
         }
 
@@ -454,18 +543,19 @@ export function BaseComposer({
           } successfully.`,
         });
       } catch (error) {
-        console.error("Failed to save composition:", error);
+        console.error("❌ Save failed:", error);
         toast({
           title: "Save Failed",
           description: "Unable to save composition. Please try again.",
           variant: "destructive",
         });
-        throw error; // Re-throw to let SaveModal handle the error
+        throw error;
       } finally {
         setIsSaving(false);
       }
     },
     [
+      api,
       blocks,
       template,
       effectiveProjectId,
@@ -477,11 +567,21 @@ export function BaseComposer({
       frontmatter,
       loadedComposition,
       toast,
+      onCompositionSaved,
     ]
   );
 
   // CSS Editor functionality
   const saveCSSContent = useCallback(async () => {
+    if (!api) {
+      toast({
+        title: "Error",
+        description: "API client not available. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!selectedStylesheetId) {
       toast({
         title: "No Stylesheet Selected",
@@ -515,7 +615,7 @@ export function BaseComposer({
     } finally {
       setIsSavingCSS(false);
     }
-  }, [selectedStylesheetId, toast]);
+  }, [api, selectedStylesheetId, toast]);
 
   // Drag and drop handlers
   const handleDragStart = useCallback((blockId: string) => {

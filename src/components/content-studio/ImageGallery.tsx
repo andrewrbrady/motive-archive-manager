@@ -17,7 +17,7 @@ import {
 interface GalleryImageProps {
   image: any;
   index: number;
-  onAddImage: (imageUrl: string, altText?: string) => void;
+  onAddImage: (imageUrl: string, altText?: string, imageObject?: any) => void;
 }
 
 /**
@@ -71,8 +71,8 @@ const GalleryImage = React.memo<GalleryImageProps>(function GalleryImage({
   }, [image]);
 
   const handleClick = useCallback(() => {
-    onAddImage(image.imageUrl, image.alt);
-  }, [image.imageUrl, image.alt, onAddImage]);
+    onAddImage(image.imageUrl, image.alt, image);
+  }, [image, onAddImage]);
 
   return (
     <div
@@ -137,7 +137,7 @@ interface ImageGalleryProps {
   isGalleryCollapsed: boolean;
   onToggleCollapse: () => void;
   onRefreshImages: () => void;
-  onAddImage: (imageUrl: string, altText?: string) => void;
+  onAddImage: (imageUrl: string, altText?: string, imageObject?: any) => void;
 }
 
 /**

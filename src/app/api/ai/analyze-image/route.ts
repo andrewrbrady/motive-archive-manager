@@ -19,14 +19,13 @@ export async function POST(request: NextRequest) {
       temperature = 0.7,
     } = await request.json();
 
-    // Debug: Log received data
+    // Debug: Log what we received
     console.log("AI Analysis API received:", {
       imageUrl: imageUrl ? "provided" : "missing",
       imageId: imageId ? "provided" : "missing",
-      metadata: metadata ? Object.keys(metadata) : "empty",
-      carId: carId || "missing",
-      projectId: projectId || "missing",
-      customContext: customContext || "missing",
+      metadata: metadata ? Object.keys(metadata) : "missing",
+      metadataValues: metadata ? JSON.stringify(metadata, null, 2) : "missing",
+      customContext: customContext ? "provided" : "missing",
       analysisType,
     });
 
@@ -47,131 +46,125 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Gather additional context from database if IDs are provided
+    // Gather image metadata only - no database lookups
     let contextInfo = {
-      carDetails: null as any,
-      projectDetails: null as any,
       imageMetadata: metadata || {},
     };
+
+    console.log(
+      "Initial metadata from request:",
+      JSON.stringify(contextInfo.imageMetadata, null, 2)
+    );
 
     try {
       const db = await getDatabase();
 
-      // Fetch car details if carId is provided
-      if (carId) {
-        const car = await db
-          .collection("cars")
-          .findOne({ _id: new ObjectId(carId) });
-        if (car) {
-          contextInfo.carDetails = {
-            make: car.make,
-            model: car.model,
-            year: car.year,
-            color: car.color,
-            description: car.description,
-            type: car.type,
-          };
-        }
-      }
-
-      // Fetch project details if projectId is provided
-      if (projectId) {
-        const project = await db
-          .collection("projects")
-          .findOne({ _id: new ObjectId(projectId) });
-        if (project) {
-          contextInfo.projectDetails = {
-            name: project.title, // Project model uses 'title' not 'name'
-            description: project.description,
-            type: project.type,
-          };
-        }
-      }
-
       // Fetch additional image metadata if imageId is provided
       if (imageId) {
+        console.log("Looking up image by ID:", imageId);
         const image = await db
           .collection("images")
           .findOne({ _id: new ObjectId(imageId) });
         if (image) {
+          console.log(
+            "Found image by ID, merging metadata:",
+            JSON.stringify(image.metadata, null, 2)
+          );
           contextInfo.imageMetadata = {
             ...contextInfo.imageMetadata,
             ...image.metadata,
             filename: image.filename,
           };
+        } else {
+          console.log("No image found by ID");
         }
       } else if (imageUrl) {
-        // Try to find image by URL if no imageId provided
-        const image = await db.collection("images").findOne({ url: imageUrl });
+        console.log("Looking up image by URL:", imageUrl);
+
+        // Try multiple URL matching strategies
+        let image = null;
+
+        // 1. Exact URL match
+        image = await db.collection("images").findOne({ url: imageUrl });
         if (image) {
+          console.log("Found image by exact URL match");
+        } else {
+          // 2. Try matching by Cloudflare ID extracted from URL
+          const cloudflareIdMatch = imageUrl.match(
+            /\/([a-f0-9-]{36})\/[^\/]*$/
+          );
+          if (cloudflareIdMatch) {
+            const cloudflareId = cloudflareIdMatch[1];
+            console.log("Extracted Cloudflare ID:", cloudflareId);
+            image = await db
+              .collection("images")
+              .findOne({ cloudflareId: cloudflareId });
+            if (image) {
+              console.log("Found image by Cloudflare ID");
+            }
+          }
+
+          // 3. Try partial URL matching (in case of different domains)
+          if (!image) {
+            const urlPath = imageUrl.split("/").slice(-2).join("/"); // Get last two parts
+            console.log("Trying partial URL match with path:", urlPath);
+            image = await db.collection("images").findOne({
+              url: {
+                $regex: urlPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+                $options: "i",
+              },
+            });
+            if (image) {
+              console.log("Found image by partial URL match");
+            }
+          }
+        }
+
+        if (image) {
+          console.log(
+            "Found image by URL, merging metadata:",
+            JSON.stringify(image.metadata, null, 2)
+          );
           contextInfo.imageMetadata = {
             ...contextInfo.imageMetadata,
             ...image.metadata,
             filename: image.filename,
           };
-          // Also try to get carId/projectId from the image record
-          if (image.carId && !carId) {
-            const car = await db
-              .collection("cars")
-              .findOne({ _id: image.carId });
-            if (car) {
-              contextInfo.carDetails = {
-                make: car.make,
-                model: car.model,
-                year: car.year,
-                color: car.color,
-                description: car.description,
-                type: car.type,
-              };
-            }
-          }
-          if (image.projectId && !projectId) {
-            const project = await db
-              .collection("projects")
-              .findOne({ _id: image.projectId });
-            if (project) {
-              contextInfo.projectDetails = {
-                name: project.title, // Project model uses 'title' not 'name'
-                description: project.description,
-                type: project.type,
-              };
-            }
-          }
+        } else {
+          console.log("No image found by URL after trying all strategies");
+          // Log some sample URLs from the database for debugging
+          const sampleImages = await db
+            .collection("images")
+            .find({})
+            .limit(3)
+            .toArray();
+          console.log(
+            "Sample image URLs from database:",
+            sampleImages.map((img) => ({
+              url: img.url,
+              cloudflareId: img.cloudflareId,
+            }))
+          );
         }
       }
     } catch (dbError) {
-      console.warn(
-        "Failed to fetch additional context from database:",
-        dbError
-      );
-      // Continue without additional context
+      console.warn("Failed to fetch image metadata from database:", dbError);
+      // Continue with provided metadata only
     }
 
-    // Build context string for the AI
+    console.log(
+      "Final merged metadata:",
+      JSON.stringify(contextInfo.imageMetadata, null, 2)
+    );
+
+    // Build context string for the AI from image metadata only
     const contextParts = [];
-
-    if (contextInfo.carDetails) {
-      const car = contextInfo.carDetails;
-      contextParts.push(
-        `Vehicle: ${car.year} ${car.make} ${car.model}${car.color ? ` (${car.color})` : ""}`
-      );
-      if (car.description) {
-        contextParts.push(`Vehicle Description: ${car.description}`);
-      }
-    }
-
-    if (contextInfo.projectDetails) {
-      const project = contextInfo.projectDetails;
-      contextParts.push(`Project: ${project.name}`);
-      if (project.description) {
-        contextParts.push(`Project Description: ${project.description}`);
-      }
-    }
 
     if (contextInfo.imageMetadata) {
       const meta = contextInfo.imageMetadata;
       const metaParts = [];
 
+      // First check for standard image metadata fields
       if (meta.filename) metaParts.push(`Filename: ${meta.filename}`);
       if (meta.angle) metaParts.push(`Angle: ${meta.angle}`);
       if (meta.view) metaParts.push(`View: ${meta.view}`);
@@ -181,9 +174,72 @@ export async function POST(request: NextRequest) {
       if (meta.description) metaParts.push(`Description: ${meta.description}`);
       if (meta.category) metaParts.push(`Category: ${meta.category}`);
 
+      // Include vehicle info if present in metadata
+      if (meta.vehicleInfo) {
+        const vehicle = meta.vehicleInfo;
+        const vehicleParts = [];
+        if (vehicle.make) vehicleParts.push(`Make: ${vehicle.make}`);
+        if (vehicle.model) vehicleParts.push(`Model: ${vehicle.model}`);
+        if (vehicle.year) vehicleParts.push(`Year: ${vehicle.year}`);
+        if (vehicleParts.length > 0) {
+          metaParts.push(`Vehicle: ${vehicleParts.join(", ")}`);
+        }
+      }
+
+      // Include any additional metadata fields that might be useful
+      if (meta.source) metaParts.push(`Source: ${meta.source}`);
+      if (meta.gallerySource)
+        metaParts.push(`Gallery Source: ${meta.gallerySource}`);
+      if (meta.createdAt) metaParts.push(`Created: ${meta.createdAt}`);
+      if (meta.location) metaParts.push(`Location: ${meta.location}`);
+      if (meta.tags && Array.isArray(meta.tags)) {
+        metaParts.push(`Tags: ${meta.tags.join(", ")}`);
+      }
+
+      // Include any other metadata fields that might be present
+      const standardFields = new Set([
+        "filename",
+        "angle",
+        "view",
+        "movement",
+        "tod",
+        "side",
+        "description",
+        "category",
+        "vehicleInfo",
+        "source",
+        "gallerySource",
+        "createdAt",
+        "location",
+        "tags",
+        "projectId",
+        "_id",
+        "updatedAt",
+      ]);
+
+      Object.entries(meta).forEach(([key, value]) => {
+        if (!standardFields.has(key) && value && typeof value === "string") {
+          metaParts.push(`${key}: ${value}`);
+        }
+      });
+
       if (metaParts.length > 0) {
         contextParts.push(`Image Metadata: ${metaParts.join(", ")}`);
       }
+    }
+
+    // Add project context if projectId is available
+    if (projectId) {
+      contextParts.push(
+        `Project Context: This image is associated with project ${projectId}`
+      );
+    }
+
+    // Add car context if carId is available
+    if (carId) {
+      contextParts.push(
+        `Car Context: This image is associated with car ${carId}`
+      );
     }
 
     // Add custom context if provided
@@ -198,9 +254,7 @@ export async function POST(request: NextRequest) {
     console.log("Context gathered:", {
       contextParts: contextParts.length,
       contextString: contextString || "No context available",
-      carDetails: contextInfo.carDetails ? "found" : "missing",
-      projectDetails: contextInfo.projectDetails ? "found" : "missing",
-      imageMetadata: Object.keys(contextInfo.imageMetadata || {}),
+      imageMetadata: Object.keys(contextInfo.imageMetadata),
       customContext: customContext ? "provided" : "missing",
     });
 

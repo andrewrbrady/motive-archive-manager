@@ -222,13 +222,24 @@ class APIClient {
       url = `${this.baseURL}/${endpoint}`;
     }
 
-    // 🔍 DEBUG: Enhanced request debugging for gallery image processing issue
+    // Add debugging for composition requests
+    if (url.includes("/api/content-studio/compositions/")) {
+      console.log("🚀 APIClient - Making request to composition endpoint:", {
+        url,
+        method: requestOptions.method,
+        hasBody: !!requestOptions.body,
+        bodySize: requestOptions.body
+          ? typeof requestOptions.body === "string"
+            ? requestOptions.body.length
+            : "non-string body"
+          : 0,
+        skipAuth,
+      });
+    }
 
     try {
       // Get authentication headers (or skip if requested)
       const authHeaders = await this.getAuthHeaders(skipAuth);
-
-      // 🔍 DEBUG: Log authentication headers (without sensitive data)
 
       const finalHeaders = {
         ...authHeaders,
@@ -240,7 +251,29 @@ class APIClient {
         headers: finalHeaders,
       };
 
+      // Add debugging for composition requests
+      if (url.includes("/api/content-studio/compositions/")) {
+        console.log("🚀 APIClient - Final request payload:", {
+          url,
+          method: requestPayload.method,
+          headers: Object.keys(finalHeaders),
+          hasAuthHeader: !!(finalHeaders as any).Authorization,
+          hasContentType: !!(finalHeaders as any)["Content-Type"],
+        });
+      }
+
       const response = await fetch(url, requestPayload);
+
+      // Add debugging for composition requests
+      if (url.includes("/api/content-studio/compositions/")) {
+        console.log("📡 APIClient - Response received:", {
+          url,
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok,
+          headers: Object.fromEntries(response.headers.entries()),
+        });
+      }
 
       // ✅ Enhanced 401 error handling with better retry logic
       if (response.status === 401 && !skipAuth && this.retryAttempts > 0) {
@@ -278,6 +311,15 @@ class APIClient {
     } catch (error: any) {
       const apiError = this.createAPIError(error, url);
       console.error(`API request failed for ${url}:`, apiError.message);
+
+      // Add debugging for composition requests
+      if (url.includes("/api/content-studio/compositions/")) {
+        console.error("💥 APIClient - Composition request failed:", {
+          url,
+          error: apiError,
+          originalError: error,
+        });
+      }
 
       // Create a proper Error object that serializes correctly
       const errorObj = new Error(apiError.message);

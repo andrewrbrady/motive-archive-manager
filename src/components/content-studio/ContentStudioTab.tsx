@@ -324,12 +324,43 @@ export function ContentStudioTab({
   // Handle when a composition is saved
   const handleCompositionSaved = useCallback(
     (composition: LoadedComposition) => {
+      console.log("🔔 [CONTENT STUDIO DEBUG] handleCompositionSaved called:", {
+        compositionId: composition._id,
+        compositionName: composition.name,
+        compositionType: composition.type,
+        blocksCount: composition.blocks.length,
+        hasMetadata: !!composition.metadata,
+        currentLoadedComposition: loadedComposition?._id || "none",
+        hasRefetchFunction: !!compositionsRefetch.current,
+      });
+
+      // Update the loaded composition with the saved data
+      setLoadedComposition(composition);
+      console.log(
+        "✅ [CONTENT STUDIO DEBUG] Updated loadedComposition state with saved data"
+      );
+
+      // Update URL with the composition ID (important for new compositions)
+      updateUrlWithComposition(composition._id);
+      console.log(
+        "✅ [CONTENT STUDIO DEBUG] Updated URL with composition ID:",
+        composition._id
+      );
+
       // Refresh the saved compositions list
       if (compositionsRefetch.current) {
+        console.log(
+          "🔄 [CONTENT STUDIO DEBUG] Calling compositions refetch function"
+        );
         compositionsRefetch.current();
+        console.log("✅ [CONTENT STUDIO DEBUG] Compositions refetch completed");
+      } else {
+        console.log(
+          "⚠️ [CONTENT STUDIO DEBUG] No compositions refetch function available"
+        );
       }
     },
-    []
+    [loadedComposition, updateUrlWithComposition]
   );
 
   // Handle when CompositionsList provides its refetch function

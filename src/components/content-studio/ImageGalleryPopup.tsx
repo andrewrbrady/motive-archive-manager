@@ -16,7 +16,7 @@ import { Loader2, ImageIcon, RefreshCw, Plus, X, Search } from "lucide-react";
 interface GalleryImageProps {
   image: any;
   index: number;
-  onAddImage: (imageUrl: string, altText?: string) => void;
+  onAddImage: (imageUrl: string, altText?: string, imageObject?: any) => void;
 }
 
 /**
@@ -70,8 +70,8 @@ const GalleryImage = React.memo<GalleryImageProps>(function GalleryImage({
   }, [image]);
 
   const handleClick = useCallback(() => {
-    onAddImage(image.imageUrl, image.alt);
-  }, [image.imageUrl, image.alt, onAddImage]);
+    onAddImage(image.imageUrl, image.alt, image);
+  }, [image, onAddImage]);
 
   return (
     <div
@@ -134,7 +134,7 @@ interface ImageGalleryPopupProps {
   projectId?: string;
   activeBlockId: string | null;
   onRefreshImages: () => void;
-  onAddImage: (imageUrl: string, altText?: string) => void;
+  onAddImage: (imageUrl: string, altText?: string, imageObject?: any) => void;
   children: React.ReactNode; // The trigger button
 }
 
@@ -157,8 +157,8 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
     const [searchTerm, setSearchTerm] = useState("");
 
     const handleAddImage = useCallback(
-      (imageUrl: string, altText?: string) => {
-        onAddImage(imageUrl, altText);
+      (imageUrl: string, altText?: string, imageObject?: any) => {
+        onAddImage(imageUrl, altText, imageObject);
         setIsOpen(false); // Close popup after adding image
       },
       [onAddImage]

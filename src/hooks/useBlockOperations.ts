@@ -66,7 +66,11 @@ export function useBlockOperations(
   const memoizedCallbacks = useMemo(
     () => ({
       // Add image block from gallery
-      addImageFromGallery: (imageUrl: string, altText?: string) => {
+      addImageFromGallery: (
+        imageUrl: string,
+        altText?: string,
+        imageObject?: any
+      ) => {
         const { position, description } = getInsertPosition();
 
         const newBlock: ImageBlock = {
@@ -84,6 +88,15 @@ export function useBlockOperations(
             projectId: projectId || undefined,
             carId: carId || undefined,
             createdAt: new Date().toISOString(),
+            // Store the image ID for database lookup
+            id: imageObject?.id,
+            originalImageObject: imageObject
+              ? {
+                  id: imageObject.id,
+                  url: imageObject.url,
+                  galleryName: imageObject.galleryName,
+                }
+              : undefined,
           },
         };
 
@@ -144,8 +157,8 @@ export function useBlockOperations(
 
   // Add image block from gallery
   const addImageFromGallery = useCallback(
-    (imageUrl: string, altText?: string) => {
-      memoizedCallbacks.addImageFromGallery(imageUrl, altText);
+    (imageUrl: string, altText?: string, imageObject?: any) => {
+      memoizedCallbacks.addImageFromGallery(imageUrl, altText, imageObject);
     },
     [memoizedCallbacks]
   );

@@ -35,7 +35,7 @@ interface ContentInsertionToolbarProps {
   loadingImages?: boolean;
   projectId?: string;
   onRefreshImages?: () => void;
-  onAddImage?: (imageUrl: string, altText?: string) => void;
+  onAddImage?: (imageUrl: string, altText?: string, imageObject?: any) => void;
   // Save functionality
   onSave?: () => void;
   isSaving?: boolean;

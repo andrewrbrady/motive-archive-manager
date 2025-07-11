@@ -812,6 +812,8 @@ const ImageBlockContent = React.memo<ImageBlockContentProps>(
         // Try to extract context from the image URL or block metadata
         const imageData = {
           imageUrl: block.imageUrl,
+          imageId:
+            block.metadata?.originalImageObject?.id || block.metadata?.id,
           metadata: block.metadata || {},
           analysisType: "alt",
           carId,
@@ -859,6 +861,8 @@ const ImageBlockContent = React.memo<ImageBlockContentProps>(
         // Try to extract context from the image URL or block metadata
         const imageData = {
           imageUrl: block.imageUrl,
+          imageId:
+            block.metadata?.originalImageObject?.id || block.metadata?.id,
           metadata: block.metadata || {},
           analysisType: "caption",
           carId,
