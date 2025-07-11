@@ -793,6 +793,8 @@ export function BaseComposer({
                 detectFrontmatterInTextBlock={
                   supportsFrontmatter ? detectFrontmatterInTextBlock : undefined
                 }
+                carId={effectiveCarId}
+                projectId={effectiveProjectId}
               />
             </div>
           </div>
@@ -817,6 +819,8 @@ export function BaseComposer({
             detectFrontmatterInTextBlock={
               supportsFrontmatter ? detectFrontmatterInTextBlock : undefined
             }
+            carId={effectiveCarId}
+            projectId={effectiveProjectId}
           />
         )
       ) : (

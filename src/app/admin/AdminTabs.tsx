@@ -29,6 +29,7 @@ import LengthSettingsContent from "./LengthSettingsContent";
 import PlatformSettingsContent from "./PlatformSettingsContent";
 import EventTypeSettingsContent from "./EventTypeSettingsContent";
 import ImageAnalysisPromptsContent from "./ImageAnalysisPromptsContent";
+import AIImageAnalysisPromptsContent from "./AIImageAnalysisPromptsContent";
 import BrandTonesContent from "./BrandTonesContent";
 import { ModelsConfigurator } from "@/components/admin/ModelsConfigurator";
 import DeliverableBatchManagement from "@/components/admin/DeliverableBatchManagement";
@@ -360,6 +361,11 @@ export default function AdminTabs() {
       value: "image-analysis-prompts",
       label: "Image Analysis Prompts",
       content: <ImageAnalysisPromptsContent />,
+    },
+    {
+      value: "ai-image-analysis-prompts",
+      label: "AI Image Analysis Prompts",
+      content: <AIImageAnalysisPromptsContent />,
     },
     {
       value: "deliverable-batches",

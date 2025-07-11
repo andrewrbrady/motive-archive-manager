@@ -68,6 +68,9 @@ interface IntegratedPreviewEditorProps {
   // Frontmatter conversion
   onConvertTextToFrontmatter?: (textBlockId: string) => void;
   detectFrontmatterInTextBlock?: (textBlock: TextBlock) => any;
+  // Context for AI generation
+  carId?: string;
+  projectId?: string;
 }
 
 /**
@@ -97,6 +100,8 @@ export const IntegratedPreviewEditor = React.memo<IntegratedPreviewEditorProps>(
     onBlocksChange,
     onConvertTextToFrontmatter,
     detectFrontmatterInTextBlock,
+    carId,
+    projectId,
   }) {
     // Load stylesheet data reactively
     const { stylesheetData } = useStylesheetData(selectedStylesheetId || null);
@@ -276,6 +281,8 @@ export const IntegratedPreviewEditor = React.memo<IntegratedPreviewEditorProps>(
                         detectFrontmatterInTextBlock={
                           detectFrontmatterInTextBlock
                         }
+                        carId={carId}
+                        projectId={projectId}
                       />
                     ))}
                   </div>
@@ -313,6 +320,9 @@ interface EditablePreviewBlockProps {
   // Frontmatter conversion
   onConvertTextToFrontmatter?: (textBlockId: string) => void;
   detectFrontmatterInTextBlock?: (textBlock: TextBlock) => any;
+  // Context for AI generation
+  carId?: string;
+  projectId?: string;
 }
 
 const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
@@ -336,6 +346,8 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
     onBlocksChange,
     onConvertTextToFrontmatter,
     detectFrontmatterInTextBlock,
+    carId,
+    projectId,
   }) {
     const getBlockIcon = (type: ContentBlockType) => {
       switch (type) {
@@ -519,6 +531,8 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
                   onBlocksChange={onBlocksChange}
                   onConvertTextToFrontmatter={onConvertTextToFrontmatter}
                   detectFrontmatterInTextBlock={detectFrontmatterInTextBlock}
+                  carId={carId}
+                  projectId={projectId}
                 />
               </div>
             ) : (

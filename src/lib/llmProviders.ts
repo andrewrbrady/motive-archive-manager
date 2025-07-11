@@ -92,6 +92,24 @@ export const llmProviders: Record<ProviderId, LLMProvider> = {
         supportedFeatures: ["text", "vision", "json-mode"],
         costPer1KTokens: 0.005, // $5 / M input
       },
+      {
+        id: "gpt-4o-mini",
+        name: "GPT‑4o Mini",
+        maxTokens: 128_000,
+        contextWindow: 128_000,
+        defaultTemperature: 0.7,
+        supportedFeatures: ["text", "vision", "json-mode"],
+        costPer1KTokens: 0.00015, // $0.15 / M input
+      },
+      {
+        id: "gpt-4.5-preview-2025-02-27",
+        name: "GPT‑4.5 Preview",
+        maxTokens: 128_000,
+        contextWindow: 128_000,
+        defaultTemperature: 0.7,
+        supportedFeatures: ["text", "vision", "json-mode"],
+        costPer1KTokens: 0.005, // $5 / M input
+      },
     ],
   },
 };

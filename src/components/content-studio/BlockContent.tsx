@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useRef } from "react";
+import React, { useMemo, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,8 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import { stripInlineStyles } from "@/lib/content-formatter";
 import {
@@ -27,6 +29,14 @@ import {
   ListBlock, // Import ListBlock
   HTMLBlock, // Import HTMLBlock
 } from "./types";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { api } from "@/lib/api-client";
 
 /**
  * BlockContent - Renders block-specific editing interface
@@ -43,6 +53,9 @@ interface BlockContentProps {
   // Frontmatter conversion
   onConvertTextToFrontmatter?: (textBlockId: string) => void;
   detectFrontmatterInTextBlock?: (textBlock: TextBlock) => any;
+  // Context for AI generation
+  carId?: string;
+  projectId?: string;
 }
 
 // Custom comparison function for React.memo to prevent unnecessary re-renders
@@ -139,6 +152,8 @@ const BlockContent = React.memo<BlockContentProps>(function BlockContent({
   onBlocksChange,
   onConvertTextToFrontmatter,
   detectFrontmatterInTextBlock,
+  carId,
+  projectId,
 }) {
   // Performance optimization: Memoize block type to prevent unnecessary switch recalculation
   const blockType = useMemo(() => block.type, [block.type]);
@@ -157,7 +172,12 @@ const BlockContent = React.memo<BlockContentProps>(function BlockContent({
       );
     case "image":
       return (
-        <ImageBlockContent block={block as ImageBlock} onUpdate={onUpdate} />
+        <ImageBlockContent
+          block={block as ImageBlock}
+          onUpdate={onUpdate}
+          carId={carId}
+          projectId={projectId}
+        />
       );
     case "video":
       return (
@@ -725,11 +745,18 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
 interface ImageBlockContentProps {
   block: ImageBlock;
   onUpdate: (updates: Partial<ContentBlock>) => void;
+  carId?: string;
+  projectId?: string;
 }
 
 const ImageBlockContent = React.memo<ImageBlockContentProps>(
-  function ImageBlockContent({ block, onUpdate }) {
+  function ImageBlockContent({ block, onUpdate, carId, projectId }) {
     const [isCollapsed, setIsCollapsed] = useState(true);
+    const [isGeneratingAlt, setIsGeneratingAlt] = useState(false);
+    const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
+    const [customContextAlt, setCustomContextAlt] = useState("");
+    const [customContextCaption, setCustomContextCaption] = useState("");
+    const { toast } = useToast();
 
     // Performance optimization: Memoize image URL validation and processing
     const imageUrlState = useMemo(() => {
@@ -775,6 +802,101 @@ const ImageBlockContent = React.memo<ImageBlockContentProps>(
       },
       [onUpdate]
     );
+
+    // AI Generation handlers
+    const handleGenerateAltText = useCallback(async () => {
+      if (!block.imageUrl || isGeneratingAlt) return;
+
+      setIsGeneratingAlt(true);
+      try {
+        // Try to extract context from the image URL or block metadata
+        const imageData = {
+          imageUrl: block.imageUrl,
+          metadata: block.metadata || {},
+          analysisType: "alt",
+          carId,
+          projectId,
+          customContext: customContextAlt.trim() || undefined,
+        };
+
+        const response = (await api.post("ai/analyze-image", imageData)) as any;
+
+        if (response.success && response.altText) {
+          onUpdate({ altText: response.altText } as Partial<ImageBlock>);
+          toast({
+            title: "Alt text generated",
+            description: "AI-generated alt text has been applied to the image.",
+          });
+        } else {
+          throw new Error("Failed to generate alt text");
+        }
+      } catch (error) {
+        console.error("Error generating alt text:", error);
+        toast({
+          title: "Generation failed",
+          description: "Failed to generate alt text. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsGeneratingAlt(false);
+      }
+    }, [
+      block.imageUrl,
+      block.metadata,
+      isGeneratingAlt,
+      onUpdate,
+      toast,
+      customContextAlt,
+      carId,
+      projectId,
+    ]);
+
+    const handleGenerateCaption = useCallback(async () => {
+      if (!block.imageUrl || isGeneratingCaption) return;
+
+      setIsGeneratingCaption(true);
+      try {
+        // Try to extract context from the image URL or block metadata
+        const imageData = {
+          imageUrl: block.imageUrl,
+          metadata: block.metadata || {},
+          analysisType: "caption",
+          carId,
+          projectId,
+          customContext: customContextCaption.trim() || undefined,
+        };
+
+        const response = (await api.post("ai/analyze-image", imageData)) as any;
+
+        if (response.success && response.caption) {
+          onUpdate({ caption: response.caption } as Partial<ImageBlock>);
+          toast({
+            title: "Caption generated",
+            description: "AI-generated caption has been applied to the image.",
+          });
+        } else {
+          throw new Error("Failed to generate caption");
+        }
+      } catch (error) {
+        console.error("Error generating caption:", error);
+        toast({
+          title: "Generation failed",
+          description: "Failed to generate caption. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsGeneratingCaption(false);
+      }
+    }, [
+      block.imageUrl,
+      block.metadata,
+      isGeneratingCaption,
+      onUpdate,
+      toast,
+      customContextCaption,
+      carId,
+      projectId,
+    ]);
 
     return (
       <div className="space-y-3">
@@ -843,13 +965,68 @@ const ImageBlockContent = React.memo<ImageBlockContentProps>(
               >
                 Alt Text
               </Label>
-              <Input
-                id={`image-alt-${block.id}`}
-                placeholder="Describe the image..."
-                value={block.altText || ""}
-                onChange={handleAltTextChange}
-                className="bg-transparent border-border/40 focus:border-border/60"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id={`image-alt-${block.id}`}
+                  placeholder="Describe the image..."
+                  value={block.altText || ""}
+                  onChange={handleAltTextChange}
+                  className="bg-transparent border-border/40 focus:border-border/60 flex-1"
+                />
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGenerateAltText}
+                        disabled={!block.imageUrl || isGeneratingAlt}
+                        className="px-3 py-1 h-9"
+                      >
+                        {isGeneratingAlt ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      className="w-80 p-3 z-[9999]"
+                      side="left"
+                      align="start"
+                      sideOffset={5}
+                      avoidCollisions={true}
+                      sticky="always"
+                    >
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">
+                          Generate Alt Text with AI
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Add custom context to help the AI generate better alt
+                          text
+                        </p>
+                        <Input
+                          placeholder="e.g., front view, driver side, interior shot..."
+                          value={customContextAlt}
+                          onChange={(e) => setCustomContextAlt(e.target.value)}
+                          className="text-xs"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleGenerateAltText();
+                            }
+                          }}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Press Enter to generate or click the button
+                        </p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </div>
 
             {/* Caption Input */}
@@ -860,15 +1037,72 @@ const ImageBlockContent = React.memo<ImageBlockContentProps>(
               >
                 Caption (optional)
               </Label>
-              <Input
-                id={`image-caption-${block.id}`}
-                placeholder="Add a caption..."
-                value={block.caption || ""}
-                onChange={(e) =>
-                  onUpdate({ caption: e.target.value } as Partial<ImageBlock>)
-                }
-                className="bg-transparent border-border/40 focus:border-border/60"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id={`image-caption-${block.id}`}
+                  placeholder="Add a caption..."
+                  value={block.caption || ""}
+                  onChange={(e) =>
+                    onUpdate({ caption: e.target.value } as Partial<ImageBlock>)
+                  }
+                  className="bg-transparent border-border/40 focus:border-border/60 flex-1"
+                />
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGenerateCaption}
+                        disabled={!block.imageUrl || isGeneratingCaption}
+                        className="px-3 py-1 h-9"
+                      >
+                        {isGeneratingCaption ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      className="w-80 p-3 z-[9999]"
+                      side="left"
+                      align="start"
+                      sideOffset={5}
+                      avoidCollisions={true}
+                      sticky="always"
+                    >
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">
+                          Generate Caption with AI
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Add custom context to help the AI generate better
+                          captions
+                        </p>
+                        <Input
+                          placeholder="e.g., highlight the wheels, focus on engine details..."
+                          value={customContextCaption}
+                          onChange={(e) =>
+                            setCustomContextCaption(e.target.value)
+                          }
+                          className="text-xs"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleGenerateCaption();
+                            }
+                          }}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Press Enter to generate or click the button
+                        </p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </div>
 
             {/* Link URL Input */}

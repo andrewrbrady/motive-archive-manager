@@ -815,6 +815,8 @@ export function BlockComposer({
                 onBlocksChange={onBlocksChange}
                 onConvertTextToFrontmatter={convertTextToFrontmatterBlock}
                 detectFrontmatterInTextBlock={detectFrontmatterInTextBlock}
+                carId={effectiveCarId}
+                projectId={effectiveProjectId}
               />
             </div>
           </div>
@@ -835,6 +837,8 @@ export function BlockComposer({
             onBlocksChange={onBlocksChange}
             onConvertTextToFrontmatter={convertTextToFrontmatterBlock}
             detectFrontmatterInTextBlock={detectFrontmatterInTextBlock}
+            carId={effectiveCarId}
+            projectId={effectiveProjectId}
           />
         )
       ) : (
