@@ -40,12 +40,12 @@ export interface StreamingResponse {
 // Initialize provider clients
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
-  timeout: 50000, // 50 second timeout
+  timeout: 280000, // 280 second timeout (4.67 minutes)
 });
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 50000, // 50 second timeout
+  timeout: 280000, // 280 second timeout (4.67 minutes)
 });
 
 /**
@@ -118,7 +118,7 @@ async function handleAnthropicRequest(
   try {
     // Create timeout promise
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Anthropic API timeout")), 45000)
+      setTimeout(() => reject(new Error("Anthropic API timeout")), 270000)
     );
 
     // Create the API request promise
@@ -181,7 +181,7 @@ async function handleOpenAIRequest(
   try {
     // Create timeout promise
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("OpenAI API timeout")), 45000)
+      setTimeout(() => reject(new Error("OpenAI API timeout")), 270000)
     );
 
     // Create the API request promise

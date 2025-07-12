@@ -4,6 +4,9 @@ import { findModelById } from "@/lib/llmProviders";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
+// Set maximum execution time to 300 seconds (5 minutes) for Vercel Pro
+export const maxDuration = 300;
+
 // Helper functions from the regular API (should be shared)
 function formatCarSpecifications(
   carDetails: any,

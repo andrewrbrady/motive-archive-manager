@@ -4,6 +4,9 @@ import { findModelById } from "@/lib/llmProviders";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
+// Set maximum execution time to 300 seconds (5 minutes) for Vercel Pro
+export const maxDuration = 300;
+
 interface MessageContent {
   type: "text";
   text: string;
@@ -359,8 +362,8 @@ export async function POST(request: NextRequest) {
     const elapsedTime = Date.now() - startTime;
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Time elapsed before LLM generation: ${elapsedTime}ms`);
 
-    if (elapsedTime > 45000) {
-      // If we're already at 45 seconds, abort
+    if (elapsedTime > 270000) {
+      // If we're already at 4.5 minutes (270 seconds), abort to leave time for response
       return NextResponse.json(
         { error: "Request timeout - too much time spent on setup" },
         { status: 408 }
@@ -388,7 +391,7 @@ export async function POST(request: NextRequest) {
 
       // Create timeout promise for LLM generation
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("LLM generation timeout")), 50000)
+        setTimeout(() => reject(new Error("LLM generation timeout")), 280000)
       );
 
       const generationPromise = generateText({
@@ -552,7 +555,7 @@ export async function POST(request: NextRequest) {
 
     // Create timeout promise for LLM generation
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("LLM generation timeout")), 50000)
+      setTimeout(() => reject(new Error("LLM generation timeout")), 280000)
     );
 
     const generationPromise = generateText({

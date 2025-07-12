@@ -51,11 +51,15 @@
       "memory": 1024
     },
     "app/api/openai/generate-project-caption/route.ts": {
-      "maxDuration": 60,
+      "maxDuration": 300,
+      "memory": 1024
+    },
+    "app/api/openai/generate-project-caption-stream/route.ts": {
+      "maxDuration": 300,
       "memory": 1024
     },
     "app/api/openai/generate-caption/route.ts": {
-      "maxDuration": 60,
+      "maxDuration": 300,
       "memory": 1024
     },
     "app/api/system-prompts/*/route.ts": {
