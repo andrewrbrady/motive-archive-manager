@@ -806,6 +806,62 @@ class APIClient {
   };
 
   /**
+   * Models API - Strongly typed methods for vehicle model management
+   */
+  models = {
+    /**
+     * Get all models with optional filtering
+     */
+    getAll: (params?: any) => {
+      const searchParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) {
+            searchParams.append(key, String(value));
+          }
+        });
+      }
+      const query = searchParams.toString();
+      return this.get(`/models${query ? `?${query}` : ""}`);
+    },
+
+    /**
+     * Get a specific model by ID
+     */
+    getById: (id: string) => {
+      return this.get(`/models/${id}`);
+    },
+
+    /**
+     * Create a new model
+     */
+    create: (data: any) => {
+      return this.post("/models", data);
+    },
+
+    /**
+     * Update a model
+     */
+    update: (id: string, data: any) => {
+      return this.put(`/models/${id}`, data);
+    },
+
+    /**
+     * Delete a model
+     */
+    delete: (id: string) => {
+      return this.delete(`/models?id=${id}`);
+    },
+
+    /**
+     * Batch create multiple models
+     */
+    batchCreate: (data: any[]) => {
+      return this.post("/models/batch", data);
+    },
+  };
+
+  /**
    * Media API - File uploads and image management
    */
   media = {

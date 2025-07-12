@@ -59,7 +59,7 @@ export function ProjectCopywriter({
     data: eventsData,
     isLoading: isLoadingEvents,
     error: eventsError,
-  } = useAPIQuery<any[]>(`projects/${project._id}/events`, {
+  } = useAPIQuery<any[]>(`projects/${project._id}/events?includeCars=true`, {
     staleTime: 3 * 60 * 1000, // 3 minutes cache for project data
     retry: 2,
     retryDelay: 1000,
@@ -160,7 +160,7 @@ export function ProjectCopywriter({
         // Convert events to project format
         const projectEvents: ProjectEvent[] = (eventsData || []).map(
           (event: any) => ({
-            id: event._id,
+            id: event._id || event.id,
             project_id: project._id,
             type: event.type,
             title: event.title,
@@ -174,6 +174,16 @@ export function ProjectCopywriter({
             imageIds: event.imageIds || [],
             createdAt: event.createdAt,
             updatedAt: event.updatedAt,
+            // Include car information if available
+            car: event.car
+              ? {
+                  _id: event.car._id,
+                  make: event.car.make,
+                  model: event.car.model,
+                  year: event.car.year,
+                  primaryImageId: event.car.primaryImageId,
+                }
+              : undefined,
           })
         );
 
@@ -191,6 +201,7 @@ export function ProjectCopywriter({
 
         return {
           cars: projectCars,
+          models: [], // Empty array for models - not handled by legacy ProjectCopywriter
           events: projectEvents,
           systemPrompts: [], // Now handled by shared cache in BaseCopywriter
           lengthSettings: [], // Now handled by shared cache in BaseCopywriter

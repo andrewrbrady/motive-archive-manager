@@ -158,6 +158,7 @@ function GalleryCopywriter({ galleryId }: { galleryId: string }) {
       // Convert to expected format
       return {
         cars: gallery.cars || [],
+        models: [], // No models for gallery mode
         events: [],
         systemPrompts: await fetchSystemPrompts(),
         lengthSettings: await fetchLengthSettings(),

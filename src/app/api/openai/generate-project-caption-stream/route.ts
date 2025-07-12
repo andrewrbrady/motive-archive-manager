@@ -110,6 +110,53 @@ function formatEventSpecifications(eventDetails: any): string {
   return eventText;
 }
 
+function formatModelSpecifications(modelDetails: any): string {
+  if (
+    !modelDetails ||
+    !modelDetails.models ||
+    modelDetails.models.length === 0
+  ) {
+    return "";
+  }
+
+  let modelText = "";
+  const models = modelDetails.models;
+
+  modelText += `Vehicle Models (${models.length}):\n`;
+
+  models.forEach((model: any, index: number) => {
+    modelText += `${index + 1}. ${model.make} ${model.model}`;
+
+    if (model.generation?.code) {
+      modelText += ` (${model.generation.code})`;
+    }
+
+    if (model.market_segment) {
+      modelText += ` - ${model.market_segment}`;
+    }
+
+    if (model.generation?.year_range) {
+      const start = model.generation.year_range.start;
+      const end = model.generation.year_range.end;
+      modelText += ` - ${start}${end ? `-${end}` : "-Present"}`;
+    }
+
+    if (model.engine_options && model.engine_options.length > 0) {
+      const firstEngine = model.engine_options[0];
+      if (firstEngine) {
+        modelText += ` - ${firstEngine.type || "Engine"}`;
+        if (firstEngine.power?.hp) {
+          modelText += ` (${firstEngine.power.hp} HP)`;
+        }
+      }
+    }
+
+    modelText += "\n";
+  });
+
+  return modelText;
+}
+
 function getMaxTokensForLength(length: string): number {
   // Remove hard token limits - let the AI generate appropriate length based on instructions
   // Return a generous limit that won't cut off content (same as regular API)
@@ -121,6 +168,7 @@ export async function POST(request: NextRequest) {
     const {
       projectId,
       selectedCarIds = [],
+      selectedModelIds = [],
       selectedEventIds = [],
       selectedSystemPromptId,
       customLLMText,
@@ -128,6 +176,7 @@ export async function POST(request: NextRequest) {
       clientInfo,
       carDetails,
       eventDetails,
+      modelDetails,
       platform = "instagram",
       tone = "professional",
       style = "engaging",
@@ -188,9 +237,10 @@ export async function POST(request: NextRequest) {
       systemPrompt = activeSystemPromptDoc?.prompt || "";
     }
 
-    // Format car and event specifications like the regular API
+    // Format car, event, and model specifications like the regular API
     const specsText = formatCarSpecifications(carDetails, useMinimalCarData);
     const eventSpecsText = formatEventSpecifications(eventDetails);
+    const modelSpecsText = formatModelSpecifications(modelDetails);
 
     // Use custom LLM text if provided, otherwise build prompt (EXACTLY like regular API)
     let userPrompt = "";
@@ -206,6 +256,15 @@ export async function POST(request: NextRequest) {
       }
 
       userPromptParts.push("VEHICLE PROJECT SPECIFICATIONS:", specsText);
+
+      // Add model specifications if available
+      if (modelSpecsText) {
+        userPromptParts.push(
+          "",
+          "VEHICLE MODEL SPECIFICATIONS:",
+          modelSpecsText
+        );
+      }
 
       // Add event specifications if available
       if (eventSpecsText) {

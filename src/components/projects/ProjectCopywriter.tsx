@@ -179,9 +179,11 @@ export function ProjectCopywriter({
     const context: GenerationContext = {
       projectId: project._id!,
       selectedCarIds,
+      selectedModelIds: [], // Legacy component doesn't support models
       selectedEventIds,
       selectedSystemPromptId,
       carDetails,
+      modelDetails: [], // Legacy component doesn't support models
       eventDetails,
       derivedLength,
       useMinimalCarData,

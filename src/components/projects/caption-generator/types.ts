@@ -98,6 +98,14 @@ export interface ProjectEvent {
   imageIds?: string[];
   createdAt: string;
   updatedAt: string;
+  // Car information (populated when includeCars=true)
+  car?: {
+    _id: string;
+    make: string;
+    model: string;
+    year: number;
+    primaryImageId?: string;
+  };
 }
 
 export interface SavedCaption {

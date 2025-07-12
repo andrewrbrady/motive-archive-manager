@@ -14,6 +14,10 @@ export interface PreloadedProjectData {
     cars: any[];
     total: number;
   };
+  models?: {
+    models: any[];
+    total: number;
+  };
   captions?: {
     captions: any[];
     total: number;

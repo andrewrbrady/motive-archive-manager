@@ -13,10 +13,13 @@ export interface CaptionFormState {
 
 export interface GenerationContext {
   carId?: string;
+  projectId?: string;
   selectedCarIds: string[];
+  selectedModelIds: string[];
   selectedEventIds: string[];
   selectedSystemPromptId: string | null;
   carDetails: any[];
+  modelDetails: any[];
   eventDetails: any[];
   derivedLength: LengthSetting | null;
   useMinimalCarData: boolean;

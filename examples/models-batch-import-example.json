@@ -1,0 +1,269 @@
+[
+  {
+    "make": "BMW",
+    "model": "3 Series",
+    "generation": {
+      "code": "F30",
+      "year_range": {
+        "start": 2012,
+        "end": 2019
+      },
+      "body_styles": ["Sedan", "Wagon"],
+      "trims": [
+        {
+          "name": "328i",
+          "year_range": { "start": 2012, "end": 2015 },
+          "engine": "N20B20",
+          "transmission": ["Manual", "Automatic"],
+          "drivetrain": ["RWD", "AWD"],
+          "performance": {
+            "hp": 240,
+            "torque": { "value": 258, "unit": "lb-ft" },
+            "acceleration": {
+              "0_to_60": { "value": 5.7, "unit": "seconds" }
+            }
+          },
+          "price_range": {
+            "msrp": {
+              "min": 34000,
+              "max": 41000,
+              "currency": "USD"
+            }
+          },
+          "fuel_economy": {
+            "city_mpg": 23,
+            "highway_mpg": 35,
+            "combined_mpg": 27
+          },
+          "emissions_rating": {
+            "standard": "ULEV-II",
+            "co2_grams_per_km": 160
+          },
+          "standard_features": [
+            "Bluetooth",
+            "Dual-zone climate control",
+            "iDrive infotainment",
+            "Power-adjustable seats"
+          ],
+          "optional_packages": [
+            {
+              "name": "M Sport Package",
+              "features": ["Sport suspension", "M steering wheel", "Aero kit"]
+            }
+          ]
+        },
+        {
+          "name": "330i",
+          "year_range": { "start": 2016, "end": 2019 },
+          "engine": "B48",
+          "transmission": ["Automatic"],
+          "drivetrain": ["RWD", "AWD"],
+          "performance": {
+            "hp": 248,
+            "torque": { "value": 258, "unit": "lb-ft" }
+          },
+          "price_range": {
+            "msrp": {
+              "min": 36000,
+              "max": 43000,
+              "currency": "USD"
+            }
+          },
+          "fuel_economy": {
+            "city_mpg": 24,
+            "highway_mpg": 34,
+            "combined_mpg": 27
+          },
+          "emissions_rating": {
+            "standard": "ULEV-II",
+            "co2_grams_per_km": 155
+          },
+          "standard_features": [
+            "LED headlights",
+            "Rearview camera",
+            "Power front seats",
+            "USB audio interface"
+          ]
+        }
+      ]
+    },
+    "engine_options": [
+      {
+        "id": "N20B20",
+        "type": "I4",
+        "displacement": { "value": 2.0, "unit": "L" },
+        "power": { "hp": 240, "kW": 179 },
+        "torque": { "value": 258, "unit": "lb-ft" },
+        "fuel_type": "Gasoline",
+        "aspiration": "Turbocharged"
+      },
+      {
+        "id": "B48",
+        "type": "I4",
+        "displacement": { "value": 2.0, "unit": "L" },
+        "power": { "hp": 248, "kW": 185 },
+        "torque": { "value": 258, "unit": "lb-ft" },
+        "fuel_type": "Gasoline",
+        "aspiration": "Turbocharged"
+      }
+    ],
+    "market_segment": "Luxury",
+    "description": "Compact executive car with multiple trim levels and engine options",
+    "tags": ["luxury", "performance", "sedan", "wagon"]
+  },
+  {
+    "make": "Toyota",
+    "model": "Camry",
+    "generation": {
+      "code": "XV70",
+      "year_range": {
+        "start": 2018,
+        "end": null
+      },
+      "body_styles": ["Sedan"],
+      "trims": [
+        {
+          "name": "LE",
+          "year_range": { "start": 2018 },
+          "engine": "A25A-FKS",
+          "transmission": ["Automatic"],
+          "drivetrain": ["FWD"],
+          "performance": {
+            "hp": 203,
+            "torque": { "value": 184, "unit": "lb-ft" }
+          },
+          "price_range": {
+            "msrp": {
+              "min": 25000,
+              "max": 28000,
+              "currency": "USD"
+            }
+          },
+          "fuel_economy": {
+            "city_mpg": 28,
+            "highway_mpg": 39,
+            "combined_mpg": 32
+          },
+          "emissions_rating": {
+            "standard": "ULEV-II",
+            "co2_grams_per_km": 145
+          },
+          "standard_features": [
+            "Toyota Safety Sense 2.0",
+            "8-inch touchscreen",
+            "Apple CarPlay",
+            "Android Auto"
+          ]
+        },
+        {
+          "name": "XLE",
+          "year_range": { "start": 2018 },
+          "engine": "A25A-FKS",
+          "transmission": ["Automatic"],
+          "drivetrain": ["FWD"],
+          "performance": {
+            "hp": 203,
+            "torque": { "value": 184, "unit": "lb-ft" }
+          },
+          "price_range": {
+            "msrp": {
+              "min": 29000,
+              "max": 32000,
+              "currency": "USD"
+            }
+          },
+          "fuel_economy": {
+            "city_mpg": 28,
+            "highway_mpg": 39,
+            "combined_mpg": 32
+          },
+          "emissions_rating": {
+            "standard": "ULEV-II",
+            "co2_grams_per_km": 145
+          },
+          "standard_features": [
+            "Heated seats",
+            "Dual-zone climate control",
+            "Wireless phone charging",
+            "Blind spot monitoring"
+          ]
+        }
+      ]
+    },
+    "engine_options": [
+      {
+        "id": "A25A-FKS",
+        "type": "I4",
+        "displacement": { "value": 2.5, "unit": "L" },
+        "power": { "hp": 203, "kW": 151 },
+        "torque": { "value": 184, "unit": "lb-ft" },
+        "fuel_type": "Gasoline",
+        "aspiration": "Naturally Aspirated"
+      }
+    ],
+    "market_segment": "Mid-Size",
+    "description": "Mid-size sedan with reliable performance and excellent fuel economy",
+    "tags": ["reliable", "family", "sedan", "fuel-efficient"]
+  },
+  {
+    "make": "Audi",
+    "model": "A4",
+    "generation": {
+      "code": "B9",
+      "year_range": {
+        "start": 2016,
+        "end": null
+      },
+      "body_styles": ["Sedan", "Wagon"],
+      "trims": [
+        {
+          "name": "Premium",
+          "year_range": { "start": 2016 },
+          "engine": "EA888",
+          "transmission": ["Automatic"],
+          "drivetrain": ["FWD", "AWD"],
+          "performance": {
+            "hp": 248,
+            "torque": { "value": 273, "unit": "lb-ft" }
+          },
+          "price_range": {
+            "msrp": {
+              "min": 37000,
+              "max": 42000,
+              "currency": "USD"
+            }
+          },
+          "fuel_economy": {
+            "city_mpg": 24,
+            "highway_mpg": 31,
+            "combined_mpg": 27
+          },
+          "emissions_rating": {
+            "standard": "ULEV-II",
+            "co2_grams_per_km": 155
+          },
+          "standard_features": [
+            "MMI infotainment",
+            "Virtual cockpit",
+            "LED headlights",
+            "Power tailgate"
+          ]
+        }
+      ]
+    },
+    "engine_options": [
+      {
+        "id": "EA888",
+        "type": "I4",
+        "displacement": { "value": 2.0, "unit": "L" },
+        "power": { "hp": 248, "kW": 185 },
+        "torque": { "value": 273, "unit": "lb-ft" },
+        "fuel_type": "Gasoline",
+        "aspiration": "Turbocharged"
+      }
+    ],
+    "market_segment": "Luxury",
+    "description": "Compact executive car with advanced technology and refined driving experience",
+    "tags": ["luxury", "technology", "sedan", "wagon", "premium"]
+  }
+]

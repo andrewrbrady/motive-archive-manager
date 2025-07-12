@@ -36,7 +36,7 @@ interface JsonUploadPasteModalProps {
   onSubmit: (data: any[]) => Promise<void>;
   title: string;
   description?: string;
-  expectedType: string; // "events", "deliverables", "deliverables-relaxed", or "cars"
+  expectedType: string; // "events", "deliverables", "deliverables-relaxed", "cars", or "models"
   isSubmitting?: boolean;
   carData?: {
     make?: string;
@@ -72,8 +72,8 @@ export default function JsonUploadPasteModal({
       data: any
     ): { isValid: boolean; error?: string; data?: any[]; count?: number } => {
       try {
-        // For cars, we can accept either a single object or an array with one object
-        if (expectedType === "cars") {
+        // For cars and models, we can accept either a single object or an array with one object
+        if (expectedType === "cars" || expectedType === "models") {
           let carData: any[];
 
           if (Array.isArray(data)) {
@@ -81,10 +81,10 @@ export default function JsonUploadPasteModal({
               return { isValid: false, error: "Array cannot be empty" };
             }
             if (data.length > 1) {
+              const itemType = expectedType === "cars" ? "car" : "model";
               return {
                 isValid: false,
-                error:
-                  "Only one car object is allowed. Please provide a single car object or an array with one car.",
+                error: `Only one ${itemType} object is allowed. Please provide a single ${itemType} object or an array with one ${itemType}.`,
               };
             }
             carData = data;
@@ -92,19 +92,20 @@ export default function JsonUploadPasteModal({
             // Single object - wrap it in an array for consistent handling
             carData = [data];
           } else {
+            const itemType = expectedType === "cars" ? "car" : "model";
             return {
               isValid: false,
-              error:
-                "JSON must be a car object or an array with one car object",
+              error: `JSON must be a ${itemType} object or an array with one ${itemType} object`,
             };
           }
 
-          // Validate the car object
-          const car = carData[0];
-          if (!car.make || !car.model) {
+          // Validate the car/model object
+          const item = carData[0];
+          if (!item.make || !item.model) {
+            const itemType = expectedType === "cars" ? "Car" : "Model";
             return {
               isValid: false,
-              error: "Car object missing required fields: make, model",
+              error: `${itemType} object missing required fields: make, model`,
             };
           }
 
@@ -279,7 +280,7 @@ export default function JsonUploadPasteModal({
               <Upload className="w-4 h-4 mr-2" />
               Upload JSON File
             </Button>
-            {expectedType === "cars" && (
+            {(expectedType === "cars" || expectedType === "models") && (
               <Button
                 variant="outline"
                 size="sm"
@@ -307,7 +308,9 @@ export default function JsonUploadPasteModal({
               placeholder={
                 expectedType === "cars"
                   ? `Paste your car JSON object here...`
-                  : `Paste your ${expectedType} JSON array here...`
+                  : expectedType === "models"
+                    ? `Paste your model JSON object here...`
+                    : `Paste your ${expectedType} JSON array here...`
               }
               value={jsonText}
               onChange={(e) => handleTextChange(e.target.value)}
@@ -335,7 +338,9 @@ export default function JsonUploadPasteModal({
                           Ready to{" "}
                           {expectedType === "cars"
                             ? "populate form with car data"
-                            : `create ${validationResult.count} ${expectedType}`}
+                            : expectedType === "models"
+                              ? "populate form with model data"
+                              : `create ${validationResult.count} ${expectedType}`}
                         </p>
                       </div>
                     ) : (
@@ -383,6 +388,50 @@ export default function JsonUploadPasteModal({
     "status": "not_started"
   }
 ]`;
+                  } else if (expectedType === "models") {
+                    return `{
+  "make": "BMW",
+  "model": "3 Series",
+  "generation": {
+    "code": "F30",
+    "year_range": {
+      "start": 2012,
+      "end": 2019
+    },
+    "body_styles": ["Sedan", "Wagon"],
+    "trims": [
+      {
+        "name": "328i",
+        "year_range": { "start": 2012, "end": 2015 },
+        "engine": "N20B20",
+        "transmission": ["Manual", "Automatic"],
+        "drivetrain": ["RWD", "AWD"],
+        "performance": {
+          "hp": 240,
+          "torque": { "value": 258, "unit": "lb-ft" }
+        },
+        "standard_features": [
+          "Bluetooth",
+          "Dual-zone climate control"
+        ]
+      }
+    ]
+  },
+  "engine_options": [
+    {
+      "id": "N20B20",
+      "type": "I4",
+      "displacement": { "value": 2.0, "unit": "L" },
+      "power": { "hp": 240, "kW": 179 },
+      "torque": { "value": 258, "unit": "lb-ft" },
+      "fuel_type": "Gasoline",
+      "aspiration": "Turbocharged"
+    }
+  ],
+  "market_segment": "Luxury",
+  "description": "Compact executive car",
+  "tags": ["luxury", "performance", "sedan"]
+}`;
                   } else {
                     return `{
   "make": "Toyota",
@@ -433,10 +482,14 @@ export default function JsonUploadPasteModal({
             {isSubmitting
               ? expectedType === "cars"
                 ? "Populating..."
-                : "Creating..."
+                : expectedType === "models"
+                  ? "Populating..."
+                  : "Creating..."
               : expectedType === "cars"
                 ? "Populate Form"
-                : `Create ${validationResult.count || 0} ${expectedType}`}
+                : expectedType === "models"
+                  ? "Populate Form"
+                  : `Create ${validationResult.count || 0} ${expectedType}`}
           </Button>
         </DialogFooter>
       </DialogContent>

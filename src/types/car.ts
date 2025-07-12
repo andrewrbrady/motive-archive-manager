@@ -133,6 +133,18 @@ export interface Car {
   make: string;
   model: string;
   year?: number;
+  // Model reference for integration with models system
+  modelId?: string; // Reference to VehicleModel
+  modelInfo?: {
+    // Populated model data
+    _id: string;
+    make: string;
+    model: string;
+    generation?: string;
+    market_segment?: string;
+    body_styles?: string[];
+    // ... other model fields can be added as needed
+  };
   price: PriceHistory;
   mileage?: {
     value: number;

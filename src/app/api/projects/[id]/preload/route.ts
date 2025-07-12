@@ -77,7 +77,7 @@ async function preloadProjectData(
         $or: [{ ownerId: userId }, { "members.userId": userId }],
       },
       {
-        projection: { _id: 1, ownerId: 1, members: 1, carIds: 1 },
+        projection: { _id: 1, ownerId: 1, members: 1, carIds: 1, modelIds: 1 },
       }
     );
     console.timeEnd("preload-auth-check");
@@ -92,8 +92,9 @@ async function preloadProjectData(
     // ⚡ OPTIMIZED: Build parallel queries for requested tabs
     const queries: Promise<any>[] = [];
     const tabQueries: Record<string, () => Promise<any>> = {
-      events: () => fetchEventsData(db, projectId, limit, includeCars),
+      events: () => fetchEventsData(db, projectId, limit, true), // Always include cars in preload
       cars: () => fetchCarsData(db, project.carIds || [], limit),
+      models: () => fetchModelsData(db, project.modelIds || [], limit),
       captions: () => fetchCaptionsData(db, projectId, limit),
       timeline: () => fetchTimelineData(db, projectId),
     };
@@ -307,6 +308,54 @@ async function fetchCarsData(db: any, carIds: any[], limit: number) {
       primaryImageId: car.primaryImageId?.toString(),
     })),
     total: cars.length,
+    limit,
+  };
+}
+
+// ⚡ OPTIMIZED: Fetch models data with minimal fields
+async function fetchModelsData(db: any, modelIds: any[], limit: number) {
+  console.time("fetch-models");
+
+  if (!modelIds || modelIds.length === 0) {
+    return { models: [], total: 0, limit };
+  }
+
+  const modelObjectIds = modelIds
+    .filter((id) => id instanceof ObjectId || ObjectId.isValid(id))
+    .map((id) => (id instanceof ObjectId ? id : new ObjectId(id)));
+
+  if (modelObjectIds.length === 0) {
+    return { models: [], total: 0, limit };
+  }
+
+  const models = await db
+    .collection("models")
+    .find({
+      _id: { $in: modelObjectIds },
+      active: true, // Only fetch active models
+    })
+    .project({
+      _id: 1,
+      make: 1,
+      model: 1,
+      generation: 1,
+      market_segment: 1,
+      engine_options: 1,
+      description: 1,
+      created_at: 1,
+    })
+    .sort({ make: 1, model: 1, "generation.code": 1 })
+    .limit(limit)
+    .toArray();
+
+  console.timeEnd("fetch-models");
+
+  return {
+    models: models.map((model: any) => ({
+      ...model,
+      _id: model._id.toString(),
+    })),
+    total: models.length,
     limit,
   };
 }

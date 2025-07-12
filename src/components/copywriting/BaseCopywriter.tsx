@@ -14,6 +14,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { CarSelection } from "../projects/caption-generator/CarSelection";
+import { ModelSelection } from "../projects/caption-generator/ModelSelection";
 import { EventSelection } from "../projects/caption-generator/EventSelection";
 import { SystemPromptSelection } from "../projects/caption-generator/SystemPromptSelection";
 import { BrandToneSelection } from "../projects/caption-generator/BrandToneSelection";
@@ -64,10 +65,14 @@ export interface CopywriterConfig {
     allowMinimalCarData: boolean;
     showClientHandle: boolean;
   };
+  loadingStates?: {
+    isLoadingModels?: boolean;
+  };
 }
 
 export interface CopywriterData {
   cars: ProjectCar[];
+  models: any[]; // Vehicle models for copywriter context
   events: ProjectEvent[];
   systemPrompts: any[];
   lengthSettings: any[];
@@ -171,6 +176,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   } = useQuery<CopywriterData>({
     queryKey: [`copywriter-entity-data-${config.entityId}`],
     queryFn: callbacks.onDataFetch,
+    enabled: !config.loadingStates?.isLoadingModels, // Wait for models data to finish loading
     staleTime: 3 * 60 * 1000, // 3 minutes cache for entity data
     retry: 2,
     retryDelay: 1000,
@@ -183,6 +189,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     const baseData = {
       // Ensure arrays are properly initialized to prevent .map() errors
       cars: Array.isArray(entityData?.cars) ? entityData.cars : [],
+      models: Array.isArray(entityData?.models) ? entityData.models : [],
       events: Array.isArray(entityData?.events) ? entityData.events : [],
       systemPrompts: Array.isArray(sharedSystemPrompts)
         ? sharedSystemPrompts
@@ -242,6 +249,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
 
   // Selection states
   const [selectedCarIds, setSelectedCarIds] = useState<string[]>([]);
+  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
   const [selectedSystemPromptId, setSelectedSystemPromptId] =
     useState<string>("");
@@ -250,9 +258,14 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     hasUserInteractedWithCarSelection,
     setHasUserInteractedWithCarSelection,
   ] = useState(false);
+  const [
+    hasUserInteractedWithModelSelection,
+    setHasUserInteractedWithModelSelection,
+  ] = useState(false);
 
-  // Car and event detail states
+  // Car, model, and event detail states
   const [carDetails, setCarDetails] = useState<any[]>([]);
+  const [modelDetails, setModelDetails] = useState<any[]>([]);
   const [eventDetails, setEventDetails] = useState<ProjectEvent[]>([]);
 
   // UI states
@@ -263,6 +276,11 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   const [editableLLMText, setEditableLLMText] = useState<string>("");
   const [useMinimalCarData, setUseMinimalCarData] = useState(false);
   const [enableStreaming, setEnableStreaming] = useState<boolean>(true);
+
+  // Collapsible section states
+  const [isCarSectionOpen, setIsCarSectionOpen] = useState(true);
+  const [isModelSectionOpen, setIsModelSectionOpen] = useState(true);
+  const [isEventSectionOpen, setIsEventSectionOpen] = useState(true);
 
   // Saved captions management
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -369,6 +387,32 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     memoizedDataWithConditional.cars,
     selectedCarIds.length,
     hasUserInteractedWithCarSelection,
+  ]);
+
+  // Auto-select models for project mode
+  React.useEffect(() => {
+    if (
+      config.mode === "project" &&
+      memoizedDataWithConditional.models.length > 0 &&
+      selectedModelIds.length === 0 &&
+      !hasUserInteractedWithModelSelection
+    ) {
+      // In project mode, auto-select all models to enable generation controls
+      const allModelIds = memoizedDataWithConditional.models.map(
+        (model) => model._id
+      );
+      setSelectedModelIds(allModelIds);
+      setModelDetails(memoizedDataWithConditional.models);
+
+      console.log(
+        `🏭 BaseCopywriter: Auto-selected ${allModelIds.length} models for project mode`
+      );
+    }
+  }, [
+    config.mode,
+    memoizedDataWithConditional.models,
+    selectedModelIds.length,
+    hasUserInteractedWithModelSelection,
   ]);
 
   // Fetch prompts when component mounts
@@ -563,6 +607,51 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     memoizedDataWithConditional.cars,
     config.features.allowMultipleCars,
     selectedCarIds.length,
+  ]);
+
+  // Model selection handlers (for project mode)
+  const handleModelSelection = useCallback(
+    (modelId: string) => {
+      if (config.mode !== "project") return;
+
+      setHasUserInteractedWithModelSelection(true);
+      setSelectedModelIds((prev) => {
+        const newSelection = prev.includes(modelId)
+          ? prev.filter((id) => id !== modelId)
+          : [...prev, modelId];
+
+        // Update model details based on selection
+        const details = memoizedDataWithConditional.models.filter((model) =>
+          newSelection.includes(model._id)
+        );
+        setModelDetails(details);
+
+        return newSelection;
+      });
+    },
+    [memoizedDataWithConditional.models, config.mode]
+  );
+
+  const handleSelectAllModels = useCallback(() => {
+    if (config.mode !== "project") return;
+
+    setHasUserInteractedWithModelSelection(true);
+    const allModelIds = memoizedDataWithConditional.models.map(
+      (model) => model._id
+    );
+
+    // If all models are selected, deselect all; otherwise select all
+    if (selectedModelIds.length === allModelIds.length) {
+      setSelectedModelIds([]);
+      setModelDetails([]);
+    } else {
+      setSelectedModelIds(allModelIds);
+      setModelDetails(memoizedDataWithConditional.models);
+    }
+  }, [
+    memoizedDataWithConditional.models,
+    config.mode,
+    selectedModelIds.length,
   ]);
 
   // System prompt handler with localStorage persistence
@@ -816,6 +905,79 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     }
     llmText += "\n";
 
+    // Add model details if any
+    if (modelDetails.length > 0) {
+      if (modelDetails.length === 1) {
+        const model = modelDetails[0];
+        llmText += "VEHICLE MODEL SPECIFICATIONS:\n";
+        llmText += `Make: ${model.make}\n`;
+        llmText += `Model: ${model.model}\n`;
+
+        if (model.generation) {
+          llmText += `Generation: ${model.generation.code}\n`;
+          if (model.generation.year_range) {
+            const start = model.generation.year_range.start;
+            const end = model.generation.year_range.end;
+            llmText += `Production Years: ${start}${end ? `-${end}` : "-Present"}\n`;
+          }
+
+          if (
+            model.generation.body_styles &&
+            model.generation.body_styles.length > 0
+          ) {
+            llmText += `Body Styles: ${model.generation.body_styles.join(", ")}\n`;
+          }
+
+          if (model.generation.trims && model.generation.trims.length > 0) {
+            llmText += `Available Trims: ${model.generation.trims.length} variants\n`;
+            // Add a few example trims
+            const exampleTrims = model.generation.trims
+              .slice(0, 3)
+              .map((trim: any) => trim.name);
+            if (exampleTrims.length > 0) {
+              llmText += `Example Trims: ${exampleTrims.join(", ")}\n`;
+            }
+          }
+        }
+
+        if (model.market_segment) {
+          llmText += `Market Segment: ${model.market_segment}\n`;
+        }
+
+        if (model.engine_options && model.engine_options.length > 0) {
+          llmText += `Engine Options: ${model.engine_options.length} available\n`;
+          // Add details for first engine option
+          const firstEngine = model.engine_options[0];
+          if (firstEngine) {
+            llmText += `Primary Engine: ${firstEngine.type || "Unknown"}`;
+            if (firstEngine.displacement) {
+              llmText += ` ${firstEngine.displacement.value}${firstEngine.displacement.unit}`;
+            }
+            if (firstEngine.power?.hp) {
+              llmText += ` (${firstEngine.power.hp} HP)`;
+            }
+            if (firstEngine.fuel_type) {
+              llmText += ` - ${firstEngine.fuel_type}`;
+            }
+            llmText += `\n`;
+          }
+        }
+
+        if (model.description) {
+          llmText += `Model Description: ${model.description}\n`;
+        }
+      } else {
+        llmText += "SELECTED VEHICLE MODELS:\n";
+        modelDetails.forEach((model, index) => {
+          llmText += `Model ${index + 1}: ${model.make} ${model.model}`;
+          if (model.generation?.code) llmText += ` (${model.generation.code})`;
+          if (model.market_segment) llmText += ` - ${model.market_segment}`;
+          llmText += `\n`;
+        });
+      }
+      llmText += "\n";
+    }
+
     // Add event details if any
     if (eventDetails.length > 0) {
       llmText += "ASSOCIATED EVENTS:\n";
@@ -856,6 +1018,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     return llmText;
   }, [
     carDetails,
+    modelDetails,
     selectedSystemPromptId,
     memoizedDataWithConditional.systemPrompts,
     selectedBrandToneId,
@@ -935,9 +1098,11 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     const context: GenerationContext = {
       projectId: config.mode === "project" ? config.entityId : "",
       selectedCarIds,
+      selectedModelIds,
       selectedEventIds,
       selectedSystemPromptId,
       carDetails,
+      modelDetails,
       eventDetails,
       derivedLength,
       useMinimalCarData,
@@ -1008,6 +1173,28 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
           };
         }
 
+        // Process model details
+        let combinedModelDetails = null;
+        if (
+          Array.isArray(context.modelDetails) &&
+          context.modelDetails.length > 0
+        ) {
+          combinedModelDetails = {
+            models: context.modelDetails,
+            count: context.modelDetails.length,
+            makes: [
+              ...new Set(context.modelDetails.map((model) => model.make)),
+            ],
+            segments: [
+              ...new Set(
+                context.modelDetails
+                  .map((model) => model.market_segment)
+                  .filter(Boolean)
+              ),
+            ],
+          };
+        }
+
         const response = await fetch(
           "/api/openai/generate-project-caption-stream",
           {
@@ -1021,6 +1208,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
               clientInfo,
               carDetails: combinedCarDetails,
               eventDetails: combinedEventDetails,
+              modelDetails: combinedModelDetails,
               temperature: formState.temperature,
               tone: formState.tone,
               style: formState.style,
@@ -1029,6 +1217,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
               aiModel: formState.model,
               projectId: context.projectId,
               selectedCarIds: context.selectedCarIds,
+              selectedModelIds: context.selectedModelIds,
               selectedEventIds: context.selectedEventIds,
               selectedSystemPromptId: context.selectedSystemPromptId,
               useMinimalCarData: context.useMinimalCarData,
@@ -1410,7 +1599,23 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
             loadingCars={isLoading}
             onCarSelection={handleCarSelection}
             onSelectAllCars={handleSelectAllCars}
+            isOpen={isCarSectionOpen}
+            onToggle={setIsCarSectionOpen}
           />
+
+          {/* Model Selection - Only for project mode */}
+          {config.mode === "project" &&
+            memoizedDataWithConditional.models.length > 0 && (
+              <ModelSelection
+                projectModels={memoizedDataWithConditional.models}
+                selectedModelIds={selectedModelIds}
+                loadingModels={isLoading}
+                onModelSelection={handleModelSelection}
+                onSelectAllModels={handleSelectAllModels}
+                isOpen={isModelSectionOpen}
+                onToggle={setIsModelSectionOpen}
+              />
+            )}
 
           {/* Event Selection */}
           {config.features.allowEventSelection && (
@@ -1422,6 +1627,8 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
               onSelectAllEvents={handleSelectAllEvents}
               hasMoreEvents={memoizedDataWithConditional.hasMoreEvents}
               onLoadMoreEvents={handleLoadMoreEvents}
+              isOpen={isEventSectionOpen}
+              onToggle={setIsEventSectionOpen}
             />
           )}
 

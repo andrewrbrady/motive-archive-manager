@@ -126,6 +126,9 @@ export function ProjectClientWrapper({
   const [preloadedCars, setPreloadedCars] = useState<ProjectCar[] | undefined>(
     undefined
   );
+  const [preloadedModels, setPreloadedModels] = useState<any[] | undefined>(
+    undefined
+  );
   const [preloadedGalleries, setPreloadedGalleries] = useState<
     any[] | undefined
   >(undefined);
@@ -182,6 +185,7 @@ export function ProjectClientWrapper({
           "events",
           "team",
           "cars",
+          "models",
           "images",
           "galleries",
           "assets",
@@ -223,11 +227,15 @@ export function ProjectClientWrapper({
     isLoading: isPreloadingTabs,
     error: preloadError,
     refetch: refetchPreload,
-  } = useProjectPreload(project._id || "", ["events", "cars", "captions"], {
-    enabled: !!api && !!project._id,
-    limit: 50,
-    includeCars: true,
-  });
+  } = useProjectPreload(
+    project._id || "",
+    ["events", "cars", "models", "captions"],
+    {
+      enabled: !!api && !!project._id,
+      limit: 50,
+      includeCars: true,
+    }
+  );
 
   // Set preloaded data when available
   useEffect(() => {
@@ -248,6 +256,16 @@ export function ProjectClientWrapper({
       if (data.cars?.cars && !preloadedCars) {
         setPreloadedCars(data.cars.cars);
         // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Pre-loaded cars data:", data.cars.cars.length, "cars");
+      }
+
+      // Set models data
+      if (data.models?.models && !preloadedModels) {
+        setPreloadedModels(data.models.models);
+        console.log(
+          "✅ Pre-loaded models data:",
+          data.models.models.length,
+          "models"
+        );
       }
 
       // Set copywriter data
@@ -283,6 +301,7 @@ export function ProjectClientWrapper({
     preloadData,
     preloadedEvents,
     preloadedCars,
+    preloadedModels,
     preloadedCopywriterData,
     preloadedAssets,
     preloadedTimelineData,
@@ -709,6 +728,7 @@ export function ProjectClientWrapper({
     // Clear pre-loaded data to ensure fresh data on next tab access
     setPreloadedEvents(undefined);
     setPreloadedCars(undefined);
+    setPreloadedModels(undefined);
     setPreloadedGalleries(undefined);
     setPreloadedAssets(undefined);
     setPreloadedDeliverables(undefined);
@@ -774,6 +794,7 @@ export function ProjectClientWrapper({
         onProjectUpdate={handleProjectUpdate}
         preloadedEvents={preloadedEvents}
         preloadedCars={preloadedCars}
+        preloadedModels={preloadedModels}
         preloadedGalleries={preloadedGalleries}
         preloadedAssets={preloadedAssets}
         preloadedDeliverables={preloadedDeliverables}

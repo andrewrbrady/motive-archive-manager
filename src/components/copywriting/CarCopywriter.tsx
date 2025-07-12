@@ -216,6 +216,7 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
 
         return {
           cars: [projectCar],
+          models: [], // Empty array for models - not applicable for single car copywriter
           events: projectEvents,
           systemPrompts: [], // Now handled by shared cache in BaseCopywriter
           lengthSettings: [], // Now handled by shared cache in BaseCopywriter

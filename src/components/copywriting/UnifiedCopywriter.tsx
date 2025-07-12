@@ -39,6 +39,7 @@ interface UnifiedCopywriterProps {
   // SSR optimization - optional pre-fetched data
   initialCopywriterData?: {
     cars: BaTCarDetails[];
+    models?: any[];
     events: any[];
     captions: any[];
   };
@@ -110,7 +111,7 @@ export function UnifiedCopywriter({
       return {
         captions: `/api/projects/${projectId}/captions`,
         systemPrompts: `system-prompts/active`,
-        events: `/api/projects/${projectId}/events`,
+        events: `/api/projects/${projectId}/events?includeCars=true`,
       };
     } else {
       const primaryCarId = normalizedCarIds[0];
@@ -244,6 +245,37 @@ export function UnifiedCopywriter({
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`🚗 UnifiedCopywriter: Using basic car data:`, carsData || []);
     return carsData || [];
   }, [initialCopywriterData?.cars, projectId, fullCarsData, carsData]);
+
+  // Models data fetching (only for project mode)
+  const modelsEndpoint = React.useMemo(() => {
+    if (projectId) {
+      return `projects/${projectId}/models`;
+    }
+    return null;
+  }, [projectId]);
+
+  const {
+    data: modelsData,
+    isLoading: isLoadingModels,
+    error: modelsError,
+  } = useAPIQuery<any[]>(modelsEndpoint!, {
+    enabled: !!modelsEndpoint && !initialCopywriterData?.models, // Don't fetch if we have initial data
+    staleTime: 3 * 60 * 1000,
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+    select: (data: any) => {
+      console.log(
+        `🏭 UnifiedCopywriter: Raw models API response for ${modelsEndpoint}:`,
+        data
+      );
+
+      // Project models response - API returns {models: [...]}
+      const result = Array.isArray(data?.models) ? data.models : [];
+      console.log(`🏭 UnifiedCopywriter: Project models parsed:`, result);
+      return result;
+    },
+  });
 
   // Events data fetching
   const eventsEndpoint = apiEndpoints.events;
@@ -445,6 +477,9 @@ export function UnifiedCopywriter({
       title || (mode === "project" ? "Project Copywriter" : "Car Copywriter"),
     apiEndpoints,
     features,
+    loadingStates: {
+      isLoadingModels,
+    },
   };
 
   // Callbacks for BaseCopywriter
@@ -505,6 +540,16 @@ export function UnifiedCopywriter({
             imageIds: event.imageIds || [],
             createdAt: event.createdAt,
             updatedAt: event.updatedAt,
+            // Include car information if available
+            car: event.car
+              ? {
+                  _id: event.car._id,
+                  make: event.car.make,
+                  model: event.car.model,
+                  year: event.car.year,
+                  primaryImageId: event.car.primaryImageId,
+                }
+              : undefined,
           }));
 
         // Convert captions to unified format - prioritize fresh API data over initial data
@@ -563,8 +608,16 @@ export function UnifiedCopywriter({
           createdAt: caption.createdAt,
         }));
 
+        // Convert models to project format - use initial data if available
+        const models = initialCopywriterData?.models || modelsData || [];
+        const projectModels = models.map((model: any) => ({
+          ...model,
+          _id: model._id,
+        }));
+
         return {
           cars: projectCars,
+          models: projectModels,
           events: projectEvents,
           systemPrompts: [], // Handled by shared cache in BaseCopywriter
           lengthSettings: [], // Handled by shared cache in BaseCopywriter

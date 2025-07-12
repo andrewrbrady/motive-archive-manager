@@ -271,6 +271,12 @@ const projectSchema = new mongoose.Schema<
         ref: "Car",
       },
     ],
+    modelIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "VehicleModel",
+      },
+    ],
     galleryIds: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -370,6 +376,7 @@ projectSchema.index({ ownerId: 1 });
 projectSchema.index({ "members.userId": 1 });
 projectSchema.index({ clientId: 1 });
 projectSchema.index({ carIds: 1 });
+projectSchema.index({ modelIds: 1 });
 projectSchema.index({ tags: 1 });
 projectSchema.index({ "timeline.startDate": 1, "timeline.endDate": 1 });
 projectSchema.index({ createdAt: -1 });

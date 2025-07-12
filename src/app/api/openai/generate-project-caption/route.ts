@@ -129,6 +129,61 @@ function formatEventSpecifications(eventDetails: any): string {
   return eventSpecs.join("\n");
 }
 
+function formatModelSpecifications(modelDetails: any): string {
+  if (!modelDetails || modelDetails.count === 0) {
+    return "";
+  }
+
+  const modelSpecs: string[] = [];
+
+  // Model overview
+  modelSpecs.push(
+    `Project includes ${modelDetails.count} vehicle model${modelDetails.count !== 1 ? "s" : ""}`
+  );
+
+  if (modelDetails.makes && modelDetails.makes.length > 0) {
+    modelSpecs.push(`Makes: ${modelDetails.makes.join(", ")}`);
+  }
+
+  if (modelDetails.segments && modelDetails.segments.length > 0) {
+    modelSpecs.push(`Market Segments: ${modelDetails.segments.join(", ")}`);
+  }
+
+  // Simplified model details - only essential info
+  if (modelDetails.models && modelDetails.models.length > 0) {
+    modelSpecs.push("\nModel Details:");
+
+    modelDetails.models.forEach((model: any, index: number) => {
+      const specs: string[] = [];
+
+      // Essential model info only
+      if (model.make && model.model) {
+        specs.push(`${model.make} ${model.model}`);
+      }
+
+      if (model.generation?.code) {
+        specs.push(`(${model.generation.code})`);
+      }
+
+      if (model.market_segment) {
+        specs.push(model.market_segment);
+      }
+
+      if (model.generation?.year_range) {
+        const start = model.generation.year_range.start;
+        const end = model.generation.year_range.end;
+        specs.push(`${start}${end ? `-${end}` : "-Present"}`);
+      }
+
+      if (specs.length > 0) {
+        modelSpecs.push(`${index + 1}. ${specs.join(" ")}`);
+      }
+    });
+  }
+
+  return modelSpecs.join("\n");
+}
+
 // Helper function to get max tokens based on length
 function getMaxTokensForLength(length: string): number {
   // Remove hard token limits - let the AI generate appropriate length based on instructions
@@ -147,6 +202,7 @@ export async function POST(request: NextRequest) {
       clientInfo,
       carDetails,
       eventDetails,
+      modelDetails,
       temperature,
       tone,
       style,
@@ -155,6 +211,7 @@ export async function POST(request: NextRequest) {
       aiModel,
       projectId,
       selectedCarIds,
+      selectedModelIds = [],
       selectedEventIds,
       systemPromptId,
       customLLMText,
@@ -204,6 +261,9 @@ export async function POST(request: NextRequest) {
 
     // Format event specifications
     const eventSpecsText = formatEventSpecifications(eventDetails);
+
+    // Format model specifications
+    const modelSpecsText = formatModelSpecifications(modelDetails);
 
     // Fetch the selected system prompt from database with timeout
     let systemPrompt = "";
@@ -376,6 +436,11 @@ export async function POST(request: NextRequest) {
     }
 
     userPromptParts.push("VEHICLE PROJECT SPECIFICATIONS:", specsText);
+
+    // Add model specifications if available
+    if (modelSpecsText) {
+      userPromptParts.push("", "VEHICLE MODEL SPECIFICATIONS:", modelSpecsText);
+    }
 
     // Add event specifications if available
     if (eventSpecsText) {

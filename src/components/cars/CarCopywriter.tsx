@@ -521,9 +521,11 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     const context: GenerationContext = {
       projectId: "", // Empty string instead of null for individual car
       selectedCarIds: [carDetails._id],
+      selectedModelIds: [], // Individual car doesn't support models
       selectedEventIds,
       selectedSystemPromptId,
       carDetails: [carDetails],
+      modelDetails: [], // Individual car doesn't support models
       eventDetails,
       derivedLength,
       useMinimalCarData: false,

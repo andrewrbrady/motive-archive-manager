@@ -72,6 +72,9 @@ const ProjectDeliverablesTab = lazy(() =>
 const ProjectCarsTab = lazy(() =>
   import("./ProjectCarsTab").then((m) => ({ default: m.ProjectCarsTab }))
 );
+const ProjectModelsTab = lazy(() =>
+  import("./ProjectModelsTab").then((m) => ({ default: m.ProjectModelsTab }))
+);
 const ProjectGalleriesTab = lazy(() =>
   import("./ProjectGalleriesTab").then((m) => ({
     default: m.ProjectGalleriesTab,
@@ -122,6 +125,7 @@ interface ProjectTabsProps {
   onProjectUpdate: () => void;
   preloadedEvents?: EventWithCar[]; // Optional pre-fetched events data for SSR optimization
   preloadedCars?: ProjectCar[]; // Optional pre-fetched cars data for SSR optimization
+  preloadedModels?: any[]; // Optional pre-fetched models data for SSR optimization
   preloadedGalleries?: any[]; // Optional pre-fetched galleries data for SSR optimization
   preloadedAssets?: any[]; // Optional pre-fetched assets data for SSR optimization
   preloadedDeliverables?: any[]; // Optional pre-fetched deliverables data for SSR optimization
@@ -136,6 +140,7 @@ const tabs = [
   { value: "events", label: "Events" },
   { value: "team", label: "Team" },
   { value: "cars", label: "Cars" },
+  { value: "models", label: "Models" },
   { value: "images", label: "Images" },
   { value: "galleries", label: "Galleries" },
   { value: "assets", label: "Assets" },
@@ -157,6 +162,7 @@ export function ProjectTabs({
   onProjectUpdate,
   preloadedEvents,
   preloadedCars,
+  preloadedModels,
   preloadedGalleries,
   preloadedAssets,
   preloadedDeliverables,
@@ -168,6 +174,7 @@ export function ProjectTabs({
     // Preload critical tabs that are most commonly accessed
     events: true,
     cars: true,
+    models: true,
     images: true,
   });
 
@@ -235,12 +242,12 @@ export function ProjectTabs({
         onValueChange={onTabChange}
         className="hidden lg:block space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-12 bg-transparent border rounded-md h-auto p-1 gap-1">
+        <TabsList className="flex flex-wrap w-full bg-transparent border rounded-md h-auto p-1 gap-1">
           {tabs.map((tab) => (
             <TabsTrigger
               key={tab.value}
               value={tab.value}
-              className="data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
+              className="flex-1 min-w-0 data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
             >
               {tab.label}
             </TabsTrigger>
@@ -294,6 +301,16 @@ export function ProjectTabs({
               project={project}
               onProjectUpdate={onProjectUpdate}
               initialCars={preloadedCars}
+            />
+          </Suspense>
+        )}
+
+        {activeTab === "models" && hasLoadedTab.models && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <ProjectModelsTab
+              project={project}
+              onProjectUpdate={onProjectUpdate}
+              initialModels={preloadedModels}
             />
           </Suspense>
         )}

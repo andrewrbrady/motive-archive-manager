@@ -78,12 +78,14 @@ export function CaptionGenerator({
     const context: GenerationContext = {
       carId,
       selectedCarIds: captionData.selectedCarIds,
+      selectedModelIds: [], // Legacy component doesn't support models
       selectedEventIds: captionData.selectedEventIds,
       selectedSystemPromptId: captionData.selectedSystemPromptId,
       carDetails:
         mode === "car" && captionData.carDetails
           ? [captionData.carDetails]
           : captionData.projectCars,
+      modelDetails: [], // Legacy component doesn't support models
       eventDetails: captionData.eventDetails,
       derivedLength,
       useMinimalCarData: captionData.useMinimalCarData,

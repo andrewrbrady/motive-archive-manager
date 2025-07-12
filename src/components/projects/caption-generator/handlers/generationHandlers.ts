@@ -16,9 +16,11 @@ export interface GenerationState {
 export interface GenerationContext {
   projectId: string;
   selectedCarIds: string[];
+  selectedModelIds: string[];
   selectedEventIds: string[];
   selectedSystemPromptId: string;
   carDetails: BaTCarDetails[];
+  modelDetails: any[];
   eventDetails: ProjectEvent[];
   derivedLength: LengthSetting | null;
   useMinimalCarData: boolean;
@@ -134,6 +136,26 @@ export function useGenerationHandlers() {
         };
       }
 
+      // Process model details
+      let combinedModelDetails = null;
+      if (
+        Array.isArray(context.modelDetails) &&
+        context.modelDetails.length > 0
+      ) {
+        combinedModelDetails = {
+          models: context.modelDetails,
+          count: context.modelDetails.length,
+          makes: [...new Set(context.modelDetails.map((model) => model.make))],
+          segments: [
+            ...new Set(
+              context.modelDetails
+                .map((model) => model.market_segment)
+                .filter(Boolean)
+            ),
+          ],
+        };
+      }
+
       // Prepare the request payload
       const requestPayload: any = {
         platform: formState.platform,
@@ -141,6 +163,7 @@ export function useGenerationHandlers() {
         clientInfo,
         carDetails: combinedCarDetails,
         eventDetails: combinedEventDetails,
+        modelDetails: combinedModelDetails,
         temperature: formState.temperature,
         tone: formState.tone,
         style: formState.style,
@@ -149,6 +172,7 @@ export function useGenerationHandlers() {
         aiModel: formState.model,
         projectId: context.projectId,
         selectedCarIds: context.selectedCarIds,
+        selectedModelIds: context.selectedModelIds,
         selectedEventIds: context.selectedEventIds,
         systemPromptId: context.selectedSystemPromptId,
         useMinimalCarData: context.useMinimalCarData,

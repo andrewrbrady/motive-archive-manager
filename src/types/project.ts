@@ -115,6 +115,7 @@ export interface Project {
   // Relationships - stored as ObjectIds in DB, converted to strings for frontend
   clientId?: string;
   carIds: string[];
+  modelIds: string[]; // Vehicle models attached to project
   galleryIds: string[];
   deliverableIds: string[];
   eventIds: string[];
@@ -176,6 +177,7 @@ export interface CreateProjectRequest {
   type: ProjectType;
   clientId?: string;
   carIds?: string[];
+  modelIds?: string[]; // Vehicle models to attach to project
   templateId?: string;
   timeline: {
     startDate: Date;

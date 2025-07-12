@@ -14,7 +14,8 @@ export interface JsonImportConfig {
     | "events"
     | "deliverables"
     | "deliverables-relaxed"
-    | "specifications";
+    | "specifications"
+    | "models";
   buttonText?: string;
   buttonVariant?:
     | "default"
@@ -60,12 +61,16 @@ export function JsonImportUtility({
         const itemType =
           config.expectedType === "cars"
             ? "car"
-            : config.expectedType.slice(0, -1); // Remove 's' for singular
+            : config.expectedType === "models"
+              ? "model"
+              : config.expectedType.slice(0, -1); // Remove 's' for singular
 
         toast.success(
           config.expectedType === "cars"
             ? `Form populated with ${itemType} data`
-            : `Successfully imported ${itemCount} ${itemCount === 1 ? itemType : config.expectedType}`
+            : config.expectedType === "models"
+              ? `Form populated with ${itemType} data`
+              : `Successfully imported ${itemCount} ${itemCount === 1 ? itemType : config.expectedType}`
         );
       } catch (error) {
         console.error("Error importing JSON:", error);
@@ -86,6 +91,8 @@ export function JsonImportUtility({
     switch (config.expectedType) {
       case "cars":
         return "Import JSON";
+      case "models":
+        return "Import JSON";
       case "events":
         return "Batch Import Events";
       case "deliverables":
@@ -105,6 +112,8 @@ export function JsonImportUtility({
     switch (config.expectedType) {
       case "cars":
         return "Upload a JSON file or paste a JSON object to populate the form with car data.";
+      case "models":
+        return "Upload a JSON file or paste a JSON object to populate the form with model data.";
       case "events":
         return "Upload a JSON file or paste JSON data to create multiple events at once.";
       case "deliverables":
