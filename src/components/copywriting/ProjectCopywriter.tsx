@@ -137,6 +137,7 @@ export function ProjectCopywriter({
       allowEventSelection: true,
       allowMinimalCarData: true,
       showClientHandle: false,
+      allowGallerySelection: true,
     },
   };
 
@@ -203,10 +204,15 @@ export function ProjectCopywriter({
           cars: projectCars,
           models: [], // Empty array for models - not handled by legacy ProjectCopywriter
           events: projectEvents,
+          galleries: [], // Empty array for galleries - legacy ProjectCopywriter doesn't handle galleries
+          galleryImages: [], // Empty array for gallery images - legacy ProjectCopywriter doesn't handle galleries
           systemPrompts: [], // Now handled by shared cache in BaseCopywriter
           lengthSettings: [], // Now handled by shared cache in BaseCopywriter
           savedCaptions,
           clientHandle: null, // Projects don't typically have client handles
+          hasMoreEvents: false, // Legacy ProjectCopywriter doesn't handle pagination
+          hasMoreCaptions: false, // Legacy ProjectCopywriter doesn't handle pagination
+          hasMoreGalleries: false, // Legacy ProjectCopywriter doesn't handle galleries
         };
       } catch (error) {
         console.error("Error processing project copywriter data:", error);

@@ -100,7 +100,7 @@ export function EmailComposer(props: EmailComposerProps) {
 
   // Handle export with options
   const handleExportWithOptions = useCallback(
-    async (options: ExportOptions) => {
+    async (options: ExportOptions, selectedStylesheetId?: string | null) => {
       await exportWithOptions(
         props.blocks,
         props.template?.id || null,
@@ -108,7 +108,7 @@ export function EmailComposer(props: EmailComposerProps) {
         options,
         props.selectedCopies[0]?.projectId || props.projectId,
         props.selectedCopies[0]?.carId || props.carId,
-        null // selectedStylesheetId will be managed by BaseComposer
+        selectedStylesheetId || null // Use the actual selected stylesheet ID
       );
     },
     [
@@ -170,7 +170,9 @@ export function EmailComposer(props: EmailComposerProps) {
             projectId={exportProps.effectiveProjectId}
             carId={exportProps.effectiveCarId}
             hasEmailFeatures={hasEmailFeatures(exportProps.blocks)}
-            onExport={handleExportWithOptions}
+            onExport={(options) =>
+              handleExportWithOptions(options, exportProps.selectedStylesheetId)
+            }
           />
         </>
       );

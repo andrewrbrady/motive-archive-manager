@@ -30,12 +30,12 @@ interface CarCopywriterProps {
 export function CarCopywriter({ carId }: CarCopywriterProps) {
   const api = useAPI();
 
-  // Use optimized query hook for car data - non-blocking, cached
+  // Use optimized query hook for car data with galleries - non-blocking, cached
   const {
     data: carData,
     isLoading: isLoadingCar,
     error: carError,
-  } = useAPIQuery<any>(`cars/${carId}`, {
+  } = useAPIQuery<any>(`cars/${carId}?includeGalleries=true`, {
     staleTime: 3 * 60 * 1000, // 3 minutes cache
     retry: 2,
     retryDelay: 1000,
@@ -66,6 +66,105 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
     retryDelay: 1000,
     refetchOnWindowFocus: false,
   });
+
+  // Process gallery images when car data changes
+  const [galleryImages, setGalleryImages] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    const processGalleryImages = async () => {
+      if (!carData?.galleries || carData.galleries.length === 0) {
+        setGalleryImages([]);
+        return;
+      }
+
+      const galleries = carData.galleries;
+      console.log("🖼️ CarCopywriter: Processing car galleries data:", {
+        galleriesCount: galleries.length,
+        galleries: galleries.map((g: any) => ({
+          id: g._id,
+          name: g.name,
+          imageCount: g.imageIds?.length || 0,
+        })),
+      });
+
+      // Collect all image IDs from all galleries
+      const allImageIds = galleries.flatMap((gallery: any) => {
+        return gallery.imageIds || [];
+      });
+      console.log("🖼️ CarCopywriter: Collected image IDs from car galleries:", {
+        totalImageIds: allImageIds.length,
+        imageIds: allImageIds.slice(0, 5), // Show first 5 IDs
+      });
+
+      if (allImageIds.length === 0) {
+        setGalleryImages([]);
+        return;
+      }
+
+      try {
+        if (!api) {
+          console.warn(
+            "🖼️ CarCopywriter: API not available, skipping gallery images fetch"
+          );
+          return;
+        }
+
+        // Fetch images metadata using the images metadata API
+        const imageMetadataResponse = await api.get(
+          `images/metadata?ids=${allImageIds.join(",")}`
+        );
+
+        console.log("🖼️ CarCopywriter: Raw image metadata API response:", {
+          responseType: typeof imageMetadataResponse,
+          isArray: Array.isArray(imageMetadataResponse),
+          length: Array.isArray(imageMetadataResponse)
+            ? imageMetadataResponse.length
+            : 0,
+          requestedImageIds: allImageIds,
+          requestedImageIdsCount: allImageIds.length,
+        });
+
+        // Process and format the image metadata
+        if (Array.isArray(imageMetadataResponse)) {
+          const processedImages = imageMetadataResponse.map((img) => ({
+            id: img.imageId,
+            url: img.url,
+            filename: img.filename,
+            metadata: {
+              ...img.metadata,
+              // Ensure all metadata fields are available
+              angle: img.metadata?.angle || null,
+              view: img.metadata?.view || null,
+              movement: img.metadata?.movement || null,
+              tod: img.metadata?.tod || null,
+              side: img.metadata?.side || null,
+              description: img.metadata?.description || null,
+              category: img.metadata?.category || null,
+              isPrimary: img.metadata?.isPrimary || false,
+            },
+            galleryName:
+              galleries.find((g: any) => g.imageIds?.includes(img.imageId))
+                ?.name || "",
+          }));
+
+          setGalleryImages(processedImages);
+
+          console.log("🖼️ CarCopywriter: Processed car gallery images:", {
+            galleryImagesCount: processedImages.length,
+            sampleProcessedImage: processedImages[0],
+          });
+        }
+      } catch (error) {
+        console.warn(
+          "🖼️ CarCopywriter: Failed to fetch car gallery images metadata:",
+          error
+        );
+        setGalleryImages([]);
+      }
+    };
+
+    processGalleryImages();
+  }, [carData, api]);
 
   // Determine overall loading state - only entity-specific data
   const isLoading = isLoadingCar || isLoadingEvents;
@@ -130,12 +229,14 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
       captions: `captions`,
       systemPrompts: `system-prompts/active`,
       events: `cars/${carId}/events`,
+      galleries: `cars/${carId}?includeGalleries=true`,
     },
     features: {
       allowMultipleCars: false,
       allowEventSelection: true,
       allowMinimalCarData: false,
       showClientHandle: true,
+      allowGallerySelection: true,
     },
   };
 
@@ -214,16 +315,22 @@ export function CarCopywriter({ carId }: CarCopywriterProps) {
           createdAt: caption.createdAt,
         }));
 
+        // Use galleries from car data
+        const galleries = carData?.galleries || [];
+
         return {
           cars: [projectCar],
           models: [], // Empty array for models - not applicable for single car copywriter
           events: projectEvents,
+          galleries, // Use car galleries
+          galleryImages, // Use processed gallery images from state
           systemPrompts: [], // Now handled by shared cache in BaseCopywriter
           lengthSettings: [], // Now handled by shared cache in BaseCopywriter
           savedCaptions: savedCaptions,
           clientHandle: null, // TODO: Implement client handle fetching if needed
           hasMoreEvents: hasMoreEventsAvailable,
           hasMoreCaptions: hasMoreCaptionsAvailable,
+          hasMoreGalleries: false, // Gallery pagination not implemented for cars
         };
       } catch (error) {
         console.error("Error processing car copywriter data:", error);

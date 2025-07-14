@@ -114,6 +114,11 @@ function processStylesheetForEmail(cssContent: string): string {
   processedCSS = processedCSS.replace(/^\s*animation\s*:[^;]+;/gm, "");
   processedCSS = processedCSS.replace(/^\s*transition\s*:[^;]+;/gm, "");
 
+  // Clean up excessive whitespace left by removals
+  processedCSS = processedCSS.replace(/\n\s*\n\s*\n/g, "\n\n");
+  processedCSS = processedCSS.replace(/^\s*\n/gm, "");
+  processedCSS = processedCSS.trim();
+
   return processedCSS;
 }
 
@@ -144,7 +149,11 @@ function processEmailCSSForSendGrid(cssContent: string): string {
     ""
   );
 
-  // That's it - no more aggressive processing that can corrupt legitimate CSS
+  // Clean up excessive whitespace and empty lines left by removals
+  processedCSS = processedCSS.replace(/\n\s*\n\s*\n/g, "\n\n"); // Replace multiple newlines with double newlines
+  processedCSS = processedCSS.replace(/^\s*\n/gm, ""); // Remove empty lines at start
+  processedCSS = processedCSS.trim(); // Remove leading/trailing whitespace
+
   return processedCSS;
 }
 
@@ -249,8 +258,11 @@ function generateSendGridHTML(
   const contentHTML = generateSendGridBlocksHTML(contentBlocks);
 
   // Generate clean div-based structure like the working template
-  // Use the stylesheet CSS directly without aggressive processing that corrupts it
-  const cleanCSS = includeCSS ? processedStylesheetCSS : processedStylesheetCSS;
+  // Use the stylesheet CSS only if includeCSS is true and CSS has actual content
+  const cleanCSS =
+    includeCSS && processedStylesheetCSS && processedStylesheetCSS.trim()
+      ? processedStylesheetCSS.trim()
+      : "";
 
   // Default email container configuration - header disabled by default to prevent duplicate headers
   const hasHeaderImages = headerImages && headerImages.length > 0;
@@ -1182,8 +1194,10 @@ function generateHTMLFromBlocks(
         li {
             margin-bottom: 8px;
         }
+        
+        /* Custom stylesheet CSS */
+        ${processedStylesheetCSS}
     </style>
-    ${processedStylesheetCSS}
 </head>
 <body>
     <div class="content">

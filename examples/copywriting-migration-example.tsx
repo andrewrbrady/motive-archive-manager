@@ -146,6 +146,7 @@ function GalleryCopywriter({ galleryId }: { galleryId: string }) {
       allowEventSelection: false,
       allowMinimalCarData: false,
       showClientHandle: false,
+      allowGallerySelection: false,
     },
   };
 
@@ -160,6 +161,8 @@ function GalleryCopywriter({ galleryId }: { galleryId: string }) {
         cars: gallery.cars || [],
         models: [], // No models for gallery mode
         events: [],
+        galleries: [],
+        galleryImages: [],
         systemPrompts: await fetchSystemPrompts(),
         lengthSettings: await fetchLengthSettings(),
         savedCaptions: gallery.captions || [],

@@ -4,18 +4,13 @@ import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { toast } from "@/components/ui/use-toast";
-import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { CarSelection } from "../projects/caption-generator/CarSelection";
 import { ModelSelection } from "../projects/caption-generator/ModelSelection";
 import { EventSelection } from "../projects/caption-generator/EventSelection";
+import { GallerySelection } from "../projects/caption-generator/GallerySelection";
 import { SystemPromptSelection } from "../projects/caption-generator/SystemPromptSelection";
 import { BrandToneSelection } from "../projects/caption-generator/BrandToneSelection";
 import { CaptionPreview } from "../projects/caption-generator/CaptionPreview";
@@ -44,10 +39,6 @@ import { useBrandTones } from "@/hooks/useBrandTones";
 import {
   saveSystemPrompt,
   restoreSystemPrompt,
-  saveDataSourceSections,
-  restoreDataSourceSections,
-  getDefaultDataSourceSections,
-  type DataSourceSections,
 } from "@/lib/copywriter-storage";
 
 export interface CopywriterConfig {
@@ -58,15 +49,19 @@ export interface CopywriterConfig {
     captions: string;
     systemPrompts: string;
     events?: string;
+    galleries?: string;
   };
   features: {
     allowMultipleCars: boolean;
     allowEventSelection: boolean;
     allowMinimalCarData: boolean;
     showClientHandle: boolean;
+    allowGallerySelection: boolean;
   };
   loadingStates?: {
     isLoadingModels?: boolean;
+    isLoadingGalleries?: boolean;
+    galleriesReady?: boolean;
   };
 }
 
@@ -74,24 +69,20 @@ export interface CopywriterData {
   cars: ProjectCar[];
   models: any[]; // Vehicle models for copywriter context
   events: ProjectEvent[];
+  galleries: any[]; // Project galleries with image metadata
+  galleryImages: any[]; // Rich image metadata for galleries
   systemPrompts: any[];
   lengthSettings: any[];
   savedCaptions: ProjectSavedCaption[];
   clientHandle?: string | null;
-  // Enhanced data integration for richer content generation
-  deliverables?: any[];
-  galleries?: any[];
-  inspections?: any[];
   // Load more flags
   hasMoreEvents?: boolean;
   hasMoreCaptions?: boolean;
+  hasMoreGalleries?: boolean;
 }
 
 export interface CopywriterCallbacks {
   onDataFetch: () => Promise<CopywriterData>;
-  onConditionalDataFetch?: (
-    sections: DataSourceSections
-  ) => Promise<Partial<CopywriterData>>;
   onSaveCaption: (captionData: any) => Promise<boolean>;
   onDeleteCaption: (captionId: string) => Promise<boolean>;
   onUpdateCaption: (captionId: string, newText: string) => Promise<boolean>;
@@ -110,30 +101,6 @@ interface BaseCopywriterProps {
  */
 export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   const { user } = useFirebaseAuth();
-
-  // Data source section states with localStorage persistence
-  const [dataSections, setDataSections] = useState<DataSourceSections>(() => {
-    return restoreDataSourceSections() || getDefaultDataSourceSections();
-  });
-
-  // Save data sections to localStorage whenever they change
-  useEffect(() => {
-    saveDataSourceSections(dataSections);
-  }, [dataSections]);
-
-  // Conditional data states
-  const [conditionalData, setConditionalData] = useState<
-    Partial<CopywriterData>
-  >({});
-  const [loadingConditionalData, setLoadingConditionalData] = useState<{
-    deliverables: boolean;
-    galleries: boolean;
-    inspections: boolean;
-  }>({
-    deliverables: false,
-    galleries: false,
-    inspections: false,
-  });
 
   // Shared cache strategy - Use direct useAPIQuery for system data that's common across all copywriters
   const {
@@ -174,7 +141,10 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     error: entityDataError,
     refetch: refreshData,
   } = useQuery<CopywriterData>({
-    queryKey: [`copywriter-entity-data-${config.entityId}`],
+    queryKey: [
+      `copywriter-entity-data-${config.entityId}`,
+      config.loadingStates?.galleriesReady,
+    ],
     queryFn: callbacks.onDataFetch,
     enabled: !config.loadingStates?.isLoadingModels, // Wait for models data to finish loading
     staleTime: 3 * 60 * 1000, // 3 minutes cache for entity data
@@ -191,6 +161,12 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
       cars: Array.isArray(entityData?.cars) ? entityData.cars : [],
       models: Array.isArray(entityData?.models) ? entityData.models : [],
       events: Array.isArray(entityData?.events) ? entityData.events : [],
+      galleries: Array.isArray(entityData?.galleries)
+        ? entityData.galleries
+        : [],
+      galleryImages: Array.isArray(entityData?.galleryImages)
+        ? entityData.galleryImages
+        : [],
       systemPrompts: Array.isArray(sharedSystemPrompts)
         ? sharedSystemPrompts
         : [],
@@ -204,34 +180,20 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
       clientHandle: entityData?.clientHandle || null,
       hasMoreEvents: entityData?.hasMoreEvents || false,
       hasMoreCaptions: entityData?.hasMoreCaptions || false,
+      hasMoreGalleries: entityData?.hasMoreGalleries || false,
     };
 
-    // Add conditional data only if sections are expanded
+    // Return base data - galleries are always available from entity data
     return {
       ...baseData,
-      deliverables: dataSections.deliverables
-        ? Array.isArray(conditionalData.deliverables)
-          ? conditionalData.deliverables
-          : []
-        : [],
-      galleries: dataSections.galleries
-        ? Array.isArray(conditionalData.galleries)
-          ? conditionalData.galleries
-          : []
-        : [],
-      inspections: dataSections.inspections
-        ? Array.isArray(conditionalData.inspections)
-          ? conditionalData.inspections
-          : []
-        : [],
+      // Galleries are always available from base data when gallery selection is enabled
+      galleries: baseData.galleries,
     };
   }, [
     entityData,
     sharedSystemPrompts,
     sharedLengthSettings,
     brandTones, // Phase 2A: Include brand tones dependency
-    conditionalData,
-    dataSections,
   ]);
 
   // Combined loading state - must wait for both shared and entity data
@@ -251,6 +213,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   const [selectedCarIds, setSelectedCarIds] = useState<string[]>([]);
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
+  const [selectedGalleryIds, setSelectedGalleryIds] = useState<string[]>([]);
   const [selectedSystemPromptId, setSelectedSystemPromptId] =
     useState<string>("");
   const [selectedBrandToneId, setSelectedBrandToneId] = useState<string>(""); // Phase 2A: Brand tone selection
@@ -263,10 +226,12 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     setHasUserInteractedWithModelSelection,
   ] = useState(false);
 
-  // Car, model, and event detail states
+  // Car, model, event, and gallery detail states
   const [carDetails, setCarDetails] = useState<any[]>([]);
   const [modelDetails, setModelDetails] = useState<any[]>([]);
   const [eventDetails, setEventDetails] = useState<ProjectEvent[]>([]);
+  const [galleryDetails, setGalleryDetails] = useState<any[]>([]);
+  // Note: galleryImages comes from memoizedDataWithConditional.galleryImages, not local state
 
   // UI states
   const [contentViewMode, setContentViewMode] = useState<"preview" | "saved">(
@@ -281,6 +246,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
   const [isCarSectionOpen, setIsCarSectionOpen] = useState(true);
   const [isModelSectionOpen, setIsModelSectionOpen] = useState(true);
   const [isEventSectionOpen, setIsEventSectionOpen] = useState(true);
+  const [isGallerySectionOpen, setIsGallerySectionOpen] = useState(true);
 
   // Saved captions management
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -447,40 +413,17 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     hasError,
   ]);
 
-  // Debug logging for enhanced data integration
+  // Debug logging for gallery data integration
   React.useEffect(() => {
-    console.log("BaseCopywriter: Enhanced data integration status:", {
-      deliverables: {
-        available: Array.isArray(memoizedDataWithConditional.deliverables),
-        length: memoizedDataWithConditional.deliverables?.length || 0,
-        sample: memoizedDataWithConditional.deliverables?.[0]
-          ? {
-              id:
-                memoizedDataWithConditional.deliverables[0]._id ||
-                memoizedDataWithConditional.deliverables[0].id,
-              title: memoizedDataWithConditional.deliverables[0].title,
-              type: memoizedDataWithConditional.deliverables[0].type,
-            }
-          : null,
-      },
+    console.log("BaseCopywriter: Gallery data integration status:", {
       galleries: {
         available: Array.isArray(memoizedDataWithConditional.galleries),
         length: memoizedDataWithConditional.galleries?.length || 0,
       },
-      inspections: {
-        available: Array.isArray(memoizedDataWithConditional.inspections),
-        length: memoizedDataWithConditional.inspections?.length || 0,
-      },
       mode: config.mode,
       entityId: config.entityId,
     });
-  }, [
-    memoizedDataWithConditional.deliverables,
-    memoizedDataWithConditional.galleries,
-    memoizedDataWithConditional.inspections,
-    config.mode,
-    config.entityId,
-  ]);
+  }, [memoizedDataWithConditional.galleries, config.mode, config.entityId]);
 
   // Debug logging for car data and selection states
   React.useEffect(() => {
@@ -565,6 +508,52 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
       setLoadingMoreEvents(false);
     }
   }, [loadingMoreEvents, memoizedDataWithConditional.hasMoreEvents]);
+
+  // Gallery selection handlers
+  const handleGallerySelection = useCallback(
+    (galleryId: string) => {
+      if (!config.features.allowGallerySelection) return;
+
+      setSelectedGalleryIds((prev) => {
+        const newSelection = prev.includes(galleryId)
+          ? prev.filter((id) => id !== galleryId)
+          : [...prev, galleryId];
+
+        // Update gallery details based on selection
+        const details = memoizedDataWithConditional.galleries.filter(
+          (gallery) => newSelection.includes(gallery._id)
+        );
+        setGalleryDetails(details);
+
+        return newSelection;
+      });
+    },
+    [
+      memoizedDataWithConditional.galleries,
+      config.features.allowGallerySelection,
+    ]
+  );
+
+  const handleSelectAllGalleries = useCallback(() => {
+    if (!config.features.allowGallerySelection) return;
+
+    const allGalleryIds = memoizedDataWithConditional.galleries.map(
+      (gallery) => gallery._id
+    );
+
+    // If all galleries are selected, deselect all; otherwise select all
+    if (selectedGalleryIds.length === allGalleryIds.length) {
+      setSelectedGalleryIds([]);
+      setGalleryDetails([]);
+    } else {
+      setSelectedGalleryIds(allGalleryIds);
+      setGalleryDetails(memoizedDataWithConditional.galleries);
+    }
+  }, [
+    memoizedDataWithConditional.galleries,
+    config.features.allowGallerySelection,
+    selectedGalleryIds.length,
+  ]);
 
   // Car selection handlers (for multi-car mode)
   const handleCarSelection = useCallback(
@@ -673,69 +662,17 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     }
   }, [memoizedDataWithConditional.systemPrompts]);
 
-  // Conditional data fetching handler
-  const handleSectionToggle = useCallback(
-    (section: keyof DataSourceSections) => {
-      const newSections = {
-        ...dataSections,
-        [section]: !dataSections[section],
-      };
-      setDataSections(newSections);
-
-      // If section is being opened and we don't have data, fetch it
-      if (
-        newSections[section] &&
-        !conditionalData[section] &&
-        callbacks.onConditionalDataFetch
-      ) {
-        // PHASE 3C FIX: Remove blocking await from background operations
-        const fetchOperation = () => {
-          setLoadingConditionalData((prev) => ({ ...prev, [section]: true }));
-
-          console.log(
-            `🔄 BaseCopywriter: Fetching ${section} data for ${config.mode} ${config.entityId}`
-          );
-
-          callbacks.onConditionalDataFetch!({
-            deliverables: section === "deliverables",
-            galleries: section === "galleries",
-            inspections: section === "inspections",
-          })
-            .then((sectionData) => {
-              setConditionalData((prev) => ({ ...prev, ...sectionData }));
-              console.log(
-                `✅ BaseCopywriter: Successfully fetched ${section} data`
-              );
-            })
-            .catch((error) => {
-              console.warn(
-                `⚠️ BaseCopywriter: Failed to fetch ${section} data:`,
-                error
-              );
-              toast({
-                title: "Data Loading Error",
-                description: `Failed to load ${section} data. Please try again.`,
-                variant: "destructive",
-              });
-            })
-            .finally(() => {
-              setLoadingConditionalData((prev) => ({
-                ...prev,
-                [section]: false,
-              }));
-            });
-        };
-
-        // Execute fetch operation in background - truly non-blocking
-        setTimeout(fetchOperation, 0);
-      }
-    },
-    [dataSections, conditionalData, callbacks, config.mode, config.entityId]
-  );
-
   // LLM preview handlers
   const buildLLMText = useCallback(() => {
-    if (carDetails.length === 0 || !selectedSystemPromptId) return "";
+    // Allow generation without cars for project-level content, but require system prompt
+    if (!selectedSystemPromptId) return "";
+
+    console.log("🖼️ buildLLMText: Starting with conditions:", {
+      carDetailsLength: carDetails.length,
+      selectedSystemPromptId,
+      selectedGalleryIds: selectedGalleryIds.length,
+      mode: config.mode,
+    });
 
     let llmText = "";
 
@@ -1001,6 +938,258 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
       llmText += "\n";
     }
 
+    // Add gallery and image metadata if any
+    // Calculate gallery details dynamically based on selectedGalleryIds
+    const currentGalleryDetails = memoizedDataWithConditional.galleries.filter(
+      (gallery) => selectedGalleryIds.includes(gallery._id)
+    );
+
+    console.log("🖼️ LLM Context: Gallery data for LLM analysis:", {
+      galleryDetailsLength: galleryDetails.length,
+      currentGalleryDetailsLength: currentGalleryDetails.length,
+      selectedGalleryIds,
+      availableGalleryImages: memoizedDataWithConditional.galleryImages.length,
+      availableGalleries: memoizedDataWithConditional.galleries?.length || 0,
+      currentGalleryDetails: currentGalleryDetails.map((g) => ({
+        id: g._id,
+        name: g.name,
+        imageCount: g.imageCount || g.imageIds?.length || 0,
+      })),
+      allGalleries:
+        memoizedDataWithConditional.galleries?.slice(0, 2)?.map((g) => ({
+          id: g._id,
+          name: g.name,
+        })) || [],
+    });
+
+    if (currentGalleryDetails.length > 0) {
+      llmText += "ASSOCIATED GALLERIES:\n";
+      currentGalleryDetails.forEach((gallery, index) => {
+        llmText += `Gallery ${index + 1}:\n`;
+        llmText += `  Name: ${gallery.name}\n`;
+        if (gallery.description)
+          llmText += `  Description: ${gallery.description}\n`;
+        llmText += `  Images Count: ${gallery.imageCount || gallery.imageIds?.length || 0}\n`;
+
+        // Add image metadata for this gallery
+        const galleryImageData =
+          memoizedDataWithConditional.galleryImages.filter((img: any) =>
+            gallery.imageIds?.includes(img.id)
+          );
+
+        // 🖼️ COMPREHENSIVE IMAGE MATCHING DEBUGGING
+        console.log(`🖼️ LLM Context: Processing gallery "${gallery.name}":`, {
+          galleryImageIds: gallery.imageIds?.slice(0, 5), // Show first 5 IDs
+          galleryImageIdsCount: gallery.imageIds?.length || 0,
+          galleryImageIdsTypes: gallery.imageIds
+            ?.slice(0, 3)
+            .map((id: string) => ({
+              id: id,
+              type: typeof id,
+              length: id?.toString().length,
+            })),
+          matchedImages: galleryImageData.length,
+          sampleImageMetadata: galleryImageData[0]?.metadata,
+          allAvailableImageIds: memoizedDataWithConditional.galleryImages
+            .map((img: any) => img.id)
+            .slice(0, 10),
+          allAvailableImageIdsTypes: memoizedDataWithConditional.galleryImages
+            .slice(0, 3)
+            .map((img: any) => ({
+              id: img.id,
+              type: typeof img.id,
+              length: img.id?.toString().length,
+            })),
+          galleryImageDataSample: galleryImageData.slice(0, 2).map((img) => ({
+            id: img.id,
+            metadata: img.metadata,
+          })),
+        });
+
+        // 🖼️ ID MATCHING ANALYSIS - Check for format mismatches
+        if (
+          gallery.imageIds &&
+          gallery.imageIds.length > 0 &&
+          memoizedDataWithConditional.galleryImages.length > 0
+        ) {
+          const galleryIdSet = new Set(
+            gallery.imageIds.map((id: string) => id.toString())
+          );
+          const imageIdSet = new Set(
+            memoizedDataWithConditional.galleryImages.map((img: any) =>
+              img.id.toString()
+            )
+          );
+
+          console.log(
+            `🖼️ LLM Context: ID matching analysis for gallery "${gallery.name}":`,
+            {
+              galleryIdsAsStrings: Array.from(galleryIdSet).slice(0, 5),
+              imageIdsAsStrings: Array.from(imageIdSet).slice(0, 5),
+              galleryIdsCount: galleryIdSet.size,
+              imageIdsCount: imageIdSet.size,
+              intersection: (Array.from(galleryIdSet) as string[])
+                .filter((id: string) => imageIdSet.has(id))
+                .slice(0, 5),
+              intersectionCount: (Array.from(galleryIdSet) as string[]).filter(
+                (id: string) => imageIdSet.has(id)
+              ).length,
+              potentialMatches:
+                memoizedDataWithConditional.galleryImages.filter((img: any) =>
+                  galleryIdSet.has(img.id.toString())
+                ).length,
+            }
+          );
+
+          // 🖼️ ENHANCED MATCHING - Try both original and string-normalized matching
+          const enhancedGalleryImageData =
+            memoizedDataWithConditional.galleryImages.filter((img: any) => {
+              const imgIdStr = img.id.toString();
+              return gallery.imageIds?.some(
+                (galleryId: string) => galleryId.toString() === imgIdStr
+              );
+            });
+
+          if (enhancedGalleryImageData.length > galleryImageData.length) {
+            console.log(
+              `🖼️ LLM Context: Enhanced matching found more images for gallery "${gallery.name}":`,
+              {
+                originalMatches: galleryImageData.length,
+                enhancedMatches: enhancedGalleryImageData.length,
+                additionalMatches:
+                  enhancedGalleryImageData.length - galleryImageData.length,
+              }
+            );
+            // Use the enhanced matching result
+            galleryImageData.length = 0;
+            galleryImageData.push(...enhancedGalleryImageData);
+          }
+        }
+
+        console.log(
+          `🖼️ LLM Context: Final processing results for gallery "${gallery.name}":`,
+          {
+            galleryImageIds: gallery.imageIds?.slice(0, 5), // Show first 5 IDs
+            matchedImages: galleryImageData.length,
+            sampleImageMetadata: galleryImageData[0]?.metadata,
+            allAvailableImageIds: memoizedDataWithConditional.galleryImages
+              .map((img: any) => img.id)
+              .slice(0, 10),
+            galleryImageDataSample: galleryImageData.slice(0, 2).map((img) => ({
+              id: img.id,
+              metadata: img.metadata,
+            })),
+          }
+        );
+
+        // 🖼️ ADD COMPLETE IMAGE OBJECTS WITH RICH METADATA TO LLM CONTEXT
+        if (galleryImageData.length > 0) {
+          llmText += `  Images with Metadata:\n`;
+
+          // Add each image as a complete object with all its rich metadata
+          galleryImageData.forEach((img, imgIndex) => {
+            llmText += `    Image ${imgIndex + 1}:\n`;
+            llmText += `      Filename: ${img.filename || "Unknown"}\n`;
+            llmText += `      URL: ${img.url || "No URL"}\n`;
+
+            // Add all available metadata fields
+            if (img.metadata) {
+              if (img.metadata.description) {
+                llmText += `      Description: ${img.metadata.description}\n`;
+              }
+              if (img.metadata.angle) {
+                llmText += `      Angle: ${img.metadata.angle}\n`;
+              }
+              if (img.metadata.view) {
+                llmText += `      View: ${img.metadata.view}\n`;
+              }
+              if (img.metadata.movement) {
+                llmText += `      Movement: ${img.metadata.movement}\n`;
+              }
+              if (img.metadata.tod) {
+                llmText += `      Time of Day: ${img.metadata.tod}\n`;
+              }
+              if (img.metadata.side) {
+                llmText += `      Side: ${img.metadata.side}\n`;
+              }
+              if (img.metadata.category) {
+                llmText += `      Category: ${img.metadata.category}\n`;
+              }
+              if (img.metadata.isPrimary) {
+                llmText += `      Primary Image: Yes\n`;
+              }
+
+              // Add any additional metadata fields that might exist
+              const additionalFields = Object.keys(img.metadata).filter(
+                (key) =>
+                  ![
+                    "description",
+                    "angle",
+                    "view",
+                    "movement",
+                    "tod",
+                    "side",
+                    "category",
+                    "isPrimary",
+                  ].includes(key)
+              );
+              additionalFields.forEach((field) => {
+                if (
+                  img.metadata[field] &&
+                  typeof img.metadata[field] !== "object"
+                ) {
+                  llmText += `      ${field}: ${img.metadata[field]}\n`;
+                }
+              });
+            }
+            llmText += `\n`; // Add spacing between images
+          });
+
+          // Enhanced logging for complete image objects
+          console.log(
+            `🖼️ LLM Context: Added complete image objects for gallery "${gallery.name}":`,
+            {
+              totalImages: galleryImageData.length,
+              sampleCompleteImage: {
+                filename: galleryImageData[0]?.filename,
+                url: galleryImageData[0]?.url,
+                metadata: galleryImageData[0]?.metadata,
+              },
+              allImagesWithMetadata: galleryImageData.map((img, i) => ({
+                index: i + 1,
+                filename: img.filename,
+                hasDescription: !!img.metadata?.description,
+                hasAngle: !!img.metadata?.angle,
+                hasView: !!img.metadata?.view,
+                hasMovement: !!img.metadata?.movement,
+                metadataFields: img.metadata
+                  ? Object.keys(img.metadata).length
+                  : 0,
+              })),
+              metadataFieldsFound: {
+                descriptions: galleryImageData.filter(
+                  (img) => img.metadata?.description
+                ).length,
+                angles: galleryImageData.filter((img) => img.metadata?.angle)
+                  .length,
+                views: galleryImageData.filter((img) => img.metadata?.view)
+                  .length,
+                movements: galleryImageData.filter(
+                  (img) => img.metadata?.movement
+                ).length,
+                urls: galleryImageData.filter((img) => img.url).length,
+              },
+            }
+          );
+        } else {
+          console.log(
+            `🖼️ LLM Context: No image metadata found for gallery "${gallery.name}" - no images matched`
+          );
+        }
+      });
+      llmText += "\n";
+    }
+
     // Add generation settings
     llmText += "GENERATION SETTINGS:\n";
     llmText += `Platform: ${formState.platform}\n`;
@@ -1015,6 +1204,17 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
 
     llmText += "Generate a caption that follows the requirements above.";
 
+    // Log the final LLM context to verify gallery data inclusion
+    const hasGalleryData = llmText.includes("ASSOCIATED GALLERIES:");
+    console.log("🖼️ LLM Context: Final context for LLM generation:", {
+      hasGalleryData,
+      contextLength: llmText.length,
+      gallerySection: hasGalleryData
+        ? llmText.split("ASSOCIATED GALLERIES:")[1]?.split("\n\n")[0]
+        : "No gallery data found",
+      selectedGalleryCount: galleryDetails.length,
+    });
+
     return llmText;
   }, [
     carDetails,
@@ -1025,6 +1225,8 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     brandTones,
     formState,
     eventDetails,
+    galleryDetails,
+    memoizedDataWithConditional.galleryImages,
     derivedLength,
   ]);
 
@@ -1095,6 +1297,17 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
     // Allow generation even without cars - users might want project-level or general content
     // if (carDetails.length === 0) return;
 
+    // Ensure editableLLMText is populated with current context before generation
+    const currentLLMText = buildLLMText();
+    setEditableLLMText(currentLLMText);
+
+    console.log("🖼️ Generation: Built fresh LLM context:", {
+      textLength: currentLLMText.length,
+      hasGalleryData: currentLLMText.includes("ASSOCIATED GALLERIES:"),
+      selectedGalleryCount: selectedGalleryIds.length,
+      galleryImageCount: memoizedDataWithConditional.galleryImages.length,
+    });
+
     const context: GenerationContext = {
       projectId: config.mode === "project" ? config.entityId : "",
       selectedCarIds,
@@ -1106,7 +1319,7 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
       eventDetails,
       derivedLength,
       useMinimalCarData,
-      editableLLMText,
+      editableLLMText: currentLLMText, // Use fresh LLM text
       clientHandle: memoizedDataWithConditional.clientHandle || null,
     };
 
@@ -1194,6 +1407,23 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
             ],
           };
         }
+
+        // Log gallery data being sent to LLM
+        console.log("🖼️ LLM API Call: Gallery data check:", {
+          hasCustomLLMText: !!context.editableLLMText,
+          customLLMTextLength: context.editableLLMText?.length || 0,
+          hasGalleryDataInText:
+            context.editableLLMText?.includes("ASSOCIATED GALLERIES:") || false,
+          selectedGalleryIds: selectedGalleryIds,
+          galleryPreview: context.editableLLMText?.includes(
+            "ASSOCIATED GALLERIES:"
+          )
+            ? context.editableLLMText
+                .split("ASSOCIATED GALLERIES:")[1]
+                ?.split("\n\n")[0]
+                ?.slice(0, 300) + "..."
+            : "No gallery data found",
+        });
 
         const response = await fetch(
           "/api/openai/generate-project-caption-stream",
@@ -1632,6 +1862,21 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
             />
           )}
 
+          {/* Gallery Selection - For both project and car mode when enabled */}
+          {config.features.allowGallerySelection && (
+            <GallerySelection
+              projectGalleries={memoizedDataWithConditional.galleries}
+              selectedGalleryIds={selectedGalleryIds}
+              loadingGalleries={isLoading}
+              onGallerySelection={handleGallerySelection}
+              onSelectAllGalleries={handleSelectAllGalleries}
+              hasMoreGalleries={memoizedDataWithConditional.hasMoreGalleries}
+              galleryImages={memoizedDataWithConditional.galleryImages}
+              isOpen={isGallerySectionOpen}
+              onToggle={setIsGallerySectionOpen}
+            />
+          )}
+
           {/* System Prompt Selection */}
           <SystemPromptSelection
             systemPrompts={memoizedDataWithConditional.systemPrompts}
@@ -1651,209 +1896,6 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
             brandToneError={brandTonesError ? String(brandTonesError) : null}
             onBrandToneChange={setSelectedBrandToneId}
           />
-
-          {/* Data Source Sections - Collapsible with Lazy Loading */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Enhanced Data Sources</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Expand sections to load additional data for richer content
-                generation
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Deliverables Section */}
-              <Collapsible
-                open={dataSections.deliverables}
-                onOpenChange={() => handleSectionToggle("deliverables")}
-              >
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-between p-2 h-auto"
-                  >
-                    <div className="flex items-center gap-2">
-                      {dataSections.deliverables ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                      <span className="font-medium">Deliverables</span>
-                      <Badge variant="secondary" className="ml-2">
-                        {memoizedDataWithConditional.deliverables.length}
-                      </Badge>
-                    </div>
-                    {loadingConditionalData.deliverables && (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-2 pt-2">
-                  {memoizedDataWithConditional.deliverables.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-2">
-                      {memoizedDataWithConditional.deliverables
-                        .slice(0, 3)
-                        .map((deliverable: any, index: number) => (
-                          <div
-                            key={deliverable._id || index}
-                            className="p-2 border rounded text-sm"
-                          >
-                            <div className="font-medium">
-                              {deliverable.title ||
-                                deliverable.name ||
-                                `Deliverable ${index + 1}`}
-                            </div>
-                            {deliverable.type && (
-                              <div className="text-xs text-muted-foreground">
-                                {deliverable.type}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      {memoizedDataWithConditional.deliverables.length > 3 && (
-                        <div className="text-xs text-muted-foreground text-center">
-                          and{" "}
-                          {memoizedDataWithConditional.deliverables.length - 3}{" "}
-                          more...
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground text-center py-2">
-                      No deliverables available
-                    </div>
-                  )}
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Galleries Section */}
-              <Collapsible
-                open={dataSections.galleries}
-                onOpenChange={() => handleSectionToggle("galleries")}
-              >
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-between p-2 h-auto"
-                  >
-                    <div className="flex items-center gap-2">
-                      {dataSections.galleries ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                      <span className="font-medium">Galleries</span>
-                      <Badge variant="secondary" className="ml-2">
-                        {memoizedDataWithConditional.galleries.length}
-                      </Badge>
-                    </div>
-                    {loadingConditionalData.galleries && (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-2 pt-2">
-                  {memoizedDataWithConditional.galleries.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-2">
-                      {memoizedDataWithConditional.galleries
-                        .slice(0, 3)
-                        .map((gallery: any, index: number) => (
-                          <div
-                            key={gallery._id || index}
-                            className="p-2 border rounded text-sm"
-                          >
-                            <div className="font-medium">
-                              {gallery.title ||
-                                gallery.name ||
-                                `Gallery ${index + 1}`}
-                            </div>
-                            {gallery.imageCount && (
-                              <div className="text-xs text-muted-foreground">
-                                {gallery.imageCount} images
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      {memoizedDataWithConditional.galleries.length > 3 && (
-                        <div className="text-xs text-muted-foreground text-center">
-                          and {memoizedDataWithConditional.galleries.length - 3}{" "}
-                          more...
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground text-center py-2">
-                      No galleries available
-                    </div>
-                  )}
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Inspections Section */}
-              <Collapsible
-                open={dataSections.inspections}
-                onOpenChange={() => handleSectionToggle("inspections")}
-              >
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-between p-2 h-auto"
-                  >
-                    <div className="flex items-center gap-2">
-                      {dataSections.inspections ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                      <span className="font-medium">Inspections</span>
-                      <Badge variant="secondary" className="ml-2">
-                        {memoizedDataWithConditional.inspections.length}
-                      </Badge>
-                    </div>
-                    {loadingConditionalData.inspections && (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-2 pt-2">
-                  {memoizedDataWithConditional.inspections.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-2">
-                      {memoizedDataWithConditional.inspections
-                        .slice(0, 3)
-                        .map((inspection: any, index: number) => (
-                          <div
-                            key={inspection._id || index}
-                            className="p-2 border rounded text-sm"
-                          >
-                            <div className="font-medium">
-                              {inspection.title ||
-                                inspection.name ||
-                                `Inspection ${index + 1}`}
-                            </div>
-                            {inspection.status && (
-                              <div className="text-xs text-muted-foreground">
-                                {inspection.status}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      {memoizedDataWithConditional.inspections.length > 3 && (
-                        <div className="text-xs text-muted-foreground text-center">
-                          and{" "}
-                          {memoizedDataWithConditional.inspections.length - 3}{" "}
-                          more...
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground text-center py-2">
-                      No inspections available
-                    </div>
-                  )}
-                </CollapsibleContent>
-              </Collapsible>
-            </CardContent>
-          </Card>
 
           {/* Generation Controls */}
           <GenerationControls

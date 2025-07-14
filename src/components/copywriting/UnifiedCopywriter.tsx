@@ -103,6 +103,7 @@ export function UnifiedCopywriter({
     allowEventSelection,
     allowMinimalCarData,
     showClientHandle,
+    allowGallerySelection: !!projectId, // Only enable for project mode
   };
 
   // Smart endpoint configuration
@@ -112,6 +113,7 @@ export function UnifiedCopywriter({
         captions: `/api/projects/${projectId}/captions`,
         systemPrompts: `system-prompts/active`,
         events: `/api/projects/${projectId}/events?includeCars=true`,
+        galleries: `/api/projects/${projectId}/galleries`,
       };
     } else {
       const primaryCarId = normalizedCarIds[0];
@@ -119,6 +121,7 @@ export function UnifiedCopywriter({
         captions: `captions`,
         systemPrompts: `system-prompts/active`,
         events: primaryCarId ? `cars/${primaryCarId}/events` : undefined,
+        galleries: undefined,
       };
     }
   }, [projectId, normalizedCarIds]);
@@ -310,6 +313,278 @@ export function UnifiedCopywriter({
     refetchOnWindowFocus: false,
   });
 
+  // Galleries data fetching (only for project mode)
+  const galleriesEndpoint = apiEndpoints.galleries;
+  const {
+    data: galleriesData,
+    isLoading: isLoadingGalleries,
+    error: galleriesError,
+  } = useAPIQuery<{ galleries: any[] }>(galleriesEndpoint!, {
+    enabled: !!galleriesEndpoint && !!projectId,
+    staleTime: 3 * 60 * 1000, // 3 minutes cache
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Process gallery images when galleries data changes
+  const [galleryImages, setGalleryImages] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    const processGalleryImages = async () => {
+      if (!galleriesData?.galleries || galleriesData.galleries.length === 0) {
+        setGalleryImages([]);
+        return;
+      }
+
+      const galleries = galleriesData.galleries;
+      console.log("🖼️ UnifiedCopywriter: Processing galleries data:", {
+        galleriesCount: galleries.length,
+        galleries: galleries.map((g) => ({
+          id: g._id,
+          name: g.name,
+          imageCount: g.imageIds?.length || 0,
+        })),
+      });
+
+      // Collect all image IDs from all galleries
+      console.log("🖼️ UnifiedCopywriter: Gallery structure:", galleries[0]);
+      const allImageIds = galleries.flatMap((gallery) => {
+        console.log(`🖼️ Gallery ${gallery.name} imageIds:`, gallery.imageIds);
+        return gallery.imageIds || [];
+      });
+      console.log("🖼️ UnifiedCopywriter: Collected image IDs from galleries:", {
+        totalImageIds: allImageIds.length,
+        imageIds: allImageIds.slice(0, 5), // Show first 5 IDs
+      });
+
+      if (allImageIds.length === 0) {
+        setGalleryImages([]);
+        return;
+      }
+
+      try {
+        if (!api) {
+          console.warn(
+            "🖼️ UnifiedCopywriter: API not available, skipping gallery images fetch"
+          );
+          return;
+        }
+
+        // Fetch images metadata using the images metadata API
+        const imageMetadataResponse = await api.get(
+          `images/metadata?ids=${allImageIds.join(",")}`
+        );
+
+        // 🖼️ COMPREHENSIVE METADATA API DEBUGGING
+        console.log("🖼️ UnifiedCopywriter: Raw image metadata API response:", {
+          responseType: typeof imageMetadataResponse,
+          isArray: Array.isArray(imageMetadataResponse),
+          length: Array.isArray(imageMetadataResponse)
+            ? imageMetadataResponse.length
+            : 0,
+          requestedImageIds: allImageIds,
+          requestedImageIdsCount: allImageIds.length,
+          firstFewRequestedIds: allImageIds.slice(0, 5),
+        });
+
+        // 🖼️ DETAILED RESPONSE STRUCTURE ANALYSIS
+        if (
+          Array.isArray(imageMetadataResponse) &&
+          imageMetadataResponse.length > 0
+        ) {
+          const sampleImage = imageMetadataResponse[0];
+          console.log(
+            "🖼️ UnifiedCopywriter: Sample image metadata structure:",
+            {
+              sampleImageKeys: Object.keys(sampleImage),
+              imageId: sampleImage.imageId,
+              imageIdType: typeof sampleImage.imageId,
+              hasMetadata: !!sampleImage.metadata,
+              metadataKeys: sampleImage.metadata
+                ? Object.keys(sampleImage.metadata)
+                : [],
+              metadataValues: sampleImage.metadata
+                ? {
+                    angle: sampleImage.metadata.angle,
+                    view: sampleImage.metadata.view,
+                    movement: sampleImage.metadata.movement,
+                    tod: sampleImage.metadata.tod,
+                    side: sampleImage.metadata.side,
+                    description: sampleImage.metadata.description,
+                    category: sampleImage.metadata.category,
+                    isPrimary: sampleImage.metadata.isPrimary,
+                  }
+                : null,
+              url: sampleImage.url,
+              filename: sampleImage.filename,
+            }
+          );
+
+          // 🖼️ METADATA FIELD ANALYSIS ACROSS ALL IMAGES
+          const metadataFieldAnalysis = {
+            totalImages: imageMetadataResponse.length,
+            imagesWithMetadata: 0,
+            fieldsPopulated: {
+              angle: 0,
+              view: 0,
+              movement: 0,
+              tod: 0,
+              side: 0,
+              description: 0,
+              category: 0,
+              isPrimary: 0,
+            },
+            sampleValues: {
+              angles: new Set(),
+              views: new Set(),
+              movements: new Set(),
+              tods: new Set(),
+              sides: new Set(),
+              categories: new Set(),
+            },
+          };
+
+          imageMetadataResponse.forEach((img) => {
+            if (img.metadata) {
+              metadataFieldAnalysis.imagesWithMetadata++;
+
+              if (img.metadata.angle) {
+                metadataFieldAnalysis.fieldsPopulated.angle++;
+                metadataFieldAnalysis.sampleValues.angles.add(
+                  img.metadata.angle
+                );
+              }
+              if (img.metadata.view) {
+                metadataFieldAnalysis.fieldsPopulated.view++;
+                metadataFieldAnalysis.sampleValues.views.add(img.metadata.view);
+              }
+              if (img.metadata.movement) {
+                metadataFieldAnalysis.fieldsPopulated.movement++;
+                metadataFieldAnalysis.sampleValues.movements.add(
+                  img.metadata.movement
+                );
+              }
+              if (img.metadata.tod) {
+                metadataFieldAnalysis.fieldsPopulated.tod++;
+                metadataFieldAnalysis.sampleValues.tods.add(img.metadata.tod);
+              }
+              if (img.metadata.side) {
+                metadataFieldAnalysis.fieldsPopulated.side++;
+                metadataFieldAnalysis.sampleValues.sides.add(img.metadata.side);
+              }
+              if (img.metadata.description) {
+                metadataFieldAnalysis.fieldsPopulated.description++;
+              }
+              if (img.metadata.category) {
+                metadataFieldAnalysis.fieldsPopulated.category++;
+                metadataFieldAnalysis.sampleValues.categories.add(
+                  img.metadata.category
+                );
+              }
+              if (img.metadata.isPrimary) {
+                metadataFieldAnalysis.fieldsPopulated.isPrimary++;
+              }
+            }
+          });
+
+          console.log("🖼️ UnifiedCopywriter: Metadata field analysis:", {
+            ...metadataFieldAnalysis,
+            sampleValues: {
+              angles: Array.from(
+                metadataFieldAnalysis.sampleValues.angles
+              ).slice(0, 5),
+              views: Array.from(metadataFieldAnalysis.sampleValues.views).slice(
+                0,
+                5
+              ),
+              movements: Array.from(
+                metadataFieldAnalysis.sampleValues.movements
+              ).slice(0, 5),
+              tods: Array.from(metadataFieldAnalysis.sampleValues.tods).slice(
+                0,
+                5
+              ),
+              sides: Array.from(metadataFieldAnalysis.sampleValues.sides).slice(
+                0,
+                5
+              ),
+              categories: Array.from(
+                metadataFieldAnalysis.sampleValues.categories
+              ).slice(0, 5),
+            },
+          });
+        }
+
+        console.log("🖼️ UnifiedCopywriter: Image metadata response:", {
+          responseType: typeof imageMetadataResponse,
+          isArray: Array.isArray(imageMetadataResponse),
+          length: Array.isArray(imageMetadataResponse)
+            ? imageMetadataResponse.length
+            : 0,
+        });
+
+        // Process and format the image metadata
+        if (Array.isArray(imageMetadataResponse)) {
+          const processedImages = imageMetadataResponse.map((img) => ({
+            id: img.imageId,
+            url: img.url,
+            filename: img.filename,
+            metadata: {
+              ...img.metadata,
+              // Ensure all metadata fields are available
+              angle: img.metadata?.angle || null,
+              view: img.metadata?.view || null,
+              movement: img.metadata?.movement || null,
+              tod: img.metadata?.tod || null,
+              side: img.metadata?.side || null,
+              description: img.metadata?.description || null,
+              category: img.metadata?.category || null,
+              isPrimary: img.metadata?.isPrimary || false,
+            },
+            galleryName:
+              galleries.find((g) => g.imageIds?.includes(img.imageId))?.name ||
+              "",
+          }));
+
+          setGalleryImages(processedImages);
+
+          // 🖼️ PROCESSED IMAGES DEBUGGING
+          console.log("🖼️ UnifiedCopywriter: Processed gallery images:", {
+            galleryImagesCount: processedImages.length,
+            sampleProcessedImage: processedImages[0],
+            metadataIntegrityCheck: {
+              imagesWithAngle: processedImages.filter(
+                (img) => img.metadata.angle
+              ).length,
+              imagesWithView: processedImages.filter((img) => img.metadata.view)
+                .length,
+              imagesWithMovement: processedImages.filter(
+                (img) => img.metadata.movement
+              ).length,
+              imagesWithDescription: processedImages.filter(
+                (img) => img.metadata.description
+              ).length,
+            },
+            galleryNameMapping: processedImages.slice(0, 3).map((img) => ({
+              imageId: img.id,
+              galleryName: img.galleryName,
+              hasGalleryName: !!img.galleryName,
+            })),
+          });
+        }
+      } catch (error) {
+        console.warn(
+          "🖼️ UnifiedCopywriter: Failed to fetch gallery images metadata:",
+          error
+        );
+        setGalleryImages([]);
+      }
+    };
+
+    processGalleryImages();
+  }, [galleriesData, api]);
+
   // Enhanced debugging for loading states
   React.useEffect(() => {
     console.log("🐛 UnifiedCopywriter Debug Info:", {
@@ -318,21 +593,25 @@ export function UnifiedCopywriter({
       carsEndpoint,
       captionsQuery,
       eventsEndpoint,
+      galleriesEndpoint,
       initialCopywriterData: !!initialCopywriterData,
       isLoadingCars,
       isLoadingFullCars,
       isLoadingEvents,
       isLoadingCaptions,
+      isLoadingGalleries,
       carsData: carsData?.length || 0,
       fullCarsData: fullCarsData?.length || 0,
       finalCarsData: finalCarsData?.length || 0,
       eventsData: eventsData?.length || 0,
       captionsData: captionsData?.length || 0,
+      galleriesData: galleriesData?.galleries?.length || 0,
       errors: {
         carsError: !!carsError,
         fullCarsError: !!fullCarsError,
         eventsError: !!eventsError,
         captionsError: !!captionsError,
+        galleriesError: !!galleriesError,
       },
     });
   }, [
@@ -341,20 +620,24 @@ export function UnifiedCopywriter({
     carsEndpoint,
     captionsQuery,
     eventsEndpoint,
+    galleriesEndpoint,
     initialCopywriterData,
     isLoadingCars,
     isLoadingFullCars,
     isLoadingEvents,
     isLoadingCaptions,
+    isLoadingGalleries,
     carsData,
     fullCarsData,
     finalCarsData,
     eventsData,
     captionsData,
+    galleriesData,
     carsError,
     fullCarsError,
     eventsError,
     captionsError,
+    galleriesError,
   ]);
 
   // Loading and error states - don't show loading if we have initial data
@@ -479,6 +762,8 @@ export function UnifiedCopywriter({
     features,
     loadingStates: {
       isLoadingModels,
+      isLoadingGalleries,
+      galleriesReady: !isLoadingGalleries && galleryImages.length > 0,
     },
   };
 
@@ -615,10 +900,15 @@ export function UnifiedCopywriter({
           _id: model._id,
         }));
 
-        return {
+        // Use galleries data from useAPIQuery and processed gallery images from state
+        const galleries = galleriesData?.galleries || [];
+
+        const result = {
           cars: projectCars,
           models: projectModels,
           events: projectEvents,
+          galleries,
+          galleryImages, // Use galleryImages from state
           systemPrompts: [], // Handled by shared cache in BaseCopywriter
           lengthSettings: [], // Handled by shared cache in BaseCopywriter
           savedCaptions,
@@ -628,103 +918,23 @@ export function UnifiedCopywriter({
             "clientHandle" in finalCarsData[0]
               ? (finalCarsData[0] as any).clientHandle || null
               : null,
-          // Enhanced data integration - empty arrays for lazy loading
-          deliverables: [],
-          galleries: [],
-          inspections: [],
+
           hasMoreEvents: events.length > 5,
           hasMoreCaptions: captionsArray.length >= 4,
+          hasMoreGalleries: false, // Gallery pagination not implemented yet
         };
-      } catch (error) {
-        console.error("Error fetching copywriter data:", error);
-        throw error;
-      }
-    },
 
-    onConditionalDataFetch: async (
-      sections
-    ): Promise<Partial<CopywriterData>> => {
-      const result: Partial<CopywriterData> = {};
-
-      try {
-        // Fetch deliverables if requested
-        if (sections.deliverables) {
-          try {
-            const deliverablesEndpoint =
-              mode === "project"
-                ? `projects/${projectId}/deliverables`
-                : `cars/${entityId}/deliverables`;
-
-            const deliverablesResponse = await api.get(deliverablesEndpoint);
-            result.deliverables = Array.isArray(deliverablesResponse)
-              ? deliverablesResponse
-              : [];
-
-            console.log(
-              `📦 UnifiedCopywriter: Conditionally fetched ${result.deliverables.length} deliverables for ${mode} ${entityId}`
-            );
-          } catch (deliverablesError) {
-            console.warn(
-              `⚠️ UnifiedCopywriter: Failed to conditionally fetch deliverables for ${mode} ${entityId}:`,
-              deliverablesError
-            );
-            result.deliverables = [];
-          }
-        }
-
-        // Fetch galleries if requested
-        if (sections.galleries) {
-          try {
-            const galleriesEndpoint =
-              mode === "project"
-                ? `projects/${projectId}/galleries`
-                : `cars/${entityId}/galleries`;
-
-            const galleriesResponse = await api.get(galleriesEndpoint);
-            result.galleries = Array.isArray(galleriesResponse)
-              ? galleriesResponse
-              : [];
-
-            console.log(
-              `🖼️ UnifiedCopywriter: Conditionally fetched ${result.galleries.length} galleries for ${mode} ${entityId}`
-            );
-          } catch (galleriesError) {
-            console.warn(
-              `⚠️ UnifiedCopywriter: Failed to conditionally fetch galleries for ${mode} ${entityId}:`,
-              galleriesError
-            );
-            result.galleries = [];
-          }
-        }
-
-        // Fetch inspections if requested
-        if (sections.inspections) {
-          try {
-            const inspectionsEndpoint =
-              mode === "project"
-                ? `projects/${projectId}/inspections`
-                : `cars/${entityId}/inspections`;
-
-            const inspectionsResponse = await api.get(inspectionsEndpoint);
-            result.inspections = Array.isArray(inspectionsResponse)
-              ? inspectionsResponse
-              : [];
-
-            console.log(
-              `🔍 UnifiedCopywriter: Conditionally fetched ${result.inspections.length} inspections for ${mode} ${entityId}`
-            );
-          } catch (inspectionsError) {
-            console.warn(
-              `⚠️ UnifiedCopywriter: Failed to conditionally fetch inspections for ${mode} ${entityId}:`,
-              inspectionsError
-            );
-            result.inspections = [];
-          }
-        }
+        console.log("🖼️ UnifiedCopywriter: Final result:", {
+          carsCount: result.cars.length,
+          galleriesCount: result.galleries.length,
+          galleryImagesCount: galleryImages.length,
+          eventsCount: result.events.length,
+          captionsCount: result.savedCaptions.length,
+        });
 
         return result;
       } catch (error) {
-        console.error("Error in conditional data fetch:", error);
+        console.error("Error fetching copywriter data:", error);
         throw error;
       }
     },
