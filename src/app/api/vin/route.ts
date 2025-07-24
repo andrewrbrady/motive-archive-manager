@@ -83,26 +83,52 @@ interface VINResponse {
       unit: string;
     };
   };
-  aiAnalysis?: {
-    [key: string]: {
-      value: string;
-      confidence: "confirmed" | "inferred" | "suggested";
-      source: string;
-    };
-  };
 }
 
-interface AIAnalysisField {
-  value: string;
-  confidence: "confirmed" | "inferred" | "suggested";
-  source: string;
+// Helper function to safely parse numeric values
+function safeParseFloat(value: string | undefined): number | undefined {
+  if (!value || value === "Not Applicable") return undefined;
+  const parsed = parseFloat(value.replace(/,/g, ""));
+  return isNaN(parsed) ? undefined : parsed;
+}
+
+// Helper function to safely parse integer values
+function safeParseInt(value: string | undefined): number | undefined {
+  if (!value || value === "Not Applicable") return undefined;
+  const parsed = parseInt(value.replace(/,/g, ""));
+  return isNaN(parsed) ? undefined : parsed;
+}
+
+// Helper function to extract GVWR from various NHTSA fields
+function extractGVWR(
+  results: Record<string, string>
+): { value: number; unit: string } | undefined {
+  // Check for direct GVWR fields
+  const gvwrFields = [
+    "Gross Vehicle Weight Rating From",
+    "GVWR",
+    "Gross Vehicle Weight Rating",
+    "GVWR From",
+    "GVWR To",
+  ];
+
+  for (const field of gvwrFields) {
+    const value = results[field];
+    if (value && value !== "Not Applicable") {
+      const numericValue = safeParseFloat(value);
+      if (numericValue) {
+        // NHTSA typically provides GVWR in pounds
+        return { value: numericValue, unit: "lbs" };
+      }
+    }
+  }
+
+  return undefined;
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const vin = searchParams.get("vin");
-
-  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Received VIN request for:", vin);
 
   if (!vin) {
     return NextResponse.json(
@@ -112,13 +138,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Call NHTSA API
+    // Call NHTSA API - our most reliable data source
     const response = await fetch(
       `https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${vin}?format=json`
     );
     const data = await response.json();
-
-    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Raw NHTSA API response:", JSON.stringify(data, null, 2));
 
     if (!data.Results) {
       return NextResponse.json(
@@ -131,90 +155,19 @@ export async function GET(request: Request) {
     const results = data.Results.reduce((acc: any, item: any) => {
       if (item.Value && item.Value !== "Not Applicable") {
         acc[item.Variable] = item.Value;
-        // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Found value for ${item.Variable}:`, item.Value);
       }
       return acc;
     }, {});
 
-    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Processed NHTSA results:", results);
-
-    // Get AI analysis of the data
-    let aiAnalysis;
-    let additionalFields: Record<string, AIAnalysisField> = {};
-    try {
-      const aiResponse = await fetch(
-        new URL("/api/vin/validate", request.url).toString(),
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ nhtsaData: data }), // Send the complete NHTSA response
-        }
-      );
-
-      if (aiResponse.ok) {
-        const aiResult = await aiResponse.json();
-        // Filter out any AI analysis fields that we already have structured data for
-        aiAnalysis = Object.fromEntries(
-          Object.entries(aiResult.additionalFields || {}).filter(([key]) => {
-            // Remove fields we already have structured data for
-            return (
-              !key.toLowerCase().includes("gvwr") &&
-              !key.toLowerCase().includes("weight") &&
-              !key.toLowerCase().includes("engine") &&
-              !key.toLowerCase().includes("doors") &&
-              !key.toLowerCase().includes("displacement") &&
-              !key.toLowerCase().includes("horsepower") &&
-              !key.toLowerCase().includes("tire")
-            );
-          })
-        );
-
-        if (aiResult?.additionalFields) {
-          additionalFields = aiResult.additionalFields as Record<
-            string,
-            AIAnalysisField
-          >;
-          // Check if AI found GVWR in the data
-          const gvwrField = Object.entries(additionalFields).find(
-            ([key, info]) =>
-              key.toLowerCase().includes("gvwr") ||
-              key.toLowerCase().includes("weight") ||
-              info.value.toLowerCase().includes("gvwr")
-          ) as [string, AIAnalysisField] | undefined;
-
-          if (gvwrField) {
-            const [_, info] = gvwrField;
-            // Extract numeric value and unit from the GVWR string
-            const match = info.value.match(
-              /(\d+(?:,\d+)?)\s*(lbs?|pounds?|kg)/i
-            );
-            if (match) {
-              const value = parseInt(match[1].replace(",", ""));
-              const unit = match[2].toLowerCase().startsWith("lb")
-                ? "lbs"
-                : "kg";
-              results.GVWR = { value, unit };
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error getting AI analysis:", error);
-      // Continue without AI analysis
-    }
-
-    // Prepare basic VIN info
+    // Prepare optimized VIN info using only NHTSA data
     const vinInfo: VINResponse = {
       make: results["Make"] || "",
       model: results["Model"] || "",
-      year: parseInt(results["Model Year"]) || 0,
+      year: safeParseInt(results["Model Year"]) || 0,
       engineType: results["Fuel Type - Primary"],
-      engineDisplacement: parseFloat(results["Displacement (L)"]) || undefined,
+      engineDisplacement: safeParseFloat(results["Displacement (L)"]),
       engineConfiguration: results["Engine Configuration"],
-      engineCylinders:
-        parseInt(results["Engine Number of Cylinders"]) || undefined,
+      engineCylinders: safeParseInt(results["Engine Number of Cylinders"]),
       error: data.Results.some(
         (r: { Variable: string; Value: string }) =>
           r.Variable === "Error Code" && r.Value
@@ -238,8 +191,8 @@ export async function GET(request: Request) {
       series: results["Series"],
       trim: results["Trim"],
       bodyClass: results["Body Class"],
-      horsepower: parseInt(results["Engine Brake (hp) From"]) || undefined,
-      doors: parseInt(results["Doors"]) || undefined,
+      horsepower: safeParseInt(results["Engine Brake (hp) From"]),
+      doors: safeParseInt(results["Doors"]),
       plant: {
         city: results["Plant City"],
         country: results["Plant Country"],
@@ -247,7 +200,7 @@ export async function GET(request: Request) {
       },
       transmission: {
         style: results["Transmission Style"],
-        speeds: parseInt(results["Transmission Speeds"]) || undefined,
+        speeds: safeParseInt(results["Transmission Speeds"]),
       },
       driveType: results["Drive Type"],
       braking: {
@@ -290,31 +243,28 @@ export async function GET(request: Request) {
           : undefined,
       },
       dimensions: {
-        gvwr: results.GVWR,
+        gvwr: extractGVWR(results),
         wheelBase: results["Wheel Base (inches) From"]
           ? {
-              from: parseFloat(results["Wheel Base (inches) From"]),
-              to: parseFloat(results["Wheel Base (inches) To"]) || undefined,
+              from: safeParseFloat(results["Wheel Base (inches) From"]),
+              to: safeParseFloat(results["Wheel Base (inches) To"]),
               unit: "inches",
             }
           : undefined,
-        trackWidth: parseFloat(results["Track Width (inches)"]) || undefined,
-        bedLength: parseFloat(results["Bed Length (inches)"]) || undefined,
-        curbWeight: parseFloat(results["Curb Weight (pounds)"]) || undefined,
+        trackWidth: safeParseFloat(results["Track Width (inches)"]),
+        bedLength: safeParseFloat(results["Bed Length (inches)"]),
+        curbWeight: safeParseFloat(results["Curb Weight (pounds)"]),
       },
       performance: {
-        topSpeed: parseFloat(results["Top Speed (MPH)"]) || undefined,
+        topSpeed: safeParseFloat(results["Top Speed (MPH)"]),
         enginePower: results["Engine Power (kW)"]
           ? {
-              value: parseFloat(results["Engine Power (kW)"]),
+              value: safeParseFloat(results["Engine Power (kW)"]) || 0,
               unit: "kW",
             }
           : undefined,
       },
-      aiAnalysis: additionalFields,
     };
-
-    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Final VIN response:", vinInfo);
 
     return NextResponse.json(vinInfo);
   } catch (error) {

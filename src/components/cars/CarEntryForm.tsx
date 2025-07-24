@@ -61,12 +61,6 @@ interface VINResponse {
     country?: string;
     company?: string;
   };
-  aiAnalysis?: {
-    [key: string]: {
-      value: string;
-      confidence: string;
-    };
-  };
   doors?: number;
   dimensions?: {
     wheelbase?: MeasurementValue;
@@ -580,8 +574,8 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
 
       // Create a loading toast that we can update
       const toastId = `decode-${Date.now()}`;
-      toast.loading("Initiating VIN decode...", {
-        duration: 20000, // Long duration as we'll dismiss it manually
+      toast.loading("Decoding VIN from NHTSA database...", {
+        duration: 10000, // Shorter duration since we removed slow AI processing
         id: toastId,
       });
 
@@ -675,20 +669,6 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
         // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Dimensions data received:", data.dimensions);
         // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Updated dimensions in form:", updatedFormData.dimensions);
 
-        // Add AI analysis insights if available
-        if ("aiAnalysis" in data) {
-          toast.loading("Processing AI insights...", { id: toastId });
-          const highlights = Object.entries(data.aiAnalysis || {})
-            .filter(([_, info]) => info.confidence === "confirmed")
-            .map(([_, info]) => info.value)
-            .join("\n");
-
-          if (highlights) {
-            updatedFormData.description =
-              formData.description + "\n\nVehicle Highlights:\n" + highlights;
-          }
-        }
-
         if (process.env.NODE_ENV !== "production") {
           console.log("Updated form data:", {
             hasMake: !!updatedFormData.make,
@@ -740,13 +720,12 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
       setIsDecodingVinWithoutCorrections(true);
 
       const toastId = `decode-no-correct-${Date.now()}`;
-      toast.loading("Initiating VIN decode...", {
-        duration: 20000,
+      toast.loading("Decoding VIN from NHTSA database...", {
+        duration: 10000, // Shorter duration since we removed slow AI processing
         id: toastId,
       });
 
       try {
-        toast.loading("Fetching vehicle data from NHTSA...", { id: toastId });
         const data: VINResponse = await api.get(`/vin?vin=${formData.vin}`);
 
         if (process.env.NODE_ENV !== "production") {
@@ -762,8 +741,6 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
         if (data.error && handleVinError(data, toastId)) {
           return;
         }
-
-        toast.loading("Processing vehicle information...", { id: toastId });
         if (process.env.NODE_ENV !== "production") {
           console.log("Previous form data:", {
             hasMake: !!formData.make,
@@ -830,19 +807,6 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
           },
           doors: data.doors || formData.doors,
         } as typeof formData;
-
-        if ("aiAnalysis" in data) {
-          toast.loading("Processing AI insights...", { id: toastId });
-          const highlights = Object.entries(data.aiAnalysis || {})
-            .filter(([_, info]) => info.confidence === "confirmed")
-            .map(([_, info]) => info.value)
-            .join("\n");
-
-          if (highlights) {
-            updatedFormData.description =
-              formData.description + "\n\nVehicle Highlights:\n" + highlights;
-          }
-        }
 
         if (process.env.NODE_ENV !== "production") {
           console.log("Updated form data:", {
