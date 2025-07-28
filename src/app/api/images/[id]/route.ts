@@ -150,7 +150,7 @@ export async function GET(request: Request) {
       url: imageUrl,
       filename: image.filename,
       metadata: image.metadata || {},
-      carId: image.carId.toString(),
+      carId: image.carId?.toString() || null,
       createdAt: image.createdAt,
       updatedAt: image.updatedAt,
       category: determineImageCategory(image),

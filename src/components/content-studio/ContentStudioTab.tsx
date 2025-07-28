@@ -248,7 +248,8 @@ export function ContentStudioTab({
         setIsLoadingComposition(false);
       }
     },
-    [api, carId, projectId, toast, updateUrlWithComposition, clearWorkingState]
+    [api, carId, projectId, toast, clearWorkingState]
+    // Removed updateUrlWithComposition - it has empty deps and is stable
   );
 
   // Check URL for composition ID on mount and when search params change
@@ -279,7 +280,7 @@ export function ContentStudioTab({
     loadedComposition,
     isLoadingComposition,
     loadCompositionById,
-    updateUrlWithComposition,
+    // Removed updateUrlWithComposition to prevent infinite loop - it has empty deps and never changes
   ]);
 
   // Save working state when it changes (but not when loading a saved composition)
@@ -293,7 +294,7 @@ export function ContentStudioTab({
     activeTemplate,
     activeTab,
     loadedComposition,
-    saveWorkingState,
+    // Removed saveWorkingState to prevent infinite loop - callback recreates when deps change
   ]);
 
   // Handle copy selection from the LoadModal (replace current content)
@@ -309,7 +310,7 @@ export function ContentStudioTab({
       // Clear URL composition parameter
       updateUrlWithComposition(null);
     },
-    [updateUrlWithComposition]
+    [] // updateUrlWithComposition is stable (empty deps)
   );
 
   // Handle creating new composition with copy
@@ -325,13 +326,15 @@ export function ContentStudioTab({
       setActiveTemplate(null);
       // Clear URL composition parameter
       updateUrlWithComposition(null);
+      // Clear working state directly
+      localStorage.removeItem(workingStateKey);
 
       toast({
         title: "New Composition Started",
         description: "Created a fresh composition with the selected copy.",
       });
     },
-    [updateUrlWithComposition, toast]
+    [workingStateKey, toast] // updateUrlWithComposition is stable (empty deps)
   );
 
   // Handle creating a blank new composition
@@ -346,8 +349,8 @@ export function ContentStudioTab({
     setActiveTemplate(null);
     // Clear URL composition parameter
     updateUrlWithComposition(null);
-    // Clear working state
-    clearWorkingState();
+    // Clear working state - call directly to avoid callback dependency
+    localStorage.removeItem(workingStateKey);
 
     // Switch to email composer tab
     setActiveTab("email-composer");
@@ -356,7 +359,7 @@ export function ContentStudioTab({
       title: "New Composition Started",
       description: "Started a blank composition. Ready to create!",
     });
-  }, [updateUrlWithComposition, clearWorkingState, toast]);
+  }, [workingStateKey, toast]); // Removed clearWorkingState dependency - call localStorage directly
 
   // Handle block changes from the BlockComposer
   const handleBlocksChange = useCallback((newBlocks: ContentBlock[]) => {
@@ -398,7 +401,7 @@ export function ContentStudioTab({
       // Clear working state since we're now editing a saved composition
       clearWorkingState();
     },
-    [updateUrlWithComposition, clearWorkingState]
+    [clearWorkingState] // updateUrlWithComposition is stable (empty deps)
   );
 
   // Clear loaded composition when starting fresh
@@ -417,7 +420,7 @@ export function ContentStudioTab({
 
     // Clear working state
     clearWorkingState();
-  }, [updateUrlWithComposition, clearWorkingState]);
+  }, [clearWorkingState]); // updateUrlWithComposition is stable (empty deps)
 
   // Handle when a composition is saved
   const handleCompositionSaved = useCallback(
@@ -458,7 +461,7 @@ export function ContentStudioTab({
         );
       }
     },
-    [loadedComposition, updateUrlWithComposition]
+    [loadedComposition] // updateUrlWithComposition is stable (empty deps)
   );
 
   // Handle when CompositionsList provides its refetch function
@@ -505,7 +508,7 @@ export function ContentStudioTab({
 
     // Update the previous context
     previousContext.current = currentContext;
-  }, [carId, projectId, updateUrlWithComposition, clearWorkingState]);
+  }, [carId, projectId, clearWorkingState]); // updateUrlWithComposition is stable (empty deps)
 
   return (
     <div className="space-y-6">

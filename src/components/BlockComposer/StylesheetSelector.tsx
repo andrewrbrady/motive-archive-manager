@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -37,7 +37,7 @@ interface StylesheetSelectorProps {
   className?: string;
 }
 
-export function StylesheetSelector({
+const StylesheetSelectorComponent = React.memo(function StylesheetSelector({
   selectedStylesheetId,
   onStylesheetChange,
   className,
@@ -419,4 +419,6 @@ export function StylesheetSelector({
       )}
     </div>
   );
-}
+});
+
+export { StylesheetSelectorComponent as StylesheetSelector };

@@ -161,6 +161,11 @@ export function BaseComposer({
     string | null
   >(null);
 
+  // Memoize setSelectedStylesheetId to prevent unnecessary re-renders
+  const handleStylesheetChange = useCallback((stylesheetId: string | null) => {
+    setSelectedStylesheetId(stylesheetId);
+  }, []);
+
   // CSS Editor state
   const [cssContent, setCSSContent] = useState<string>("");
   const [isSavingCSS, setIsSavingCSS] = useState(false);
@@ -308,7 +313,7 @@ export function BaseComposer({
       // Clear composition name when loadedComposition is null
       setCompositionName("");
     }
-  }, [loadedComposition, supportsFrontmatter, frontmatter, setFrontmatter]);
+  }, [loadedComposition, supportsFrontmatter]);
 
   // Migration effect: ensure all text blocks have an element property
   React.useEffect(() => {
@@ -328,7 +333,7 @@ export function BaseComposer({
       });
       onBlocksChange(migratedBlocks);
     }
-  }, [blocks, onBlocksChange]);
+  }, [blocks]);
 
   // Load CSS content when switching to CSS mode or when stylesheet changes
   React.useEffect(() => {
@@ -422,7 +427,7 @@ export function BaseComposer({
         onBlocksChange(textBlocks);
       }
     }
-  }, [selectedCopies, blocks.length, onBlocksChange]);
+  }, [selectedCopies, blocks.length]);
 
   // Autosave effect - trigger autosave when composition data changes
   React.useEffect(() => {
@@ -442,7 +447,7 @@ export function BaseComposer({
     template,
     compositionName,
     loadedComposition,
-    scheduleAutosave,
+    // Removed scheduleAutosave to prevent infinite loop - callback recreates when deps change
   ]);
 
   // Clean up autosave when component unmounts or composition changes
@@ -840,7 +845,7 @@ export function BaseComposer({
               {/* Stylesheet Selector */}
               <StylesheetSelector
                 selectedStylesheetId={selectedStylesheetId || undefined}
-                onStylesheetChange={setSelectedStylesheetId}
+                onStylesheetChange={handleStylesheetChange}
                 className="w-auto"
               />
 

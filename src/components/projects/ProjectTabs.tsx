@@ -8,7 +8,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Suspense, lazy, useState, useEffect } from "react";
+import React, {
+  Suspense,
+  lazy,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import { Project, ProjectTimeline } from "@/types/project";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { Event } from "@/types/event";
@@ -133,8 +140,8 @@ interface ProjectTabsProps {
   preloadedCopywriterData?: { cars: any[]; events: any[]; captions: any[] }; // Optional pre-fetched copywriter data for SSR optimization
 }
 
-// Define tab configuration
-const tabs = [
+// Define tab configuration OUTSIDE component to prevent re-creation
+const TABS = [
   { value: "overview", label: "Overview" },
   { value: "timeline", label: "Timeline" },
   { value: "events", label: "Events" },
@@ -149,12 +156,16 @@ const tabs = [
   { value: "content-studio", label: "Content Studio" },
   { value: "ai-chat", label: "AI Assistant" },
   { value: "calendar", label: "Calendar" },
-];
+] as const;
 
-// Track which tabs have been loaded
-const loadedTabs = new Set<string>();
+// Loading fallback component OUTSIDE to prevent re-creation
+const TabLoadingFallback = () => (
+  <div className="flex items-center justify-center py-12">
+    <LoadingSpinner size="lg" />
+  </div>
+);
 
-export function ProjectTabs({
+function ProjectTabsComponent({
   project,
   activeTab,
   onTabChange,
@@ -200,22 +211,24 @@ export function ProjectTabs({
 
   // Mark tab as loaded when it becomes active (fallback)
   useEffect(() => {
-    if (activeTab && !hasLoadedTab[activeTab]) {
-      setHasLoadedTab((prev) => ({
-        ...prev,
-        [activeTab]: true,
-      }));
-      loadedTabs.add(activeTab);
+    if (activeTab) {
+      setHasLoadedTab((prev) => {
+        // Only update if the tab is not already loaded to prevent unnecessary re-renders
+        if (!prev[activeTab]) {
+          return {
+            ...prev,
+            [activeTab]: true,
+          };
+        }
+        return prev; // Return same object reference to prevent re-render
+      });
     }
-  }, [activeTab, hasLoadedTab]);
+  }, [activeTab]); // Only depend on activeTab - use functional update to read current state
 
-  const currentTab = tabs.find((tab) => tab.value === activeTab);
-
-  // Loading fallback component
-  const TabLoadingFallback = () => (
-    <div className="flex items-center justify-center py-12">
-      <LoadingSpinner size="lg" />
-    </div>
+  // Memoize currentTab to prevent re-computation
+  const currentTab = useMemo(
+    () => TABS.find((tab) => tab.value === activeTab),
+    [activeTab]
   );
 
   return (
@@ -227,7 +240,7 @@ export function ProjectTabs({
             <SelectValue>{currentTab?.label || "Select Tab"}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {tabs.map((tab) => (
+            {TABS.map((tab) => (
               <SelectItem key={tab.value} value={tab.value}>
                 {tab.label}
               </SelectItem>
@@ -243,7 +256,7 @@ export function ProjectTabs({
         className="hidden lg:block space-y-6"
       >
         <TabsList className="flex flex-wrap w-full bg-transparent border rounded-md h-auto p-1 gap-1">
-          {tabs.map((tab) => (
+          {TABS.map((tab) => (
             <TabsTrigger
               key={tab.value}
               value={tab.value}
@@ -398,3 +411,6 @@ export function ProjectTabs({
     </div>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export const ProjectTabs = React.memo(ProjectTabsComponent);

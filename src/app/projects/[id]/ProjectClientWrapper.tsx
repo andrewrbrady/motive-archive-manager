@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSession, useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { useRouter } from "next/navigation";
 import { Project, ProjectStatus, ProjectTimeline } from "@/types/project";
@@ -205,14 +205,14 @@ export function ProjectClientWrapper({
   }, []);
 
   // Function to handle tab changes with URL updates
-  const handleTabChange = (newTab: string) => {
+  const handleTabChange = useCallback((newTab: string) => {
     setActiveTab(newTab);
 
     // Update URL without page reload
     const url = new URL(window.location.href);
     url.searchParams.set("tab", newTab);
     window.history.pushState({}, "", url.toString());
-  };
+  }, []);
 
   // Fetch member details when project is loaded
   useEffect(() => {
@@ -724,7 +724,7 @@ export function ProjectClientWrapper({
   };
 
   // Update handleProjectUpdate to refresh pre-loaded data
-  const handleProjectUpdate = () => {
+  const handleProjectUpdate = useCallback(() => {
     // Clear pre-loaded data to ensure fresh data on next tab access
     setPreloadedEvents(undefined);
     setPreloadedCars(undefined);
@@ -738,7 +738,7 @@ export function ProjectClientWrapper({
 
     // Refresh the page to get updated data from server
     router.refresh();
-  };
+  }, [router]);
 
   // Enhanced inviteUser with comprehensive error handling
   const inviteUser = async (email: string, role: string) => {
