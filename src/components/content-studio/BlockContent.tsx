@@ -16,6 +16,7 @@ import {
   FileText,
   Sparkles,
   Loader2,
+  Split,
 } from "lucide-react";
 import { stripInlineStyles } from "@/lib/content-formatter";
 import {
@@ -267,6 +268,7 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
     onConvertTextToFrontmatter,
     detectFrontmatterInTextBlock,
   }) {
+    const { toast } = useToast();
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [showLinkDialog, setShowLinkDialog] = useState(false);
     const [linkText, setLinkText] = useState("");
@@ -547,6 +549,73 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
       updateFormattedContent(e.target.value);
     };
 
+    // Split text block at paragraph markers
+    const splitTextBlock = () => {
+      const content = displayContent.trim();
+      if (!content) return;
+
+      // Split by double line breaks (paragraphs) or single line breaks
+      const paragraphs = content
+        .split(/\n\s*\n|\n/)
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
+
+      // Only split if there are multiple paragraphs
+      if (paragraphs.length <= 1) {
+        toast({
+          title: "Cannot Split Block",
+          description:
+            "This text block contains only one paragraph. Add line breaks to create multiple paragraphs before splitting.",
+          variant: "default",
+        });
+        return;
+      }
+
+      // Find the current block index
+      const currentBlockIndex = blocks.findIndex((b) => b.id === block.id);
+      if (currentBlockIndex === -1) return;
+
+      // Create new blocks for each paragraph
+      const newBlocks: TextBlock[] = paragraphs.map((paragraph, index) => ({
+        id: `${block.id}-split-${index}`,
+        type: "text" as const,
+        content: paragraph,
+        order: block.order + index,
+        element: index === 0 ? block.element : "p", // Keep original element for first block, use paragraph for others
+        richFormatting: {
+          enabled: true,
+          formattedContent: paragraph,
+          hasLinks: /\[([^\]]+)\]\(([^)]+)\)/.test(paragraph),
+          hasBold: /\*\*([^*]+)\*\*/.test(paragraph),
+          hasItalic: /\*([^*]+)\*/.test(paragraph),
+        },
+        metadata: {
+          ...block.metadata,
+          splitFrom: block.id,
+          splitIndex: index,
+        },
+      }));
+
+      // Create new blocks array with the split blocks replacing the original
+      const updatedBlocks = [
+        ...blocks.slice(0, currentBlockIndex),
+        ...newBlocks,
+        ...blocks.slice(currentBlockIndex + 1).map((b) => ({
+          ...b,
+          order: b.order + newBlocks.length - 1, // Adjust order for remaining blocks
+        })),
+      ];
+
+      // Update blocks
+      onBlocksChange(updatedBlocks);
+
+      // Show success feedback
+      toast({
+        title: "Text Block Split",
+        description: `Successfully split text block into ${newBlocks.length} separate blocks.`,
+      });
+    };
+
     return (
       <div className="space-y-3">
         {/* Frontmatter Detection and Conversion */}
@@ -656,6 +725,16 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
               title="Insert Link"
             >
               <Link className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={splitTextBlock}
+              className="h-8 w-8 p-0 hover:bg-muted/20"
+              title="Split text block at paragraph breaks"
+            >
+              <Split className="h-4 w-4" />
             </Button>
             <Button
               type="button"

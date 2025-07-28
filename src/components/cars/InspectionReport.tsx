@@ -272,9 +272,11 @@ export default function InspectionReport({
           {inspection.description && (
             <div>
               <h3 className="font-semibold mb-2">Notes</h3>
-              <p className="text-muted-foreground whitespace-pre-wrap">
-                {inspection.description}
-              </p>
+              <div className="max-w-4xl max-h-96 overflow-y-auto bg-muted/30 rounded-lg border p-4">
+                <p className="text-muted-foreground whitespace-pre-wrap">
+                  {inspection.description}
+                </p>
+              </div>
             </div>
           )}
 

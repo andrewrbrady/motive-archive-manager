@@ -576,9 +576,11 @@ export function BaseSpecifications({
       {carData.description && (
         <div className="space-y-3">
           <SectionHeader title="Description" />
-          <p className="text-sm text-[hsl(var(--foreground))] dark:text-white whitespace-pre-wrap bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
-            {carData.description}
-          </p>
+          <div className="max-w-4xl max-h-96 overflow-y-auto">
+            <p className="text-sm text-[hsl(var(--foreground))] dark:text-white whitespace-pre-wrap bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
+              {carData.description}
+            </p>
+          </div>
         </div>
       )}
     </div>

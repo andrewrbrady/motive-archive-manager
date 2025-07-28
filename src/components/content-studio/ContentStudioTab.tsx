@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Mail, Newspaper, Info, Archive } from "lucide-react";
+import { FileText, Mail, Newspaper, Info, Archive, Plus } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -142,11 +142,48 @@ export function ContentStudioTab({
   // Function to load a composition by ID
   const loadCompositionById = useCallback(
     async (compositionId: string) => {
+      // Validate composition ID format before making API call
+      if (!compositionId || compositionId.length !== 24) {
+        console.error("Invalid composition ID format:", compositionId);
+        updateUrlWithComposition(null);
+        return;
+      }
+
       setIsLoadingComposition(true);
       try {
         const composition = await api.get<LoadedComposition>(
           `/content-studio/compositions/${compositionId}`
         );
+
+        // Validate composition context - ensure it belongs to current car/project
+        const compositionCarId = composition.metadata?.carId;
+        const compositionProjectId = composition.metadata?.projectId;
+
+        // Check if composition context matches current context
+        const contextMismatch =
+          (carId && compositionCarId && compositionCarId !== carId) ||
+          (projectId &&
+            compositionProjectId &&
+            compositionProjectId !== projectId);
+
+        if (contextMismatch) {
+          console.warn("Composition context mismatch:", {
+            compositionCarId,
+            compositionProjectId,
+            currentCarId: carId,
+            currentProjectId: projectId,
+          });
+
+          toast({
+            title: "Composition Not Available",
+            description:
+              "This composition belongs to a different context and cannot be loaded here.",
+            variant: "destructive",
+          });
+
+          updateUrlWithComposition(null);
+          return;
+        }
 
         // Set the loaded composition for editing
         setLoadedComposition(composition);
@@ -159,30 +196,59 @@ export function ContentStudioTab({
           setSelectedCopies(composition.metadata.selectedCopies);
         }
 
-        // Switch to the email composer tab by default
-        setActiveTab("email-composer");
+        // Switch to the appropriate composer tab based on composition type
+        const composerType = composition.metadata?.composerType || "email";
+        setActiveTab(
+          composerType === "email" ? "email-composer" : "news-composer"
+        );
 
-        // Update URL with composition ID
+        // Update URL with composition ID (in case it was cleaned up)
         updateUrlWithComposition(compositionId);
 
         // Clear working state since we're now editing a saved composition
         clearWorkingState();
-      } catch (error) {
+
+        console.log("✅ Successfully loaded composition:", {
+          id: compositionId,
+          name: composition.name,
+          blocksCount: composition.blocks?.length || 0,
+        });
+      } catch (error: any) {
         console.error("Error loading composition:", error);
+
+        // Handle specific error types
+        let errorMessage = "Failed to load the composition. Please try again.";
+        let shouldClearUrl = true;
+
+        if (error?.response?.status === 404) {
+          errorMessage =
+            "Composition not found. It may have been deleted or you may not have access to it.";
+        } else if (error?.response?.status === 401) {
+          errorMessage =
+            "You don't have permission to access this composition.";
+        } else if (error?.response?.status === 400) {
+          errorMessage = "Invalid composition ID format.";
+        } else if (error?.code === "NETWORK_ERROR" || !navigator.onLine) {
+          errorMessage =
+            "Network error. Please check your connection and try again.";
+          shouldClearUrl = false; // Don't clear URL for network errors
+        }
+
         toast({
           title: "Error Loading Composition",
-          description:
-            "Failed to load the composition. It may have been deleted.",
+          description: errorMessage,
           variant: "destructive",
         });
 
-        // Clear composition from URL if it failed to load
-        updateUrlWithComposition(null);
+        // Clear composition from URL if it failed to load (except for network errors)
+        if (shouldClearUrl) {
+          updateUrlWithComposition(null);
+        }
       } finally {
         setIsLoadingComposition(false);
       }
     },
-    [toast, updateUrlWithComposition, clearWorkingState]
+    [api, carId, projectId, toast, updateUrlWithComposition, clearWorkingState]
   );
 
   // Check URL for composition ID on mount and when search params change
@@ -197,7 +263,14 @@ export function ContentStudioTab({
       return;
     }
 
-    // Only load if we have a composition ID, no loaded composition, not loading
+    // Validate composition ID format before attempting to load
+    if (compositionId && (!compositionId || compositionId.length !== 24)) {
+      console.error("Invalid composition ID in URL:", compositionId);
+      updateUrlWithComposition(null);
+      return;
+    }
+
+    // Only load if we have a valid composition ID, no loaded composition, not loading
     if (compositionId && !loadedComposition && !isLoadingComposition) {
       loadCompositionById(compositionId);
     }
@@ -206,6 +279,7 @@ export function ContentStudioTab({
     loadedComposition,
     isLoadingComposition,
     loadCompositionById,
+    updateUrlWithComposition,
   ]);
 
   // Save working state when it changes (but not when loading a saved composition)
@@ -259,6 +333,30 @@ export function ContentStudioTab({
     },
     [updateUrlWithComposition, toast]
   );
+
+  // Handle creating a blank new composition
+  const handleCreateNew = useCallback(() => {
+    // Set flag to prevent URL effect from reloading
+    isIntentionallyClearing.current = true;
+
+    // Clear everything to start completely fresh
+    setSelectedCopies([]);
+    setLoadedComposition(null);
+    setBlocks([]);
+    setActiveTemplate(null);
+    // Clear URL composition parameter
+    updateUrlWithComposition(null);
+    // Clear working state
+    clearWorkingState();
+
+    // Switch to email composer tab
+    setActiveTab("email-composer");
+
+    toast({
+      title: "New Composition Started",
+      description: "Started a blank composition. Ready to create!",
+    });
+  }, [updateUrlWithComposition, clearWorkingState, toast]);
 
   // Handle block changes from the BlockComposer
   const handleBlocksChange = useCallback((newBlocks: ContentBlock[]) => {
@@ -436,6 +534,15 @@ export function ContentStudioTab({
 
         {/* Context indicator and actions */}
         <div className="flex items-center space-x-4">
+          <Button
+            onClick={handleCreateNew}
+            variant="default"
+            size="sm"
+            className="bg-primary hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Composition
+          </Button>
           {loadedComposition && (
             <Button
               variant="outline"
@@ -552,6 +659,7 @@ export function ContentStudioTab({
             projectId={projectId}
             onLoadComposition={handleLoadComposition}
             onRefetch={handleCompositionsRefetch}
+            onCreateNew={handleCreateNew}
           />
         </TabsContent>
       </Tabs>

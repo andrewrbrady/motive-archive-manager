@@ -325,7 +325,7 @@ export default function DeliverableModal({
                   <FileText className="h-4 w-4" />
                   Description
                 </h3>
-                <div className="p-3 bg-transparent border border-border/20 rounded-lg">
+                <div className="p-3 bg-transparent border border-border/20 rounded-lg max-w-4xl max-h-96 overflow-y-auto">
                   <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
                     {deliverable.description}
                   </div>

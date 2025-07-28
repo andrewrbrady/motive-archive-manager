@@ -914,9 +914,11 @@ const SpecificationsStandalone: React.FC<SpecificationsStandaloneProps> = ({
                 placeholder="Enter car description..."
               />
             ) : (
-              <p className="text-sm text-[hsl(var(--foreground))] dark:text-white whitespace-pre-wrap">
-                {car.description || "No description available"}
-              </p>
+              <div className="max-w-4xl max-h-96 overflow-y-auto">
+                <p className="text-sm text-[hsl(var(--foreground))] dark:text-white whitespace-pre-wrap">
+                  {car.description || "No description available"}
+                </p>
+              </div>
             )}
           </div>
         </div>

@@ -42,6 +42,7 @@ import {
   useStylesheetData,
   invalidateStylesheetCache,
 } from "@/hooks/useStylesheetData";
+import { useAutosave } from "@/hooks/useAutosave";
 
 import { useAPI } from "@/hooks/useAPI";
 import {
@@ -212,6 +213,59 @@ export function BaseComposer({
     effectiveProjectId
   );
 
+  // Autosave functionality
+  const handleAutosave = useCallback(
+    async (data: any) => {
+      if (!data.blocks || data.blocks.length === 0) return;
+
+      // Only autosave if we have a loaded composition (don't auto-create new ones)
+      if (!loadedComposition || !api) return;
+
+      const compositionData = {
+        name:
+          data.compositionName ||
+          loadedComposition.name ||
+          "Untitled Composition",
+        type: composerType,
+        blocks: data.blocks,
+        template: template?.id || null,
+        metadata: {
+          selectedCopies: data.selectedCopies,
+          selectedStylesheetId,
+          composerType,
+          projectId: effectiveProjectId,
+          carId: effectiveCarId,
+          ...(supportsFrontmatter && { frontmatter }),
+        },
+      };
+
+      await api.put(
+        `/api/content-studio/compositions/${loadedComposition._id}`,
+        compositionData
+      );
+    },
+    [
+      loadedComposition,
+      composerType,
+      template,
+      selectedStylesheetId,
+      effectiveProjectId,
+      effectiveCarId,
+      supportsFrontmatter,
+      frontmatter,
+      api,
+    ]
+  );
+
+  const { scheduleAutosave, clearAutosave } = useAutosave({
+    delay: 5000, // 5 seconds delay
+    enabled: !!loadedComposition, // Only enable autosave for existing compositions
+    onSave: handleAutosave,
+    onError: (error) => {
+      console.error("Autosave failed:", error);
+    },
+  });
+
   // Load stylesheet data for CSS editor
   const { stylesheetData, loading: stylesheetLoading } =
     useStylesheetData(selectedStylesheetId);
@@ -369,6 +423,34 @@ export function BaseComposer({
       }
     }
   }, [selectedCopies, blocks.length, onBlocksChange]);
+
+  // Autosave effect - trigger autosave when composition data changes
+  React.useEffect(() => {
+    // Only schedule autosave if we have a loaded composition
+    if (loadedComposition && blocks.length > 0) {
+      scheduleAutosave({
+        blocks,
+        selectedCopies,
+        activeTemplate: template,
+        compositionName,
+        hasChanges: true,
+      });
+    }
+  }, [
+    blocks,
+    selectedCopies,
+    template,
+    compositionName,
+    loadedComposition,
+    scheduleAutosave,
+  ]);
+
+  // Clean up autosave when component unmounts or composition changes
+  React.useEffect(() => {
+    return () => {
+      clearAutosave();
+    };
+  }, [clearAutosave, loadedComposition?._id]);
 
   // Handle save button click
   const handleSaveClick = useCallback(() => {

@@ -17,6 +17,7 @@ import {
   Copy,
   Download,
   Palette,
+  Plus,
 } from "lucide-react";
 import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { api } from "@/lib/api-client";
@@ -27,6 +28,7 @@ interface CompositionsListProps {
   projectId?: string;
   onLoadComposition: (composition: LoadedComposition) => void;
   onRefetch?: (refetchFn: () => void) => void;
+  onCreateNew?: () => void; // New prop for creating blank compositions
 }
 
 export function CompositionsList({
@@ -34,6 +36,7 @@ export function CompositionsList({
   projectId,
   onLoadComposition,
   onRefetch,
+  onCreateNew,
 }: CompositionsListProps) {
   const { toast } = useToast();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -197,19 +200,30 @@ export function CompositionsList({
                 </Badge>
               )}
             </div>
-            <Button
-              onClick={() => refetch()}
-              variant="ghost"
-              size="sm"
-              disabled={isLoading}
-              className="hover:bg-muted/20"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                "Refresh"
-              )}
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button
+                onClick={onCreateNew}
+                variant="default"
+                size="sm"
+                className="bg-primary hover:bg-primary/90"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                New
+              </Button>
+              <Button
+                onClick={() => refetch()}
+                variant="ghost"
+                size="sm"
+                disabled={isLoading}
+                className="hover:bg-muted/20"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Refresh"
+                )}
+              </Button>
+            </div>
           </CardTitle>
         </CardHeader>
         {!isLoading && compositions.length > 0 && (
