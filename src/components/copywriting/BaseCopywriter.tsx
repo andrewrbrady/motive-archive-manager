@@ -87,6 +87,12 @@ export interface CopywriterCallbacks {
   onDeleteCaption: (captionId: string) => Promise<boolean>;
   onUpdateCaption: (captionId: string, newText: string) => Promise<boolean>;
   onRefresh: () => Promise<void>;
+  onLoadMoreEvents?: (
+    currentLimit: number
+  ) => Promise<{ events: any[]; hasMore: boolean }>;
+  onLoadMoreCaptions?: (
+    currentLimit: number
+  ) => Promise<{ captions: any[]; hasMore: boolean }>;
 }
 
 interface BaseCopywriterProps {
@@ -494,20 +500,38 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
 
   // Load more events handler
   const handleLoadMoreEvents = useCallback(async () => {
-    if (loadingMoreEvents || !memoizedDataWithConditional.hasMoreEvents) return;
+    if (
+      loadingMoreEvents ||
+      !memoizedDataWithConditional.hasMoreEvents ||
+      !callbacks.onLoadMoreEvents
+    )
+      return;
 
     setLoadingMoreEvents(true);
     try {
-      // This would need to be implemented in the callbacks
-      // For now, just log that it was called
-      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Load more events requested");
-      // TODO: Implement actual load more logic in callbacks
+      const currentEventCount = memoizedDataWithConditional.events?.length || 0;
+      const result = await callbacks.onLoadMoreEvents(currentEventCount);
+
+      if (result) {
+        // Trigger a refresh to get updated data with new events
+        await callbacks.onRefresh();
+      }
     } catch (error) {
       console.error("Error loading more events:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load more events",
+        variant: "destructive",
+      });
     } finally {
       setLoadingMoreEvents(false);
     }
-  }, [loadingMoreEvents, memoizedDataWithConditional.hasMoreEvents]);
+  }, [
+    loadingMoreEvents,
+    memoizedDataWithConditional.hasMoreEvents,
+    memoizedDataWithConditional.events?.length,
+    callbacks,
+  ]);
 
   // Gallery selection handlers
   const handleGallerySelection = useCallback(
@@ -1763,21 +1787,39 @@ export function BaseCopywriter({ config, callbacks }: BaseCopywriterProps) {
 
   // Load more captions handler
   const handleLoadMoreCaptions = useCallback(async () => {
-    if (loadingMoreCaptions || !memoizedDataWithConditional.hasMoreCaptions)
+    if (
+      loadingMoreCaptions ||
+      !memoizedDataWithConditional.hasMoreCaptions ||
+      !callbacks.onLoadMoreCaptions
+    )
       return;
 
     setLoadingMoreCaptions(true);
     try {
-      // This would need to be implemented in the callbacks
-      // For now, just log that it was called
-      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Load more captions requested");
-      // TODO: Implement actual load more logic in callbacks
+      const currentCaptionCount =
+        memoizedDataWithConditional.savedCaptions?.length || 0;
+      const result = await callbacks.onLoadMoreCaptions(currentCaptionCount);
+
+      if (result) {
+        // Trigger a refresh to get updated data with new captions
+        await callbacks.onRefresh();
+      }
     } catch (error) {
       console.error("Error loading more captions:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load more captions",
+        variant: "destructive",
+      });
     } finally {
       setLoadingMoreCaptions(false);
     }
-  }, [loadingMoreCaptions, memoizedDataWithConditional.hasMoreCaptions]);
+  }, [
+    loadingMoreCaptions,
+    memoizedDataWithConditional.hasMoreCaptions,
+    memoizedDataWithConditional.savedCaptions?.length,
+    callbacks,
+  ]);
 
   // Handle error state without blocking UI
   if (hasError) {

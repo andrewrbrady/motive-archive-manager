@@ -2,8 +2,16 @@
 
 import React, { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, Plus } from "lucide-react";
+import { Download, FileText, Plus, Image as ImageIcon } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useGalleries } from "@/hooks/use-galleries";
 
 import {
   BaseComposer,
@@ -48,6 +56,13 @@ interface NewsComposerProps
 export function NewsComposer(props: NewsComposerProps) {
   const { toast } = useToast();
 
+  // Gallery selection state
+  const [selectedGalleryId, setSelectedGalleryId] = useState<string>("none");
+
+  // Fetch available galleries
+  const { data: galleriesData } = useGalleries({ limit: 100 });
+  const galleries = galleriesData?.galleries || [];
+
   // Export functionality
   const { exportToMDX } = useContentExport();
 
@@ -74,12 +89,50 @@ export function NewsComposer(props: NewsComposerProps) {
   // News export buttons
   const renderExportButtons = useCallback(
     (exportProps: ExportButtonsProps) => {
+      const handleExportMDX = () => {
+        const galleryIds =
+          selectedGalleryId && selectedGalleryId !== "none"
+            ? [selectedGalleryId]
+            : [];
+        exportToMDX(
+          exportProps.blocks,
+          exportProps.compositionName,
+          galleryIds
+        );
+      };
+
       return (
-        <>
+        <div className="flex items-center gap-2">
+          {/* Gallery Selection Dropdown */}
+          <Select
+            value={selectedGalleryId}
+            onValueChange={setSelectedGalleryId}
+          >
+            <SelectTrigger className="w-[200px] bg-background border-border/40">
+              <ImageIcon className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Select gallery..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No Gallery</SelectItem>
+              {galleries.map((gallery) => (
+                <SelectItem key={gallery._id} value={gallery._id}>
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    <div>
+                      <div className="font-medium">{gallery.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {gallery.imageIds.length} images
+                      </div>
+                    </div>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Export MDX Button */}
           <Button
-            onClick={() =>
-              exportToMDX(exportProps.blocks, exportProps.compositionName)
-            }
+            onClick={handleExportMDX}
             variant="outline"
             size="sm"
             className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
@@ -87,10 +140,10 @@ export function NewsComposer(props: NewsComposerProps) {
             <Download className="h-4 w-4 mr-2" />
             Export MDX
           </Button>
-        </>
+        </div>
       );
     },
-    [exportToMDX]
+    [exportToMDX, selectedGalleryId, galleries]
   );
 
   // News-specific controls

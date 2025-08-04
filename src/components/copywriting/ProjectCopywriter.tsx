@@ -3,6 +3,7 @@
 import React from "react";
 import { toast } from "@/components/ui/use-toast";
 import { useAPIQuery } from "@/hooks/useAPIQuery";
+import { useAPI } from "@/hooks/useAPI";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,11 @@ export function ProjectCopywriter({
   onProjectUpdate,
 }: ProjectCopywriterProps) {
   const { user } = useFirebaseAuth();
+  const api = useAPI();
+
+  // State for tracking pagination
+  const [eventsLimit, setEventsLimit] = React.useState(6);
+  const [captionsLimit, setCaptionsLimit] = React.useState(4);
 
   if (!project._id) {
     return (
@@ -59,24 +65,31 @@ export function ProjectCopywriter({
     data: eventsData,
     isLoading: isLoadingEvents,
     error: eventsError,
-  } = useAPIQuery<any[]>(`projects/${project._id}/events?includeCars=true`, {
-    staleTime: 3 * 60 * 1000, // 3 minutes cache for project data
-    retry: 2,
-    retryDelay: 1000,
-    refetchOnWindowFocus: false,
-  });
+    refetch: refetchEvents,
+  } = useAPIQuery<any[]>(
+    `projects/${project._id}/events?includeCars=true&limit=${eventsLimit}`,
+    {
+      staleTime: 3 * 60 * 1000, // 3 minutes cache for project data
+      retry: 2,
+      retryDelay: 1000,
+      refetchOnWindowFocus: false,
+    }
+  );
 
   const {
     data: captionsData,
     isLoading: isLoadingCaptions,
     error: captionsError,
     refetch: refetchCaptions,
-  } = useAPIQuery<any[]>(`projects/${project._id}/captions`, {
-    staleTime: 1 * 60 * 1000, // 1 minute cache for user data
-    retry: 2,
-    retryDelay: 1000,
-    refetchOnWindowFocus: false,
-  });
+  } = useAPIQuery<any[]>(
+    `projects/${project._id}/captions?limit=${captionsLimit}&sort=-createdAt`,
+    {
+      staleTime: 1 * 60 * 1000, // 1 minute cache for user data
+      retry: 2,
+      retryDelay: 1000,
+      refetchOnWindowFocus: false,
+    }
+  );
 
   // Determine overall loading state - only entity-specific data
   const isLoading = isLoadingCars || isLoadingEvents;
@@ -210,8 +223,8 @@ export function ProjectCopywriter({
           lengthSettings: [], // Now handled by shared cache in BaseCopywriter
           savedCaptions,
           clientHandle: null, // Projects don't typically have client handles
-          hasMoreEvents: false, // Legacy ProjectCopywriter doesn't handle pagination
-          hasMoreCaptions: false, // Legacy ProjectCopywriter doesn't handle pagination
+          hasMoreEvents: (eventsData?.length ?? 0) >= eventsLimit, // Has more if we got a full batch
+          hasMoreCaptions: (captionsData?.length ?? 0) >= captionsLimit, // Has more if we got a full batch
           hasMoreGalleries: false, // Legacy ProjectCopywriter doesn't handle galleries
         };
       } catch (error) {
@@ -352,6 +365,57 @@ export function ProjectCopywriter({
     onRefresh: async (): Promise<void> => {
       // Refresh captions data with optimized cache invalidation
       await refetchCaptions();
+      await refetchEvents();
+    },
+
+    onLoadMoreEvents: async (currentLimit: number) => {
+      try {
+        if (!api) {
+          throw new Error("API not available");
+        }
+
+        const newLimit = currentLimit + 6; // Load 6 more events
+        setEventsLimit(newLimit);
+
+        // The useAPIQuery will automatically refetch with the new limit
+        await refetchEvents();
+
+        // Check if we have more events to load
+        const hasMore = (eventsData?.length ?? 0) >= newLimit;
+
+        return {
+          events: eventsData || [],
+          hasMore,
+        };
+      } catch (error) {
+        console.error("Error loading more events:", error);
+        throw error;
+      }
+    },
+
+    onLoadMoreCaptions: async (currentLimit: number) => {
+      try {
+        if (!api) {
+          throw new Error("API not available");
+        }
+
+        const newLimit = currentLimit + 4; // Load 4 more captions
+        setCaptionsLimit(newLimit);
+
+        // The useAPIQuery will automatically refetch with the new limit
+        await refetchCaptions();
+
+        // Check if we have more captions to load
+        const hasMore = (captionsData?.length ?? 0) >= newLimit;
+
+        return {
+          captions: captionsData || [],
+          hasMore,
+        };
+      } catch (error) {
+        console.error("Error loading more captions:", error);
+        throw error;
+      }
     },
   };
 

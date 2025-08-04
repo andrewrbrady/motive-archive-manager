@@ -4,6 +4,24 @@ import {
 } from "@/components/content-studio/types";
 import { api } from "@/lib/api-client";
 
+// Utility to get base URL without any variant for frontmatter
+function getBaseImageUrl(url: string): string {
+  if (!url || !url.includes("imagedelivery.net")) {
+    return url;
+  }
+
+  // Remove any existing variant to get base URL
+  const urlParts = url.split("/");
+  const lastPart = urlParts[urlParts.length - 1];
+
+  // If the last part is a variant, remove it
+  if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+    urlParts.pop();
+  }
+
+  return urlParts.join("/");
+}
+
 export interface ExportMetadata {
   name: string;
   exportedAt: string;
@@ -178,11 +196,56 @@ export class ContentExporter {
   }
 
   /**
+   * Get the current URL for an image, checking gallery data for updates
+   */
+  private static async getCurrentImageUrl(
+    imageBlock: any,
+    galleryIds?: string[]
+  ): Promise<string> {
+    const originalUrl = imageBlock.imageUrl;
+
+    // If no galleries are selected or no metadata, return original URL
+    const imageId = imageBlock.metadata?.id || imageBlock.metadata?.imageId;
+    if (!galleryIds || galleryIds.length === 0 || !imageId) {
+      return originalUrl;
+    }
+
+    try {
+      // Check all selected galleries for this image
+      for (const galleryId of galleryIds) {
+        const response = (await api.get(`/api/galleries/${galleryId}`)) as any;
+        const gallery = response.gallery;
+
+        if (gallery && gallery.images) {
+          // Find the image in this gallery by ID
+          const currentImage = gallery.images.find(
+            (img: any) => img._id === imageId
+          );
+
+          if (currentImage && currentImage.url !== originalUrl) {
+            console.log(`📸 Using updated URL for image ${imageId}:`, {
+              original: originalUrl,
+              current: currentImage.url,
+            });
+            return currentImage.url;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("Failed to fetch current image URL from galleries:", error);
+    }
+
+    // Fallback to original URL
+    return originalUrl;
+  }
+
+  /**
    * Export content to MDX format
    */
   static async exportToMDX(
     blocks: ContentBlock[],
-    compositionName: string
+    compositionName: string,
+    galleryIds?: string[]
   ): Promise<string> {
     const frontmatterBlocks = blocks.filter(
       (block) => block.type === "frontmatter"
@@ -193,8 +256,13 @@ export class ContentExporter {
 
     // Generate frontmatter
     let frontmatter = "";
-    if (frontmatterBlocks.length > 0) {
+    let hasFrontmatterContent =
+      frontmatterBlocks.length > 0 || (galleryIds && galleryIds.length > 0);
+
+    if (hasFrontmatterContent) {
       frontmatter = "---\n";
+
+      // Add existing frontmatter blocks
       frontmatterBlocks.forEach((block) => {
         // Use the data property from FrontmatterBlock
         if (block.data) {
@@ -203,43 +271,119 @@ export class ContentExporter {
           });
         }
       });
+
+      // Add gallery data if galleries are selected
+      if (galleryIds && galleryIds.length > 0) {
+        try {
+          // Fetch gallery data for each selected gallery
+          const galleryPromises = galleryIds.map(async (galleryId) => {
+            const gallery = (await api.get(
+              `/api/galleries/${galleryId}`
+            )) as any;
+            return gallery;
+          });
+
+          const galleries = await Promise.all(galleryPromises);
+
+          // Combine all images from all selected galleries into one flat array
+          const allImages: any[] = [];
+          let imageCounter = 1;
+
+          for (const gallery of galleries) {
+            if (gallery && gallery.images) {
+              // Get ordered images array, falling back to default order if not available
+              const orderedImageIds = gallery.orderedImages?.length
+                ? gallery.orderedImages
+                    .sort((a: any, b: any) => a.order - b.order)
+                    .map((item: any) => item.id)
+                : gallery.imageIds;
+
+              // Create a map of images by their ID for quick lookup
+              const imageMap = new Map(
+                gallery.images?.map((image: any) => [image._id, image]) || []
+              );
+
+              // Map the ordered IDs to their corresponding images
+              orderedImageIds.forEach((id: string) => {
+                const image = imageMap.get(id) as any;
+                if (image) {
+                  allImages.push({
+                    id: `img${imageCounter}`,
+                    src: getBaseImageUrl(image.url), // Use base URL without variant
+                    alt:
+                      image.alt ||
+                      image.filename ||
+                      `Gallery Image ${imageCounter}`,
+                  });
+                  imageCounter++;
+                }
+              });
+            }
+          }
+
+          // Add gallery to frontmatter in the requested format
+          if (allImages.length > 0) {
+            frontmatter += "gallery:\n";
+            allImages.forEach((image) => {
+              frontmatter += `  - id: "${image.id}"\n`;
+              frontmatter += `    src: "${image.src}"\n`;
+              frontmatter += `    alt: "${image.alt}"\n`;
+            });
+          }
+        } catch (error) {
+          console.error("Failed to fetch gallery data for MDX export:", error);
+          // Continue without gallery data if fetch fails
+        }
+      }
+
       frontmatter += "---\n\n";
     }
 
-    // Generate content
-    const content = contentBlocks
-      .sort((a, b) => a.order - b.order)
-      .map((block) => {
-        switch (block.type) {
-          case "html":
-            const htmlBlock = block as any;
-            // For MDX, we can include HTML directly since MDX supports HTML
-            return htmlBlock.content || "";
-          case "text":
-            const textBlock = block as any;
-            const element = textBlock.element || "p";
-            if (element === "h1") return `# ${textBlock.content}`;
-            if (element === "h2") return `## ${textBlock.content}`;
-            if (element === "h3") return `### ${textBlock.content}`;
-            return textBlock.content;
-          case "list":
-            const listBlock = block as any;
-            const items = listBlock.items || [];
-            if (items.length === 0) return "";
-            return items.map((item: string) => `- ${item}`).join("\n");
-          case "image":
-            const imageBlock = block as any;
-            return `![${imageBlock.altText || ""}](${imageBlock.imageUrl})`;
-          case "divider":
-            return "---";
-          case "video":
-            const videoBlock = block as any;
-            return `[${videoBlock.title || "Video"}](${videoBlock.videoUrl})`;
-          default:
-            return "";
-        }
-      })
-      .join("\n\n");
+    // Generate content - handle async image URL processing
+    const sortedBlocks = contentBlocks.sort((a, b) => a.order - b.order);
+    const contentPromises = sortedBlocks.map(async (block) => {
+      switch (block.type) {
+        case "html":
+          const htmlBlock = block as any;
+          // For MDX, we can include HTML directly since MDX supports HTML
+          return htmlBlock.content || "";
+        case "text":
+          const textBlock = block as any;
+          const element = textBlock.element || "p";
+          if (element === "h1") return `# ${textBlock.content}`;
+          if (element === "h2") return `## ${textBlock.content}`;
+          if (element === "h3") return `### ${textBlock.content}`;
+          return textBlock.content;
+        case "list":
+          const listBlock = block as any;
+          const items = listBlock.items || [];
+          if (items.length === 0) return "";
+          return items.map((item: string) => `- ${item}`).join("\n");
+        case "image":
+          const imageBlock = block as any;
+          // Get the current URL (checking galleries for updates)
+          const currentImageUrl = await this.getCurrentImageUrl(
+            imageBlock,
+            galleryIds
+          );
+          let imageMarkdown = `![${imageBlock.altText || ""}](${currentImageUrl})`;
+          // Include caption if it exists
+          if (imageBlock.caption) {
+            imageMarkdown += `\n\n*${imageBlock.caption}*`;
+          }
+          return imageMarkdown;
+        case "divider":
+          return "---";
+        case "video":
+          const videoBlock = block as any;
+          return `[${videoBlock.title || "Video"}](${videoBlock.videoUrl})`;
+        default:
+          return "";
+      }
+    });
+
+    const contentArray = await Promise.all(contentPromises);
+    const content = contentArray.join("\n\n");
 
     const mdxContent = frontmatter + content;
 

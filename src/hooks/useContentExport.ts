@@ -150,9 +150,13 @@ export function useContentExport() {
   );
 
   const exportToMDX = useCallback(
-    async (blocks: ContentBlock[], compositionName: string) => {
+    async (
+      blocks: ContentBlock[],
+      compositionName: string,
+      galleryIds?: string[]
+    ) => {
       try {
-        await ContentExporter.exportToMDX(blocks, compositionName);
+        await ContentExporter.exportToMDX(blocks, compositionName, galleryIds);
         toast({
           title: "MDX Export Complete",
           description: "MDX file downloaded successfully.",

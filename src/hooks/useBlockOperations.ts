@@ -9,6 +9,27 @@ import {
   HTMLBlock,
 } from "@/components/content-studio/types";
 
+// Utility to ensure image URLs use the "public" variant for BlockComposer
+function ensurePublicVariant(url: string): string {
+  if (!url || !url.includes("imagedelivery.net")) {
+    return url;
+  }
+
+  // Remove any existing variant and add "public"
+  const urlParts = url.split("/");
+  const lastPart = urlParts[urlParts.length - 1];
+
+  // If the last part is a variant, replace it with "public"
+  if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+    urlParts[urlParts.length - 1] = "public";
+  } else {
+    // No variant specified, append "public"
+    urlParts.push("public");
+  }
+
+  return urlParts.join("/");
+}
+
 /**
  * Custom hook for handling block operations in BlockComposer
  * Extracted from BlockComposer.tsx to reduce file size and improve maintainability
@@ -73,11 +94,14 @@ export function useBlockOperations(
       ) => {
         const { position, description } = getInsertPosition();
 
+        // Ensure BlockComposer images always use "public" variant
+        const publicVariantUrl = ensurePublicVariant(imageUrl);
+
         const newBlock: ImageBlock = {
           id: `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           type: "image",
           order: position,
-          imageUrl,
+          imageUrl: publicVariantUrl,
           altText: altText || "",
           width: "100%",
           alignment: "center",

@@ -19,7 +19,15 @@ import {
 import { Event, EventType } from "@/types/event";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Pencil, Save, Trash2, X, CheckSquare, Square } from "lucide-react";
+import {
+  Pencil,
+  Save,
+  Trash2,
+  X,
+  CheckSquare,
+  Square,
+  Unlink,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -54,6 +62,7 @@ export interface ListViewProps {
   events: Event[];
   onUpdateEvent: (eventId: string, updates: Partial<Event>) => Promise<void>;
   onDeleteEvent: (eventId: string) => Promise<void>;
+  onDetachEvent?: (eventId: string) => Promise<void>;
   onEventUpdated: () => void;
   isEditMode?: boolean;
 }
@@ -84,6 +93,7 @@ export default function ListView({
   events,
   onUpdateEvent,
   onDeleteEvent,
+  onDetachEvent,
   onEventUpdated,
   isEditMode: parentEditMode,
 }: ListViewProps) {
@@ -115,6 +125,7 @@ export default function ListView({
       events={events}
       onUpdateEvent={onUpdateEvent}
       onDeleteEvent={onDeleteEvent}
+      onDetachEvent={onDetachEvent}
       onEventUpdated={onEventUpdated}
       isEditMode={parentEditMode}
     />
@@ -126,6 +137,7 @@ function ListViewContent({
   events,
   onUpdateEvent,
   onDeleteEvent,
+  onDetachEvent,
   onEventUpdated,
   isEditMode: parentEditMode,
 }: ListViewProps) {
@@ -295,6 +307,19 @@ function ListViewContent({
       }
     } catch (error) {
       toast.error("Failed to delete event");
+    }
+  };
+
+  const handleDetach = async (eventId: string) => {
+    try {
+      if (window.confirm("Are you sure you want to detach this event?")) {
+        if (onDetachEvent) {
+          await onDetachEvent(eventId);
+          toast.success("Event detached successfully");
+        }
+      }
+    } catch (error) {
+      toast.error("Failed to detach event");
     }
   };
 
@@ -742,14 +767,30 @@ function ListViewContent({
                     <Pencil className="h-4 w-4" />
                   </Button>
                   {isEditMode && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(event.id)}
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-muted"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <>
+                      {/* Show detach button for attached events, delete for owned events */}
+                      {(event as any).isAttached && onDetachEvent ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDetach(event.id)}
+                          className="h-8 w-8 text-muted-foreground hover:text-orange-500 hover:bg-muted"
+                          title="Detach event from project"
+                        >
+                          <Unlink className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(event.id)}
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-muted"
+                          title="Delete event permanently"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               </TableCell>

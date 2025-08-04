@@ -450,6 +450,7 @@ export default function ProjectEventsTab({
             events={events}
             onUpdateEvent={handleUpdateEvent}
             onDeleteEvent={handleDeleteEvent}
+            onDetachEvent={handleDetachEvent}
             onEventUpdated={fetchEvents}
             isEditMode={isEditMode}
           />
