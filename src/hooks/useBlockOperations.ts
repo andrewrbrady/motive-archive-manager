@@ -6,6 +6,7 @@ import {
   ImageBlock,
   VideoBlock,
   DividerBlock,
+  ButtonBlock,
   HTMLBlock,
 } from "@/components/content-studio/types";
 
@@ -327,6 +328,24 @@ export function useBlockOperations(
     insertBlock(newBlock, "HTML Block Added");
   }, [insertBlock]);
 
+  // Add new button block
+  const addButtonBlock = useCallback(() => {
+    const newBlock: ButtonBlock = {
+      id: `button-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type: "button",
+      order: 0, // Will be set by insertBlock
+      text: "Click Here",
+      url: "#",
+      backgroundColor: "#007cba",
+      textColor: "#ffffff",
+      borderRadius: "4px",
+      padding: "12px 24px",
+      styles: {},
+      metadata: { source: "manual", createdAt: new Date().toISOString() },
+    };
+    insertBlock(newBlock, "Button Block Added");
+  }, [insertBlock]);
+
   return {
     addImageFromGallery,
     removeBlock,
@@ -338,6 +357,7 @@ export function useBlockOperations(
     addVideoBlock,
     addListBlock, // Exported
     addHtmlBlock, // Exported
+    addButtonBlock, // Exported
     getInsertPosition,
     insertBlock,
   };

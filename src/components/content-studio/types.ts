@@ -143,7 +143,7 @@ export interface FrontmatterBlock extends BaseContentBlock {
 export interface ListBlock extends BaseContentBlock {
   type: "list";
   items: string[];
-  style: "ul"; // Only unordered for now
+  style: "ul" | "ol"; // Support both unordered and ordered lists
 }
 
 export interface HTMLBlock extends BaseContentBlock {

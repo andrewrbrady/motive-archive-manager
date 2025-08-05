@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { ContentBlock, ImageBlock, TextBlock, HTMLBlock } from "./types";
+import {
+  ContentBlock,
+  ImageBlock,
+  TextBlock,
+  HTMLBlock,
+  ButtonBlock,
+} from "./types";
 import { EmailContainerConfig } from "./EmailContainerConfig";
 import { classToEmailInlineStyles } from "@/lib/css-parser";
 import {
@@ -573,6 +579,18 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
           color: containerConfig.textColor,
         };
 
+        // Include text alignment from block formatting
+        const blockFormatting = textBlock.formatting || {};
+        const formattingStyles = {
+          textAlign: blockFormatting.textAlign || "left",
+          fontSize: blockFormatting.fontSize,
+          fontWeight: blockFormatting.fontWeight,
+          color: blockFormatting.color,
+          lineHeight: blockFormatting.lineHeight,
+          marginTop: blockFormatting.marginTop,
+          marginBottom: blockFormatting.marginBottom,
+        };
+
         const stylesheetElementStyles = getElementStylesFromStylesheet(
           element,
           stylesheetData,
@@ -582,9 +600,16 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
         return {
           ...baseStyles,
           ...stylesheetElementStyles, // Stylesheet styles override defaults
+          ...formattingStyles, // Block formatting styles
           ...customStyles, // User-defined styles always take precedence
         };
-      }, [element, stylesheetData, containerConfig.textColor, customStyles]);
+      }, [
+        element,
+        stylesheetData,
+        containerConfig.textColor,
+        customStyles,
+        textBlock.formatting,
+      ]);
 
       console.log(
         `📧 AccurateEmailPreview - ${element.toUpperCase()} with stylesheet styles:`,
@@ -735,9 +760,9 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
     }
 
     case "button": {
-      const buttonBlock = block as any;
-      const buttonText = buttonBlock.text || buttonBlock.buttonText || "Button";
-      const buttonUrl = buttonBlock.url || buttonBlock.buttonUrl || "#";
+      const buttonBlock = block as ButtonBlock;
+      const buttonText = buttonBlock.text || "Button";
+      const buttonUrl = buttonBlock.url || "#";
 
       return (
         <div className="text-center">
@@ -746,13 +771,15 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              backgroundColor: containerConfig.linkColor,
-              color: "#ffffff",
-              padding: "12px 24px",
-              borderRadius: "4px",
+              backgroundColor:
+                buttonBlock.backgroundColor || containerConfig.linkColor,
+              color: buttonBlock.textColor || "#ffffff",
+              padding: buttonBlock.padding || "12px 24px",
+              borderRadius: buttonBlock.borderRadius || "4px",
               textDecoration: "none",
               display: "inline-block",
-              fontWeight: "bold",
+              fontWeight: "500",
+              fontSize: "14px",
               ...customStyles,
             }}
             className={buttonBlock.cssClassName || ""}

@@ -277,10 +277,42 @@ export function processStylesheetForEmail(cssContent: string): string {
   // Remove .content-studio-preview scoping
   let processedCSS = cssContent.replace(/\.content-studio-preview\s+/g, "");
 
+  // CRITICAL: Remove HTML comments that can break style tags
+  processedCSS = processedCSS.replace(/<!--[\s\S]*?-->/g, "");
+
+  // CRITICAL: Remove nested <style> and </style> tags that break CSS
+  processedCSS = processedCSS.replace(/<\/?style[^>]*>/gi, "");
+
+  // Remove MSO conditional comments and VML content
+  processedCSS = processedCSS.replace(/\[if\s+mso\][\s\S]*?\[endif\]/gi, "");
+
+  // Remove duplicate base/reset styles that conflict with template
+  processedCSS = processedCSS.replace(
+    /\/\*\s*Reset and base styles\s*\*\/[\s\S]*?(?=\/\*|$)/gi,
+    ""
+  );
+
+  // Remove duplicate dark mode styles (template provides these)
+  processedCSS = processedCSS.replace(
+    /\/\*\s*Dark mode styles\s*\*\/[\s\S]*?@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)\s*\{[\s\S]*?\}/gi,
+    ""
+  );
+
+  // Remove duplicate responsive media queries that match template structure
+  processedCSS = processedCSS.replace(
+    /@media\s+screen\s+and\s+\(\s*max-width\s*:\s*600px\s*\)\s*\{[\s\S]*?\.mobile-stack[\s\S]*?\}/gi,
+    ""
+  );
+
   // Remove only specific properties that don't work in email (safer approach)
   processedCSS = processedCSS.replace(/^\s*transform\s*:[^;]+;/gm, "");
   processedCSS = processedCSS.replace(/^\s*animation\s*:[^;]+;/gm, "");
   processedCSS = processedCSS.replace(/^\s*transition\s*:[^;]+;/gm, "");
+
+  // Clean up excessive whitespace left by removals
+  processedCSS = processedCSS.replace(/\n\s*\n\s*\n/g, "\n\n");
+  processedCSS = processedCSS.replace(/^\s*\n/gm, "");
+  processedCSS = processedCSS.trim();
 
   return processedCSS;
 }

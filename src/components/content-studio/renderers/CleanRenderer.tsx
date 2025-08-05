@@ -6,6 +6,7 @@ import {
   ImageBlock,
   VideoBlock,
   DividerBlock,
+  ButtonBlock,
   HTMLBlock,
 } from "../types";
 import {
@@ -503,6 +504,41 @@ const CleanPreviewBlock = React.memo<CleanPreviewBlockProps>(
         };
 
         return <hr className="border-0" style={dividerStyle} />;
+      }
+
+      case "button": {
+        const buttonBlock = block as ButtonBlock;
+        const buttonText = buttonBlock.text || "Button";
+        const buttonUrl = buttonBlock.url || "#";
+
+        // Only user-specified styles go inline - let CSS control typography
+        const buttonStyle: any = {};
+        if (buttonBlock.backgroundColor)
+          buttonStyle.backgroundColor = buttonBlock.backgroundColor;
+        if (buttonBlock.textColor) buttonStyle.color = buttonBlock.textColor;
+        if (buttonBlock.padding) buttonStyle.padding = buttonBlock.padding;
+        if (buttonBlock.borderRadius)
+          buttonStyle.borderRadius = buttonBlock.borderRadius;
+
+        // Merge with custom styles from stylesheet
+        Object.assign(buttonStyle, customStyles);
+
+        return (
+          <div className="text-center">
+            <button
+              className={`email-button ${buttonBlock.cssClassName || ""}`}
+              style={buttonStyle}
+              disabled={true} // Disabled in preview
+            >
+              {buttonText}
+            </button>
+            {buttonUrl && buttonUrl !== "#" && (
+              <div className="text-xs text-muted-foreground mt-2 font-mono">
+                → {buttonUrl}
+              </div>
+            )}
+          </div>
+        );
       }
 
       default:

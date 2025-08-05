@@ -17,6 +17,9 @@ import {
   Sparkles,
   Loader2,
   Split,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from "lucide-react";
 import { stripInlineStyles } from "@/lib/content-formatter";
 import {
@@ -26,6 +29,7 @@ import {
   ImageBlock,
   VideoBlock,
   DividerBlock,
+  ButtonBlock,
   FrontmatterBlock,
   ListBlock, // Import ListBlock
   HTMLBlock, // Import HTMLBlock
@@ -190,6 +194,10 @@ const BlockContent = React.memo<BlockContentProps>(function BlockContent({
           block={block as DividerBlock}
           onUpdate={onUpdate}
         />
+      );
+    case "button":
+      return (
+        <ButtonBlockContent block={block as ButtonBlock} onUpdate={onUpdate} />
       );
     case "frontmatter":
       return (
@@ -616,6 +624,18 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
       });
     };
 
+    // Handle text alignment change
+    const handleTextAlignmentChange = (
+      alignment: "left" | "center" | "right"
+    ) => {
+      onUpdate({
+        formatting: {
+          ...block.formatting,
+          textAlign: alignment,
+        },
+      } as Partial<TextBlock>);
+    };
+
     return (
       <div className="space-y-3">
         {/* Frontmatter Detection and Conversion */}
@@ -744,6 +764,51 @@ const TextBlockContent = React.memo<TextBlockContentProps>(
               title="Use **bold**, *italic*, or [link text](url) syntax"
             >
               <Info className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Text Alignment Controls */}
+        <div className="flex items-center space-x-2">
+          <Label className="text-sm font-medium text-muted-foreground">
+            Alignment:
+          </Label>
+          <div className="flex space-x-1">
+            <Button
+              type="button"
+              variant={
+                block.formatting?.textAlign === "left" ? "default" : "outline"
+              }
+              size="sm"
+              onClick={() => handleTextAlignmentChange("left")}
+              className="h-8 w-8 p-0"
+              title="Align Left"
+            >
+              <AlignLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant={
+                block.formatting?.textAlign === "center" ? "default" : "outline"
+              }
+              size="sm"
+              onClick={() => handleTextAlignmentChange("center")}
+              className="h-8 w-8 p-0"
+              title="Align Center"
+            >
+              <AlignCenter className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant={
+                block.formatting?.textAlign === "right" ? "default" : "outline"
+              }
+              size="sm"
+              onClick={() => handleTextAlignmentChange("right")}
+              className="h-8 w-8 p-0"
+              title="Align Right"
+            >
+              <AlignRight className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -2349,6 +2414,167 @@ const HTMLBlockContent = React.memo<HTMLBlockContentProps>(
             </div>
           </div>
         )}
+      </div>
+    );
+  }
+);
+
+// ButtonBlockContent - Button block editing interface
+interface ButtonBlockContentProps {
+  block: ButtonBlock;
+  onUpdate: (updates: Partial<ContentBlock>) => void;
+}
+
+const ButtonBlockContent = React.memo<ButtonBlockContentProps>(
+  function ButtonBlockContent({ block, onUpdate }) {
+    return (
+      <div className="space-y-4">
+        {/* Button Text */}
+        <div>
+          <Label
+            htmlFor={`button-text-${block.id}`}
+            className="text-xs font-medium text-muted-foreground"
+          >
+            Button Text
+          </Label>
+          <Input
+            id={`button-text-${block.id}`}
+            value={block.text || ""}
+            onChange={(e) =>
+              onUpdate({ text: e.target.value } as Partial<ButtonBlock>)
+            }
+            placeholder="Click Here"
+            className="mt-1"
+          />
+        </div>
+
+        {/* Button URL */}
+        <div>
+          <Label
+            htmlFor={`button-url-${block.id}`}
+            className="text-xs font-medium text-muted-foreground"
+          >
+            Button URL
+          </Label>
+          <Input
+            id={`button-url-${block.id}`}
+            type="url"
+            value={block.url || ""}
+            onChange={(e) =>
+              onUpdate({ url: e.target.value } as Partial<ButtonBlock>)
+            }
+            placeholder="https://example.com"
+            className="mt-1"
+          />
+        </div>
+
+        {/* Styling Options */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Background Color */}
+          <div>
+            <Label
+              htmlFor={`button-bg-${block.id}`}
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Background Color
+            </Label>
+            <Input
+              id={`button-bg-${block.id}`}
+              type="color"
+              value={block.backgroundColor || "#007cba"}
+              onChange={(e) =>
+                onUpdate({
+                  backgroundColor: e.target.value,
+                } as Partial<ButtonBlock>)
+              }
+              className="mt-1 h-10"
+            />
+          </div>
+
+          {/* Text Color */}
+          <div>
+            <Label
+              htmlFor={`button-color-${block.id}`}
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Text Color
+            </Label>
+            <Input
+              id={`button-color-${block.id}`}
+              type="color"
+              value={block.textColor || "#ffffff"}
+              onChange={(e) =>
+                onUpdate({ textColor: e.target.value } as Partial<ButtonBlock>)
+              }
+              className="mt-1 h-10"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* Border Radius */}
+          <div>
+            <Label
+              htmlFor={`button-radius-${block.id}`}
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Border Radius
+            </Label>
+            <Input
+              id={`button-radius-${block.id}`}
+              value={block.borderRadius || "4px"}
+              onChange={(e) =>
+                onUpdate({
+                  borderRadius: e.target.value,
+                } as Partial<ButtonBlock>)
+              }
+              placeholder="4px"
+              className="mt-1"
+            />
+          </div>
+
+          {/* Padding */}
+          <div>
+            <Label
+              htmlFor={`button-padding-${block.id}`}
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Padding
+            </Label>
+            <Input
+              id={`button-padding-${block.id}`}
+              value={block.padding || "12px 24px"}
+              onChange={(e) =>
+                onUpdate({ padding: e.target.value } as Partial<ButtonBlock>)
+              }
+              placeholder="12px 24px"
+              className="mt-1"
+            />
+          </div>
+        </div>
+
+        {/* Button Preview */}
+        <div>
+          <Label className="text-xs font-medium text-muted-foreground">
+            Preview
+          </Label>
+          <div className="mt-2 p-4 border border-border/40 rounded-md bg-muted/10 text-center">
+            <button
+              style={{
+                backgroundColor: block.backgroundColor || "#007cba",
+                color: block.textColor || "#ffffff",
+                borderRadius: block.borderRadius || "4px",
+                padding: block.padding || "12px 24px",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "14px",
+                fontWeight: "500",
+              }}
+            >
+              {block.text || "Click Here"}
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

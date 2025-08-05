@@ -8,6 +8,7 @@ import {
   ImageBlock,
   VideoBlock,
   DividerBlock,
+  ButtonBlock,
   FrontmatterBlock,
   ListBlock,
   HTMLBlock,
@@ -461,6 +462,43 @@ const NewsArticleBlock = React.memo<NewsArticleBlockProps>(
         // Frontmatter blocks are handled separately in news article mode
         // and should not be rendered in the content flow
         return null;
+      }
+
+      case "button": {
+        const buttonBlock = block as ButtonBlock;
+        const buttonText = buttonBlock.text || "Button";
+        const buttonUrl = buttonBlock.url || "#";
+
+        const buttonStyle = {
+          backgroundColor: buttonBlock.backgroundColor || "#007bff",
+          color: buttonBlock.textColor || "#ffffff",
+          padding: buttonBlock.padding || "12px 24px",
+          borderRadius: buttonBlock.borderRadius || "6px",
+          textDecoration: "none",
+          display: "inline-block",
+          fontWeight: "500",
+          fontSize: "14px",
+          border: "none",
+          cursor: "pointer",
+          ...customStyles,
+        };
+
+        return (
+          <div className="text-center my-6">
+            <button
+              className={buttonBlock.cssClassName || ""}
+              style={buttonStyle}
+              disabled={true} // Disabled in preview
+            >
+              {buttonText}
+            </button>
+            {buttonUrl && buttonUrl !== "#" && (
+              <div className="text-xs text-muted-foreground mt-2 font-mono">
+                → {buttonUrl}
+              </div>
+            )}
+          </div>
+        );
       }
 
       default:

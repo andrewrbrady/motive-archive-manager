@@ -15,6 +15,8 @@ import {
   Archive,
   Video,
   Code,
+  MousePointer,
+  Clipboard,
 } from "lucide-react";
 import { ImageGalleryPopup } from "./ImageGalleryPopup";
 import { BlockGroupsManager } from "./BlockGroupsManager";
@@ -27,9 +29,11 @@ interface ContentInsertionToolbarProps {
   onAddTextBlock: () => void;
   onAddDividerBlock: () => void;
   onAddVideoBlock: () => void;
+  onAddButtonBlock: () => void;
   onAddFrontmatterBlock?: () => void;
   onAddListBlock?: () => void;
   onAddHtmlBlock?: () => void;
+  onPasteMarkdown?: () => void;
   // Image gallery props
   finalImages?: any[];
   loadingImages?: boolean;
@@ -61,9 +65,11 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
     onAddTextBlock,
     onAddDividerBlock,
     onAddVideoBlock,
+    onAddButtonBlock,
     onAddFrontmatterBlock,
     onAddListBlock,
     onAddHtmlBlock,
+    onPasteMarkdown,
     finalImages = [],
     loadingImages = false,
     projectId,
@@ -203,6 +209,19 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                     </Button>
                   )}
 
+                  {/* Markdown Paste Button */}
+                  {onPasteMarkdown && (
+                    <Button
+                      onClick={onPasteMarkdown}
+                      variant="ghost"
+                      size="sm"
+                      className="hover:bg-muted/20"
+                      title="Paste Markdown"
+                    >
+                      <Clipboard className="h-4 w-4" />
+                    </Button>
+                  )}
+
                   <Button
                     onClick={onAddVideoBlock}
                     variant="ghost"
@@ -211,6 +230,16 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                     title="Add Video Block"
                   >
                     <Video className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    onClick={onAddButtonBlock}
+                    variant="ghost"
+                    size="sm"
+                    className="hover:bg-muted/20"
+                    title="Add Button Block"
+                  >
+                    <MousePointer className="h-4 w-4" />
                   </Button>
 
                   <Button
@@ -350,6 +379,19 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                     </Button>
                   )}
 
+                  {/* Markdown Paste Button */}
+                  {onPasteMarkdown && (
+                    <Button
+                      onClick={onPasteMarkdown}
+                      variant="outline"
+                      size="sm"
+                      className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+                    >
+                      <Clipboard className="h-4 w-4 mr-2" />
+                      Paste Markdown
+                    </Button>
+                  )}
+
                   {/* Video Block Button */}
                   <Button
                     onClick={onAddVideoBlock}
@@ -359,6 +401,17 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                   >
                     <Video className="h-4 w-4 mr-2" />
                     Video Block
+                  </Button>
+
+                  {/* Button Block Button */}
+                  <Button
+                    onClick={onAddButtonBlock}
+                    variant="outline"
+                    size="sm"
+                    className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+                  >
+                    <MousePointer className="h-4 w-4 mr-2" />
+                    Button Block
                   </Button>
 
                   {/* Text Block Button */}

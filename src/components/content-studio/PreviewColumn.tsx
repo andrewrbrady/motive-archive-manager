@@ -582,26 +582,27 @@ const ButtonBlockPreview = React.memo<{ block: ButtonBlock }>(
     }, [block.text]);
 
     // Performance optimization: Memoize button styles
-    const buttonStyles = useMemo(
-      () => ({
-        backgroundColor: block.backgroundColor || "#007bff",
-        color: block.textColor || "#ffffff",
-        borderRadius: block.borderRadius || "6px",
-        padding: block.padding || "12px 24px",
-      }),
-      [
-        block.backgroundColor,
-        block.textColor,
-        block.borderRadius,
-        block.padding,
-      ]
-    );
+    const buttonStyles = useMemo(() => {
+      // Only user-specified styles go inline - let CSS control typography
+      const inlineStyles: any = {};
+      if (block.backgroundColor)
+        inlineStyles.backgroundColor = block.backgroundColor;
+      if (block.textColor) inlineStyles.color = block.textColor;
+      if (block.borderRadius) inlineStyles.borderRadius = block.borderRadius;
+      if (block.padding) inlineStyles.padding = block.padding;
+
+      return inlineStyles;
+    }, [
+      block.backgroundColor,
+      block.textColor,
+      block.borderRadius,
+      block.padding,
+    ]);
 
     return (
       <div className="p-6 text-center">
-        <Button
-          variant="default"
-          className="inline-flex items-center px-6 py-3 rounded-lg font-medium"
+        <button
+          className={`email-button ${block.cssClassName || ""}`}
           style={buttonStyles}
           disabled={true} // Disabled in preview
         >
@@ -609,7 +610,7 @@ const ButtonBlockPreview = React.memo<{ block: ButtonBlock }>(
           {!buttonContent.hasContent && (
             <span className="ml-1 opacity-50">(empty)</span>
           )}
-        </Button>
+        </button>
         {block.url && (
           <div className="text-xs text-muted-foreground mt-2 font-mono">
             → {block.url}

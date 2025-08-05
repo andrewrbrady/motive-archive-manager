@@ -664,6 +664,84 @@ const HTMLBlockPreview = React.memo<{
   );
 });
 
+// Add ButtonBlockPreview component before PreviewBlock
+const ButtonBlockPreview = React.memo<{
+  block: ButtonBlock;
+  stylesheetData: any;
+  previewMode?: "clean" | "email";
+  emailPlatform?: string;
+}>(function ButtonBlockPreview({
+  block,
+  stylesheetData,
+  previewMode = "clean",
+  emailPlatform = "generic",
+}) {
+  // Apply CSS class styles if available
+  const customStyles = useMemo(() => {
+    const currentCSSClass = getCSSClassFromStylesheet(
+      stylesheetData,
+      block.cssClassName
+    );
+    if (currentCSSClass) {
+      return previewMode === "email"
+        ? classToEmailInlineStyles(currentCSSClass, emailPlatform)
+        : classToInlineStyles(currentCSSClass);
+    }
+    return {};
+  }, [stylesheetData, block.cssClassName, previewMode, emailPlatform]);
+
+  // Performance optimization: Memoize button content processing
+  const buttonContent = useMemo(() => {
+    const hasContent = block.text && block.text.trim() !== "";
+    return {
+      text: hasContent ? block.text : "Button Text",
+      hasContent,
+    };
+  }, [block.text]);
+
+  // Performance optimization: Memoize button styles
+  const buttonStyles = useMemo(() => {
+    // Only user-specified styles go inline - let CSS control typography
+    const inlineStyles: any = {};
+    if (block.backgroundColor)
+      inlineStyles.backgroundColor = block.backgroundColor;
+    if (block.textColor) inlineStyles.color = block.textColor;
+    if (block.borderRadius) inlineStyles.borderRadius = block.borderRadius;
+    if (block.padding) inlineStyles.padding = block.padding;
+
+    return {
+      ...inlineStyles,
+      ...customStyles,
+    };
+  }, [
+    block.backgroundColor,
+    block.textColor,
+    block.borderRadius,
+    block.padding,
+    customStyles,
+  ]);
+
+  return (
+    <div className="p-6 text-center">
+      <button
+        className={`email-button ${block.cssClassName || ""}`}
+        style={buttonStyles}
+        disabled={true} // Disabled in preview
+      >
+        {buttonContent.text}
+        {!buttonContent.hasContent && (
+          <span className="ml-1 opacity-50">(empty)</span>
+        )}
+      </button>
+      {block.url && (
+        <div className="text-xs text-muted-foreground mt-2 font-mono">
+          → {block.url}
+        </div>
+      )}
+    </div>
+  );
+});
+
 const PreviewBlock = React.memo<PreviewBlockProps>(function PreviewBlock({
   block,
   stylesheetData,
@@ -717,6 +795,14 @@ const PreviewBlock = React.memo<PreviewBlockProps>(function PreviewBlock({
     case "frontmatter":
       return <FrontmatterBlockPreview block={block as FrontmatterBlock} />;
     case "button":
+      return (
+        <ButtonBlockPreview
+          block={block as ButtonBlock}
+          stylesheetData={stylesheetData}
+          previewMode={previewMode}
+          emailPlatform={emailPlatform}
+        />
+      );
     case "spacer":
     case "columns":
       return (

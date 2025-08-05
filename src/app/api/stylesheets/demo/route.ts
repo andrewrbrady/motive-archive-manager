@@ -349,8 +349,45 @@ export async function POST(request: NextRequest) {
         }
     `;
 
-    // Parse the CSS content
-    const parsedCSS = parseCSS(sampleCSS);
+    // Parse the CSS content with error handling
+    let parsedCSS;
+    try {
+      const rawParsedCSS = parseCSS(sampleCSS);
+
+      // Validate parsed CSS to ensure it won't cause Mongoose Map errors
+      const validVariables: { [key: string]: string } = {};
+      for (const [key, value] of Object.entries(rawParsedCSS.variables)) {
+        // Only include variables with valid keys for Mongoose Maps
+        if (
+          key &&
+          typeof key === "string" &&
+          !key.includes(".") &&
+          !key.includes("[") &&
+          !key.includes("]") &&
+          !key.includes("<") &&
+          !key.includes(">") &&
+          key.length < 100
+        ) {
+          validVariables[key] = value;
+        }
+      }
+
+      parsedCSS = {
+        ...rawParsedCSS,
+        variables: validVariables,
+      };
+    } catch (parseError) {
+      console.error(
+        "CSS parsing failed for demo stylesheet, using minimal parsed structure:",
+        parseError
+      );
+      // Fallback to a minimal parsed structure to prevent crashes
+      parsedCSS = {
+        classes: [],
+        variables: {},
+        globalStyles: {},
+      };
+    }
 
     // Create the demo stylesheet
     const stylesheet: ClientStylesheet = {

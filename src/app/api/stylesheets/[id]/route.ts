@@ -125,7 +125,45 @@ export async function PUT(
       const cssContentToSave =
         body.cssContent.trim() || "/* Empty stylesheet */";
       updateData.cssContent = cssContentToSave;
-      updateData.parsedCSS = parseCSS(cssContentToSave);
+
+      try {
+        // Parse CSS content with error handling
+        const parsedCSS = parseCSS(cssContentToSave);
+
+        // Validate parsed CSS to ensure it won't cause Mongoose Map errors
+        const validVariables: { [key: string]: string } = {};
+        for (const [key, value] of Object.entries(parsedCSS.variables)) {
+          // Only include variables with valid keys for Mongoose Maps
+          if (
+            key &&
+            typeof key === "string" &&
+            !key.includes(".") &&
+            !key.includes("[") &&
+            !key.includes("]") &&
+            !key.includes("<") &&
+            !key.includes(">") &&
+            key.length < 100
+          ) {
+            validVariables[key] = value;
+          }
+        }
+
+        updateData.parsedCSS = {
+          ...parsedCSS,
+          variables: validVariables,
+        };
+      } catch (parseError) {
+        console.error(
+          "CSS parsing failed, using minimal parsed structure:",
+          parseError
+        );
+        // Fallback to a minimal parsed structure to prevent crashes
+        updateData.parsedCSS = {
+          classes: [],
+          variables: {},
+          globalStyles: {},
+        };
+      }
     }
 
     // Update the stylesheet in database

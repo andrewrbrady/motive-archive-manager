@@ -24,18 +24,52 @@ export function fixCloudflareImageUrl(url: string | null | undefined): string {
 
   let result: string;
 
-  // If it's a Cloudflare URL and doesn't have any variant, add /public
-  if (
-    url.includes("imagedelivery.net") &&
-    !url.includes("/public") &&
-    !url.includes("/thumbnail") &&
-    !url.includes("/medium") &&
-    !url.includes("/large") &&
-    !url.includes("/highres")
-  ) {
-    result = `${url}/public`;
+  // Handle Cloudflare URLs
+  if (url.includes("imagedelivery.net")) {
+    // List of all known Cloudflare variants
+    const variants = [
+      "/public",
+      "/thumbnail",
+      "/medium",
+      "/large",
+      "/highres",
+      "/small",
+      "/avatar",
+      "/webp",
+      "/preview",
+      "/original",
+    ];
+
+    // Check if URL already has a variant
+    const hasVariant = variants.some((variant) => url.includes(variant));
+
+    if (!hasVariant) {
+      // No variant found, add /public
+      result = `${url}/public`;
+    } else {
+      // Already has a variant, but check for malformed double variants
+      let cleanUrl = url;
+
+      // Remove any trailing variants that might be duplicated
+      // This handles cases like "/small/public" by cleaning them up
+      const variantPattern = new RegExp(
+        `(${variants.map((v) => v.replace("/", "\\/")).join("|")})(${variants.map((v) => v.replace("/", "\\/")).join("|")})+$`
+      );
+
+      if (variantPattern.test(url)) {
+        // Remove all trailing variants and add /public
+        const baseUrlMatch = url.match(
+          /^(https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+)/
+        );
+        if (baseUrlMatch) {
+          cleanUrl = `${baseUrlMatch[1]}/public`;
+        }
+      }
+
+      result = cleanUrl;
+    }
   } else {
-    // Return as-is for non-Cloudflare URLs or URLs that already have variants
+    // Return as-is for non-Cloudflare URLs
     result = url;
   }
 

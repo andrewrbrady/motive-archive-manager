@@ -23,6 +23,7 @@ import {
   StylesheetResponse,
 } from "@/types/stylesheet";
 import { invalidateStylesheetCache } from "@/hooks/useStylesheetData";
+import { CSSEditor } from "../content-studio/CSSEditor";
 
 interface StylesheetEditDialogProps {
   isOpen: boolean;
@@ -163,7 +164,7 @@ export function StylesheetEditDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-7xl max-h-[95vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Save className="h-5 w-5" />
@@ -182,90 +183,103 @@ export function StylesheetEditDialog({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex-1 overflow-hidden">
-            <div className="space-y-4 overflow-y-auto max-h-[60vh] pr-2">
-              {/* Basic Information */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Stylesheet Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange("name", e.target.value)}
-                    placeholder="Client Name Newsletter Styles"
-                    disabled={loading}
-                    required
-                  />
+            <div className="grid grid-cols-2 gap-6 h-[calc(95vh-200px)] overflow-hidden">
+              {/* Left Column - Metadata */}
+              <div className="space-y-4 overflow-y-auto pr-2">
+                {/* Basic Information */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Stylesheet Name *</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) =>
+                        handleInputChange("name", e.target.value)
+                      }
+                      placeholder="Client Name Newsletter Styles"
+                      disabled={loading}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="version">Version</Label>
+                    <Input
+                      id="version"
+                      value={formData.version}
+                      onChange={(e) =>
+                        handleInputChange("version", e.target.value)
+                      }
+                      placeholder="1.0.0"
+                      disabled={loading}
+                    />
+                  </div>
                 </div>
+
+                {/* Description */}
                 <div className="space-y-2">
-                  <Label htmlFor="version">Version</Label>
+                  <Label htmlFor="description">Description</Label>
                   <Input
-                    id="version"
-                    value={formData.version}
+                    id="description"
+                    value={formData.description}
                     onChange={(e) =>
-                      handleInputChange("version", e.target.value)
+                      handleInputChange("description", e.target.value)
                     }
-                    placeholder="1.0.0"
+                    placeholder="Newsletter styles for XYZ Company"
                     disabled={loading}
                   />
                 </div>
-              </div>
 
-              {/* Description */}
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Input
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) =>
-                    handleInputChange("description", e.target.value)
-                  }
-                  placeholder="Newsletter styles for XYZ Company"
-                  disabled={loading}
-                />
-              </div>
+                {/* Tags */}
+                <div className="space-y-2">
+                  <Label htmlFor="tags">Tags</Label>
+                  <Input
+                    id="tags"
+                    value={formData.tags}
+                    onChange={(e) => handleInputChange("tags", e.target.value)}
+                    placeholder="newsletter, client, brand"
+                    disabled={loading}
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    Separate multiple tags with commas
+                  </div>
+                </div>
 
-              {/* Tags */}
-              <div className="space-y-2">
-                <Label htmlFor="tags">Tags</Label>
-                <Input
-                  id="tags"
-                  value={formData.tags}
-                  onChange={(e) => handleInputChange("tags", e.target.value)}
-                  placeholder="newsletter, client, brand"
-                  disabled={loading}
-                />
-                <div className="text-xs text-muted-foreground">
-                  Separate multiple tags with commas
+                {/* Stylesheet Info */}
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">
+                    {stylesheet.classCount} classes
+                  </Badge>
+                  <Badge variant="outline">
+                    {stylesheet.categoryCount} categories
+                  </Badge>
+                  {stylesheet.clientName && (
+                    <Badge variant="secondary">{stylesheet.clientName}</Badge>
+                  )}
                 </div>
               </div>
 
-              {/* Stylesheet Info */}
-              <div className="flex items-center gap-2">
-                <Badge variant="outline">{stylesheet.classCount} classes</Badge>
-                <Badge variant="outline">
-                  {stylesheet.categoryCount} categories
-                </Badge>
-                {stylesheet.clientName && (
-                  <Badge variant="secondary">{stylesheet.clientName}</Badge>
-                )}
-              </div>
-
-              {/* CSS Content */}
-              <div className="space-y-2">
-                <Label htmlFor="cssContent">CSS Content *</Label>
-                <Textarea
-                  id="cssContent"
-                  value={formData.cssContent}
-                  onChange={(e) =>
-                    handleInputChange("cssContent", e.target.value)
-                  }
-                  placeholder="Paste your CSS here..."
-                  className="min-h-48 font-mono text-sm"
-                  disabled={loading}
-                  required
-                />
+              {/* Right Column - CSS Editor with Vim Mode */}
+              <div className="flex flex-col h-full">
+                <div className="mb-3">
+                  <Label className="text-sm font-medium">
+                    CSS Content with Vim Mode
+                  </Label>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Use Vim keybindings • Ctrl+S to save • Syntax highlighting
+                  </div>
+                </div>
+                <div className="flex-1 border border-border/40 rounded-lg overflow-hidden">
+                  <CSSEditor
+                    cssContent={formData.cssContent}
+                    onCSSChange={(content) =>
+                      handleInputChange("cssContent", content)
+                    }
+                    selectedStylesheetId={stylesheet.id}
+                    className="h-full"
+                  />
+                </div>
                 {formData.cssContent && (
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-muted-foreground mt-2 text-right">
                     {formData.cssContent.length.toLocaleString()} characters
                   </div>
                 )}

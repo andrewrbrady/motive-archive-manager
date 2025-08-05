@@ -6,6 +6,7 @@ import {
   ImageBlock,
   DividerBlock,
   HTMLBlock,
+  ButtonBlock,
 } from "@/components/content-studio/types";
 import { dbConnect } from "@/lib/mongodb";
 import { Stylesheet } from "@/models/Stylesheet";
@@ -109,6 +110,18 @@ function processStylesheetForEmail(cssContent: string): string {
   // Remove .content-studio-preview scoping
   let processedCSS = cssContent.replace(/\.content-studio-preview\s+/g, "");
 
+  // CRITICAL: Remove HTML comments that can break style tags
+  processedCSS = processedCSS.replace(/<!--[\s\S]*?-->/g, "");
+
+  // CRITICAL: Remove nested <style> and </style> tags that break CSS
+  processedCSS = processedCSS.replace(/<\/?style[^>]*>/gi, "");
+
+  // Remove MSO conditional comments and VML content
+  processedCSS = processedCSS.replace(/\[if\s+mso\][\s\S]*?\[endif\]/gi, "");
+
+  // MUCH LESS AGGRESSIVE: Only remove truly problematic CSS
+  // Don't remove user's reset styles, dark mode, or media queries - they might be intentional customizations!
+
   // Remove only specific properties that don't work in email (safer approach)
   processedCSS = processedCSS.replace(/^\s*transform\s*:[^;]+;/gm, "");
   processedCSS = processedCSS.replace(/^\s*animation\s*:[^;]+;/gm, "");
@@ -129,7 +142,7 @@ function processStylesheetForEmail(cssContent: string): string {
 function processEmailCSSForSendGrid(cssContent: string): string {
   if (!cssContent) return "";
 
-  // Use the basic email processing first
+  // Use the basic email processing first (includes HTML comment removal)
   let processedCSS = processStylesheetForEmail(cssContent);
 
   // Remove only the most dangerous patterns with very specific regex
@@ -357,75 +370,256 @@ function generateMailchimpHTML(
         table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
         img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
         
-        /* Media queries for responsive design */
+        /* Body and tables */
+        body { 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            width: 100% !important; 
+            min-width: 100% !important; 
+            background-color: #f4f4f4 !important;
+            font-family: Arial, sans-serif !important;
+            -webkit-text-size-adjust: 100% !important;
+            -ms-text-size-adjust: 100% !important;
+        }
+        table { 
+            border-collapse: collapse !important; 
+            mso-table-lspace: 0pt !important; 
+            mso-table-rspace: 0pt !important; 
+        }
+        img { 
+            border: 0 !important; 
+            height: auto !important; 
+            line-height: 100% !important; 
+            outline: none !important; 
+            text-decoration: none !important; 
+        }
+        
+        /* Layout */
+        .main-table { 
+            width: 100% !important; 
+            max-width: 600px !important; 
+            margin: 0 auto !important;
+            background-color: #ffffff !important; 
+        }
+        
+        /* Wrapper */
+        .email-wrapper {
+            width: 100% !important;
+            background-color: #f4f4f4 !important;
+            margin: 0 !important;
+            padding: 20px 0 !important;
+        }
+        
+        /* Padding */
+        .mobile-pad { padding: 12px !important; }
+        
+        /* Utils */
+        .mobile-stack { display: block !important; width: 100% !important; max-width: 100% !important; }
+        .mobile-center { text-align: center !important; }
+        
+        /* Images responsive by default */
+        img { max-width: 100% !important; width: auto !important; height: auto !important; }
+        .responsive-hero-image { 
+            height: auto !important; 
+            min-height: 100px !important; 
+            object-fit: cover !important; 
+            object-position: center !important;
+            max-width: 100% !important; 
+            width: 100% !important;
+        }
+        
+        /* Spacing - Override these in your custom stylesheet */
+        .block-spacing { margin-bottom: 16px; }
+        .block-spacing-sm { margin-bottom: 8px; }
+        .button-spacing { margin: 24px 0; }
+        .image-spacing { margin: 20px 0; }
+        .divider-spacing { margin: 24px 0; }
+        .no-margin-top { margin-top: 0; }
+        .no-margin-bottom { margin-bottom: 0; }
+        
+        /* Elements - Override these in your custom stylesheet */
+        .image-caption { 
+            font-family: Arial, sans-serif; 
+            font-size: 14px; 
+            line-height: 18px; 
+            color: #666666; 
+            font-style: italic; 
+            margin: 12px 0 0 0; 
+        }
+        .divider-line { 
+            border: none; 
+            border-top: 1px solid #ddd; 
+        }
+        
+        /* Clean edges */
+        .main-table .block-spacing:first-child { margin-top: 0 !important; }
+        .main-table .block-spacing:last-child { margin-bottom: 0 !important; }
+        .mobile-pad > .block-spacing:first-child { margin-top: 0 !important; }
+        .mobile-pad > .block-spacing:last-child { margin-bottom: 0 !important; }
+        
+        /* Typography - Override these in your custom stylesheet */
+        h1, h2, h3, h4, h5, h6 { 
+            font-family: Arial, sans-serif; 
+            font-weight: bold; 
+            margin: 0; 
+            padding: 0; 
+            color: #333333;
+        }
+        p { 
+            font-family: Arial, sans-serif; 
+            font-size: 16px; 
+            line-height: 24px; 
+            margin: 0 0 16px 0; 
+            color: #333333;
+        }
+        
+        /* Button foundation - Fully customizable via your stylesheet */
+        .email-button {
+            display: inline-block;
+            text-decoration: none;
+            border: none;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            line-height: 1.4;
+            cursor: pointer;
+        }
+        
+        /*
+        HOW TO CUSTOMIZE YOUR EMAILS:
+        
+        1. Typography: Override defaults
+           h3 { font-size: 14px; }
+           p { font-size: 18px; }
+        
+        2. Buttons: Full control over styling
+           .email-button { 
+               font-family: 'Helvetica', Arial, sans-serif;
+               font-size: 16px;
+               font-weight: 600;
+               line-height: 1.2;
+           }
+           .btn-primary { background-color: #222222; color: #ffffff; }
+           .cta-button { 
+               background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+               font-size: 18px;
+               font-weight: bold;
+           }
+        
+        3. Spacing: Use margin/padding utilities
+           .my-spacing { margin: 40px 0; }
+        
+        4. Responsive: Add mobile overrides
+           @media screen and (max-width: 600px) {
+               .email-button { font-size: 18px !important; }
+               h3 { font-size: 18px !important; }
+           }
+        */
+        
+        /* Mobile */
         @media screen and (max-width: 600px) {
+
+            .main-table { max-width: 100% !important; }
+            .email-wrapper { padding: 10px 0 !important; }
             .mobile-stack { display: block !important; width: 100% !important; }
             .mobile-center { text-align: center !important; }
-            .mobile-padding { padding: 20px !important; }
+            .mobile-pad { padding: 12px !important; }
             
-            /* Force proper heading sizes on mobile - Gmail override */
-            h1, h1 * { font-size: 24px !important; line-height: 30px !important; }
-            h2, h2 * { font-size: 28px !important; line-height: 34px !important; }
-            h3, h3 * { font-size: 18px !important; line-height: 24px !important; }
+
+            h1, h1 * { font-size: 28px !important; line-height: 34px !important; }
+            h2, h2 * { font-size: 24px !important; line-height: 30px !important; }
+            h3, h3 * { font-size: 20px !important; line-height: 26px !important; }
             p, p * { font-size: 16px !important; line-height: 24px !important; }
             
-            /* Gmail-specific heading overrides with higher specificity */
-            td h1 { font-size: 24px !important; line-height: 30px !important; }
-            td h2 { font-size: 28px !important; line-height: 34px !important; }
-            td h3 { font-size: 18px !important; line-height: 24px !important; }
+
+            td h1 { font-size: 28px !important; line-height: 34px !important; }
+            td h2 { font-size: 24px !important; line-height: 30px !important; }
+            td h3 { font-size: 20px !important; line-height: 26px !important; }
             
-            /* Force font weight to ensure visibility */
-            h1, h2, h3 { font-weight: bold !important; }
+
+            .block-spacing { margin-bottom: 12px !important; }
+            .button-spacing { margin: 20px 0 !important; }
+            .image-spacing { margin: 16px 0 !important; }
+            .divider-spacing { margin: 20px 0 !important; }
             
-            /* Additional Gmail-specific overrides */
-            .mobile-font-size { font-size: 28px !important; line-height: 34px !important; }
-            
-            /* Ensure tables scale on mobile */
-            table[role="presentation"] { width: 100% !important; }
-            
-            /* Force images to scale */
-            img { max-width: 100% !important; width: auto !important; height: auto !important; }
-            
-            /* Mobile-specific hero image sizing - natural height with side cropping */
+
             .responsive-hero-image { 
                 height: auto !important; 
                 min-height: 100px !important; 
-                object-fit: cover !important; 
-                object-position: center !important;
+                width: 100% !important;
             }
+        }
+        
+        /* Desktop */
+        @media (min-width: 601px) {
+
+            .main-table { max-width: 600px; }
+            .mobile-pad { padding: 30px; }
+            .block-spacing { margin-bottom: 20px; }
+            .button-spacing { margin: 28px 0; }
+            .image-spacing { margin: 24px 0; }
+            .divider-spacing { margin: 28px 0; }
+            
+
+            h1, h1 * { font-size: 32px; line-height: 38px; }
+            h2, h2 * { font-size: 28px; line-height: 34px; }
+            h3, h3 * { font-size: 24px; line-height: 30px; }
         }
         
         ${dynamicCSS}
         
-        /* Custom stylesheet CSS */
         ${processedStylesheetCSS}
         
-        /* Dark mode styles */
+        /* Dark mode styles - Only apply to elements that explicitly opt-in */
         @media (prefers-color-scheme: dark) {
             .dark-bg { background-color: #1a1a1a !important; }
             .dark-text { color: #ffffff !important; }
             .dark-link { color: #4a9eff !important; }
+            /* Keep default text dark for email compatibility */
+            body, h1, h2, h3, h4, h5, h6, p, li { color: #333333 !important; }
         }
     </style>
 </head>
-<body style="margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #f4f4f4; width: 100%; overflow-x: hidden;" class="email-body">
     ${previewText ? `<div style="display: none; max-height: 0; overflow: hidden;">${escapeHtml(previewText)}</div>` : ""}
     
     <!-- Full-width header images (if any) -->
     ${headerHTML}
     
-    <!-- Main container table -->
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
+    <!-- Wrapper -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-wrapper">
         <tr>
-            <td align="center" style="padding: ${headerHTML.trim() ? "0" : "20px"} 0 20px 0;">
-                <!-- Email content table -->
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="background-color: #ffffff; margin: 0 auto; max-width: 600px;" class="dark-bg">
+            <td align="center">
+                <!-- Main content -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="main-table">
                     <tr>
-                        <td style="padding: ${headerHTML.trim() ? "30px 30px 40px 30px" : "40px 30px"};" class="mobile-padding">
+                        <td class="mobile-pad">
                             ${contentHTML}
                         </td>
                     </tr>
                 </table>
+            </td>
+        </tr>
+    </table>
+    
+    <!-- Mailchimp Footer with Required Merge Tags -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8f9fa;">
+        <tr>
+            <td align="center" class="mobile-pad" style="padding: 20px;">
+                <div style="margin: 0 auto; max-width: 600px; font-family: Arial, sans-serif; font-size: 12px; line-height: 16px; color: #666666; text-align: center;" class="mobile-stack">
+                    <!-- Physical Address -->
+                    <div style="margin-bottom: 10px;">
+                        *|LIST:ADDRESS_HTML|*
+                    </div>
+                    
+                    <!-- Unsubscribe Link -->
+                    <div>
+                        <a href="*|UNSUB|*" style="color: #666666; text-decoration: underline;">Unsubscribe</a> from this list
+                    </div>
+                    
+                    <!-- Alternative unsubscribe format (uncomment if preferred) -->
+                    <!-- <div><a href="*|LIST:UNSUB|*" style="color: #666666; text-decoration: underline;">*|LIST:UNSUB|*</a></div> -->
+                </div>
             </td>
         </tr>
     </table>
@@ -457,7 +651,7 @@ function generateGenericEmailHTML(
     <title>${escapeHtml(title)}</title>
     <style>
         /* Generic email styles */
-        body { margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4; }
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #ffffff; }
         table { border-collapse: collapse; }
         img { max-width: 100%; height: auto; }
         .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
@@ -496,8 +690,10 @@ function generateSendGridImageHTML(block: any): string {
     ? `<a href="${escapeHtml(linkUrl)}" target="_blank">${imageTag}</a>`
     : imageTag;
 
-  return `${wrappedImage}
-    ${block.caption ? `<p style="text-align:center;font-size:14px;color:#666;margin:10px 0 0;">${escapeHtml(block.caption)}</p>` : ""}`;
+  return `<div class="image-spacing">
+    ${wrappedImage}
+    ${block.caption ? `<p class="image-caption" style="text-align:center;">${escapeHtml(block.caption)}</p>` : ""}
+  </div>`;
 }
 
 // Removed generateSendGridBasicImageHTML - replaced with CSS class-based approach
@@ -516,12 +712,31 @@ function generateSendGridBlocksHTML(blocks: any[]): string {
           const customClasses = generateEmailClasses("", block);
 
           // For SendGrid, include HTML content directly with optional CSS classes
-          return `<div${customClasses ? ` class="${customClasses}"` : ""}>${content}</div>`;
+          return `<div${customClasses ? ` class="${customClasses}"` : ""} style="margin-bottom: 12px;">${content}</div>`;
         }
         case "text": {
           const textBlock = block as TextBlock;
           const element = textBlock.element || "p";
           const customClasses = generateEmailClasses("", block);
+
+          // Get formatting from block formatting property
+          const formatting = textBlock.formatting || {};
+          const textAlign = formatting.textAlign || "left";
+          const fontSize = formatting.fontSize;
+          const fontWeight = formatting.fontWeight;
+          const color = formatting.color;
+          const lineHeight = formatting.lineHeight;
+          const marginTop = formatting.marginTop;
+          const marginBottom = formatting.marginBottom;
+
+          // Build inline style string from formatting
+          let inlineStyles = `text-align: ${textAlign};`;
+          if (fontSize) inlineStyles += ` font-size: ${fontSize};`;
+          if (fontWeight) inlineStyles += ` font-weight: ${fontWeight};`;
+          if (color) inlineStyles += ` color: ${color};`;
+          if (lineHeight) inlineStyles += ` line-height: ${lineHeight};`;
+          if (marginTop) inlineStyles += ` margin-top: ${marginTop};`;
+          if (marginBottom) inlineStyles += ` margin-bottom: ${marginBottom};`;
 
           // Process rich formatting if available, otherwise use raw content
           let processedContent = textBlock.content || "";
@@ -534,7 +749,7 @@ function generateSendGridBlocksHTML(blocks: any[]): string {
             .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
             .replace(
               /\[([^\]]+)\]\(([^)]+)\)/g,
-              '<a href="$2" style="color: #0066cc; text-decoration: underline;" class="dark-link">$1</a>'
+              '<a href="$2" style="color: #0066cc; text-decoration: underline;">$1</a>'
             )
             .replace(/\n/g, "<br>");
 
@@ -544,7 +759,7 @@ function generateSendGridBlocksHTML(blocks: any[]): string {
             ? processedContent
             : escapeHtml(processedContent);
 
-          return `<${element}${customClasses ? ` class="${customClasses}"` : ""}>${finalContent}</${element}>`;
+          return `<${element}${customClasses ? ` class="${customClasses}"` : ""} style="${inlineStyles} margin-bottom: 12px;">${finalContent}</${element}>`;
         }
         case "list": {
           const listBlock = block as any;
@@ -552,7 +767,7 @@ function generateSendGridBlocksHTML(blocks: any[]): string {
           const customClasses = generateEmailClasses("", block);
 
           if (items.length === 0) {
-            return `<div${customClasses ? ` class="${customClasses}"` : ""} style="color: #666; font-style: italic;">Empty list</div>`;
+            return `<div${customClasses ? ` class="${customClasses}"` : ""} style="color: #666; font-style: italic; margin-bottom: 12px;">Empty list</div>`;
           }
 
           const listItems = items
@@ -562,20 +777,39 @@ function generateSendGridBlocksHTML(blocks: any[]): string {
             )
             .join("");
 
-          return `<ul${customClasses ? ` class="${customClasses}"` : ""} style="margin: 16px 0; padding-left: 20px; list-style-type: disc;">${listItems}</ul>`;
+          return `<ul${customClasses ? ` class="${customClasses} block-spacing"` : ' class="block-spacing"'} style="margin: 0 0 12px 0; padding-left: 20px; list-style-type: disc;">${listItems}</ul>`;
         }
         case "image":
           return generateSendGridImageHTML(block);
         case "divider": {
           const dividerClasses = generateEmailClasses("", block);
-          return `<hr${dividerClasses ? ` class="${dividerClasses}"` : ""} style="border:none;border-top:1px solid #ddd;margin:30px 0;">`;
+          return `<hr${dividerClasses ? ` class="${dividerClasses} divider-spacing divider-line"` : ' class="divider-spacing divider-line"'}>`;
         }
         case "video": {
           const videoClasses = generateEmailClasses("", block);
-          return `<div${videoClasses ? ` class="${videoClasses}"` : ""} style="margin:20px 0;">
+          return `<div${videoClasses ? ` class="${videoClasses} block-spacing"` : ' class="block-spacing"'} style="margin:0 0 12px 0;">
             <p><strong>Video:</strong> ${escapeHtml(block.title || "Video Content")}</p>
             <p><a href="${escapeHtml(block.videoUrl)}" target="_blank" style="color: #0066cc;">Watch Video</a></p>
           </div>`;
+        }
+        case "button": {
+          const buttonBlock = block as ButtonBlock;
+          const buttonText = buttonBlock.text || "Button";
+          const buttonUrl = buttonBlock.url || "#";
+          const backgroundColor = buttonBlock.backgroundColor || "#0066cc";
+          const textColor = buttonBlock.textColor || "#ffffff";
+          const borderRadius = buttonBlock.borderRadius || "4px";
+          const padding = buttonBlock.padding || "12px 24px";
+          const customClasses = generateEmailClasses("", block);
+
+          // Use table structure for better email client compatibility and mobile centering
+          return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 24px 0;" class="button-spacing">
+            <tr>
+                <td align="center" class="mobile-center"${customClasses ? ` ${customClasses}` : ""}>
+                    <a href="${escapeHtml(buttonUrl)}" target="_blank" rel="noopener noreferrer" class="email-button" style="background-color: ${backgroundColor}; color: ${textColor}; padding: ${padding}; border-radius: ${borderRadius};">${escapeHtml(buttonText)}</a>
+                </td>
+            </tr>
+          </table>`;
         }
         default: {
           const defaultClasses = generateEmailClasses("", block);
@@ -642,7 +876,7 @@ function generateFullWidthImageHTML(block: ImageBlock): string {
                      alt="${escapeHtml(altText)}"
                      width="100%"
                      class="responsive-hero-image responsive-hero-${block.id}"
-                     style="display: block; width: 100%; max-width: ${maxWidth}px; height: auto; border: 0; outline: none; text-decoration: none; margin: 0; padding: 0;">
+                     style="display: block; width: 100%; max-width: 100%; height: auto; border: 0; outline: none; text-decoration: none; margin: 0; padding: 0;">
             </td>
             <!--<![endif]-->`;
 
@@ -675,7 +909,7 @@ function generateFullWidthImageHTML(block: ImageBlock): string {
         <td align="center" bgcolor="${backgroundColor}" style="padding:0;" mc:edit="header_image_${block.id}">
             
             <!--[if (gte mso 9)|(IE)]>
-            <table role="presentation" width="${outlookWidth}" align="center" cellpadding="0" cellspacing="0" border="0">
+            <table role="presentation" width="${outlookWidth}" align="center" cellpadding="0" cellspacing="0" border="0" style="max-width: 100%;">
                 <tr>
             <![endif]-->
             
@@ -684,7 +918,7 @@ function generateFullWidthImageHTML(block: ImageBlock): string {
                 ? `
             <!--[if (gte mso 9)|(IE)]></tr><tr><td align="center" style="padding: 8px 20px 0; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px; color: #666666; font-style: italic;"><![endif]-->
             <!--[if !mso]><!-->
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${maxWidth}px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${maxWidth}px;" class="mobile-stack">
                 <tr>
                     <td align="center" style="padding: 8px 20px 0; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px; color: #666666; font-style: italic;">
                         ${escapeHtml(block.caption)}
@@ -704,7 +938,7 @@ function generateFullWidthImageHTML(block: ImageBlock): string {
   // Original approach for non-center-crop images
   const imageTag = `<img src="${escapeHtml(block.imageUrl)}" 
                  width="${outlookWidth}"
-                 style="display:block;width:100%;max-width:${maxWidth}px;height:auto;border:0;outline:none;text-decoration:none;margin:0;padding:0;" 
+                                      style="display:block;width:100%;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;margin:0;padding:0;" 
                  alt="${escapeHtml(altText)}">`;
 
   const wrappedImage = hasLink
@@ -717,7 +951,7 @@ function generateFullWidthImageHTML(block: ImageBlock): string {
         <td align="center" bgcolor="${backgroundColor}" style="padding:0;" mc:edit="header_image_${block.id}">
             
             <!--[if (gte mso 9)|(IE)]>
-            <table role="presentation" width="${outlookWidth}" align="center" cellpadding="0" cellspacing="0" border="0">
+            <table role="presentation" width="${outlookWidth}" align="center" cellpadding="0" cellspacing="0" border="0" style="max-width: 100%;"
                 <tr><td align="center">
             <![endif]-->
             
@@ -727,7 +961,7 @@ function generateFullWidthImageHTML(block: ImageBlock): string {
                 ? `
             <!--[if (gte mso 9)|(IE)]></td></tr><tr><td align="center" style="padding: 8px 20px 0; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px; color: #666666; font-style: italic;"><![endif]-->
             <!--[if !mso]><!-->
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${maxWidth}px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${maxWidth}px;" class="mobile-stack">
                 <tr>
                     <td align="center" style="padding: 8px 20px 0; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px; color: #666666; font-style: italic;">
                         ${escapeHtml(block.caption)}
@@ -785,7 +1019,7 @@ function generateEmailBlockHTML(block: ContentBlock): string {
 
       // For email, we need to be careful with HTML content
       // Wrap it in a table structure for email compatibility
-      return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 20px;">
+      return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 12px;" class="block-spacing">
         <tr>
             <td mc:edit="html_block_${block.id}">
                 <div${customClasses ? ` class="${customClasses}"` : ""}>${content}</div>
@@ -809,35 +1043,47 @@ function generateEmailBlockHTML(block: ContentBlock): string {
         .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
         .replace(
           /\[([^\]]+)\]\(([^)]+)\)/g,
-          '<a href="$2" style="color: #0066cc; text-decoration: underline;" class="dark-link">$1</a>'
+          '<a href="$2" style="color: #0066cc; text-decoration: underline;">$1</a>'
         )
         .replace(/\n/g, "<br>");
 
       const element = textBlock.element || "p";
 
-      // Email-safe default styles based on element type
-      let defaultStyles = "";
+      // Get formatting from block formatting property
+      const formatting = textBlock.formatting || {};
+      const textAlign = formatting.textAlign || "left";
+      const fontSize = formatting.fontSize;
+      const fontWeight = formatting.fontWeight;
+      const color = formatting.color;
+      const lineHeight = formatting.lineHeight;
+      const marginTop = formatting.marginTop;
+      const marginBottom = formatting.marginBottom;
+
+      // ONLY user-specified formatting goes inline (for Gmail compatibility)
+      // Let CSS handle defaults so custom styles can override them
+      const criticalStyles = [];
+
+      // Add user-specified formatting as inline styles (Gmail fallback)
+      if (textAlign) criticalStyles.push(`text-align: ${textAlign}`);
+      if (fontSize) criticalStyles.push(`font-size: ${fontSize}`);
+      if (fontWeight) criticalStyles.push(`font-weight: ${fontWeight}`);
+      if (color) criticalStyles.push(`color: ${color}`);
+      if (lineHeight) criticalStyles.push(`line-height: ${lineHeight}`);
+      if (marginTop) criticalStyles.push(`margin-top: ${marginTop}`);
+      if (marginBottom) criticalStyles.push(`margin-bottom: ${marginBottom}`);
+
+      const defaultStyles = criticalStyles.join("; ");
+
+      // CSS classes for responsive behavior and custom styling
       let defaultClasses = "";
       switch (element) {
         case "h1":
-          defaultStyles =
-            "margin: 0 0 20px 0; font-family: Arial, sans-serif; font-size: 28px; line-height: 34px; font-weight: bold; color: #333333";
-          defaultClasses = "dark-text mobile-font-size";
-          break;
         case "h2":
-          defaultStyles =
-            "margin: 0 0 18px 0; font-family: Arial, sans-serif; font-size: 32px; line-height: 38px; font-weight: bold; color: #333333";
-          defaultClasses = "dark-text mobile-font-size";
-          break;
         case "h3":
-          defaultStyles =
-            "margin: 0 0 16px 0; font-family: Arial, sans-serif; font-size: 20px; line-height: 26px; font-weight: bold; color: #333333";
-          defaultClasses = "dark-text mobile-font-size";
+          defaultClasses = "mobile-font-size";
           break;
-        default: // p
-          defaultStyles =
-            "margin: 0 0 16px 0; font-family: Arial, sans-serif; font-size: 16px; line-height: 24px; color: #333333";
-          defaultClasses = "dark-text";
+        default:
+          defaultClasses = "";
       }
 
       // Generate custom CSS classes for the div wrapper
@@ -854,7 +1100,7 @@ function generateEmailBlockHTML(block: ContentBlock): string {
 
       // If custom classes exist, wrap in div with those classes
       if (customClasses) {
-        return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 20px;">
+        return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 12px;" class="block-spacing">
           <tr>
               <td mc:edit="text_block_${block.id}">
                   <div class="${customClasses}">
@@ -864,7 +1110,7 @@ function generateEmailBlockHTML(block: ContentBlock): string {
           </tr>
       </table>`;
       } else {
-        return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 20px;">
+        return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 12px;" class="block-spacing">
           <tr>
               <td mc:edit="text_block_${block.id}">
                   <${element} style="${finalStyles}" class="${defaultClasses}">${finalContent}</${element}>
@@ -921,7 +1167,7 @@ function generateEmailBlockHTML(block: ContentBlock): string {
           // Original image tag approach
           const imageTag = `<img src="${escapeHtml(imageBlock.imageUrl)}" 
                    width="${outlookWidth}"
-                   style="display:block;width:100%;max-width:${maxWidth}px;height:auto;border:0;outline:none;text-decoration:none;margin:0;padding:0;" 
+                                        style="display:block;width:100%;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;margin:0;padding:0;" 
                    alt="${escapeHtml(altText)}">`;
 
           wrappedImage = hasLink
@@ -940,7 +1186,7 @@ function generateEmailBlockHTML(block: ContentBlock): string {
         <td align="center" bgcolor="${backgroundColor}" style="padding:0;" mc:edit="fullwidth_image_${block.id}">
             
             <!--[if (gte mso 9)|(IE)]>
-            <table role="presentation" width="${outlookWidth}" align="center" cellpadding="0" cellspacing="0" border="0">
+            <table role="presentation" width="${outlookWidth}" align="center" cellpadding="0" cellspacing="0" border="0" style="max-width: 100%;"
                 <tr><td align="center">
             <![endif]-->
             
@@ -950,7 +1196,7 @@ function generateEmailBlockHTML(block: ContentBlock): string {
                 ? `
             <!--[if (gte mso 9)|(IE)]></td></tr><tr><td align="center" style="padding: 8px 20px 0; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px; color: #666666; font-style: italic;"><![endif]-->
             <!--[if !mso]><!-->
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${maxWidth}px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${maxWidth}px;" class="mobile-stack">
                 <tr>
                     <td align="center" style="padding: 8px 20px 0; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px; color: #666666; font-style: italic;">
                         ${escapeHtml(imageBlock.caption)}
@@ -967,9 +1213,9 @@ function generateEmailBlockHTML(block: ContentBlock): string {
 </table>
 
 <!-- Resume main content table -->
-<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="background-color: #ffffff; margin: 0 auto; max-width: 600px;" class="dark-bg">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px;" class="dark-bg mobile-stack main-table">
     <tr>
-        <td style="padding: 40px 30px;" class="mobile-padding">`;
+        <td class="mobile-pad">`;
       }
 
       // Standard image block (non-full-width)
@@ -1009,11 +1255,11 @@ function generateEmailBlockHTML(block: ContentBlock): string {
         ? `<a href="${escapeHtml(linkUrl)}" target="${linkTarget}" style="color: inherit; text-decoration: none;">${imageTag}</a>`
         : imageTag;
 
-      return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 20px;">
+      return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="image-spacing">
         <tr>
             <td align="${alignStyle}" mc:edit="image_block_${block.id}">
                 ${wrappedImage}
-                ${imageBlock.caption ? `<p style="margin: 8px 0 0 0; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px; color: #666666; text-align: ${alignStyle}; font-style: italic;">${escapeHtml(imageBlock.caption)}</p>` : ""}
+                ${imageBlock.caption ? `<p class="image-caption" style="text-align: ${alignStyle};">${escapeHtml(imageBlock.caption)}</p>` : ""}
             </td>
         </tr>
     </table>`;
@@ -1025,7 +1271,7 @@ function generateEmailBlockHTML(block: ContentBlock): string {
       const customClasses = generateEmailClasses("", block);
 
       if (items.length === 0) {
-        return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 20px;">
+        return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 12px;" class="block-spacing">
           <tr>
               <td mc:edit="list_block_${block.id}">
                   <div${customClasses ? ` class="${customClasses}"` : ""} style="color: #666; font-style: italic;">Empty list</div>
@@ -1037,14 +1283,14 @@ function generateEmailBlockHTML(block: ContentBlock): string {
       const listItems = items
         .map(
           (item: string) =>
-            `<li style="margin-bottom: 8px; font-family: Arial, sans-serif; font-size: 16px; line-height: 24px; color: #333333;" class="dark-text">${escapeHtml(item)}</li>`
+            `<li style="margin-bottom: 8px; font-family: Arial, sans-serif; font-size: 16px; line-height: 24px; color: #333333;">${escapeHtml(item)}</li>`
         )
         .join("");
 
-      return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 20px;">
+      return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 12px;" class="block-spacing">
         <tr>
             <td mc:edit="list_block_${block.id}">
-                <ul${customClasses ? ` class="${customClasses}"` : ""} style="margin: 0 0 16px 0; padding-left: 20px; list-style-type: disc;">${listItems}</ul>
+                <ul${customClasses ? ` class="${customClasses}"` : ""} style="margin: 0 0 8px 0; padding-left: 20px; list-style-type: disc;">${listItems}</ul>
             </td>
         </tr>
       </table>`;
@@ -1064,14 +1310,51 @@ function generateEmailBlockHTML(block: ContentBlock): string {
       );
       const finalDividerClasses = generateEmailClasses("", block);
 
-      return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: ${margin} 0;">
+      return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="divider-spacing">
         <tr>
             <td mc:edit="divider_block_${block.id}">
                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                     <tr>
-                        <td style="${finalDividerStyles}"${finalDividerClasses ? ` class="${finalDividerClasses}"` : ""}>&nbsp;</td>
+                        <td class="divider-line${finalDividerClasses ? ` ${finalDividerClasses}` : ""}">&nbsp;</td>
                     </tr>
                 </table>
+            </td>
+        </tr>
+    </table>`;
+    }
+
+    case "button": {
+      const buttonBlock = block as ButtonBlock;
+      const buttonText = buttonBlock.text || "Button";
+      const buttonUrl = buttonBlock.url || "#";
+      const backgroundColor = buttonBlock.backgroundColor || "#0066cc";
+      const textColor = buttonBlock.textColor || "#ffffff";
+      const borderRadius = buttonBlock.borderRadius || "4px";
+      const padding = buttonBlock.padding || "12px 24px";
+
+      // Only essential button styles - let CSS handle typography
+      const defaultButtonStyles = `background-color: ${backgroundColor}; color: ${textColor}; padding: ${padding}; border-radius: ${borderRadius};`;
+      const finalButtonStyles = mergeEmailStyles(
+        defaultButtonStyles,
+        block.styles || {}
+      );
+      const finalButtonClasses = generateEmailClasses("", block);
+
+      // Email-safe button using table structure for maximum compatibility
+      return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 24px 0;" class="button-spacing">
+        <tr>
+            <td align="center" class="mobile-center" mc:edit="button_block_${block.id}">
+                <!-- Button container with Outlook-specific VML fallback -->
+                <!--[if mso]>
+                <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${escapeHtml(buttonUrl)}" style="height:40px;v-text-anchor:middle;width:100%;max-width:200px;" arcsize="10%" stroke="f" fillcolor="${backgroundColor}">
+                    <w:anchorlock/>
+                    <center style="color:${textColor};font-family:Arial,sans-serif;font-size:14px;font-weight:500;">${escapeHtml(buttonText)}</center>
+                </v:roundrect>
+                <![endif]-->
+                <!-- Modern email client button -->
+                <!--[if !mso]><!-->
+                <a href="${escapeHtml(buttonUrl)}" target="_blank" rel="noopener noreferrer" class="email-button${finalButtonClasses ? ` ${finalButtonClasses}` : ""}" style="${finalButtonStyles}">${escapeHtml(buttonText)}</a>
+                <!--<![endif]-->
             </td>
         </tr>
     </table>`;

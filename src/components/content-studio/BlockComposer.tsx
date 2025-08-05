@@ -48,6 +48,7 @@ import {
   defaultEmailContainerConfig,
 } from "./EmailContainerConfig";
 import { CSSEditor } from "./CSSEditor";
+import { MarkdownPasteModal } from "./MarkdownPasteModal";
 
 // Custom hooks
 import { useFrontmatterOperations } from "@/hooks/useFrontmatterOperations";
@@ -141,6 +142,9 @@ export function BlockComposer({
   // Export modal state
   const [showExportModal, setShowExportModal] = useState(false);
 
+  // Markdown paste modal state
+  const [showMarkdownModal, setShowMarkdownModal] = useState(false);
+
   // Email container configuration
   const [emailContainerConfig, setEmailContainerConfig] =
     useState<EmailContainerConfig>(defaultEmailContainerConfig);
@@ -184,6 +188,7 @@ export function BlockComposer({
     addVideoBlock,
     addListBlock, // Added
     addHtmlBlock, // Added
+    addButtonBlock, // Added
   } = useBlockOperations(
     blocks,
     onBlocksChange,
@@ -577,6 +582,60 @@ export function BlockComposer({
     setEditorMode(mode);
   }, []);
 
+  // Handle markdown paste
+  const handlePasteMarkdown = useCallback(() => {
+    setShowMarkdownModal(true);
+  }, []);
+
+  // Handle importing blocks from markdown
+  const handleImportMarkdownBlocks = useCallback(
+    (markdownBlocks: ContentBlock[]) => {
+      if (markdownBlocks.length === 0) return;
+
+      // Find the insertion position
+      let insertPosition = blocks.length;
+      if (activeBlockId) {
+        const activeBlockIndex = blocks.findIndex(
+          (block) => block.id === activeBlockId
+        );
+        if (activeBlockIndex !== -1) {
+          insertPosition = activeBlockIndex + 1;
+        }
+      }
+
+      // Insert the new blocks and reorder
+      const updatedBlocks = [
+        ...blocks.slice(0, insertPosition),
+        ...markdownBlocks.map((block, index) => ({
+          ...block,
+          order: insertPosition + index,
+        })),
+        ...blocks.slice(insertPosition),
+      ];
+
+      // Reorder all blocks to have sequential order values
+      const reorderedBlocks = updatedBlocks.map((block, index) => ({
+        ...block,
+        order: index,
+      }));
+
+      onBlocksChange(reorderedBlocks);
+
+      // Set the first imported block as active
+      if (markdownBlocks.length > 0) {
+        setActiveBlockId(markdownBlocks[0].id);
+      }
+
+      toast({
+        title: "Markdown Imported",
+        description: `${markdownBlocks.length} content block${
+          markdownBlocks.length === 1 ? "" : "s"
+        } have been added from markdown.`,
+      });
+    },
+    [blocks, activeBlockId, onBlocksChange, toast]
+  );
+
   return (
     <div className="flex-1 space-y-6 pb-6">
       {/* CSS Stylesheet Injector */}
@@ -879,9 +938,11 @@ export function BlockComposer({
           onAddTextBlock={addTextBlock}
           onAddDividerBlock={addDividerBlock}
           onAddVideoBlock={addVideoBlock}
+          onAddButtonBlock={addButtonBlock}
           onAddFrontmatterBlock={addFrontmatterBlock}
           onAddListBlock={addListBlock} // Pass to toolbar
           onAddHtmlBlock={addHtmlBlock} // Pass to toolbar
+          onPasteMarkdown={handlePasteMarkdown}
           finalImages={finalImages}
           loadingImages={loadingImages}
           projectId={effectiveProjectId}
@@ -919,6 +980,14 @@ export function BlockComposer({
             selectedStylesheetId
           );
         }}
+      />
+
+      {/* Markdown Paste Modal */}
+      <MarkdownPasteModal
+        isOpen={showMarkdownModal}
+        onClose={() => setShowMarkdownModal(false)}
+        onPasteBlocks={handleImportMarkdownBlocks}
+        activeBlockId={activeBlockId}
       />
     </div>
   );
