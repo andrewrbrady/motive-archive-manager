@@ -22,10 +22,18 @@ import {
   Crop,
   Search,
   Filter,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import Image from "next/image";
 import { getEnhancedImageUrl } from "@/lib/imageUtils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CLOUDFLARE_VARIANTS } from "@/lib/cloudflare-image-loader";
 
 interface ImageViewModalProps {
   isOpen: boolean;
@@ -282,6 +290,8 @@ export function ImageViewModal({
   const [copiedFilename, setCopiedFilename] = useState(false);
   const [imageDimensions, setImageDimensions] =
     useState<ImageDimensions | null>(null);
+  const [selectedVariant, setSelectedVariant] =
+    useState<keyof typeof CLOUDFLARE_VARIANTS>("medium");
 
   // Find current image index for navigation
   const currentIndex = images.findIndex((img) => img._id === image?._id);
@@ -345,6 +355,47 @@ export function ImageViewModal({
       toast({
         title: "Error",
         description: "Failed to copy URL",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Build a Cloudflare variant URL from an existing Cloudflare Images URL
+  const buildVariantUrl = (
+    baseUrl: string,
+    variantKey: keyof typeof CLOUDFLARE_VARIANTS
+  ): string => {
+    try {
+      if (!baseUrl.includes("imagedelivery.net")) return baseUrl;
+      const match = baseUrl.match(
+        /https:\/\/imagedelivery\.net\/([^/]+)\/([^/]+)(?:\/(.+))?$/
+      );
+      if (!match) return baseUrl;
+      const [, accountHash, imageId] = match;
+      const variant = CLOUDFLARE_VARIANTS[variantKey];
+      return `https://imagedelivery.net/${accountHash}/${imageId}/${variant}`;
+    } catch {
+      return baseUrl;
+    }
+  };
+
+  const handleCopyVariantUrl = async (
+    variantKey: keyof typeof CLOUDFLARE_VARIANTS
+  ) => {
+    if (!image?.url) return;
+    try {
+      const urlToCopy = buildVariantUrl(image.url, variantKey);
+      await navigator.clipboard.writeText(urlToCopy);
+      setCopiedUrl(true);
+      toast({
+        title: "Copied!",
+        description: `Image URL (${variantKey}) copied to clipboard`,
+      });
+      setTimeout(() => setCopiedUrl(false), 2000);
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to copy variant URL",
         variant: "destructive",
       });
     }
@@ -598,19 +649,57 @@ export function ImageViewModal({
                   Copy Filename
                 </Button>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyUrl}
-                  className="justify-start"
-                >
-                  {copiedUrl ? (
-                    <Check className="h-4 w-4 mr-2 text-green-600" />
-                  ) : (
-                    <Copy className="h-4 w-4 mr-2" />
-                  )}
-                  Copy URL
-                </Button>
+                <div className="flex gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-between w-44"
+                      >
+                        <span className="capitalize">
+                          Variant: {selectedVariant}
+                        </span>
+                        <ChevronDown className="h-4 w-4 ml-2" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      {(
+                        [
+                          "public",
+                          "large",
+                          "medium",
+                          "thumbnail",
+                          "hero",
+                          "wide",
+                          "square",
+                          "gallery",
+                        ] as (keyof typeof CLOUDFLARE_VARIANTS)[]
+                      ).map((key) => (
+                        <DropdownMenuItem
+                          key={key}
+                          onClick={() => setSelectedVariant(key)}
+                          className="capitalize"
+                        >
+                          {key}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopyVariantUrl(selectedVariant)}
+                    className="justify-start flex-1"
+                  >
+                    {copiedUrl ? (
+                      <Check className="h-4 w-4 mr-2 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4 mr-2" />
+                    )}
+                    Copy URL
+                  </Button>
+                </div>
 
                 <Button
                   variant="outline"

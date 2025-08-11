@@ -49,6 +49,7 @@ interface SortableGalleryItemProps {
   isBatchMode?: boolean;
   isSelected?: boolean;
   onSelectionChange?: (isSelected: boolean) => void;
+  onView?: (image: any) => void;
 }
 
 interface RestoreOriginalData {
@@ -70,9 +71,10 @@ export function SortableGalleryItem({
   isBatchMode,
   isSelected,
   onSelectionChange,
+  onView,
 }: SortableGalleryItemProps) {
   const api = useAPI();
-  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  // Lightbox replaced by parent-controlled ImageViewModal
   const [isCopied, setIsCopied] = useState(false);
   const [isProcessingModalOpen, setIsProcessingModalOpen] = useState(false);
   const [processingType, setProcessingType] =
@@ -132,8 +134,8 @@ export function SortableGalleryItem({
     ? imageDimensions.width > imageDimensions.height
     : false;
 
-  // Use consistent aspect ratio for all gallery images to prevent layout shifts
-  const aspectRatio = 0.8; // 4:5 aspect ratio for consistent gallery layout
+  // Use consistent 3:2 aspect ratio across gallery
+  const aspectRatio = 1.5; // 3:2 aspect ratio
 
   const handleCopyUrl = async () => {
     try {
@@ -247,7 +249,9 @@ export function SortableGalleryItem({
     if (isBatchMode && onSelectionChange) {
       onSelectionChange(!isSelected);
     } else {
-      setIsLightboxOpen(true);
+      if (onView) {
+        onView(image);
+      }
     }
   };
 
@@ -278,7 +282,7 @@ export function SortableGalleryItem({
                 isBatchMode && isSelected && "border border-gray-400 p-1",
                 isBatchMode && "cursor-pointer"
               )}
-              onClick={isBatchMode ? handleImageClick : undefined}
+              onClick={handleImageClick}
             >
               <div
                 className={cn(
@@ -294,7 +298,6 @@ export function SortableGalleryItem({
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   className="object-contain bg-muted cursor-pointer"
                   priority={false}
-                  onClick={!isBatchMode ? handleImageClick : undefined}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
 
@@ -308,6 +311,8 @@ export function SortableGalleryItem({
                       className="p-1 bg-background/80 rounded-full hover:bg-primary/80 hover:text-white transition-colors focus:outline-none"
                       aria-label="Drag to reorder"
                       title="Drag to reorder"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
                     >
                       <GripVertical className="h-4 w-4" />
                     </button>
@@ -315,7 +320,10 @@ export function SortableGalleryItem({
                     {/* Restore button for processed images */}
                     {canRestore && (
                       <button
-                        onClick={handleRestore}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRestore();
+                        }}
                         disabled={isRestoring}
                         className="p-1 bg-background/80 rounded-full hover:bg-orange-600/80 hover:text-white transition-colors focus:outline-none"
                         aria-label="Restore original image"
@@ -327,7 +335,10 @@ export function SortableGalleryItem({
 
                     {/* Crop button for all images */}
                     <button
-                      onClick={handleCrop}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCrop();
+                      }}
                       className="p-1 bg-background/80 rounded-full hover:bg-green-600/80 hover:text-white transition-colors focus:outline-none"
                       aria-label="Crop image"
                       title="Crop image"
@@ -338,7 +349,10 @@ export function SortableGalleryItem({
                     {/* Canvas extension button for horizontal images */}
                     {isHorizontal && (
                       <button
-                        onClick={handleCanvasExtension}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCanvasExtension();
+                        }}
                         className="p-1 bg-background/80 rounded-full hover:bg-primary/80 hover:text-white transition-colors focus:outline-none"
                         aria-label="Extend canvas"
                         title="Extend canvas"
@@ -350,7 +364,10 @@ export function SortableGalleryItem({
                     {/* Image matte button for horizontal images */}
                     {isHorizontal && (
                       <button
-                        onClick={handleImageMatte}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleImageMatte();
+                        }}
                         className="p-1 bg-background/80 rounded-full hover:bg-purple-600/80 hover:text-white transition-colors focus:outline-none"
                         aria-label="Create image matte"
                         title="Create image matte"
@@ -361,7 +378,10 @@ export function SortableGalleryItem({
 
                     {/* Copy URL button */}
                     <button
-                      onClick={handleCopyUrl}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCopyUrl();
+                      }}
                       className="p-1 bg-background/80 rounded-full hover:bg-blue-600/80 hover:text-white transition-colors focus:outline-none"
                       aria-label="Copy URL"
                       title="Copy URL"
@@ -375,7 +395,10 @@ export function SortableGalleryItem({
 
                     {/* Delete button */}
                     <button
-                      onClick={() => onDelete(image)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(image);
+                      }}
                       className="p-1 bg-background/80 rounded-full hover:bg-destructive/80 hover:text-white transition-colors focus:outline-none"
                       aria-label="Delete image"
                       title="Delete image"
@@ -415,33 +438,6 @@ export function SortableGalleryItem({
           )}
         </Tooltip>
       </TooltipProvider>
-
-      <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
-        <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 overflow-hidden">
-          <div className="relative w-full h-[80vh]">
-            <Image
-              key={lightboxUrl}
-              src={lightboxUrl}
-              alt={image.filename || "Gallery image"}
-              fill
-              className="object-contain"
-              priority
-            />
-          </div>
-          {(image.filename || image.metadata?.description) && (
-            <div className="p-4 bg-background">
-              {image.filename && (
-                <p className="text-sm font-medium">{image.filename}</p>
-              )}
-              {image.metadata?.description && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  {image.metadata.description}
-                </p>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Unified Image Processing Modal */}
       {galleryId && (

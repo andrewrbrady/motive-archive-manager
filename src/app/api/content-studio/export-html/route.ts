@@ -113,8 +113,31 @@ function processStylesheetForEmail(cssContent: string): string {
   // CRITICAL: Remove HTML comments that can break style tags
   processedCSS = processedCSS.replace(/<!--[\s\S]*?-->/g, "");
 
-  // CRITICAL: Remove nested <style> and </style> tags that break CSS
-  processedCSS = processedCSS.replace(/<\/?style[^>]*>/gi, "");
+  // CRITICAL: Remove all <style> and </style> tags to prevent duplication
+  // This includes variations with attributes and different casing
+  processedCSS = processedCSS.replace(/<\s*\/?style[^>]*>/gi, "");
+
+  // ENHANCED: Remove any remaining HTML tag remnants that might cause issues
+  processedCSS = processedCSS.replace(/<\s*\/?\s*>/g, "");
+
+  // FIX: Common CSS syntax errors
+  // Fix malformed CSS like "width: 100% !important;g: 0 10px;" -> "width: 100% !important; padding: 0 10px;"
+  processedCSS = processedCSS.replace(/;\s*g:\s*([^;]+);/g, "; padding: $1;");
+
+  // Fix other common malformed CSS patterns
+  processedCSS = processedCSS.replace(
+    /;\s*([a-z]):\s*([^;]+);/g,
+    (match, prop, value) => {
+      // If the property is a single letter followed by a colon, it's likely malformed
+      if (prop.length === 1) {
+        console.warn(
+          `⚠️  Fixed malformed CSS property '${prop}:' -> 'padding:'`
+        );
+        return `; padding: ${value};`;
+      }
+      return match;
+    }
+  );
 
   // Remove MSO conditional comments and VML content
   processedCSS = processedCSS.replace(/\[if\s+mso\][\s\S]*?\[endif\]/gi, "");
@@ -142,7 +165,7 @@ function processStylesheetForEmail(cssContent: string): string {
 function processEmailCSSForSendGrid(cssContent: string): string {
   if (!cssContent) return "";
 
-  // Use the basic email processing first (includes HTML comment removal)
+  // Use the basic email processing first (includes HTML comment removal and style tag removal)
   let processedCSS = processStylesheetForEmail(cssContent);
 
   // Remove only the most dangerous patterns with very specific regex
@@ -217,11 +240,35 @@ function generateEmailHTMLFromBlocks(
   ]);
 
   // Process stylesheet CSS for email compatibility based on platform
-  const processedStylesheetCSS = stylesheetCSS
+  let processedStylesheetCSS = stylesheetCSS
     ? emailPlatform === "sendgrid"
       ? processEmailCSSForSendGrid(stylesheetCSS)
       : processStylesheetForEmail(stylesheetCSS)
     : "";
+
+  // SAFETY CHECK: Ensure no style tags remain in processed CSS
+  if (processedStylesheetCSS && /<\s*\/?style/i.test(processedStylesheetCSS)) {
+    console.warn(
+      "⚠️  Found remaining style tags in processed CSS, cleaning..."
+    );
+    processedStylesheetCSS = processedStylesheetCSS.replace(
+      /<\s*\/?style[^>]*>/gi,
+      ""
+    );
+  }
+
+  // ADD MOBILE RESPONSIVE PADDING: Override inline styles for mobile
+  if (processedStylesheetCSS) {
+    processedStylesheetCSS += `
+
+/* Mobile responsive padding override for inline styles */
+@media screen and (max-width: 600px) {
+    .inner-pad {
+        padding-left: 6px !important;
+        padding-right: 6px !important;
+    }
+}`;
+  }
 
   // Generate platform-specific HTML
   switch (emailPlatform) {
@@ -311,15 +358,19 @@ function generateSendGridHTML(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(title)}</title>
-  <style>
-    ${cleanCSS || ""}
-  </style>
+  ${
+    cleanCSS && cleanCSS.trim()
+      ? `<style>
+    ${cleanCSS}
+  </style>`
+      : ""
+  }
 </head>
 <body>
   <div class="email-container">${headerContent}
 
     <!-- Content -->
-    <div class="content">
+    <div class="content inner-pad" style="padding: 0 25px;">
       ${contentHTML}
     </div>
   </div>
@@ -364,221 +415,13 @@ function generateMailchimpHTML(
         </xml>
     </noscript>
     <![endif]-->
-    <style type="text/css">
-        /* Reset and base styles */
-        body, table, td, p, a, li, blockquote { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
-        table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
-        img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
-        
-        /* Body and tables */
-        body { 
-            margin: 0 !important; 
-            padding: 0 !important; 
-            width: 100% !important; 
-            min-width: 100% !important; 
-            background-color: #f4f4f4 !important;
-            font-family: Arial, sans-serif !important;
-            -webkit-text-size-adjust: 100% !important;
-            -ms-text-size-adjust: 100% !important;
-        }
-        table { 
-            border-collapse: collapse !important; 
-            mso-table-lspace: 0pt !important; 
-            mso-table-rspace: 0pt !important; 
-        }
-        img { 
-            border: 0 !important; 
-            height: auto !important; 
-            line-height: 100% !important; 
-            outline: none !important; 
-            text-decoration: none !important; 
-        }
-        
-        /* Layout */
-        .main-table { 
-            width: 100% !important; 
-            max-width: 600px !important; 
-            margin: 0 auto !important;
-            background-color: #ffffff !important; 
-        }
-        
-        /* Wrapper */
-        .email-wrapper {
-            width: 100% !important;
-            background-color: #f4f4f4 !important;
-            margin: 0 !important;
-            padding: 20px 0 !important;
-        }
-        
-        /* Padding */
-        .mobile-pad { padding: 12px !important; }
-        
-        /* Utils */
-        .mobile-stack { display: block !important; width: 100% !important; max-width: 100% !important; }
-        .mobile-center { text-align: center !important; }
-        
-        /* Images responsive by default */
-        img { max-width: 100% !important; width: auto !important; height: auto !important; }
-        .responsive-hero-image { 
-            height: auto !important; 
-            min-height: 100px !important; 
-            object-fit: cover !important; 
-            object-position: center !important;
-            max-width: 100% !important; 
-            width: 100% !important;
-        }
-        
-        /* Spacing - Override these in your custom stylesheet */
-        .block-spacing { margin-bottom: 16px; }
-        .block-spacing-sm { margin-bottom: 8px; }
-        .button-spacing { margin: 24px 0; }
-        .image-spacing { margin: 20px 0; }
-        .divider-spacing { margin: 24px 0; }
-        .no-margin-top { margin-top: 0; }
-        .no-margin-bottom { margin-bottom: 0; }
-        
-        /* Elements - Override these in your custom stylesheet */
-        .image-caption { 
-            font-family: Arial, sans-serif; 
-            font-size: 14px; 
-            line-height: 18px; 
-            color: #666666; 
-            font-style: italic; 
-            margin: 12px 0 0 0; 
-        }
-        .divider-line { 
-            border: none; 
-            border-top: 1px solid #ddd; 
-        }
-        
-        /* Clean edges */
-        .main-table .block-spacing:first-child { margin-top: 0 !important; }
-        .main-table .block-spacing:last-child { margin-bottom: 0 !important; }
-        .mobile-pad > .block-spacing:first-child { margin-top: 0 !important; }
-        .mobile-pad > .block-spacing:last-child { margin-bottom: 0 !important; }
-        
-        /* Typography - Override these in your custom stylesheet */
-        h1, h2, h3, h4, h5, h6 { 
-            font-family: Arial, sans-serif; 
-            font-weight: bold; 
-            margin: 0; 
-            padding: 0; 
-            color: #333333;
-        }
-        p { 
-            font-family: Arial, sans-serif; 
-            font-size: 16px; 
-            line-height: 24px; 
-            margin: 0 0 16px 0; 
-            color: #333333;
-        }
-        
-        /* Button foundation - Fully customizable via your stylesheet */
-        .email-button {
-            display: inline-block;
-            text-decoration: none;
-            border: none;
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-            font-weight: 500;
-            line-height: 1.4;
-            cursor: pointer;
-        }
-        
-        /*
-        HOW TO CUSTOMIZE YOUR EMAILS:
-        
-        1. Typography: Override defaults
-           h3 { font-size: 14px; }
-           p { font-size: 18px; }
-        
-        2. Buttons: Full control over styling
-           .email-button { 
-               font-family: 'Helvetica', Arial, sans-serif;
-               font-size: 16px;
-               font-weight: 600;
-               line-height: 1.2;
-           }
-           .btn-primary { background-color: #222222; color: #ffffff; }
-           .cta-button { 
-               background: linear-gradient(45deg, #ff6b6b, #ee5a24);
-               font-size: 18px;
-               font-weight: bold;
-           }
-        
-        3. Spacing: Use margin/padding utilities
-           .my-spacing { margin: 40px 0; }
-        
-        4. Responsive: Add mobile overrides
-           @media screen and (max-width: 600px) {
-               .email-button { font-size: 18px !important; }
-               h3 { font-size: 18px !important; }
-           }
-        */
-        
-        /* Mobile */
-        @media screen and (max-width: 600px) {
-
-            .main-table { max-width: 100% !important; }
-            .email-wrapper { padding: 10px 0 !important; }
-            .mobile-stack { display: block !important; width: 100% !important; }
-            .mobile-center { text-align: center !important; }
-            .mobile-pad { padding: 12px !important; }
-            
-
-            h1, h1 * { font-size: 28px !important; line-height: 34px !important; }
-            h2, h2 * { font-size: 24px !important; line-height: 30px !important; }
-            h3, h3 * { font-size: 20px !important; line-height: 26px !important; }
-            p, p * { font-size: 16px !important; line-height: 24px !important; }
-            
-
-            td h1 { font-size: 28px !important; line-height: 34px !important; }
-            td h2 { font-size: 24px !important; line-height: 30px !important; }
-            td h3 { font-size: 20px !important; line-height: 26px !important; }
-            
-
-            .block-spacing { margin-bottom: 12px !important; }
-            .button-spacing { margin: 20px 0 !important; }
-            .image-spacing { margin: 16px 0 !important; }
-            .divider-spacing { margin: 20px 0 !important; }
-            
-
-            .responsive-hero-image { 
-                height: auto !important; 
-                min-height: 100px !important; 
-                width: 100% !important;
-            }
-        }
-        
-        /* Desktop */
-        @media (min-width: 601px) {
-
-            .main-table { max-width: 600px; }
-            .mobile-pad { padding: 30px; }
-            .block-spacing { margin-bottom: 20px; }
-            .button-spacing { margin: 28px 0; }
-            .image-spacing { margin: 24px 0; }
-            .divider-spacing { margin: 28px 0; }
-            
-
-            h1, h1 * { font-size: 32px; line-height: 38px; }
-            h2, h2 * { font-size: 28px; line-height: 34px; }
-            h3, h3 * { font-size: 24px; line-height: 30px; }
-        }
-        
-        ${dynamicCSS}
-        
-        ${processedStylesheetCSS}
-        
-        /* Dark mode styles - Only apply to elements that explicitly opt-in */
-        @media (prefers-color-scheme: dark) {
-            .dark-bg { background-color: #1a1a1a !important; }
-            .dark-text { color: #ffffff !important; }
-            .dark-link { color: #4a9eff !important; }
-            /* Keep default text dark for email compatibility */
-            body, h1, h2, h3, h4, h5, h6, p, li { color: #333333 !important; }
-        }
-    </style>
+    ${
+      processedStylesheetCSS && processedStylesheetCSS.trim()
+        ? `<style type="text/css">
+        ${dynamicCSS ? dynamicCSS + "\n\n" : ""}${processedStylesheetCSS}
+    </style>`
+        : ""
+    }
 </head>
 <body style="margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #f4f4f4; width: 100%; overflow-x: hidden;" class="email-body">
     ${previewText ? `<div style="display: none; max-height: 0; overflow: hidden;">${escapeHtml(previewText)}</div>` : ""}
@@ -593,7 +436,7 @@ function generateMailchimpHTML(
                 <!-- Main content -->
                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="main-table">
                     <tr>
-                        <td class="mobile-pad">
+                        <td class="inner-pad" style="padding: 0 25px;">
                             ${contentHTML}
                         </td>
                     </tr>
@@ -649,22 +492,18 @@ function generateGenericEmailHTML(
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${escapeHtml(title)}</title>
-    <style>
-        /* Generic email styles */
-        body { margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #ffffff; }
-        table { border-collapse: collapse; }
-        img { max-width: 100%; height: auto; }
-        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
-        .content { padding: 20px; }
-        
-        ${processedStylesheetCSS}
-        ${dynamicCSS}
-    </style>
+    ${
+      processedStylesheetCSS && processedStylesheetCSS.trim()
+        ? `<style>
+        ${dynamicCSS ? dynamicCSS + "\n\n" : ""}${processedStylesheetCSS}
+    </style>`
+        : ""
+    }
 </head>
 <body>
     ${headerHTML}
     <div class="container">
-        <div class="content">
+        <div class="content inner-pad" style="padding: 0 25px;">
             ${contentHTML}
         </div>
     </div>
@@ -782,8 +621,20 @@ function generateSendGridBlocksHTML(blocks: any[]): string {
         case "image":
           return generateSendGridImageHTML(block);
         case "divider": {
+          const dividerBlock = block as DividerBlock;
+          const thickness = dividerBlock.thickness || "1px";
+          const color = dividerBlock.color || "#e1e4e8";
+          const margin = dividerBlock.margin || "24px";
+
+          // Default divider styles and apply block styles for SendGrid
+          const defaultDividerStyles = `border: none; border-top: ${thickness} solid ${color}; margin: ${margin} 0; height: 1px; font-size: 1px; line-height: 1px`;
+          const finalDividerStyles = mergeEmailStyles(
+            defaultDividerStyles,
+            block.styles || {}
+          );
           const dividerClasses = generateEmailClasses("", block);
-          return `<hr${dividerClasses ? ` class="${dividerClasses} divider-spacing divider-line"` : ' class="divider-spacing divider-line"'}>`;
+
+          return `<hr${dividerClasses ? ` class="${dividerClasses} divider-spacing divider-line"` : ' class="divider-spacing divider-line"'} style="${finalDividerStyles}">`;
         }
         case "video": {
           const videoClasses = generateEmailClasses("", block);
@@ -1124,7 +975,7 @@ function generateEmailBlockHTML(block: ContentBlock): string {
       const imageBlock = block as ImageBlock;
       const altText = imageBlock.altText || "";
       const alignment = imageBlock.alignment || "center";
-      const width = imageBlock.width === "100%" ? "540" : imageBlock.width;
+      const width = imageBlock.width === "100%" ? "600" : imageBlock.width;
 
       // Email-specific properties
       const isFullWidth = imageBlock.email?.isFullWidth || false;
@@ -1215,15 +1066,15 @@ function generateEmailBlockHTML(block: ContentBlock): string {
 <!-- Resume main content table -->
 <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px;" class="dark-bg mobile-stack main-table">
     <tr>
-        <td class="mobile-pad">`;
+        <td class="inner-pad" style="padding: 0 25px;">`;
       }
 
       // Standard image block (non-full-width)
-      // Convert percentage width to pixels (assuming 540px max content width)
+      // Convert percentage width to pixels (assuming 600px max content width)
       let pixelWidth = width;
       if (typeof width === "string" && width.includes("%")) {
         const percentage = parseInt(width.replace("%", ""));
-        pixelWidth = Math.round((540 * percentage) / 100).toString();
+        pixelWidth = Math.round((600 * percentage) / 100).toString();
       }
 
       const alignStyle =
@@ -1315,7 +1166,7 @@ function generateEmailBlockHTML(block: ContentBlock): string {
             <td mc:edit="divider_block_${block.id}">
                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                     <tr>
-                        <td class="divider-line${finalDividerClasses ? ` ${finalDividerClasses}` : ""}">&nbsp;</td>
+                        <td class="divider-line${finalDividerClasses ? ` ${finalDividerClasses}` : ""}" style="${finalDividerStyles}">&nbsp;</td>
                     </tr>
                 </table>
             </td>
@@ -1386,9 +1237,33 @@ function generateHTMLFromBlocks(
     .join("\n");
 
   // Process stylesheet CSS for email compatibility
-  const processedStylesheetCSS = stylesheetCSS
+  let processedStylesheetCSS = stylesheetCSS
     ? processStylesheetForEmail(stylesheetCSS)
     : "";
+
+  // SAFETY CHECK: Ensure no style tags remain in processed CSS
+  if (processedStylesheetCSS && /<\s*\/?style/i.test(processedStylesheetCSS)) {
+    console.warn(
+      "⚠️  Found remaining style tags in processed CSS, cleaning..."
+    );
+    processedStylesheetCSS = processedStylesheetCSS.replace(
+      /<\s*\/?style[^>]*>/gi,
+      ""
+    );
+  }
+
+  // ADD MOBILE RESPONSIVE PADDING: Override inline styles for mobile
+  if (processedStylesheetCSS) {
+    processedStylesheetCSS += `
+
+/* Mobile responsive padding override for inline styles */
+@media screen and (max-width: 600px) {
+    .inner-pad {
+        padding-left: 6px !important;
+        padding-right: 6px !important;
+    }
+}`;
+  }
 
   // Create complete HTML document
   const html = `<!DOCTYPE html>
@@ -1483,7 +1358,7 @@ function generateHTMLFromBlocks(
     </style>
 </head>
 <body>
-    <div class="content">
+    <div class="content inner-pad" style="padding: 0 25px;">
         ${blockHTML}
     </div>
 </body>

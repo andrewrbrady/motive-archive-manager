@@ -16,74 +16,21 @@ export function fixCloudflareImageUrl(url: string | null | undefined): string {
     return "https://placehold.co/600x400?text=No+Image";
   }
 
-  // Check cache first for performance optimization
-  const cacheKey = url.trim();
-  if (urlCache.has(cacheKey)) {
-    return urlCache.get(cacheKey)!;
-  }
+  // SIMPLIFIED: Just return the base URL without transformation
+  // Let CloudflareImage component handle variants to avoid conflicts
+  const cleanUrl = url.trim();
 
-  let result: string;
-
-  // Handle Cloudflare URLs
-  if (url.includes("imagedelivery.net")) {
-    // List of all known Cloudflare variants
-    const variants = [
-      "/public",
-      "/thumbnail",
-      "/medium",
-      "/large",
-      "/highres",
-      "/small",
-      "/avatar",
-      "/webp",
-      "/preview",
-      "/original",
-    ];
-
-    // Check if URL already has a variant
-    const hasVariant = variants.some((variant) => url.includes(variant));
-
-    if (!hasVariant) {
-      // No variant found, add /public
-      result = `${url}/public`;
-    } else {
-      // Already has a variant, but check for malformed double variants
-      let cleanUrl = url;
-
-      // Remove any trailing variants that might be duplicated
-      // This handles cases like "/small/public" by cleaning them up
-      const variantPattern = new RegExp(
-        `(${variants.map((v) => v.replace("/", "\\/")).join("|")})(${variants.map((v) => v.replace("/", "\\/")).join("|")})+$`
-      );
-
-      if (variantPattern.test(url)) {
-        // Remove all trailing variants and add /public
-        const baseUrlMatch = url.match(
-          /^(https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+)/
-        );
-        if (baseUrlMatch) {
-          cleanUrl = `${baseUrlMatch[1]}/public`;
-        }
-      }
-
-      result = cleanUrl;
-    }
-  } else {
-    // Return as-is for non-Cloudflare URLs
-    result = url;
-  }
-
-  // Cache the result for future use (limit cache size to prevent memory leaks)
-  if (urlCache.size > 1000) {
-    // Clear oldest entries if cache gets too large
-    const firstKey = urlCache.keys().next().value;
-    if (firstKey) {
-      urlCache.delete(firstKey);
+  // For Cloudflare URLs, extract base URL only (no variants)
+  if (cleanUrl.includes("imagedelivery.net")) {
+    const baseUrlMatch = cleanUrl.match(
+      /^(https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+)/
+    );
+    if (baseUrlMatch) {
+      return baseUrlMatch[1]; // Return base URL without any variants
     }
   }
-  urlCache.set(cacheKey, result);
 
-  return result;
+  return cleanUrl;
 }
 
 /**

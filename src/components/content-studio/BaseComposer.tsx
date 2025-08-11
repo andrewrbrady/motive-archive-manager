@@ -525,6 +525,48 @@ export function BaseComposer({
     [blocks, activeBlockId, onBlocksChange, toast]
   );
 
+  // Handle uploaded images - convert to image blocks and refresh galleries
+  const handleImagesUploaded = useCallback(
+    async (uploadedImages: { url: string; galleryId: string }[]) => {
+      try {
+        // Add each uploaded image as an image block
+        for (const image of uploadedImages) {
+          // Create image object with proper structure
+          const imageObject = {
+            _id: `temp_${Date.now()}_${Math.random()}`,
+            url: image.url,
+            altText: "",
+            metadata: {
+              uploadedFrom: "base-composer",
+              galleryId: image.galleryId,
+            },
+          };
+
+          // Add image block using existing function
+          addImageFromGallery(image.url, "", imageObject);
+        }
+
+        // Refresh gallery images to show newly uploaded images
+        if (refetchImages) {
+          await refetchImages();
+        }
+
+        toast({
+          title: "Images Uploaded",
+          description: `${uploadedImages.length} image(s) added to composition`,
+        });
+      } catch (error) {
+        console.error("Error handling uploaded images:", error);
+        toast({
+          title: "Error",
+          description: "Failed to add uploaded images to composition",
+          variant: "destructive",
+        });
+      }
+    },
+    [addImageFromGallery, refetchImages, toast]
+  );
+
   // Save composition functionality
   const saveComposition = useCallback(
     async (name: string) => {
@@ -1119,6 +1161,7 @@ export function BaseComposer({
           projectId={effectiveProjectId}
           onRefreshImages={refetchImages}
           onAddImage={addImageFromGallery}
+          onImagesUploaded={handleImagesUploaded}
           onSave={handleSaveClick}
           isSaving={isSaving}
           canSave={blocks.length > 0}

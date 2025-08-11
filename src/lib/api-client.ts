@@ -176,13 +176,13 @@ class APIClient {
    * Now uses the centralized getValidToken function
    */
   private async getAuthHeaders(skipAuth = false): Promise<HeadersInit> {
+    if (skipAuth) {
+      return {}; // Return empty headers for uploads to let browser set Content-Type
+    }
+
     const baseHeaders: HeadersInit = {
       "Content-Type": "application/json",
     };
-
-    if (skipAuth) {
-      return baseHeaders;
-    }
 
     try {
       const token = await getValidToken(); // Using centralized function
@@ -507,19 +507,37 @@ class APIClient {
     formData: FormData,
     options?: Omit<RequestOptions, "method" | "body" | "headers">
   ): Promise<T> {
-    // For uploads, we don't set Content-Type (let browser set it with boundary)
-    const authHeaders = await this.getAuthHeaders();
-    const { Authorization } = authHeaders as Record<string, string>;
+    // For uploads, let browser set ALL headers including Content-Type with boundary
+    try {
+      const token = await getValidToken();
 
-    return this.request<T>(endpoint, {
-      ...options,
-      method: "POST",
-      body: formData,
-      headers: {
-        Authorization, // Only include auth header, not Content-Type
-      },
-      skipAuth: true, // We manually added auth header above
-    });
+      // Construct the full URL
+      let url: string;
+      if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) {
+        url = endpoint;
+      } else if (endpoint.startsWith("/api/")) {
+        url = endpoint;
+      } else if (endpoint.startsWith("/")) {
+        url = `/api${endpoint}`;
+      } else {
+        url = `${this.baseURL}/${endpoint}`;
+      }
+
+      // Make request directly with fetch, only setting Authorization header
+      const response = await fetch(url, {
+        ...options,
+        method: "POST",
+        body: formData,
+        headers: {
+          Authorization: `Bearer ${token}`, // Only auth header, let browser set Content-Type
+        },
+      });
+
+      return this.handleResponse<T>(response);
+    } catch (error) {
+      console.error("💥 APIClient: Failed to upload:", error);
+      throw error;
+    }
   }
 
   /**

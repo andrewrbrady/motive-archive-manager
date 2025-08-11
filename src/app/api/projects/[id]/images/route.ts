@@ -3,6 +3,11 @@ import { MongoClient, ObjectId, UpdateFilter } from "mongodb";
 import { getDatabase, getMongoClient } from "@/lib/mongodb";
 import { DB_NAME } from "@/constants";
 import { fixCloudflareImageUrl } from "@/lib/image-utils";
+import {
+  verifyAuthMiddleware,
+  verifyFirebaseToken,
+  getUserIdFromToken,
+} from "@/lib/firebase-auth-middleware";
 
 // ✅ PERFORMANCE FIX: Images change less frequently
 export const revalidate = 600; // 10 minutes
@@ -408,12 +413,31 @@ export async function GET(request: Request) {
 }
 
 // POST - Upload new images for a project
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const url = new URL(request.url);
   const segments = url.pathname.split("/");
   const id = segments[segments.length - 2];
 
+  // Check authentication
+  const authResult = await verifyAuthMiddleware(request);
+  if (authResult) {
+    return authResult;
+  }
+
   try {
+    // Get token data and extract user ID
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.split("Bearer ")[1];
+    const tokenData = await verifyFirebaseToken(token);
+
+    if (!tokenData) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const userId = getUserIdFromToken(tokenData);
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid project ID format" },
@@ -443,12 +467,31 @@ export async function POST(request: Request) {
     const db = await getDatabase();
     const projectObjectId = new ObjectId(id);
 
-    // Check if project exists
+    // Check if project exists and user has access
     const project = await db
       .collection("projects")
       .findOne({ _id: projectObjectId });
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    // Check if user has permission to upload images
+    const isMember = project.members?.some(
+      (member: any) => member.userId === userId
+    );
+    const isOwner = project.ownerId === userId;
+    const canUpload =
+      isOwner ||
+      (isMember &&
+        ["owner", "manager", "photographer", "editor"].includes(
+          project.members.find((m: any) => m.userId === userId)?.role
+        ));
+
+    if (!canUpload) {
+      return NextResponse.json(
+        { error: "Insufficient permissions to upload images" },
+        { status: 403 }
+      );
     }
 
     const uploadedImages = [];

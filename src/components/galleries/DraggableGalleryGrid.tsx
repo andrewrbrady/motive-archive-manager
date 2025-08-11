@@ -34,6 +34,8 @@ import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import { BatchCanvasExtensionModal } from "./BatchCanvasExtensionModal";
 import { BatchImageMatteModal } from "./BatchImageMatteModal";
 import { Input } from "@/components/ui/input";
+import { ImageViewModal } from "@/components/cars/ImageViewModal";
+import { ImageData } from "@/app/images/columns";
 
 interface DraggableGalleryGridProps {
   gallery: Gallery;
@@ -57,6 +59,11 @@ export function DraggableGalleryGrid({
   const [isBatchImageMatteOpen, setIsBatchImageMatteOpen] =
     React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
+
+  // Image view modal state
+  const [isImageViewModalOpen, setIsImageViewModalOpen] = React.useState(false);
+  const [selectedImageForView, setSelectedImageForView] =
+    React.useState<ImageData | null>(null);
 
   const getOrderedItems = React.useCallback((gallery: Gallery) => {
     if (
@@ -101,6 +108,13 @@ export function DraggableGalleryGrid({
       return false;
     });
   }, [items, searchQuery, gallery.images]);
+
+  // Build ordered list of images for the modal based on current filter/order
+  const orderedFilteredImages: ImageData[] = React.useMemo(() => {
+    return filteredItems
+      .map((item) => gallery.images?.find((img: any) => img._id === item.id))
+      .filter(Boolean) as ImageData[];
+  }, [filteredItems, gallery.images]);
 
   // Keep track of the last successful order to handle errors
   const lastSuccessfulOrder = React.useRef(items);
@@ -236,6 +250,27 @@ export function DraggableGalleryGrid({
       // If no dimensions available, we'll include it and let the processing handle it
       return true;
     });
+  };
+
+  const handleOpenImageView = (image: any) => {
+    // Ensure the image has the fields expected by ImageViewModal's ImageData
+    const normalized: ImageData = {
+      _id: image._id,
+      url: image.url,
+      filename: image.filename,
+      metadata: image.metadata || {},
+      // Optional fields used by the modal if present
+      createdAt: (image as any).createdAt,
+      updatedAt: (image as any).updatedAt,
+      carId: (image as any).carId,
+    } as unknown as ImageData;
+
+    setSelectedImageForView(normalized);
+    setIsImageViewModalOpen(true);
+  };
+
+  const handleNavigateImage = (nextImage: ImageData) => {
+    setSelectedImageForView(nextImage);
   };
 
   const handleBatchCanvasExtension = () => {
@@ -432,6 +467,7 @@ export function DraggableGalleryGrid({
                     onSelectionChange={(isSelected) =>
                       handleImageSelection(item.id, isSelected)
                     }
+                    onView={handleOpenImageView}
                   />
                 );
               });
@@ -458,6 +494,20 @@ export function DraggableGalleryGrid({
         onBatchProcessingComplete={handleBatchProcessingComplete}
         onImageProcessed={onImageProcessed}
       />
+
+      {/* Image view modal for detailed info, like /images page */}
+      {selectedImageForView && (
+        <ImageViewModal
+          isOpen={isImageViewModalOpen}
+          onClose={() => {
+            setIsImageViewModalOpen(false);
+            setSelectedImageForView(null);
+          }}
+          image={selectedImageForView}
+          images={orderedFilteredImages}
+          onNavigate={handleNavigateImage}
+        />
+      )}
     </div>
   );
 }

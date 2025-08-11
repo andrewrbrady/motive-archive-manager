@@ -43,22 +43,35 @@ export function CloudflareImage({
   const imageRef = useRef<HTMLImageElement>(null);
   const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
 
-  // Phase 2: Fix missing Cloudflare variants - ensure URL has proper variant
+  // FIXED: Use flexible resizing instead of named variants to avoid 404s
   const optimizedSrc = useMemo(() => {
     if (src.includes("imagedelivery.net")) {
-      // Check if URL already has a variant or transform params
-      const hasVariant = src.match(/\/[^\/]+(?:,.*)?$/);
+      // Extract base URL (account + image ID)
+      const baseUrlMatch = src.match(
+        /^(https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+)/
+      );
+      if (!baseUrlMatch) return src;
 
-      if (hasVariant) {
-        // URL has a variant - replace it with the correct one
-        const cloudflareVariant = CLOUDFLARE_VARIANTS[variant] || "public";
-        const baseUrl = src.replace(/\/[^\/]+(?:,.*)?$/, "");
-        return `${baseUrl}/${cloudflareVariant}`;
-      } else {
-        // Missing variant - append the correct one based on variant prop
-        const cloudflareVariant = CLOUDFLARE_VARIANTS[variant] || "public";
-        return `${src}/${cloudflareVariant}`;
-      }
+      const baseUrl = baseUrlMatch[1];
+
+      // Use flexible resizing based on variant
+      const getFlexibleParams = (variant: string) => {
+        switch (variant) {
+          case "thumbnail":
+            return "w=200,h=150,fit=cover,q=85";
+          case "medium":
+            return "w=600,h=400,fit=cover,q=85";
+          case "large":
+            return "w=1200,h=800,fit=cover,q=85";
+          case "hero":
+            return "w=1920,q=90";
+          default:
+            return "public"; // Use original for fallback
+        }
+      };
+
+      const params = getFlexibleParams(variant);
+      return `${baseUrl}/${params}`;
     }
     return src;
   }, [src, variant]);

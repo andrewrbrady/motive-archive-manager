@@ -171,11 +171,11 @@ export async function POST(request: NextRequest) {
     let metadata = {};
     let extractedProjectId: string | null = null;
 
-    if (analysisResult) {
-      metadata = analysisResult;
-    } else if (customMetadata) {
+    // FIRST: Always parse custom metadata to extract projectId (if present)
+    if (customMetadata) {
       try {
         const parsedMetadata = JSON.parse(customMetadata);
+        console.log(`🔍 Parsing custom metadata:`, parsedMetadata);
 
         // Extract projectId from metadata if present
         if (parsedMetadata.projectId) {
@@ -186,14 +186,39 @@ export async function POST(request: NextRequest) {
           const { projectId, ...cleanMetadata } = parsedMetadata;
           metadata = cleanMetadata;
         } else {
+          console.log(
+            `⚠️ No projectId found in metadata:`,
+            Object.keys(parsedMetadata)
+          );
           metadata = parsedMetadata;
         }
       } catch (error) {
         console.error(`Failed to parse custom metadata:`, error);
       }
+    } else {
+      console.log(`ℹ️ No custom metadata provided`);
+    }
+
+    // SECOND: If we have analysis results, merge them with existing metadata (preserving projectId extraction)
+    if (analysisResult) {
+      console.log(
+        `🤖 Merging AI analysis results with existing metadata. ProjectId preserved: ${extractedProjectId}`
+      );
+      metadata = {
+        ...metadata, // Keep original metadata (without projectId)
+        ...analysisResult, // Add AI analysis results
+      };
     }
 
     // Create image document
+    console.log(`📄 Creating image document with:`, {
+      hasCarId: !!carId,
+      carId,
+      hasExtractedProjectId: !!extractedProjectId,
+      extractedProjectId,
+      metadataKeys: Object.keys(metadata),
+    });
+
     const imageDoc: Omit<Image, "_id"> = {
       cloudflareId,
       url: imageUrl,
@@ -227,18 +252,41 @@ export async function POST(request: NextRequest) {
       );
 
       try {
-        const projectUpdateResult = await collections.projects.updateOne(
-          { _id: new ObjectId(extractedProjectId) },
-          {
-            $push: { imageIds: imageId },
-            $set: { updatedAt: now },
-          }
-        );
+        // First verify the project exists
+        const existingProject = await collections.projects.findOne({
+          _id: new ObjectId(extractedProjectId),
+        });
 
-        if (projectUpdateResult.matchedCount === 0) {
-          console.error(`❌ Project ${extractedProjectId} not found!`);
+        if (!existingProject) {
+          console.error(
+            `❌ Project ${extractedProjectId} not found in database!`
+          );
         } else {
-          console.log(`✅ Associated image with project ${extractedProjectId}`);
+          console.log(
+            `✅ Found project ${extractedProjectId}: ${(existingProject as any).title || "Untitled"}`
+          );
+
+          const projectUpdateResult = await collections.projects.updateOne(
+            { _id: new ObjectId(extractedProjectId) },
+            {
+              $addToSet: { imageIds: imageId },
+              $set: { updatedAt: now },
+            }
+          );
+
+          if (projectUpdateResult.matchedCount === 0) {
+            console.error(
+              `❌ Project ${extractedProjectId} not matched for update!`
+            );
+          } else if (projectUpdateResult.modifiedCount === 0) {
+            console.log(
+              `ℹ️ Image ${imageId} already associated with project ${extractedProjectId}`
+            );
+          } else {
+            console.log(
+              `✅ Successfully associated image ${imageId} with project ${extractedProjectId}`
+            );
+          }
         }
       } catch (error) {
         console.error(

@@ -12,6 +12,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Loader2, ImageIcon, RefreshCw, Plus, X, Search } from "lucide-react";
+import { CloudflareImage } from "@/components/ui/CloudflareImage";
 
 interface GalleryImageProps {
   image: any;
@@ -94,15 +95,17 @@ const GalleryImage = React.memo<GalleryImageProps>(function GalleryImage({
               </span>
             </div>
           ) : (
-            <img
+            <CloudflareImage
               src={image.imageUrl}
               alt={image.alt || "Gallery image"}
+              width={160}
+              height={120}
               className={`w-full aspect-[4/3] object-cover group-hover:scale-105 transition-all bg-muted/10 ${
                 isLoaded ? "opacity-100" : "opacity-0"
               }`}
+              variant="thumbnail"
               onError={handleImageError}
               onLoad={handleImageLoad}
-              loading="lazy"
             />
           )}
 

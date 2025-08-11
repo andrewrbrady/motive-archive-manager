@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { ImageGalleryPopup } from "./ImageGalleryPopup";
 import { BlockGroupsManager } from "./BlockGroupsManager";
+import { BlockComposerImageUploader } from "./BlockComposerImageUploader";
 import { ContentBlock } from "./types";
 
 interface ContentInsertionToolbarProps {
@@ -40,6 +41,8 @@ interface ContentInsertionToolbarProps {
   projectId?: string;
   onRefreshImages?: () => void;
   onAddImage?: (imageUrl: string, altText?: string, imageObject?: any) => void;
+  // Image upload props
+  onImagesUploaded?: (images: { url: string; galleryId: string }[]) => void;
   // Save functionality
   onSave?: () => void;
   isSaving?: boolean;
@@ -75,6 +78,7 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
     projectId,
     onRefreshImages,
     onAddImage,
+    onImagesUploaded,
     onSave,
     isSaving = false,
     canSave = false,
@@ -169,6 +173,16 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                         <ImageIcon className="h-4 w-4" />
                       </Button>
                     </ImageGalleryPopup>
+                  )}
+
+                  {/* Image Upload Button */}
+                  {onImagesUploaded && (
+                    <BlockComposerImageUploader
+                      projectId={projectId}
+                      carId={carId}
+                      onImagesUploaded={onImagesUploaded}
+                      className="hover:bg-muted/20"
+                    />
                   )}
                   {onAddFrontmatterBlock && (
                     <Button
@@ -338,6 +352,16 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                         Add Images
                       </Button>
                     </ImageGalleryPopup>
+                  )}
+
+                  {/* Image Upload Button */}
+                  {onImagesUploaded && (
+                    <BlockComposerImageUploader
+                      projectId={projectId}
+                      carId={carId}
+                      onImagesUploaded={onImagesUploaded}
+                      className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+                    />
                   )}
 
                   {/* Frontmatter Block Button */}

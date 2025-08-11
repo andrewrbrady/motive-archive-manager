@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import ImageUploader from "./ImageUploader";
 
 interface ProjectImageUploadProps {

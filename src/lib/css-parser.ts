@@ -280,8 +280,31 @@ export function processStylesheetForEmail(cssContent: string): string {
   // CRITICAL: Remove HTML comments that can break style tags
   processedCSS = processedCSS.replace(/<!--[\s\S]*?-->/g, "");
 
-  // CRITICAL: Remove nested <style> and </style> tags that break CSS
-  processedCSS = processedCSS.replace(/<\/?style[^>]*>/gi, "");
+  // CRITICAL: Remove all <style> and </style> tags to prevent duplication
+  // This includes variations with attributes and different casing
+  processedCSS = processedCSS.replace(/<\s*\/?style[^>]*>/gi, "");
+
+  // ENHANCED: Remove any remaining HTML tag remnants that might cause issues
+  processedCSS = processedCSS.replace(/<\s*\/?\s*>/g, "");
+
+  // FIX: Common CSS syntax errors
+  // Fix malformed CSS like "width: 100% !important;g: 0 10px;" -> "width: 100% !important; padding: 0 10px;"
+  processedCSS = processedCSS.replace(/;\s*g:\s*([^;]+);/g, "; padding: $1;");
+
+  // Fix other common malformed CSS patterns
+  processedCSS = processedCSS.replace(
+    /;\s*([a-z]):\s*([^;]+);/g,
+    (match, prop, value) => {
+      // If the property is a single letter followed by a colon, it's likely malformed
+      if (prop.length === 1) {
+        console.warn(
+          `⚠️  Fixed malformed CSS property '${prop}:' -> 'padding:'`
+        );
+        return `; padding: ${value};`;
+      }
+      return match;
+    }
+  );
 
   // Remove MSO conditional comments and VML content
   processedCSS = processedCSS.replace(/\[if\s+mso\][\s\S]*?\[endif\]/gi, "");

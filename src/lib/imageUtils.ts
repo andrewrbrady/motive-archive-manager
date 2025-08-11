@@ -15,57 +15,34 @@ export function getEnhancedImageUrl(
   width?: string,
   quality?: string
 ): string {
-  // Centralized URL transformation for named variants
-
   // Early return for empty or invalid URLs
   if (!baseUrl || typeof baseUrl !== "string") {
     return baseUrl || "";
   }
 
-  // Map requested dimensions to configured named variants
-  const getNamedVariant = (requestedWidth?: string) => {
-    if (!requestedWidth) return "public";
-
-    const w = parseInt(requestedWidth);
-    // Use actual Cloudflare variants:
-    // thumbnail: 200x150, medium: 600x400, large: 1200x800, highres: 3000x2000
-    if (w <= 200) return "thumbnail";
-    if (w <= 600) return "medium";
-    if (w <= 1200) return "large";
-    return "highres";
-  };
-
-  // Handle Cloudflare imagedelivery.net URLs
+  // Cloudflare Images (imagedelivery.net) — prefer flexible params over named variants
   if (baseUrl.includes("imagedelivery.net")) {
-    const urlParts = baseUrl.split("/");
-    const targetVariant = getNamedVariant(width);
+    // Extract base: https://imagedelivery.net/{account}/{imageId}
+    const match = baseUrl.match(
+      /^(https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+)/
+    );
+    const baseWithId = match ? match[1] : baseUrl;
 
-    // FIXED: Strip existing variants (including double variants like /large/public)
-    // Find the cloudflare ID part (format: account/imageId)
-    let cleanUrl = baseUrl;
-    if (urlParts.length >= 5) {
-      // Extract base: https://imagedelivery.net/account/imageId
-      const baseWithId = urlParts.slice(0, 5).join("/");
-      cleanUrl = baseWithId;
+    const params: string[] = [];
+    if (width && width.trim() !== "") params.push(`w=${parseInt(width, 10)}`);
+    if (quality && quality.trim() !== "")
+      params.push(`q=${parseInt(quality, 10)}`);
+
+    // If no params requested, default to reliable public variant
+    if (params.length === 0) {
+      return `${baseWithId}/public`;
     }
 
-    // Always append the target variant to the clean URL
-    const result = `${cleanUrl}/${targetVariant}`;
-
-    return result;
+    // Use flexible resizing params to avoid 404s from missing named variants
+    return `${baseWithId}/${params.join(",")}`;
   }
 
-  // Fallback - just return the base URL with /public if it doesn't have a variant
-  if (
-    !baseUrl.includes("/public") &&
-    !baseUrl.includes("/thumbnail") &&
-    !baseUrl.includes("/medium") &&
-    !baseUrl.includes("/large") &&
-    !baseUrl.includes("/highres")
-  ) {
-    return `${baseUrl}/public`;
-  }
-
+  // Non-Cloudflare URLs — return as-is
   return baseUrl;
 }
 
@@ -117,33 +94,10 @@ export function getEnhancedImageUrlBySize(
  * @returns URL normalized to medium variant with debugging logs
  */
 export function getMediumVariantUrl(baseUrl: string): string {
-  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🎯 getMediumVariantUrl input:", baseUrl);
-
-  if (!baseUrl || !baseUrl.includes("imagedelivery.net")) {
-    // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Non-Cloudflare URL, returning as-is");
-    return baseUrl;
-  }
-
-  // Always use 'medium' variant for consistent dimensions and quality
-  const urlParts = baseUrl.split("/");
-  const lastPart = urlParts[urlParts.length - 1];
-
-  // Check if the last part is a variant (alphabetic or has parameters)
-  if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
-    // Replace with medium variant
-    urlParts[urlParts.length - 1] = "medium";
-  } else {
-    // No variant specified, append medium
-    urlParts.push("medium");
-  }
-
-  const mediumUrl = urlParts.join("/");
-  console.log("🎯 getMediumVariantUrl result:", {
-    original: baseUrl,
-    lastPart: lastPart,
-    medium: mediumUrl,
-    wasNormalized: baseUrl !== mediumUrl,
-  });
-
-  return mediumUrl;
+  // Normalize to a 600px wide, q=90 flexible transform for Cloudflare Images
+  return getEnhancedImageUrl(
+    baseUrl,
+    IMAGE_SIZES.medium.width,
+    IMAGE_SIZES.medium.quality
+  );
 }

@@ -704,48 +704,7 @@ export function GalleryImageSelector({
                 >
                   <div className="relative flex-1 flex items-center justify-center bg-background">
                     <img
-                      src={(() => {
-                        // Use same logic as working ImageCard component with debugging
-                        const originalUrl = image.url;
-                        if (!originalUrl.includes("imagedelivery.net")) {
-                          console.log(
-                            "🖼️ GalleryImageSelector: Non-Cloudflare URL, using as-is:",
-                            originalUrl
-                          );
-                          return originalUrl;
-                        }
-
-                        const targetVariant = "medium"; // 600x400 for gallery thumbnails
-                        const urlParts = originalUrl.split("/");
-                        if (urlParts.length >= 5) {
-                          const lastPart = urlParts[urlParts.length - 1];
-                          if (
-                            lastPart.match(/^[a-zA-Z]+$/) ||
-                            lastPart.includes("=")
-                          ) {
-                            urlParts[urlParts.length - 1] = targetVariant;
-                            const normalizedUrl = urlParts.join("/");
-                            console.log(
-                              "🔄 GalleryImageSelector URL normalized:",
-                              {
-                                filename: image.filename,
-                                original: originalUrl,
-                                normalized: normalizedUrl,
-                                variant: targetVariant,
-                              }
-                            );
-                            return normalizedUrl;
-                          }
-                        }
-                        const appendedUrl = `${originalUrl}/${targetVariant}`;
-                        console.log("🔄 GalleryImageSelector URL appended:", {
-                          filename: image.filename,
-                          original: originalUrl,
-                          appended: appendedUrl,
-                          variant: targetVariant,
-                        });
-                        return appendedUrl;
-                      })()}
+                      src={getEnhancedImageUrl(image.url, "600", "90")}
                       alt={image.filename}
                       className="max-w-full max-h-[300px] w-auto h-auto object-contain"
                       loading="lazy"
