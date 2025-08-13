@@ -38,9 +38,22 @@ export function ProjectCalendarTab({ projectId }: ProjectCalendarTabProps) {
       };
       // Extract events array from response
       setEvents(response.events || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching project events:", error);
-      toast.error("Failed to fetch events");
+
+      // Handle specific error cases
+      if (error.status === 404) {
+        toast.error("Project not found or you don't have access to it");
+      } else if (error.status === 403) {
+        toast.error("Access denied to project events");
+      } else if (error.status === 401) {
+        toast.error("Authentication required. Please sign in again.");
+      } else {
+        toast.error("Failed to fetch events");
+      }
+
+      // Set empty events so calendar still loads
+      setEvents([]);
     } finally {
       console.timeEnd("ProjectCalendarTab-fetch-events");
     }
@@ -55,9 +68,22 @@ export function ProjectCalendarTab({ projectId }: ProjectCalendarTabProps) {
         deliverables: Deliverable[];
       };
       setDeliverables(data.deliverables || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching project deliverables:", error);
-      toast.error("Failed to fetch deliverables");
+
+      // Handle specific error cases
+      if (error.status === 404) {
+        toast.error("Project not found or you don't have access to it");
+      } else if (error.status === 403) {
+        toast.error("Access denied to project deliverables");
+      } else if (error.status === 401) {
+        toast.error("Authentication required. Please sign in again.");
+      } else {
+        toast.error("Failed to fetch deliverables");
+      }
+
+      // Set empty deliverables so calendar still loads
+      setDeliverables([]);
     } finally {
       console.timeEnd("ProjectCalendarTab-fetch-deliverables");
     }
@@ -71,10 +97,23 @@ export function ProjectCalendarTab({ projectId }: ProjectCalendarTabProps) {
       const data = (await api.get(`projects/${projectId}`)) as {
         project: { timeline: { milestones: ProjectMilestone[] } };
       };
-      setMilestones(data.project.timeline.milestones || []);
-    } catch (error) {
+      setMilestones(data.project.timeline?.milestones || []);
+    } catch (error: any) {
       console.error("Error fetching project:", error);
-      toast.error("Failed to fetch project milestones");
+
+      // Handle specific error cases
+      if (error.status === 404) {
+        toast.error("Project not found or you don't have access to it");
+      } else if (error.status === 403) {
+        toast.error("Access denied to this project");
+      } else if (error.status === 401) {
+        toast.error("Authentication required. Please sign in again.");
+      } else {
+        toast.error("Failed to fetch project milestones");
+      }
+
+      // Set empty milestones so calendar still loads
+      setMilestones([]);
     } finally {
       console.timeEnd("ProjectCalendarTab-fetch-project");
     }
@@ -86,9 +125,31 @@ export function ProjectCalendarTab({ projectId }: ProjectCalendarTabProps) {
 
       setIsLoading(true);
       console.time("ProjectCalendarTab-parallel-fetch");
-      await Promise.all([fetchEvents(), fetchDeliverables(), fetchProject()]);
-      setIsLoading(false);
-      console.timeEnd("ProjectCalendarTab-parallel-fetch");
+
+      try {
+        // Use Promise.allSettled to allow calendar to load even if some requests fail
+        const results = await Promise.allSettled([
+          fetchEvents(),
+          fetchDeliverables(),
+          fetchProject(),
+        ]);
+
+        // Check if all requests failed
+        const allFailed = results.every(
+          (result) => result.status === "rejected"
+        );
+        if (allFailed) {
+          toast.error(
+            "Failed to load calendar data. Please check your access permissions."
+          );
+        }
+      } catch (error) {
+        console.error("Error in parallel fetch:", error);
+        toast.error("Failed to load calendar data");
+      } finally {
+        setIsLoading(false);
+        console.timeEnd("ProjectCalendarTab-parallel-fetch");
+      }
     };
     fetchData();
   }, [projectId, api]);

@@ -246,8 +246,20 @@ export function useProjectData({
         `projects/${projectId}/captions`
       )) as SavedCaption[];
       setSavedCaptions(captions);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching project captions:", err);
+
+      // Handle specific error cases gracefully
+      if (err.status === 404) {
+        console.warn("Project not found or no access to captions");
+        setSavedCaptions([]);
+      } else if (err.status === 403) {
+        console.warn("Access denied to project captions");
+        setSavedCaptions([]);
+      } else {
+        console.error("Unexpected error fetching captions:", err);
+        setSavedCaptions([]);
+      }
     }
   };
 

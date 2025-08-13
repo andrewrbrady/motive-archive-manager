@@ -264,7 +264,7 @@ export function UnifiedCopywriter({
   } = useAPIQuery<any[]>(modelsEndpoint!, {
     enabled: !!modelsEndpoint && !initialCopywriterData?.models, // Don't fetch if we have initial data
     staleTime: 3 * 60 * 1000,
-    retry: 2,
+    retry: 1, // Reduce retries to avoid spam for access denied errors
     retryDelay: 1000,
     refetchOnWindowFocus: false,
     select: (data: any) => {
@@ -279,6 +279,24 @@ export function UnifiedCopywriter({
       return result;
     },
   });
+
+  // Handle models error gracefully
+  React.useEffect(() => {
+    if (modelsError) {
+      // Handle access denied errors gracefully - don't show toast for 403/404
+      if (
+        (modelsError as any)?.status === 403 ||
+        (modelsError as any)?.status === 404
+      ) {
+        console.warn(`Access denied to models endpoint: ${modelsEndpoint}`);
+      } else {
+        console.error(
+          `Error fetching models from ${modelsEndpoint}:`,
+          modelsError
+        );
+      }
+    }
+  }, [modelsError, modelsEndpoint]);
 
   // Events data fetching
   const eventsEndpoint = apiEndpoints.events;
@@ -308,10 +326,28 @@ export function UnifiedCopywriter({
   } = useAPIQuery<any[]>(captionsQuery, {
     enabled: !!captionsQuery && !initialCopywriterData?.captions, // Don't fetch if we have initial data
     staleTime: 1 * 60 * 1000,
-    retry: 2,
+    retry: 1, // Reduce retries to avoid spam for access denied errors
     retryDelay: 1000,
     refetchOnWindowFocus: false,
   });
+
+  // Handle captions error gracefully
+  React.useEffect(() => {
+    if (captionsError) {
+      // Handle access denied errors gracefully - don't show toast for 403/404
+      if (
+        (captionsError as any)?.status === 403 ||
+        (captionsError as any)?.status === 404
+      ) {
+        console.warn(`Access denied to captions endpoint: ${captionsQuery}`);
+      } else {
+        console.error(
+          `Error fetching captions from ${captionsQuery}:`,
+          captionsError
+        );
+      }
+    }
+  }, [captionsError, captionsQuery]);
 
   // Galleries data fetching (only for project mode)
   const galleriesEndpoint = apiEndpoints.galleries;
@@ -963,13 +999,31 @@ export function UnifiedCopywriter({
         }
 
         return true;
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error saving caption:", error);
-        toast({
-          title: "Error",
-          description: "Failed to save caption",
-          variant: "destructive",
-        });
+
+        // Handle specific error cases
+        if (error?.status === 403) {
+          toast({
+            title: "Access Denied",
+            description:
+              "You don't have permission to save captions for this project",
+            variant: "destructive",
+          });
+        } else if (error?.status === 404) {
+          toast({
+            title: "Project Not Found",
+            description:
+              "The project was not found or you don't have access to it",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to save caption",
+            variant: "destructive",
+          });
+        }
         return false;
       }
     },

@@ -39,7 +39,32 @@ import { ImageData } from "@/app/images/columns";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageTitle } from "@/components/ui/PageTitle";
 import JSZip from "jszip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 // import Footer from "@/components/layout/footer";
+
+// Utility to get base URL without any variant for frontmatter
+function getBaseImageUrl(url: string): string {
+  if (!url || !url.includes("imagedelivery.net")) {
+    return url;
+  }
+
+  // Remove any existing variant to get base URL
+  const urlParts = url.split("/");
+  const lastPart = urlParts[urlParts.length - 1];
+
+  // If the last part is a variant, remove it
+  if (lastPart.match(/^[a-zA-Z]+$/) || lastPart.includes("=")) {
+    urlParts.pop();
+  }
+
+  return urlParts.join("/");
+}
 
 export default function GalleryPage() {
   const params = useParams();
@@ -54,6 +79,9 @@ export default function GalleryPage() {
     description: "",
   });
   const [isAddingImages, setIsAddingImages] = useState(false);
+  const [yamlExportType, setYamlExportType] = useState<"gallery" | "carousel">(
+    "gallery"
+  );
 
   // Clean up URL parameters when viewing gallery (these should only be used during image selection)
   React.useEffect(() => {
@@ -686,10 +714,27 @@ export default function GalleryPage() {
                         Copy and paste this YAML into your configuration files.
                       </DialogDescription>
                     </DialogHeader>
+                    <div className="flex items-center space-x-2 mb-4">
+                      <Label htmlFor="export-type">Export as:</Label>
+                      <Select
+                        value={yamlExportType}
+                        onValueChange={(value: "gallery" | "carousel") =>
+                          setYamlExportType(value)
+                        }
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="gallery">Gallery</SelectItem>
+                          <SelectItem value="carousel">Carousel</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="relative flex-1 min-h-0">
                       <pre className="p-4 bg-muted rounded-lg h-full overflow-y-auto">
                         <code className="text-sm block">
-                          {`gallery:
+                          {`${yamlExportType}:
 ${(() => {
   // Create a map of images by their ID for quick lookup
   const imageMap = new Map(
@@ -709,7 +754,7 @@ ${(() => {
       const image = imageMap.get(id);
       if (!image) return null;
       return `  - id: "img${index + 1}"
-    src: "${image.url}"
+    src: "${getBaseImageUrl(image.url)}"
     alt: "${image.alt || image.filename || `Gallery Image ${index + 1}`}"`;
     })
     .filter(Boolean)

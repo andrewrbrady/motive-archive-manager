@@ -62,6 +62,7 @@ export interface ListViewProps {
   events: Event[];
   onUpdateEvent: (eventId: string, updates: Partial<Event>) => Promise<void>;
   onDeleteEvent: (eventId: string) => Promise<void>;
+  onBatchDeleteEvent?: (eventIds: string[]) => Promise<void>;
   onDetachEvent?: (eventId: string) => Promise<void>;
   onEventUpdated: () => void;
   isEditMode?: boolean;
@@ -93,6 +94,7 @@ export default function ListView({
   events,
   onUpdateEvent,
   onDeleteEvent,
+  onBatchDeleteEvent,
   onDetachEvent,
   onEventUpdated,
   isEditMode: parentEditMode,
@@ -125,6 +127,7 @@ export default function ListView({
       events={events}
       onUpdateEvent={onUpdateEvent}
       onDeleteEvent={onDeleteEvent}
+      onBatchDeleteEvent={onBatchDeleteEvent}
       onDetachEvent={onDetachEvent}
       onEventUpdated={onEventUpdated}
       isEditMode={parentEditMode}
@@ -137,6 +140,7 @@ function ListViewContent({
   events,
   onUpdateEvent,
   onDeleteEvent,
+  onBatchDeleteEvent,
   onDetachEvent,
   onEventUpdated,
   isEditMode: parentEditMode,
@@ -397,9 +401,15 @@ function ListViewContent({
     }
 
     try {
-      await Promise.all(
-        selectedEvents.map((eventId) => onDeleteEvent(eventId))
-      );
+      // Use batch delete if available, otherwise fall back to individual deletes
+      if (onBatchDeleteEvent) {
+        await onBatchDeleteEvent(selectedEvents);
+      } else {
+        // Fallback to sequential deletes to avoid concurrent request issues
+        for (const eventId of selectedEvents) {
+          await onDeleteEvent(eventId);
+        }
+      }
       toast.success(`Successfully deleted ${selectedEvents.length} events`);
       setSelectedEvents([]);
       onEventUpdated();
@@ -411,6 +421,36 @@ function ListViewContent({
 
   return (
     <div className="space-y-4">
+      {/* Batch toolbar */}
+      <div className="flex items-center justify-between">
+        {isBatchMode ? (
+          <div className="text-sm text-muted-foreground">
+            {selectedEvents.length} selected
+          </div>
+        ) : (
+          <div />
+        )}
+        <div className="flex gap-2">
+          {isBatchMode && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBatchDelete}
+              disabled={selectedEvents.length === 0}
+            >
+              <Trash2 className="w-4 h-4 mr-2" /> Delete Selected
+              {selectedEvents.length > 0 ? ` (${selectedEvents.length})` : ""}
+            </Button>
+          )}
+          <Button
+            variant={isBatchMode ? "outline" : "default"}
+            size="sm"
+            onClick={toggleBatchMode}
+          >
+            {isBatchMode ? "Exit Batch Mode" : "Enter Batch Mode"}
+          </Button>
+        </div>
+      </div>
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">

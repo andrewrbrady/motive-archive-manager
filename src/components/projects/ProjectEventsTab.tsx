@@ -314,6 +314,30 @@ export default function ProjectEventsTab({
     }
   };
 
+  const handleBatchDeleteEvent = async (eventIds: string[]) => {
+    if (!api) return;
+
+    try {
+      // Optimistically update local state
+      setEvents((currentEvents) =>
+        currentEvents.filter((event) => !eventIds.includes(event.id))
+      );
+
+      // Use the new batch delete endpoint
+      await api.deleteWithBody(`projects/${projectId}/events/batch`, {
+        eventIds,
+      });
+
+      toast.success(`Successfully deleted ${eventIds.length} events`);
+    } catch (error) {
+      // Revert the optimistic update on error
+      fetchEvents();
+      console.error("Error batch deleting events:", error);
+      toast.error("Failed to delete events");
+      throw error;
+    }
+  };
+
   const handleEditEvent = (event: Event) => {
     setEditingEvent(event);
     setShowEditEvent(true);
@@ -450,6 +474,7 @@ export default function ProjectEventsTab({
             events={events}
             onUpdateEvent={handleUpdateEvent}
             onDeleteEvent={handleDeleteEvent}
+            onBatchDeleteEvent={handleBatchDeleteEvent}
             onDetachEvent={handleDetachEvent}
             onEventUpdated={fetchEvents}
             isEditMode={isEditMode}

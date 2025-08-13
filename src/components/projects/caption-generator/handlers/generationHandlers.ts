@@ -225,8 +225,17 @@ export function useGenerationHandlers() {
 
           let errorMessage = "Failed to generate caption";
 
+          // Handle specific HTTP status codes first
+          if (error?.status === 403) {
+            errorMessage =
+              "Access denied. You don't have permission to generate captions for this project.";
+          } else if (error?.status === 404) {
+            errorMessage = "Project not found or you don't have access to it.";
+          } else if (error?.status === 401) {
+            errorMessage = "Authentication required. Please sign in again.";
+          }
           // Handle different types of errors
-          if (error instanceof Error) {
+          else if (error instanceof Error) {
             if (
               error.message.includes("timeout") ||
               error.message.includes("Timeout")
@@ -450,11 +459,27 @@ export function useCaptionSaver() {
               description: "Caption saved successfully",
             });
           })
-          .catch((error) => {
+          .catch((error: any) => {
             console.error("Error saving caption:", error);
+
+            let errorMessage = "Failed to save caption";
+
+            // Handle specific error cases
+            if (error?.status === 403) {
+              errorMessage =
+                "Access denied. You don't have permission to save captions for this project.";
+            } else if (error?.status === 404) {
+              errorMessage =
+                "Project not found or you don't have access to it.";
+            } else if (error?.status === 401) {
+              errorMessage = "Authentication required. Please sign in again.";
+            } else if (error?.message) {
+              errorMessage = error.message;
+            }
+
             toast({
               title: "Error",
-              description: "Failed to save caption",
+              description: errorMessage,
               variant: "destructive",
             });
           })

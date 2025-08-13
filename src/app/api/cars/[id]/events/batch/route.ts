@@ -26,17 +26,18 @@ export async function POST(
     // Validate each event
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
-      if (!event.type || !event.title || !event.start) {
+      // Only title is required
+      if (!event.title) {
         return NextResponse.json(
           {
-            error: `Event at index ${i} missing required fields: type, title, start`,
+            error: `Event at index ${i} missing required field: title`,
           },
           { status: 400 }
         );
       }
 
-      // Validate event type
-      if (!Object.values(EventType).includes(event.type)) {
+      // Validate event type only if provided
+      if (event.type && !Object.values(EventType).includes(event.type)) {
         return NextResponse.json(
           {
             error: `Event at index ${i} has invalid type: ${event.type}`,
@@ -45,9 +46,11 @@ export async function POST(
         );
       }
 
-      // Validate date format
+      // Validate date format only if provided
       try {
-        new Date(event.start);
+        if (event.start) {
+          new Date(event.start);
+        }
         if (event.end) {
           new Date(event.end);
         }
@@ -76,11 +79,11 @@ export async function POST(
     const eventsToCreate = events.map((event) => ({
       id: new ObjectId().toString(),
       car_id: carId,
-      type: event.type,
+      type: event.type || EventType.OTHER,
       title: event.title,
       description: event.description || "",
       url: event.url || "",
-      start: event.start,
+      start: event.start || new Date().toISOString(),
       end: event.end || null,
       isAllDay: event.isAllDay || false,
       teamMemberIds: event.teamMemberIds || [],

@@ -32,6 +32,10 @@ async function getProjectEvents(
 
     const userId =
       tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
+    const isAdmin =
+      tokenData.tokenType !== "api_token" &&
+      Array.isArray(tokenData.roles) &&
+      tokenData.roles.includes("admin");
 
     const { id: projectId } = await params;
 
@@ -54,15 +58,13 @@ async function getProjectEvents(
 
     // ⚡ OPTIMIZED: Use indexed query with field projection
     console.time("getProjectEvents-project-check");
-    const project = await db.collection("projects").findOne(
-      {
-        _id: new ObjectId(projectId),
-        $or: [{ ownerId: userId }, { "members.userId": userId }],
-      },
-      {
-        projection: { _id: 1, ownerId: 1, members: 1 }, // Only get fields we need
-      }
-    );
+    const projectQuery: any = { _id: new ObjectId(projectId) };
+    if (!isAdmin) {
+      projectQuery.$or = [{ ownerId: userId }, { "members.userId": userId }];
+    }
+    const project = await db.collection("projects").findOne(projectQuery, {
+      projection: { _id: 1, ownerId: 1, members: 1 }, // Only get fields we need
+    });
     console.timeEnd("getProjectEvents-project-check");
 
     if (!project) {

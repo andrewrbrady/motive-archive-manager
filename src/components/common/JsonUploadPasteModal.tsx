@@ -123,12 +123,13 @@ export default function JsonUploadPasteModal({
 
         // Basic validation based on expected type
         if (expectedType === "events") {
+          // Relaxed validation for events: only title is required; description and type are optional
           for (let i = 0; i < data.length; i++) {
             const item = data[i];
-            if (!item.type || !item.title || !item.start) {
+            if (!item.title) {
               return {
                 isValid: false,
-                error: `Event at index ${i} missing required fields: type, title, start`,
+                error: `Event at index ${i} missing required field: title`,
               };
             }
           }
