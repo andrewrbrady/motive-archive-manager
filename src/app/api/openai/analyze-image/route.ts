@@ -504,22 +504,21 @@ export async function POST(request: NextRequest) {
 
       if (cloudflareMatch) {
         const [, accountHash, imageId] = cloudflareMatch;
-        // Use a medium-sized variant for analysis (not highres to save bandwidth and costs)
-        // OpenAI doesn't need massive images for analysis - medium quality is sufficient
-        analysisImageUrl = `https://imagedelivery.net/${accountHash}/${imageId}/w=1200,q=85`;
+        // Use the "large" named variant for analysis (1200px, good quality)
+        // This matches our existing system's named variants instead of flexible variants
+        analysisImageUrl = `https://imagedelivery.net/${accountHash}/${imageId}/large`;
         console.log(
-          "Constructed analysis image URL (optimized size):",
+          "Constructed analysis image URL (using large variant):",
           analysisImageUrl
         );
       } else {
         console.warn("Could not parse Cloudflare URL format:", imageUrl);
-        // Fallback: if URL doesn't match expected format, try to add a reasonable variant
+        // Fallback: if URL doesn't match expected format, try to use large variant
         if (
           !imageUrl.includes("/public") &&
-          !imageUrl.match(/\/[a-zA-Z]+$/) &&
-          !imageUrl.includes("w=")
+          !imageUrl.match(/\/[a-zA-Z]+$/)
         ) {
-          analysisImageUrl = `${imageUrl}/w=1200,q=85`;
+          analysisImageUrl = `${imageUrl}/large`;
         }
       }
     } else {

@@ -144,8 +144,8 @@ export async function POST(
           <tr>
             ${limitedImages
               .map((imageId: string) => {
-                const thumbnailUrl = `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${imageId}/publicw=350`;
-                const fullSizeUrl = `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${imageId}/publicw=3000`;
+                const thumbnailUrl = `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${imageId}/thumbnail`;
+                const fullSizeUrl = `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${imageId}/large`;
                 return `
                   <td width="33%" align="center" valign="top">
                     <a href="${fullSizeUrl}" target="_blank">
