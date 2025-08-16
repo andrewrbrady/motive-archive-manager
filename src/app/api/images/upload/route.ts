@@ -222,8 +222,8 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Build base URL (no variant) to avoid stacking variants (e.g., /square/public)
-        const imageUrl = `https://imagedelivery.net/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/${result.result.id}`;
+        // Get image URL from variants and remove /public suffix (to store base URL)
+        const imageUrl = result.result.variants[0].replace(/\/public$/, "");
         // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`[API] Image URL for "${file.name}":`, imageUrl);
 
         // Create metadata - use custom metadata if provided, otherwise default

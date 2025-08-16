@@ -394,27 +394,10 @@ export async function GET(request: Request) {
     return NextResponse.json(response);
   } catch (error) {
     console.error("❌ Error fetching project images:", error);
-    
-    // Detailed error logging for debugging
-    if (error instanceof Error) {
-      console.error("❌ Error details:", {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-      });
-    } else {
-      console.error("❌ Non-Error object:", error);
-    }
-    
     return NextResponse.json(
       {
         error: "Failed to fetch images",
         details: error instanceof Error ? error.message : "Unknown error",
-        debug: {
-          errorType: error instanceof Error ? error.constructor.name : typeof error,
-          projectId: id,
-          timestamp: new Date().toISOString(),
-        },
         pagination: {
           totalImages: 0,
           totalPages: 0,
@@ -537,11 +520,10 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Create image document - store BASE URL (no variant) to avoid double variants like /square/public
-        const baseUrl = `https://imagedelivery.net/${accountId}/${uploadResult.result.id}`;
+        // Create image document
         const imageDoc = {
           cloudflareId: uploadResult.result.id,
-          url: baseUrl,
+          url: uploadResult.result.variants[0].replace(/\/public$/, ""),
           filename: file.name,
           metadata: {
             size: file.size,

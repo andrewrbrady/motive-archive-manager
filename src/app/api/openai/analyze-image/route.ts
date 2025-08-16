@@ -504,8 +504,7 @@ export async function POST(request: NextRequest) {
 
       if (cloudflareMatch) {
         const [, accountHash, imageId] = cloudflareMatch;
-        // Use the "public" named variant for analysis (original image, best quality)
-        // This matches our existing system's named variants and provides full quality for analysis
+        // Add /public variant for analysis (original image, best quality)
         analysisImageUrl = `https://imagedelivery.net/${accountHash}/${imageId}/public`;
         console.log(
           "Constructed analysis image URL (using public variant):",
@@ -513,7 +512,7 @@ export async function POST(request: NextRequest) {
         );
       } else {
         console.warn("Could not parse Cloudflare URL format:", imageUrl);
-        // Fallback: if URL doesn't match expected format, try to use public variant
+        // Fallback: if URL doesn't match expected format, try to add public variant
         if (!imageUrl.includes("/public") && !imageUrl.match(/\/[a-zA-Z]+$/)) {
           analysisImageUrl = `${imageUrl}/public`;
         }
