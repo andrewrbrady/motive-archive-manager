@@ -504,21 +504,18 @@ export async function POST(request: NextRequest) {
 
       if (cloudflareMatch) {
         const [, accountHash, imageId] = cloudflareMatch;
-        // Use the "large" named variant for analysis (1200px, good quality)
-        // This matches our existing system's named variants instead of flexible variants
-        analysisImageUrl = `https://imagedelivery.net/${accountHash}/${imageId}/large`;
+        // Use the "public" named variant for analysis (original image, best quality)
+        // This matches our existing system's named variants and provides full quality for analysis
+        analysisImageUrl = `https://imagedelivery.net/${accountHash}/${imageId}/public`;
         console.log(
-          "Constructed analysis image URL (using large variant):",
+          "Constructed analysis image URL (using public variant):",
           analysisImageUrl
         );
       } else {
         console.warn("Could not parse Cloudflare URL format:", imageUrl);
-        // Fallback: if URL doesn't match expected format, try to use large variant
-        if (
-          !imageUrl.includes("/public") &&
-          !imageUrl.match(/\/[a-zA-Z]+$/)
-        ) {
-          analysisImageUrl = `${imageUrl}/large`;
+        // Fallback: if URL doesn't match expected format, try to use public variant
+        if (!imageUrl.includes("/public") && !imageUrl.match(/\/[a-zA-Z]+$/)) {
+          analysisImageUrl = `${imageUrl}/public`;
         }
       }
     } else {
