@@ -187,9 +187,11 @@ export const UnifiedImageUploader: React.FC<UnifiedImageUploaderProps> = ({
 
   // Determine the optimal endpoint based on context
   const getUploadEndpoint = useCallback(() => {
-    // Use JSON-returning endpoint to avoid SSE handling on client
+    if (context === "project" && projectId) {
+      return `/api/projects/${projectId}/images`;
+    }
     return "/api/images/upload";
-  }, []);
+  }, [context, projectId]);
 
   // Load analysis prompts
   useEffect(() => {
@@ -503,22 +505,31 @@ export const UnifiedImageUploader: React.FC<UnifiedImageUploaderProps> = ({
           }
 
           const data = await uploadResponse.json();
-          if (!data.success || !data.images || data.images.length === 0) {
+          const projectResponse = Array.isArray(data?.uploadedImages)
+            ? data
+            : null;
+          const generalResponse = Array.isArray(data?.images) ? data : null;
+
+          if (!projectResponse && !generalResponse) {
             throw new Error(
-              data.error || "No images were uploaded successfully"
+              (data && data.error) || "No images were uploaded successfully"
             );
           }
-          const uploadedImage = data.images[0];
+
+          const uploadedImage = projectResponse
+            ? projectResponse.uploadedImages[0]
+            : generalResponse!.images[0];
+          // Always normalize to base URL to avoid double variants later
           let imageUrl: string = uploadedImage.url;
-          if (
-            imageUrl &&
-            imageUrl.includes("imagedelivery.net") &&
-            !imageUrl.match(
-              /\/(public|thumbnail|avatar|medium|large|webp|preview|original|w=\d+)$/
-            )
-          ) {
-            imageUrl = `${imageUrl}/w=200,h=200,fit=cover`;
+          if (imageUrl.includes("imagedelivery.net")) {
+            const match = imageUrl.match(
+              /^(https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+)/
+            );
+            if (match) {
+              imageUrl = match[1];
+            }
           }
+          // Do not append any variant here; keep base. Rendering components decide variants.
           console.log("🎉 Upload successful, URL:", imageUrl);
           updateProgress({
             status: "analyzing",

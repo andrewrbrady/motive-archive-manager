@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import ImageUploader from "@/components/ui/ImageUploader";
+import UnifiedImageUploader from "@/components/UnifiedImageUploader";
 import Pagination from "@/components/ui/pagination";
 import {
   Plus,
@@ -397,8 +397,10 @@ export default function ImagesClient() {
                       Select images to upload to the gallery.
                     </DialogDescription>
                   </DialogHeader>
-                  <ImageUploader
-                    mode="general"
+                  <UnifiedImageUploader
+                    context={
+                      carFilter && carFilter !== "all" ? "car" : "general"
+                    }
                     carId={
                       carFilter && carFilter !== "all" ? carFilter : undefined
                     }
@@ -410,19 +412,11 @@ export default function ImagesClient() {
                       view: "unknown",
                     }}
                     onComplete={() => {
-                      console.log(
-                        "🔄 ImagesClient: onComplete callback triggered"
-                      );
                       toast({
                         title: "Upload successful",
                         description: "Images uploaded successfully",
                       });
-                      // Refresh the images list
-                      console.log(
-                        "🔄 ImagesClient: Calling mutate() to refresh images"
-                      );
                       mutate();
-                      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 ImagesClient: Closing upload dialog");
                       setIsUploadDialogOpen(false);
                     }}
                     onError={(error: string) => {
@@ -433,7 +427,8 @@ export default function ImagesClient() {
                         variant: "destructive",
                       });
                     }}
-                    multiple
+                    showDropzone={true}
+                    showAnalysisOptions={true}
                   />
                   <DialogFooter>
                     <Button

@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { Plus, Settings, Upload } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import { GallerySelectionModal } from "./GallerySelectionModal";
 import { useProjectGalleries } from "@/hooks/useProjectGalleries";
 import { useAPI } from "@/hooks/useAPI";
-import { cn } from "@/lib/utils";
+import UnifiedImageUploader from "@/components/UnifiedImageUploader";
 import {
   Dialog,
   DialogContent,
@@ -47,164 +47,7 @@ const IMAGE_ANALYSIS_CONFIG = {
   ],
 };
 
-// Custom drag & drop uploader component for BlockComposer
-interface CustomImageUploaderProps {
-  onUploadComplete: (imageUrls: string[], imageData?: any[]) => void;
-  metadata: Record<string, any>;
-  carId?: string;
-}
-
-function CustomImageUploader({
-  onUploadComplete,
-  metadata,
-  carId,
-}: CustomImageUploaderProps) {
-  const { toast } = useToast();
-  const api = useAPI();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
-
-  const handleFiles = useCallback(
-    async (files: FileList) => {
-      if (!api || !files.length) return;
-
-      setIsUploading(true);
-      const uploadedUrls: string[] = [];
-      const uploadedData: any[] = [];
-
-      try {
-        for (const file of Array.from(files)) {
-          const formData = new FormData();
-          formData.append("files", file);
-          formData.append("metadata", JSON.stringify(metadata));
-          if (carId) {
-            formData.append("carId", carId);
-          }
-
-          // Use project-specific endpoint if projectId exists, otherwise fallback to general endpoint
-          const endpoint = metadata.projectId
-            ? `/api/projects/${metadata.projectId}/images`
-            : "/api/cloudflare/images";
-
-          const response = (await api.upload(endpoint, formData)) as {
-            success: boolean;
-            images?: Array<{ url: string; metadata?: any }>;
-            uploadedImages?: Array<{
-              _id: string;
-              url: string;
-              metadata?: any;
-            }>;
-            error?: string;
-          };
-
-          if (response.success) {
-            // Handle project endpoint response format
-            if (response.uploadedImages && response.uploadedImages.length > 0) {
-              uploadedUrls.push(response.uploadedImages[0].url);
-              uploadedData.push(...response.uploadedImages);
-            }
-            // Handle general endpoint response format
-            else if (response.images && response.images.length > 0) {
-              uploadedUrls.push(response.images[0].url);
-              uploadedData.push(...response.images);
-            } else {
-              throw new Error("No images in response");
-            }
-          } else {
-            throw new Error(response.error || "Upload failed");
-          }
-        }
-
-        onUploadComplete(uploadedUrls, uploadedData);
-      } catch (error) {
-        console.error("Upload error:", error);
-        toast({
-          title: "Upload Error",
-          description: "Failed to upload images",
-          variant: "destructive",
-        });
-      } finally {
-        setIsUploading(false);
-      }
-    },
-    [api, metadata, carId, onUploadComplete, toast]
-  );
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragActive(false);
-
-      const files = e.dataTransfer.files;
-      if (files.length > 0) {
-        handleFiles(files);
-      }
-    },
-    [handleFiles]
-  );
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragActive(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragActive(false);
-  }, []);
-
-  const handleClick = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (files) {
-        handleFiles(files);
-      }
-    },
-    [handleFiles]
-  );
-
-  return (
-    <div
-      className={cn(
-        "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
-        dragActive
-          ? "border-primary bg-primary/5"
-          : "border-border hover:border-border/80",
-        isUploading && "pointer-events-none opacity-50"
-      )}
-      onClick={handleClick}
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-    >
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={handleFileChange}
-        disabled={isUploading}
-      />
-
-      <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-      <p className="text-lg font-medium text-foreground mb-2">
-        {isUploading ? "Uploading..." : "Upload Images"}
-      </p>
-      <p className="text-sm text-muted-foreground">
-        Drag and drop images here, or click to select files
-      </p>
-      <p className="text-xs text-muted-foreground mt-2">
-        Supports JPG, PNG, GIF, WebP up to 8MB each
-      </p>
-    </div>
-  );
-}
+// Legacy custom uploader removed in favor of UnifiedImageUploader
 
 interface BlockComposerImageUploaderProps {
   projectId?: string;
@@ -531,11 +374,42 @@ export function BlockComposerImageUploader({
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Custom Drag & Drop Uploader */}
-            <CustomImageUploader
-              onUploadComplete={handleUploadComplete}
-              metadata={uploadMetadata}
+            {/* Unified Image Uploader */}
+            <UnifiedImageUploader
+              context={projectId ? "project" : carId ? "car" : "content-studio"}
+              projectId={projectId}
               carId={carId}
+              metadata={uploadMetadata}
+              showDropzone={true}
+              showAnalysisOptions={true}
+              onUploadComplete={(results) => {
+                const toPublic = (url: string) => {
+                  if (!url || !url.includes("imagedelivery.net")) return url;
+                  const match = url.match(
+                    /^(https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+)/
+                  );
+                  if (match) return `${match[1]}/public`;
+                  // Fallback: if already has a variant, replace it with public
+                  const parts = url.split("/");
+                  parts[parts.length - 1] = "public";
+                  return parts.join("/");
+                };
+                const normalized = results.map((r) => ({
+                  ...r,
+                  url: toPublic(r.url),
+                }));
+                handleUploadComplete(
+                  normalized.map((r) => r.url),
+                  normalized
+                );
+              }}
+              onError={(error) => {
+                toast({
+                  title: "Upload Error",
+                  description: error,
+                  variant: "destructive",
+                });
+              }}
             />
           </div>
         </DialogContent>

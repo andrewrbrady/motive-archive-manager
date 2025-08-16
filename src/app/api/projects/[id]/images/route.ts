@@ -537,10 +537,11 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Create image document
+        // Create image document - store BASE URL (no variant) to avoid double variants like /square/public
+        const baseUrl = `https://imagedelivery.net/${accountId}/${uploadResult.result.id}`;
         const imageDoc = {
           cloudflareId: uploadResult.result.id,
-          url: uploadResult.result.variants[0],
+          url: baseUrl,
           filename: file.name,
           metadata: {
             size: file.size,

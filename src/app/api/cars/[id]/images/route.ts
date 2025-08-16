@@ -92,10 +92,14 @@ export async function GET(request: Request) {
     }
 
     // Parse query parameters
-    const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || "50");
-    const skip =
-      parseInt(url.searchParams.get("skip") || "0") || (page - 1) * limit;
+    const pageParam = url.searchParams.get("page") || "1";
+    const limitParam = url.searchParams.get("limit") || "50";
+    const isUnlimited = limitParam.toLowerCase() === "all";
+    const page = parseInt(pageParam);
+    const limit = isUnlimited ? 0 : parseInt(limitParam);
+    const skip = isUnlimited
+      ? 0
+      : parseInt(url.searchParams.get("skip") || "0") || (page - 1) * limit;
 
     // Add logging for debugging infinite loop issues
     console.log(
@@ -103,21 +107,31 @@ export async function GET(request: Request) {
     );
 
     // Validate pagination parameters to prevent infinite loops
-    if (page < 1) {
+    if (!isUnlimited && page < 1) {
       return NextResponse.json(
         { error: "Invalid page number. Page must be 1 or greater." },
         { status: 400 }
       );
     }
 
-    if (limit < 1 || limit > 200) {
-      return NextResponse.json(
-        { error: "Invalid limit. Limit must be between 1 and 200." },
-        { status: 400 }
-      );
+    // Allow unlimited fetch with limit=all, otherwise validate sane bounds
+    if (!isUnlimited) {
+      if (Number.isNaN(limit) || limit < 1) {
+        return NextResponse.json(
+          { error: "Invalid limit. Provide a positive integer or 'all'." },
+          { status: 400 }
+        );
+      }
+      // Raise cap to allow larger galleries
+      if (limit > 5000) {
+        return NextResponse.json(
+          { error: "Invalid limit. Limit must be 5000 or less, or use 'all'." },
+          { status: 400 }
+        );
+      }
     }
 
-    if (skip < 0) {
+    if (!isUnlimited && skip < 0) {
       return NextResponse.json(
         { error: "Invalid skip value. Skip must be 0 or greater." },
         { status: 400 }
@@ -125,7 +139,7 @@ export async function GET(request: Request) {
     }
 
     // Safeguard against potentially infinite loops - if skip is extremely high, likely a bug
-    if (skip > 10000) {
+    if (!isUnlimited && skip > 10000) {
       console.warn(
         `⚠️ Extremely high skip value detected: ${skip} for car ${id}. Possible infinite loop.`
       );
@@ -136,7 +150,7 @@ export async function GET(request: Request) {
             totalImages: 0,
             totalPages: 0,
             currentPage: 1,
-            itemsPerPage: limit,
+            itemsPerPage: isUnlimited ? 0 : limit,
             startIndex: 1,
             endIndex: 0,
           },
@@ -265,27 +279,30 @@ export async function GET(request: Request) {
       db.collection("images").countDocuments(query),
 
       // Get paginated images with optimized projection and dynamic sorting
-      db
-        .collection("images")
-        .find(query, {
-          projection: {
-            cloudflareId: 1,
-            url: 1,
-            filename: 1,
-            metadata: 1,
-            carId: 1,
-            createdAt: 1,
-            updatedAt: 1,
-          },
-        })
-        .sort({
-          [sort]: sortDirection === "asc" ? 1 : -1,
-          // Add secondary sort to ensure consistency
-          ...(sort !== "createdAt" && { createdAt: -1 }),
-        })
-        .skip(skip)
-        .limit(limit)
-        .toArray(),
+      (async () => {
+        const cursor = db
+          .collection("images")
+          .find(query, {
+            projection: {
+              cloudflareId: 1,
+              url: 1,
+              filename: 1,
+              metadata: 1,
+              carId: 1,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          })
+          .sort({
+            [sort]: sortDirection === "asc" ? 1 : -1,
+            // Add secondary sort to ensure consistency
+            ...(sort !== "createdAt" && { createdAt: -1 }),
+          });
+        if (!isUnlimited) {
+          cursor.skip(skip).limit(limit);
+        }
+        return cursor.toArray();
+      })(),
     ]);
 
     if (!car) {
@@ -303,7 +320,10 @@ export async function GET(request: Request) {
     }));
 
     // Calculate pagination metadata
-    const totalPages = Math.ceil(totalImages / limit);
+    const itemsPerPage = isUnlimited ? processedImages.length : limit;
+    const totalPages = isUnlimited
+      ? 1
+      : Math.ceil(totalImages / (itemsPerPage || 1));
 
     const endTime = Date.now();
     const duration = endTime - startTime;
@@ -313,10 +333,12 @@ export async function GET(request: Request) {
       pagination: {
         totalImages,
         totalPages,
-        currentPage: page,
-        itemsPerPage: limit,
-        startIndex: skip + 1,
-        endIndex: Math.min(skip + limit, totalImages),
+        currentPage: isUnlimited ? 1 : page,
+        itemsPerPage,
+        startIndex: isUnlimited ? 1 : skip + 1,
+        endIndex: isUnlimited
+          ? processedImages.length
+          : Math.min(skip + (itemsPerPage || 0), totalImages),
       },
       debug: {
         queryDuration: `${duration}ms`,

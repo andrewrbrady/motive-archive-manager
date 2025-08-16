@@ -186,15 +186,14 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
 
           const uploadedImage = data.images[0];
           let imageUrl = uploadedImage.url;
-
-          if (
-            imageUrl &&
-            imageUrl.includes("imagedelivery.net") &&
-            !imageUrl.match(
-              /\/(public|thumbnail|avatar|medium|large|webp|preview|original|w=\d+)$/
-            )
-          ) {
-            imageUrl = `${imageUrl}/w=200,h=200,fit=cover`;
+          // Normalize to base URL (account + imageId), avoid adding any variant
+          if (imageUrl && imageUrl.includes("imagedelivery.net")) {
+            const match = imageUrl.match(
+              /^(https:\/\/imagedelivery\.net\/[^\/]+\/[^\/]+)/
+            );
+            if (match) {
+              imageUrl = match[1];
+            }
           }
 
           // Create ImageType object matching expected format

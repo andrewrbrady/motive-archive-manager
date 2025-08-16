@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import ImageManager from "@/components/ImageManager";
+import { type UnifiedUploadProgress } from "@/components/UnifiedImageUploader";
 import { Loader2 } from "lucide-react";
 import { CarImage } from "@/types/car";
 import { useAPI } from "@/hooks/useAPI";
@@ -133,6 +134,11 @@ export default function CarImageEditor({
         console.error("Error updating car images metadata:", error);
       }
     }
+  };
+
+  // Forward unified uploader progress into local legacy progress shape if needed in future
+  const handleUnifiedProgress = (items: UnifiedUploadProgress[]) => {
+    // Optional: use to display progress in editor; currently ImageManager handles its own progress UI
   };
 
   return (

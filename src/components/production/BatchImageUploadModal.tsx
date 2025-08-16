@@ -17,6 +17,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { uploadToCloudflare } from "@/lib/cloudflare";
+// TODO: Consider migrating this modal to use UnifiedImageUploader when batch uploads per inventory item are needed.
 
 interface BatchImageUploadModalProps {
   isOpen: boolean;

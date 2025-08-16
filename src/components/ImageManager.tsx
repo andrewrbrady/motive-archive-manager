@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ImageUploader } from "./ImageUploader";
+import CarImageUpload from "@/components/ui/CarImageUpload";
 import { Loader2, Trash2, ZoomIn } from "lucide-react";
 import Image from "next/image";
 import { CarImage } from "@/types/car";
@@ -42,7 +42,7 @@ export default function ImageManager({
 }: ImageManagerProps) {
   const [uploadProgress, setUploadProgress] = useState<ImageProgress[]>([]);
 
-  const handleImageUpload = async (_uploadedUrls: string[]) => {
+  const handleImageUpload = () => {
     // Clear upload progress when all uploads are complete
     setUploadProgress([]);
   };
@@ -64,13 +64,13 @@ export default function ImageManager({
 
   return (
     <div className={className}>
-      {showUploader && (
+      {showUploader && carId && (
         <div className="mb-8">
-          <ImageUploader
-            onUploadComplete={handleImageUpload}
-            onImageProgress={handleImageProgress}
-            maxSelection={maxSelection}
+          <CarImageUpload
             carId={carId}
+            onComplete={handleImageUpload}
+            onError={(err) => console.error(err)}
+            multiple={maxSelection !== 1}
           />
           {uploadProgress.length > 0 && (
             <div className="mt-4 space-y-2">
