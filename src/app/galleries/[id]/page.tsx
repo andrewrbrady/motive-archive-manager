@@ -35,6 +35,7 @@ import { toast } from "@/components/ui/use-toast";
 // import Navbar from "@/components/layout/navbar";
 import { GalleryImageSelector } from "@/components/galleries/GalleryImageSelector";
 import { DraggableGalleryGrid } from "@/components/galleries/DraggableGalleryGrid";
+import { AddImagesByFilenamesModal } from "@/components/galleries/AddImagesByFilenamesModal";
 import { ImageData } from "@/app/images/columns";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageTitle } from "@/components/ui/PageTitle";
@@ -82,6 +83,7 @@ export default function GalleryPage() {
   const [yamlExportType, setYamlExportType] = useState<"gallery" | "carousel">(
     "gallery"
   );
+  const [isAddByNamesOpen, setIsAddByNamesOpen] = useState(false);
 
   // Clean up URL parameters when viewing gallery (these should only be used during image selection)
   React.useEffect(() => {
@@ -700,6 +702,12 @@ export default function GalleryPage() {
                 Gallery Images
               </h2>
               <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsAddByNamesOpen(true)}
+                >
+                  Paste Filenames
+                </Button>
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button variant="outline">
@@ -1180,6 +1188,15 @@ ${(() => {
         </div>
       </main>
       {/* <Footer /> */}
+      <AddImagesByFilenamesModal
+        isOpen={isAddByNamesOpen}
+        onClose={() => setIsAddByNamesOpen(false)}
+        galleryId={id}
+        onImagesAdded={() => {
+          // Refresh gallery after adding images
+          mutate();
+        }}
+      />
     </div>
   );
 }

@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     }
 
     // Get the images associated with this gallery
-    const imageIds = gallery.imageIds.map((id: string) => new ObjectId(id));
+    const imageIds = gallery.imageIds || [];
 
     console.log(
       `[Gallery ${id}] Starting image lookup - ${gallery.imageIds.length} image IDs in gallery`
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
 
     // Check for orphaned image references and clean them up
     const foundImageIds = images.map((img) => img._id.toString());
-    const originalImageIds = gallery.imageIds.map((id: any) => id.toString());
+    const originalImageIds = (gallery.imageIds || []).map((id: ObjectId) => id.toString());
     const orphanedImageIds = originalImageIds.filter(
       (id: string) => !foundImageIds.includes(id)
     );
@@ -61,16 +61,15 @@ export async function GET(request: Request) {
       );
 
       // Clean up the orphaned references
-      const cleanImageIds = gallery.imageIds.filter((id: ObjectId | string) => {
-        const idString = typeof id === "string" ? id : id.toString();
+      const cleanImageIds = (gallery.imageIds || []).filter((id: ObjectId) => {
+        const idString = id.toString();
         return foundImageIds.includes(idString);
       });
 
       const cleanOrderedImages =
         gallery.orderedImages?.filter(
-          (item: { id: ObjectId | string; order: number }) => {
-            const idString =
-              typeof item.id === "string" ? item.id : item.id.toString();
+          (item: { id: ObjectId; order: number }) => {
+            const idString = item.id.toString();
             return foundImageIds.includes(idString);
           }
         ) || [];

@@ -169,7 +169,9 @@ export function useProjectGalleries(
       if (!api || !projectId) return false;
 
       try {
-        await api.delete(`/api/projects/${projectId}/galleries/${galleryId}`);
+        await api.delete(
+          `/api/projects/${projectId}/galleries?galleryId=${galleryId}`
+        );
 
         // Refresh both gallery lists
         await Promise.all([fetchProjectGalleries(), fetchAvailableGalleries()]);

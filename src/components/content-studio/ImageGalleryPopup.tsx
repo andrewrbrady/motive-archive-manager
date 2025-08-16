@@ -7,6 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -158,6 +165,37 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
   }) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [selectedGallery, setSelectedGallery] = useState<string>("");
+    const [selectedView, setSelectedView] = useState<string>("");
+    const [selectedSide, setSelectedSide] = useState<string>("");
+
+    // Derive available filter options from images
+    const availableViews = useMemo(() => {
+      const set = new Set<string>();
+      for (const img of finalImages) {
+        const val = (img.metadata?.view || img.view || "").toString().trim();
+        if (val) set.add(val);
+      }
+      return Array.from(set).sort();
+    }, [finalImages]);
+
+    const availableSides = useMemo(() => {
+      const set = new Set<string>();
+      for (const img of finalImages) {
+        const val = (img.metadata?.side || img.side || "").toString().trim();
+        if (val) set.add(val);
+      }
+      return Array.from(set).sort();
+    }, [finalImages]);
+
+    const availableGalleries = useMemo(() => {
+      const set = new Set<string>();
+      for (const img of finalImages) {
+        const val = (img.galleryName || "").toString().trim();
+        if (val) set.add(val);
+      }
+      return Array.from(set).sort();
+    }, [finalImages]);
 
     const handleAddImage = useCallback(
       (imageUrl: string, altText?: string, imageObject?: any) => {
@@ -169,9 +207,7 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
 
     // Filter images based on search term
     const filteredImages = useMemo(() => {
-      if (!searchTerm.trim()) return finalImages;
-
-      const searchLower = searchTerm.toLowerCase();
+      const searchLower = searchTerm.trim().toLowerCase();
       return finalImages.filter((image: any) => {
         // Basic fields
         const alt = (image.alt || "").toLowerCase();
@@ -196,29 +232,44 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
           ""
         ).toLowerCase();
         const tod = (image.metadata?.tod || image.tod || "").toLowerCase();
-        const view = (image.metadata?.view || image.view || "").toLowerCase();
-        const side = (image.metadata?.side || image.side || "").toLowerCase();
+        const viewRaw = image.metadata?.view || image.view || "";
+        const sideRaw = image.metadata?.side || image.side || "";
+        const view = viewRaw.toString().toLowerCase();
+        const side = sideRaw.toString().toLowerCase();
 
-        return (
-          alt.includes(searchLower) ||
-          galleryName.includes(searchLower) ||
-          fileName.includes(searchLower) ||
-          url.includes(searchLower) ||
-          description.includes(searchLower) ||
-          angle.includes(searchLower) ||
-          movement.includes(searchLower) ||
-          tod.includes(searchLower) ||
-          view.includes(searchLower) ||
-          side.includes(searchLower)
-        );
+        const matchesSearch = !searchLower
+          ? true
+          : alt.includes(searchLower) ||
+            galleryName.includes(searchLower) ||
+            fileName.includes(searchLower) ||
+            url.includes(searchLower) ||
+            description.includes(searchLower) ||
+            angle.includes(searchLower) ||
+            movement.includes(searchLower) ||
+            tod.includes(searchLower) ||
+            view.includes(searchLower) ||
+            side.includes(searchLower);
+
+        const matchesView = !selectedView
+          ? true
+          : viewRaw?.toString().toLowerCase() === selectedView.toLowerCase();
+        const matchesSide = !selectedSide
+          ? true
+          : sideRaw?.toString().toLowerCase() === selectedSide.toLowerCase();
+        const matchesGallery = !selectedGallery
+          ? true
+          : (image.galleryName || "").toString().toLowerCase() ===
+            selectedGallery.toLowerCase();
+
+        return matchesSearch && matchesView && matchesSide && matchesGallery;
       });
-    }, [finalImages, searchTerm]);
+    }, [finalImages, searchTerm, selectedView, selectedSide, selectedGallery]);
 
     return (
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>{children}</PopoverTrigger>
         <PopoverContent
-          className="w-[800px] max-w-[95vw] p-0"
+          className="w-[1100px] max-w-[98vw] p-0 z-[5000] overflow-visible"
           side="top"
           align="center"
           sideOffset={10}
@@ -264,25 +315,96 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
               )}
             </CardHeader>
             <CardContent className="p-4 pt-0">
-              {/* Search Bar */}
+              {/* Search Bar + Simple Filters */}
               {finalImages.length > 0 && (
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search images by name, gallery, description, angle, movement, time of day..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 h-9 text-sm"
-                  />
-                  {searchTerm && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSearchTerm("")}
-                      className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0 hover:bg-muted/20"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search images by name, gallery, description, angle, movement, time of day..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 h-9 text-sm"
+                    />
+                    {searchTerm && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSearchTerm("")}
+                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0 hover:bg-muted/20"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                  {/* Gallery filter */}
+                  {availableGalleries.length > 0 && (
+                    <div className="relative z-[6000]">
+                      <Select
+                        value={selectedGallery}
+                        onValueChange={(val) =>
+                          setSelectedGallery(val === "__all__" ? "" : val)
+                        }
+                      >
+                        <SelectTrigger className="w-[200px] h-9 text-sm">
+                          <SelectValue placeholder="Gallery" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[7000]" position="popper">
+                          <SelectItem value="__all__">All Galleries</SelectItem>
+                          {availableGalleries.map((g) => (
+                            <SelectItem key={g} value={g}>
+                              {g}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {/* View filter */}
+                  {availableViews.length > 0 && (
+                    <div className="relative z-[6000]">
+                      <Select
+                        value={selectedView}
+                        onValueChange={(val) =>
+                          setSelectedView(val === "__all__" ? "" : val)
+                        }
+                      >
+                        <SelectTrigger className="w-[160px] h-9 text-sm">
+                          <SelectValue placeholder="View" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[7000]" position="popper">
+                          <SelectItem value="__all__">All Views</SelectItem>
+                          {availableViews.map((v) => (
+                            <SelectItem key={v} value={v}>
+                              {v}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {/* Side filter */}
+                  {availableSides.length > 0 && (
+                    <div className="relative z-[6000]">
+                      <Select
+                        value={selectedSide}
+                        onValueChange={(val) =>
+                          setSelectedSide(val === "__all__" ? "" : val)
+                        }
+                      >
+                        <SelectTrigger className="w-[160px] h-9 text-sm">
+                          <SelectValue placeholder="Side" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[7000]" position="popper">
+                          <SelectItem value="__all__">All Sides</SelectItem>
+                          {availableSides.map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {s}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   )}
                 </div>
               )}
@@ -295,8 +417,8 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
               ) : finalImages && finalImages.length > 0 ? (
                 <>
                   {filteredImages.length > 0 ? (
-                    <ScrollArea className="h-96">
-                      <div className="grid grid-cols-4 gap-3">
+                    <ScrollArea className="h-[520px]">
+                      <div className="grid grid-cols-5 gap-3">
                         {filteredImages.map((image: any, index: number) => (
                           <GalleryImage
                             key={`gallery-popup-image-${image.id || "no-id"}-${index}`}

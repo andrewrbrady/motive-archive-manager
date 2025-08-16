@@ -292,116 +292,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    // PERFORMANCE OPTIMIZATION: Only create missing documents if really needed
-    if (
-      totalImages === 0 &&
-      car.imageIds &&
-      Array.isArray(car.imageIds) &&
-      car.imageIds.length > 0
-    ) {
-      // Create image documents from imageIds (batched for performance)
-      const now = new Date().toISOString();
-      const imageDocuments = car.imageIds
-        .map((imgId: string) => {
-          try {
-            if (!imgId) return null;
-
-            let imgObjectId;
-            if (ObjectId.isValid(imgId)) {
-              imgObjectId = new ObjectId(imgId);
-            } else {
-              imgObjectId = new ObjectId();
-            }
-
-            return {
-              _id: imgObjectId,
-              carId: carObjectId,
-              cloudflareId: imgId,
-              url: `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${imgId}/public`,
-              filename: `Image ${imgId.substring(0, 8)}`,
-              metadata: {
-                category: category || "exterior",
-                isPrimary: car.primaryImageId === imgId,
-              },
-              createdAt: now,
-              updatedAt: now,
-            };
-          } catch (error) {
-            return null;
-          }
-        })
-        .filter((doc): doc is NonNullable<typeof doc> => doc !== null);
-
-      if (imageDocuments.length > 0) {
-        try {
-          await db.collection("images").insertMany(imageDocuments, {
-            ordered: false,
-            // PERFORMANCE: Use unacknowledged writes for better performance
-            writeConcern: { w: 0 },
-          });
-        } catch (error: any) {
-          // Ignore duplicate key errors
-          if (error.code !== 11000) {
-            console.error("Error creating image documents:", error);
-          }
-        }
-      }
-
-      // Re-fetch images after creation with dynamic sorting
-      const newImages = await db
-        .collection("images")
-        .find(query, {
-          projection: {
-            cloudflareId: 1,
-            url: 1,
-            filename: 1,
-            metadata: 1,
-            carId: 1,
-            createdAt: 1,
-            updatedAt: 1,
-          },
-        })
-        .sort({
-          [sort]: sortDirection === "asc" ? 1 : -1,
-          // Add secondary sort to ensure consistency
-          ...(sort !== "createdAt" && { createdAt: -1 }),
-        })
-        .skip(skip)
-        .limit(limit)
-        .toArray();
-
-      // Process images with our utility function
-      const processedImages = newImages.map((image) => ({
-        ...image,
-        _id: image._id.toString(),
-        carId: image.carId.toString(),
-        url: fixCloudflareImageUrl(image.url),
-      }));
-
-      const newTotalImages = await db
-        .collection("images")
-        .countDocuments(query);
-      const totalPages = Math.ceil(newTotalImages / limit);
-
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-
-      return NextResponse.json({
-        images: processedImages,
-        pagination: {
-          totalImages: newTotalImages,
-          totalPages,
-          currentPage: page,
-          itemsPerPage: limit,
-          startIndex: skip + 1,
-          endIndex: Math.min(skip + limit, newTotalImages),
-        },
-        debug: {
-          queryDuration: `${duration}ms`,
-          cacheStatus: "created_documents",
-        },
-      });
-    }
+    // NOTE: After normalization, we do not auto-create image documents from car.imageIds.
 
     // PERFORMANCE OPTIMIZATION: Streamlined image processing
     const processedImages = images.map((image) => ({
@@ -688,7 +579,7 @@ export async function DELETE(request: Request) {
           foundCloudflareIds
         );
 
-        // Update the car document to remove the image IDs (both imageIds and processedImageIds)
+        // Update the car document to remove the image IDs (ObjectIds only)
         const updateResult = await db.collection("cars").updateOne(
           { _id: carObjectId },
           {

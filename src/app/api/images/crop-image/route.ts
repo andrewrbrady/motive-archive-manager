@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
+import { getDatabase } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
 interface CropImageRequest {
   imageUrl: string;
@@ -391,6 +393,11 @@ export async function POST(request: NextRequest) {
       // Process the image using Sharp (in-memory)
       let processedImageBuffer;
       try {
+        // Use slightly lower JPEG quality for large outputs to stay under serverless payload limits
+        const isLargeOutput =
+          outputWidth * outputHeight >= 12000000 || (scale || 1) >= 2;
+        const jpegQuality = isLargeOutput ? 82 : 88;
+
         processedImageBuffer = await sharp(imageBuffer)
           .extract({
             left: scaledCropX,
@@ -402,7 +409,7 @@ export async function POST(request: NextRequest) {
             fit: "fill",
             kernel: sharp.kernel.lanczos3,
           })
-          .jpeg({ quality: 90 })
+          .jpeg({ quality: jpegQuality, progressive: true })
           .toBuffer();
       } catch (sharpError) {
         console.error("❌ Sharp processing failed:", sharpError);
@@ -432,11 +439,6 @@ export async function POST(request: NextRequest) {
       // Upload to Cloudflare if requested
       if (uploadToCloudflare) {
         try {
-          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("☁️ Uploading to Cloudflare...");
-
-          // Create FormData for the upload
-          const formData = new FormData();
-
           // Generate filename based on the new naming convention
           let filename;
           if (originalFilename) {
@@ -445,8 +447,6 @@ export async function POST(request: NextRequest) {
               requestedWidth || Math.round(outputWidth / (scale || 1));
             const requestedH =
               requestedHeight || Math.round(outputHeight / (scale || 1));
-
-            // Check if this is a 2x scale (or higher)
             const scaleFactor = scale || 1;
             if (scaleFactor >= 2) {
               const scaleMultiplier = Math.round(scaleFactor);
@@ -458,21 +458,39 @@ export async function POST(request: NextRequest) {
             filename = `cropped_image_${Date.now()}.jpg`;
           }
 
-          // Create a File object from the buffer
+          // Prefer direct upload to Cloudflare from this function to avoid Vercel 413 on internal hop
+          const cfForm = new FormData();
           const file = new File([processedImageBuffer], filename, {
             type: "image/jpeg",
           });
+          cfForm.append("file", file);
 
-          formData.append("files", file);
+          const cloudflareUrl = `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/images/v1`;
+          const cfResponse = await fetch(cloudflareUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_CLOUDFLARE_API_TOKEN}`,
+            },
+            body: cfForm,
+          });
 
-          // Add car association and metadata information
-          if (originalCarId) {
-            formData.append("carId", originalCarId);
+          if (!cfResponse.ok) {
+            const errorText = await cfResponse.text();
+            throw new Error(
+              `Cloudflare upload failed (${cfResponse.status}): ${errorText}`
+            );
           }
 
-          formData.append(
-            "metadata",
-            JSON.stringify({
+          const cfResult = await cfResponse.json();
+          const imageId = cfResult?.result?.id;
+          const variants: string[] = cfResult?.result?.variants || [];
+          const imageUrl = (variants[0] || "").replace(/\/public$/, "");
+
+          // Store in MongoDB (mirror logic from /api/images/upload)
+          try {
+            const nowIso = new Date().toISOString();
+            const db = await getDatabase();
+            const metadata = {
               category: "processed",
               processing: "image_crop",
               originalImage: imageUrl,
@@ -485,80 +503,57 @@ export async function POST(request: NextRequest) {
                 outputHeight,
                 scale,
               },
-              processedAt: new Date().toISOString(),
-            })
-          );
+              processedAt: nowIso,
+            } as any;
 
-          console.log("📤 Calling upload API with:", {
-            filename,
-            fileSize: processedImageBuffer.length,
-            carId: originalCarId,
-            hasMetadata: true,
-          });
+            const imageDoc = {
+              _id: new ObjectId(),
+              cloudflareId: imageId,
+              url: imageUrl,
+              filename,
+              metadata,
+              carId: originalCarId ? new ObjectId(originalCarId) : null,
+              createdAt: nowIso,
+              updatedAt: nowIso,
+            } as any;
 
-          const uploadResponse = await fetch(
-            `${request.nextUrl.origin}/api/images/upload`,
-            {
-              method: "POST",
-              body: formData,
-            }
-          );
+            await db.collection("images").insertOne(imageDoc);
 
-          // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📥 Upload response status:", uploadResponse.status);
-
-          if (uploadResponse.ok) {
-            const uploadResult = await uploadResponse.json();
-            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Upload result:", uploadResult);
-            console.log("🔍 Upload result structure:", {
-              success: uploadResult.success,
-              hasImages: !!uploadResult.images,
-              imagesLength: uploadResult.images?.length,
-              firstImageKeys: uploadResult.images?.[0]
-                ? Object.keys(uploadResult.images[0])
-                : [],
-              firstImageId: uploadResult.images?.[0]?.id,
-              uploadResultKeys: Object.keys(uploadResult),
-            });
-
-            // Extract the actual image data from the upload response
-            if (
-              uploadResult.success &&
-              uploadResult.images &&
-              uploadResult.images.length > 0
-            ) {
-              const uploadedImage = uploadResult.images[0];
-              result.cloudflareUpload = {
-                success: true,
-                imageId: uploadedImage.cloudflareId,
-                imageUrl: uploadedImage.url,
-                filename: uploadedImage.filename,
-                mongoId: uploadedImage.id, // This is the MongoDB _id from the upload response
-              };
-              console.log(
-                "✅ Processed upload result:",
-                result.cloudflareUpload
-              );
-              // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 MongoDB ID extracted:", uploadedImage.id);
-            } else {
-              console.error(
-                "❌ Upload result missing images array:",
-                uploadResult
-              );
-              result.cloudflareUpload = uploadResult;
+            if (originalCarId && (metadata as any).category === "processed") {
+              try {
+                await db.collection("cars").updateOne(
+                  { _id: new ObjectId(originalCarId) },
+                  {
+                    $addToSet: { processedImageIds: imageDoc._id },
+                    $set: { updatedAt: nowIso },
+                  }
+                );
+              } catch (carUpdateError) {
+                console.error(
+                  "[API] Failed to update car with processed image:",
+                  carUpdateError
+                );
+              }
             }
 
-            // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Cloudflare upload successful");
-          } else {
-            const errorText = await uploadResponse.text();
+            result.cloudflareUpload = {
+              success: true,
+              imageId,
+              imageUrl,
+              filename,
+              mongoId: imageDoc._id.toString(),
+            };
+          } catch (dbErr) {
             console.error(
-              "❌ Failed to upload to Cloudflare:",
-              uploadResponse.status,
-              errorText
+              "[API] Failed to store processed image in DB:",
+              dbErr
             );
             result.cloudflareUpload = {
-              success: false,
-              error: `Upload failed: ${uploadResponse.status} - ${errorText}`,
-            };
+              success: true,
+              imageId,
+              imageUrl,
+              filename,
+            } as any;
           }
         } catch (uploadError) {
           console.error("❌ Error uploading to Cloudflare:", uploadError);

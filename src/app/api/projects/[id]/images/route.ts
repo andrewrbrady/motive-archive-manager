@@ -640,9 +640,9 @@ export async function DELETE(request: Request) {
       projectId: projectObjectId,
     });
 
-    // Remove from project's imageIds
+    // Remove from project's imageIds (ObjectIds only)
     await db.collection("projects").updateOne({ _id: projectObjectId }, {
-      $pullAll: { imageIds: imageIds },
+      $pullAll: { imageIds: imageObjectIds },
       $set: { updatedAt: new Date().toISOString() },
     } as any);
 

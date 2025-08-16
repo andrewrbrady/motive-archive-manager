@@ -341,7 +341,9 @@ export function ProjectGalleriesTab({
     if (!api) return;
 
     try {
-      await api.delete(`/api/projects/${project._id}/galleries/${galleryId}`);
+      await api.delete(
+        `/api/projects/${project._id}/galleries?galleryId=${galleryId}`
+      );
 
       toast({
         title: "Success",
