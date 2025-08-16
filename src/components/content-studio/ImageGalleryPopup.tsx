@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/popover";
 import { Loader2, ImageIcon, RefreshCw, Plus, X, Search } from "lucide-react";
 import { CloudflareImage } from "@/components/ui/CloudflareImage";
+import { useAPI } from "@/hooks/useAPI";
 
 interface GalleryImageProps {
   image: any;
@@ -142,6 +143,7 @@ interface ImageGalleryPopupProps {
   finalImages: any[];
   loadingImages: boolean;
   projectId?: string;
+  carId?: string | null;
   activeBlockId: string | null;
   onRefreshImages: () => void;
   onAddImage: (imageUrl: string, altText?: string, imageObject?: any) => void;
@@ -158,16 +160,44 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
     finalImages,
     loadingImages,
     projectId,
+    carId,
     activeBlockId,
     onRefreshImages,
     onAddImage,
     children,
   }) {
+    const api = useAPI();
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedGallery, setSelectedGallery] = useState<string>("");
     const [selectedView, setSelectedView] = useState<string>("");
-    const [selectedSide, setSelectedSide] = useState<string>("");
+    const [selectedAngle, setSelectedAngle] = useState<string>("");
+    const [carGalleries, setCarGalleries] = useState<
+      Array<{ _id: string; name: string }>
+    >([]);
+    const [loadingGalleries, setLoadingGalleries] = useState(false);
+
+    // Load actual galleries for car context so dropdown reflects attachments
+    useEffect(() => {
+      const loadGalleries = async () => {
+        if (!api || !carId) return;
+        try {
+          setLoadingGalleries(true);
+          const data = (await api.get(
+            `cars/${carId}?includeGalleries=true`
+          )) as {
+            galleries?: Array<{ _id: string; name: string }>;
+          };
+          setCarGalleries(data?.galleries || []);
+        } catch (err) {
+          // Non-blocking failure; fallback will be finalImages-derived names
+          setCarGalleries([]);
+        } finally {
+          setLoadingGalleries(false);
+        }
+      };
+      loadGalleries();
+    }, [api, carId]);
 
     // Derive available filter options from images
     const availableViews = useMemo(() => {
@@ -179,23 +209,35 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
       return Array.from(set).sort();
     }, [finalImages]);
 
-    const availableSides = useMemo(() => {
+    const availableAngles = useMemo(() => {
       const set = new Set<string>();
       for (const img of finalImages) {
-        const val = (img.metadata?.side || img.side || "").toString().trim();
+        const val = (img.metadata?.angle || img.angle || "").toString().trim();
         if (val) set.add(val);
       }
       return Array.from(set).sort();
     }, [finalImages]);
 
     const availableGalleries = useMemo(() => {
+      // Prefer actual attached galleries for car context when available
+      if (carId && carGalleries.length > 0) {
+        return carGalleries.map((g) => g.name).sort();
+      }
+      // Fallback: derive from images (include multi-membership)
       const set = new Set<string>();
       for (const img of finalImages) {
-        const val = (img.galleryName || "").toString().trim();
-        if (val) set.add(val);
+        const primary = (img.galleryName || "").toString().trim();
+        if (primary) set.add(primary);
+        const names: string[] = Array.isArray(img.galleryNames)
+          ? img.galleryNames
+          : [];
+        for (const n of names) {
+          const v = (n || "").toString().trim();
+          if (v) set.add(v);
+        }
       }
       return Array.from(set).sort();
-    }, [finalImages]);
+    }, [finalImages, carId, carGalleries]);
 
     const handleAddImage = useCallback(
       (imageUrl: string, altText?: string, imageObject?: any) => {
@@ -236,6 +278,9 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
         const sideRaw = image.metadata?.side || image.side || "";
         const view = viewRaw.toString().toLowerCase();
         const side = sideRaw.toString().toLowerCase();
+        const angleLower = (image.metadata?.angle || image.angle || "")
+          .toString()
+          .toLowerCase();
 
         const matchesSearch = !searchLower
           ? true
@@ -253,17 +298,28 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
         const matchesView = !selectedView
           ? true
           : viewRaw?.toString().toLowerCase() === selectedView.toLowerCase();
-        const matchesSide = !selectedSide
+        const matchesAngle = !selectedAngle
           ? true
-          : sideRaw?.toString().toLowerCase() === selectedSide.toLowerCase();
+          : angleLower === selectedAngle.toLowerCase();
         const matchesGallery = !selectedGallery
           ? true
-          : (image.galleryName || "").toString().toLowerCase() ===
-            selectedGallery.toLowerCase();
+          : (() => {
+              const sel = selectedGallery.toLowerCase();
+              const primary = (image.galleryName || "")
+                .toString()
+                .toLowerCase();
+              if (primary === sel) return true;
+              const names: string[] = Array.isArray(image.galleryNames)
+                ? image.galleryNames
+                : [];
+              return names.some(
+                (n) => (n || "").toString().toLowerCase() === sel
+              );
+            })();
 
-        return matchesSearch && matchesView && matchesSide && matchesGallery;
+        return matchesSearch && matchesView && matchesAngle && matchesGallery;
       });
-    }, [finalImages, searchTerm, selectedView, selectedSide, selectedGallery]);
+    }, [finalImages, searchTerm, selectedView, selectedAngle, selectedGallery]);
 
     return (
       <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -383,21 +439,21 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
                       </Select>
                     </div>
                   )}
-                  {/* Side filter */}
-                  {availableSides.length > 0 && (
+                  {/* Angle filter */}
+                  {availableAngles.length > 0 && (
                     <div className="relative z-[6000]">
                       <Select
-                        value={selectedSide}
+                        value={selectedAngle}
                         onValueChange={(val) =>
-                          setSelectedSide(val === "__all__" ? "" : val)
+                          setSelectedAngle(val === "__all__" ? "" : val)
                         }
                       >
                         <SelectTrigger className="w-[160px] h-9 text-sm">
-                          <SelectValue placeholder="Side" />
+                          <SelectValue placeholder="Angle" />
                         </SelectTrigger>
                         <SelectContent className="z-[7000]" position="popper">
-                          <SelectItem value="__all__">All Sides</SelectItem>
-                          {availableSides.map((s) => (
+                          <SelectItem value="__all__">All Angles</SelectItem>
+                          {availableAngles.map((s) => (
                             <SelectItem key={s} value={s}>
                               {s}
                             </SelectItem>

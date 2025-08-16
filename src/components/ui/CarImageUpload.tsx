@@ -1,5 +1,7 @@
 import React from "react";
-import UnifiedImageUploader from "@/components/UnifiedImageUploader";
+import UnifiedImageUploader, {
+  type UnifiedUploadProgress,
+} from "@/components/UnifiedImageUploader";
 
 interface CarImageUploadProps {
   carId: string;
@@ -8,6 +10,7 @@ interface CarImageUploadProps {
   onError?: (error: string) => void;
   onCancel?: () => void;
   multiple?: boolean;
+  onProgress?: (progress: UnifiedUploadProgress[]) => void;
 }
 
 const CarImageUpload: React.FC<CarImageUploadProps> = ({
@@ -17,6 +20,7 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
   onError,
   onCancel,
   multiple = true,
+  onProgress,
 }) => {
   console.log(
     "🚗 CarImageUpload using UNIFIED uploader with PARALLEL processing:",
@@ -29,6 +33,7 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
       carId={carId}
       vehicleInfo={vehicleInfo}
       metadata={{ vehicleInfo }}
+      onProgress={onProgress}
       onComplete={onComplete}
       onError={onError}
       onCancel={onCancel}
