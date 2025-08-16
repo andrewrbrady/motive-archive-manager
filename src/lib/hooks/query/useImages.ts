@@ -72,7 +72,8 @@ export function useCarImages(carId: string) {
       try {
         // Use only the dedicated images endpoint with pagination
         const data = await api.get<{ images: any[] }>(
-          `/cars/${carId}/images?limit=500`
+          `/cars/${carId}/images?limit=500`,
+          { skipAuth: true }
         );
 
         // If we have images from the images endpoint, return them

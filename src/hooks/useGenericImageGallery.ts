@@ -461,7 +461,7 @@ export function useGenericImageGallery({
             apiUrl
           );
 
-          const response = await api.get(apiUrl, signal ? { signal } : {});
+          const response = await api.get(apiUrl, { skipAuth: true });
 
           // Check if request was cancelled
           if (signal.aborted) {
@@ -879,6 +879,8 @@ export function useGenericImageGallery({
       console.log("🚫 [EFFECT] Skipping fetch - missing requirements:", {
         hasEntityId: !!entityId,
         hasApi: !!api,
+        apiStatus: api ? "present" : "null",
+        authStatus: "checking...",
       });
       return;
     }

@@ -177,7 +177,7 @@ class APIClient {
    */
   private async getAuthHeaders(skipAuth = false): Promise<HeadersInit> {
     if (skipAuth) {
-      return {}; // Return empty headers for uploads to let browser set Content-Type
+      return {}; // Return empty headers - no auth needed
     }
 
     const baseHeaders: HeadersInit = {
@@ -192,6 +192,12 @@ class APIClient {
       };
     } catch (error) {
       console.error("💥 APIClient: Failed to get auth headers:", error);
+      console.error("💥 APIClient: Auth error details:", {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        hasAuth: !!auth,
+        currentUser: auth?.currentUser ? "present" : "null",
+      });
       throw error;
     }
   }
