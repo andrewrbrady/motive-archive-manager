@@ -16,7 +16,13 @@ interface CarImageEditorProps {
 interface ImageProgress {
   fileName: string;
   progress: number;
-  status: "pending" | "uploading" | "analyzing" | "complete" | "error";
+  status:
+    | "pending"
+    | "optimizing"
+    | "uploading"
+    | "analyzing"
+    | "complete"
+    | "error";
   imageUrl?: string;
   metadata?: CarImage["metadata"];
   error?: string;

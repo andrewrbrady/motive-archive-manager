@@ -85,7 +85,7 @@ function CustomImageUploader({
           // Use project-specific endpoint if projectId exists, otherwise fallback to general endpoint
           const endpoint = metadata.projectId
             ? `/api/projects/${metadata.projectId}/images`
-            : "/api/images/upload";
+            : "/api/cloudflare/images";
 
           const response = (await api.upload(endpoint, formData)) as {
             success: boolean;

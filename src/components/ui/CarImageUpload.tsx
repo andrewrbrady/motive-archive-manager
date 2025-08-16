@@ -1,5 +1,5 @@
 import React from "react";
-import ImageUploader from "./ImageUploader";
+import UnifiedImageUploader from "@/components/UnifiedImageUploader";
 
 interface CarImageUploadProps {
   carId: string;
@@ -18,17 +18,23 @@ const CarImageUpload: React.FC<CarImageUploadProps> = ({
   onCancel,
   multiple = true,
 }) => {
-  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🚗 CarImageUpload rendering with:", { carId, mode: "car" });
+  console.log(
+    "🚗 CarImageUpload using UNIFIED uploader with PARALLEL processing:",
+    { carId }
+  );
 
   return (
-    <ImageUploader
-      mode="car"
+    <UnifiedImageUploader
+      context="car"
       carId={carId}
       vehicleInfo={vehicleInfo}
+      metadata={{ vehicleInfo }}
       onComplete={onComplete}
       onError={onError}
       onCancel={onCancel}
-      multiple={multiple}
+      maxFiles={multiple ? Infinity : 1}
+      showDropzone={true}
+      showAnalysisOptions={true}
     />
   );
 };

@@ -90,11 +90,12 @@ interface Collections {
 
 // Batch size for MongoDB operations
 const BATCH_SIZE = 50;
-// Parallel upload configuration - OPTIMIZED for better performance
-const CLOUDFLARE_UPLOAD_CONCURRENCY = 10; // Increased from 4 to 10
-const ANALYSIS_RETRY_COUNT = 2;
-const ANALYSIS_CONCURRENCY = 8; // Increased from 4 to 8
-const ANALYSIS_TIMEOUT = 30000; // Reduced from 60s to 30s for faster processing
+// High-Performance Parallel Processing Configuration
+const CLOUDFLARE_UPLOAD_CONCURRENCY = 20; // Significantly increased for faster uploads
+const ANALYSIS_RETRY_COUNT = 3;
+const ANALYSIS_CONCURRENCY = 16; // Much higher concurrency for OpenAI analysis
+const ANALYSIS_TIMEOUT = 45000; // Balanced timeout
+const ASYNC_ANALYSIS_ENABLED = true; // Enable non-blocking analysis
 
 // File size limits and validation
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB per file to avoid Vercel limits

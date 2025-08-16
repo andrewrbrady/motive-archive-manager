@@ -52,7 +52,7 @@ interface InspectionFormProps {
 interface UploadedImage {
   id: string;
   cloudflareId: string;
-  filename: string;
+  filename?: string;
   url: string;
 }
 

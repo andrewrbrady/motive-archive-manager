@@ -163,7 +163,7 @@ export function useUploadImages(carId: string, vehicleInfo?: any) {
         }
 
         try {
-          const response = await fetch("/api/images/upload", {
+          const response = await fetch("/api/cloudflare/images", {
             method: "POST",
             body: formData,
           });

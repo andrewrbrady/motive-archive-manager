@@ -203,7 +203,7 @@ export function useImageUploader({
         });
 
         try {
-          const response = await fetch("/api/images/upload", {
+          const response = await fetch("/api/cloudflare/images", {
             method: "POST",
             body: formData,
             signal: controller.signal,

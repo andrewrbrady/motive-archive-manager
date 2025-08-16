@@ -9,7 +9,13 @@ import { CarImage } from "@/types/car";
 interface ImageProgress {
   fileName: string;
   progress: number;
-  status: "pending" | "uploading" | "analyzing" | "complete" | "error";
+  status:
+    | "pending"
+    | "optimizing"
+    | "uploading"
+    | "analyzing"
+    | "complete"
+    | "error";
   imageUrl?: string;
   metadata?: CarImage["metadata"];
   error?: string;
@@ -89,14 +95,16 @@ export default function ImageManager({
                         progress.status === "error"
                           ? "bg-destructive-500"
                           : progress.status === "complete"
-                          ? "bg-success-500"
-                          : "bg-info-500"
+                            ? "bg-success-500"
+                            : "bg-info-500"
                       }`}
                       style={{ width: `${progress.progress}%` }}
                     />
                   </div>
                   {progress.status === "error" && (
-                    <p className="text-xs text-destructive-500">{progress.error}</p>
+                    <p className="text-xs text-destructive-500">
+                      {progress.error}
+                    </p>
                   )}
                 </div>
               ))}

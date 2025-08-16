@@ -349,8 +349,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
       let globalFileIndex = 0;
 
-      // Process chunks sequentially to avoid overwhelming the endpoints
-      const maxParallelChunks = 1; // Process one chunk at a time to avoid any issues
+      // Process chunks in parallel for maximum speed
+      const maxParallelChunks = 10; // Process multiple chunks simultaneously for speed
       console.log(
         `Processing ${chunks.length} chunks with up to ${maxParallelChunks} parallel chunks`
       );
@@ -421,19 +421,15 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         throw new Error("Authentication required");
       }
 
-      // Process each file in the chunk individually with direct Cloudflare uploads
-      for (let localIndex = 0; localIndex < chunk.length; localIndex++) {
-        const file = chunk[localIndex];
+      // Process ALL files in chunk in PARALLEL instead of sequential
+      const filePromises = chunk.map(async (file, localIndex) => {
         const fileIndex = globalOffset + localIndex;
 
         console.log(
-          `Processing file ${localIndex + 1}/${chunk.length}: ${file.name}`
+          `🚀 Starting PARALLEL upload for file ${localIndex + 1}/${chunk.length}: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`
         );
 
         try {
-          console.log(
-            `🚀 Starting upload for file ${localIndex + 1}/${chunk.length}: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`
-          );
 
           // Update progress to show upload starting
           setProgress((prev) => {
@@ -647,9 +643,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
             return updated;
           });
         }
-      }
+      });
 
-      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`✅ Chunk ${chunkIndex + 1} processed successfully`);
+      // Wait for ALL files in chunk to complete in parallel
+      await Promise.allSettled(filePromises);
+      console.log(`✅ Chunk ${chunkIndex + 1} processed with PARALLEL uploads`);
     } catch (error) {
       console.error(`❌ Chunk ${chunkIndex + 1} processing failed:`, error);
 

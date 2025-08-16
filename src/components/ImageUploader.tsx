@@ -5,6 +5,7 @@ import { CarImage } from "@/types/car";
 import { useAPI } from "@/hooks/useAPI";
 import { getValidToken } from "@/lib/api-client";
 import { compressImages, needsCompression } from "@/lib/imageCompression";
+import { optimizeImageForUpload } from "@/lib/imageOptimization";
 
 interface UploadResponse {
   imageUrl: string;
@@ -14,7 +15,13 @@ interface UploadResponse {
 interface ImageProgress {
   fileName: string;
   progress: number;
-  status: "pending" | "uploading" | "analyzing" | "complete" | "error";
+  status:
+    | "pending"
+    | "optimizing"
+    | "uploading"
+    | "analyzing"
+    | "complete"
+    | "error";
   imageUrl?: string;
   metadata?: CarImage["metadata"];
   error?: string;
@@ -47,21 +54,46 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   const uploadFile = async (file: File): Promise<UploadResponse> => {
     return new Promise(async (resolve, reject) => {
-      const formData = new FormData();
-      formData.append("files", file);
-      formData.append("metadata", JSON.stringify(metadata));
-      if (carId) {
-        formData.append("carId", carId);
-      }
-
-      onImageProgress?.({
-        fileName: file.name,
-        progress: 0,
-        status: "uploading",
-      });
-
       try {
-        const data = (await api.upload("/api/images/upload", formData)) as {
+        // Phase 1: Optimize image client-side
+        onImageProgress?.({
+          fileName: file.name,
+          progress: 0,
+          status: "optimizing",
+        });
+
+        const optimizationResult = await optimizeImageForUpload(file, {
+          context: carId ? "car" : "general",
+          quality: 0.95, // High quality preservation
+        });
+
+        const optimizedFile = optimizationResult.optimizedFile;
+
+        // Phase 2: Upload optimized file
+        onImageProgress?.({
+          fileName: file.name,
+          progress: 25,
+          status: "uploading",
+        });
+
+        const formData = new FormData();
+        formData.append("files", optimizedFile);
+        formData.append(
+          "metadata",
+          JSON.stringify({
+            ...metadata,
+            optimized: true,
+            originalSize: file.size,
+            optimizedSize: optimizedFile.size,
+            compressionRatio: optimizationResult.compressionRatio,
+            format: file.type, // Preserve original format
+          })
+        );
+        if (carId) {
+          formData.append("carId", carId);
+        }
+
+        const data = (await api.upload("/api/cloudflare/images", formData)) as {
           success: boolean;
           images: Array<{
             url: string;
@@ -92,6 +124,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           metadata: uploadedImage.metadata || {},
         });
       } catch (error) {
+        console.error("Image upload/optimization failed:", error);
         reject(error);
       }
     });
@@ -107,133 +140,104 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
 
     setUploading(true);
-    const firstFile = files[0];
+    const uploadedUrls: string[] = [];
 
     try {
-      onImageProgress?.({
-        fileName: firstFile.name,
-        progress: 0,
-        status: "pending",
-      });
+      console.log(`🚀 Starting PARALLEL upload of ${files.length} files`);
 
-      const { imageUrl, metadata: uploadMetadata } =
-        await uploadFile(firstFile);
+      // Process ALL files in parallel - this is the key fix!
+      const uploadPromises = files.map(async (file, index) => {
+        try {
+          console.log(
+            `📤 Starting upload ${index + 1}/${files.length}: ${file.name}`
+          );
 
-      onImageProgress?.({
-        fileName: firstFile.name,
-        progress: 75,
-        status: "analyzing",
-        imageUrl,
-      });
+          onImageProgress?.({
+            fileName: file.name,
+            progress: 0,
+            status: "pending",
+          });
 
-      try {
-        const { analysis } = (await api.post("openai/analyze-image", {
-          imageUrl,
-          vehicleInfo: metadata?.vehicleInfo,
-        })) as { analysis: any };
+          // Upload file (with optimization)
+          const { imageUrl, metadata: uploadMetadata } = await uploadFile(file);
 
-        onImageProgress?.({
-          fileName: firstFile.name,
-          progress: 100,
-          status: "complete",
-          imageUrl,
-          metadata: {
-            ...uploadMetadata,
-            ...analysis,
-          },
-        });
+          console.log(
+            `✅ Upload complete ${index + 1}/${files.length}: ${file.name}`
+          );
 
-        onUploadComplete?.([imageUrl]);
+          onImageProgress?.({
+            fileName: file.name,
+            progress: 75,
+            status: "analyzing",
+            imageUrl,
+          });
 
-        if (files.length > 1) {
-          const remainingFiles = files.slice(1);
-          const uploadRemainingFiles = async () => {
-            const remainingUrls: string[] = [];
+          // Analyze image (this can also be parallel)
+          try {
+            const { analysis } = (await api.post("openai/analyze-image", {
+              imageUrl,
+              vehicleInfo: metadata?.vehicleInfo,
+            })) as { analysis: any };
 
-            for (const file of remainingFiles) {
-              try {
-                onImageProgress?.({
-                  fileName: file.name,
-                  progress: 0,
-                  status: "pending",
-                });
+            onImageProgress?.({
+              fileName: file.name,
+              progress: 100,
+              status: "complete",
+              imageUrl,
+              metadata: {
+                ...uploadMetadata,
+                ...analysis,
+              },
+            });
 
-                const { imageUrl, metadata: uploadMetadata } =
-                  await uploadFile(file);
-
-                onImageProgress?.({
-                  fileName: file.name,
-                  progress: 75,
-                  status: "analyzing",
-                  imageUrl,
-                });
-
-                try {
-                  const { analysis } = (await api.post("openai/analyze-image", {
-                    imageUrl,
-                    vehicleInfo: metadata?.vehicleInfo,
-                  })) as { analysis: any };
-
-                  onImageProgress?.({
-                    fileName: file.name,
-                    progress: 100,
-                    status: "complete",
-                    imageUrl,
-                    metadata: {
-                      ...uploadMetadata,
-                      ...analysis,
-                    },
-                  });
-
-                  remainingUrls.push(imageUrl);
-                } catch (error) {
-                  console.error("Error analyzing image:", error);
-                  onImageProgress?.({
-                    fileName: file.name,
-                    progress: 85,
-                    status: "complete",
-                    imageUrl,
-                    metadata: uploadMetadata,
-                  });
-                  remainingUrls.push(imageUrl);
-                }
-              } catch (error) {
-                console.error("Error uploading file:", error);
-                onImageProgress?.({
-                  fileName: file.name,
-                  progress: 0,
-                  status: "error",
-                  error: "Failed to upload image",
-                });
-              }
-            }
-
-            if (remainingUrls.length > 0) {
-              onUploadComplete?.(remainingUrls);
-            }
-          };
-
-          uploadRemainingFiles();
+            console.log(
+              `🔍 Analysis complete ${index + 1}/${files.length}: ${file.name}`
+            );
+            return imageUrl;
+          } catch (analysisError) {
+            console.error(`Analysis failed for ${file.name}:`, analysisError);
+            onImageProgress?.({
+              fileName: file.name,
+              progress: 100,
+              status: "complete",
+              imageUrl,
+              metadata: uploadMetadata,
+            });
+            return imageUrl; // Still return URL even if analysis fails
+          }
+        } catch (error) {
+          console.error(`Upload failed for ${file.name}:`, error);
+          onImageProgress?.({
+            fileName: file.name,
+            progress: 0,
+            status: "error",
+            error: error instanceof Error ? error.message : "Upload failed",
+          });
+          return null;
         }
-      } catch (error) {
-        console.error("Error analyzing first image:", error);
-        onImageProgress?.({
-          fileName: firstFile.name,
-          progress: 85,
-          status: "complete",
-          imageUrl,
-          metadata: uploadMetadata,
-        });
-        onUploadComplete?.([imageUrl]);
+      });
+
+      // Wait for ALL uploads to complete in parallel
+      console.log(`⏳ Waiting for all ${files.length} uploads to complete...`);
+      const results = await Promise.allSettled(uploadPromises);
+
+      // Collect successful uploads
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled" && result.value) {
+          uploadedUrls.push(result.value);
+          console.log(`✅ Collected result ${index + 1}: ${result.value}`);
+        }
+      });
+
+      console.log(
+        `🎉 All uploads complete! ${uploadedUrls.length}/${files.length} successful`
+      );
+
+      if (uploadedUrls.length > 0) {
+        onUploadComplete?.(uploadedUrls);
       }
     } catch (error) {
-      console.error("Error uploading first file:", error);
-      onImageProgress?.({
-        fileName: firstFile.name,
-        progress: 0,
-        status: "error",
-        error: "Failed to upload image",
-      });
+      console.error("Batch upload failed:", error);
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
