@@ -13,6 +13,9 @@ import {
   ChevronsRight,
   ChevronsUpDown,
   Car,
+  Square,
+  CheckSquare,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageData } from "@/app/images/columns";
@@ -49,6 +52,7 @@ import { getEnhancedImageUrl } from "@/lib/imageUtils";
 interface GalleryImageSelectorProps {
   selectedImageIds: string[];
   onImageSelect: (image: ImageData) => void;
+  onBatchAdd?: (images: ImageData[]) => void;
   className?: string;
 }
 
@@ -144,6 +148,7 @@ function Pagination({
 export function GalleryImageSelector({
   selectedImageIds,
   onImageSelect,
+  onBatchAdd,
   className,
 }: GalleryImageSelectorProps) {
   const searchParams = useSearchParams();
@@ -162,6 +167,12 @@ export function GalleryImageSelector({
   const [hasMoreImages, setHasMoreImages] = useState(true);
   const [nextPage, setNextPage] = useState(2); // Start at 2 since first page loads via useImages
 
+  // State for batch selection
+  const [batchSelectedIds, setBatchSelectedIds] = useState<Set<string>>(
+    new Set()
+  );
+  const [isBatchMode, setIsBatchMode] = useState(false);
+
   // Refs for intersection observer
   const loadingTriggerRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -173,6 +184,9 @@ export function GalleryImageSelector({
   useEffect(() => {
     allImagesRef.current = allImages;
   }, [allImages]);
+
+  // Use allImages for display (no need for complex merging since we control the flow)
+  const displayImages = allImages;
 
   // Get current filter values from URL (remove page param as we don't need it)
   const currentSearch = searchParams?.get("search") || undefined;
@@ -474,14 +488,59 @@ export function GalleryImageSelector({
   // Handle image selection with optimistic update
   const handleImageSelection = useCallback(
     (image: ImageData) => {
-      onImageSelect(image);
-      mutate();
+      if (isBatchMode) {
+        // In batch mode, toggle selection in batch state
+        setBatchSelectedIds((prev) => {
+          const newSet = new Set(prev);
+          if (newSet.has(image._id)) {
+            newSet.delete(image._id);
+          } else {
+            newSet.add(image._id);
+          }
+          return newSet;
+        });
+      } else {
+        // In regular mode, use the existing handler
+        onImageSelect(image);
+        mutate();
+      }
     },
-    [onImageSelect, mutate]
+    [isBatchMode, onImageSelect, mutate]
   );
 
-  // Use allImages for display (no need for complex merging since we control the flow)
-  const displayImages = allImages;
+  // Handle select all visible images
+  const handleSelectAllVisible = useCallback(() => {
+    if (batchSelectedIds.size === displayImages.length) {
+      // If all are selected, deselect all
+      setBatchSelectedIds(new Set());
+    } else {
+      // Select all visible images
+      setBatchSelectedIds(new Set(displayImages.map((img) => img._id)));
+    }
+  }, [displayImages, batchSelectedIds.size]);
+
+  // Handle batch add to gallery
+  const handleBatchAdd = useCallback(() => {
+    if (batchSelectedIds.size === 0 || !onBatchAdd) return;
+
+    const selectedImages = displayImages.filter((img) =>
+      batchSelectedIds.has(img._id)
+    );
+    onBatchAdd(selectedImages);
+
+    // Clear batch selection and exit batch mode
+    setBatchSelectedIds(new Set());
+    setIsBatchMode(false);
+  }, [batchSelectedIds, displayImages, onBatchAdd]);
+
+  // Toggle batch mode
+  const handleToggleBatchMode = useCallback(() => {
+    setIsBatchMode((prev) => !prev);
+    // Clear selection when exiting batch mode
+    if (isBatchMode) {
+      setBatchSelectedIds(new Set());
+    }
+  }, [isBatchMode]);
 
   // Show loading while API client is initializing
   if (!api) {
@@ -497,6 +556,61 @@ export function GalleryImageSelector({
 
   return (
     <div className={cn("space-y-4", className)}>
+      {/* Batch Mode Controls */}
+      {onBatchAdd && (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-muted/50 p-4 rounded-lg border">
+          <div className="flex items-center gap-4">
+            <Button
+              variant={isBatchMode ? "default" : "outline"}
+              onClick={handleToggleBatchMode}
+              size="sm"
+            >
+              {isBatchMode ? (
+                <>
+                  <CheckSquare className="h-4 w-4 mr-2" />
+                  Exit Batch Mode
+                </>
+              ) : (
+                <>
+                  <Square className="h-4 w-4 mr-2" />
+                  Batch Select
+                </>
+              )}
+            </Button>
+
+            {isBatchMode && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleSelectAllVisible}
+                  size="sm"
+                  disabled={displayImages.length === 0}
+                >
+                  {batchSelectedIds.size === displayImages.length
+                    ? "Deselect All"
+                    : "Select All Visible"}
+                </Button>
+
+                <span className="text-sm text-muted-foreground">
+                  {batchSelectedIds.size} selected
+                </span>
+              </>
+            )}
+          </div>
+
+          {isBatchMode && batchSelectedIds.size > 0 && (
+            <Button
+              onClick={handleBatchAdd}
+              size="sm"
+              className="bg-primary hover:bg-primary/90"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add {batchSelectedIds.size} Images to Gallery
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-1 gap-2">
           <div className="w-full md:w-[250px]">
@@ -693,12 +807,17 @@ export function GalleryImageSelector({
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {displayImages.map((image, index) => {
               const isSelected = selectedImageIds.includes(image._id);
+              const isBatchSelected =
+                isBatchMode && batchSelectedIds.has(image._id);
+              const showSelection = isBatchMode ? isBatchSelected : isSelected;
+
               return (
                 <div
                   key={image._id}
                   className={cn(
-                    "group relative rounded-md overflow-hidden bg-muted cursor-pointer min-h-[200px] flex flex-col",
-                    isSelected && "ring-2 ring-primary"
+                    "group relative rounded-md overflow-hidden bg-muted cursor-pointer min-h-[200px] flex flex-col transition-all duration-200",
+                    showSelection && "ring-2 ring-primary",
+                    isBatchMode && "hover:ring-2 hover:ring-primary/50"
                   )}
                   onClick={() => handleImageSelection(image)}
                 >
@@ -709,10 +828,28 @@ export function GalleryImageSelector({
                       className="max-w-full max-h-[300px] w-auto h-auto object-contain"
                       loading="lazy"
                     />
-                    {isSelected && (
+
+                    {/* Regular selection indicator */}
+                    {!isBatchMode && isSelected && (
                       <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
                         <Check className="h-8 w-8 text-primary" />
                       </div>
+                    )}
+
+                    {/* Batch selection indicator */}
+                    {isBatchMode && (
+                      <>
+                        <div className="absolute top-2 right-2">
+                          {isBatchSelected ? (
+                            <CheckSquare className="h-6 w-6 text-primary bg-background rounded p-1" />
+                          ) : (
+                            <Square className="h-6 w-6 text-muted-foreground bg-background/80 rounded p-1" />
+                          )}
+                        </div>
+                        {isBatchSelected && (
+                          <div className="absolute inset-0 bg-primary/10" />
+                        )}
+                      </>
                     )}
                   </div>
                   <div className="w-full p-2 bg-muted/80 backdrop-blur-sm text-xs border-t border-border">

@@ -224,6 +224,77 @@ export default function GalleryPage() {
     }
   };
 
+  const handleBatchAdd = async (images: ImageData[]) => {
+    if (!gallery || images.length === 0) return;
+
+    try {
+      // Filter out images that are already in the gallery
+      const newImages = images.filter(
+        (image) => !gallery.imageIds.includes(image._id)
+      );
+
+      if (newImages.length === 0) {
+        toast({
+          title: "Info",
+          description: "All selected images are already in the gallery",
+        });
+        return;
+      }
+
+      const newImageIds = newImages.map((img) => img._id);
+      const updatedImageIds = [...gallery.imageIds, ...newImageIds];
+
+      // Create new ordered images entries
+      const newOrderedImages = newImages.map((image, index) => ({
+        id: image._id,
+        order: gallery.imageIds.length + index,
+      }));
+
+      const updatedOrderedImages = [
+        ...(gallery.orderedImages ||
+          gallery.imageIds.map((id, index) => ({ id, order: index }))),
+        ...newOrderedImages,
+      ];
+
+      const updatedGallery = {
+        ...gallery,
+        imageIds: updatedImageIds,
+        images: [...(gallery.images || []), ...newImages],
+        orderedImages: updatedOrderedImages,
+      };
+
+      // Use the existing add-images API endpoint for batch operations
+      const response = await fetch(`/api/galleries/${id}/add-images`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          imageIds: newImageIds,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to add images to gallery");
+      }
+
+      // Update local state
+      mutate(updatedGallery);
+
+      toast({
+        title: "Success",
+        description: `${newImages.length} images added to gallery`,
+      });
+    } catch (error) {
+      console.error("Failed to add images to gallery:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add images to gallery",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDoneAddingImages = () => {
     setIsAddingImages(false);
     // Clear all URL search params to return to clean gallery view
@@ -1166,6 +1237,7 @@ ${(() => {
               <GalleryImageSelector
                 selectedImageIds={gallery.imageIds}
                 onImageSelect={handleImageSelect}
+                onBatchAdd={handleBatchAdd}
               />
             ) : gallery.images && gallery.images.length > 0 ? (
               /* 
