@@ -49,6 +49,8 @@ interface UseGalleriesOptions {
   search?: string;
   page?: number;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }
 
 export function useGalleries(
@@ -76,6 +78,8 @@ export function useGalleries(
       if (options.search) searchParams.set("search", options.search);
       if (options.page) searchParams.set("page", options.page.toString());
       if (options.limit) searchParams.set("limit", options.limit.toString());
+      if (options.sortBy) searchParams.set("sortBy", options.sortBy);
+      if (options.sortOrder) searchParams.set("sortOrder", options.sortOrder);
 
       console.log(
         "🐛 useGalleries: Fetching data from:",
@@ -112,7 +116,15 @@ export function useGalleries(
     } finally {
       setIsLoading(false);
     }
-  }, [options.search, options.page, options.limit, status, session]);
+  }, [
+    options.search,
+    options.page,
+    options.limit,
+    options.sortBy,
+    options.sortOrder,
+    status,
+    session,
+  ]);
 
   const mutate = useCallback(async () => {
     await fetchGalleries();

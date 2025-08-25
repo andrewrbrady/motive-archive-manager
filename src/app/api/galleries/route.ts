@@ -40,6 +40,8 @@ export async function GET(request: NextRequest) {
       50 // Maximum page size for performance
     );
     const search = searchParams.get("search");
+    const sortBy = searchParams.get("sortBy") || "updatedAt";
+    const sortOrder = searchParams.get("sortOrder") || "desc";
 
     const skip = (page - 1) * pageSize;
 
@@ -89,13 +91,46 @@ export async function GET(request: NextRequest) {
       // Get total count for pagination
       const total = await db.collection("galleries").countDocuments(query);
 
+      // Build sort object based on parameters
+      const sortObject: any = {};
+
+      // Validate sortBy field
+      const allowedSortFields = [
+        "name",
+        "createdAt",
+        "updatedAt",
+        "imageCount",
+      ];
+      const validSortBy = allowedSortFields.includes(sortBy)
+        ? sortBy
+        : "updatedAt";
+      const validSortOrder = sortOrder === "asc" ? 1 : -1;
+
+      if (validSortBy === "imageCount") {
+        // For imageCount, we'll add it in the aggregation pipeline
+        sortObject["imageCount"] = validSortOrder;
+        sortObject["updatedAt"] = -1; // Secondary sort
+      } else {
+        sortObject[validSortBy] = validSortOrder;
+        // Add secondary sort for consistency
+        if (validSortBy !== "updatedAt") {
+          sortObject["updatedAt"] = -1;
+        }
+      }
+
       // Use aggregation pipeline to populate thumbnailImage from primaryImageId
       // Following the same pattern as cars API
       const galleries = await db
         .collection("galleries")
         .aggregate([
           { $match: query },
-          { $sort: { updatedAt: -1, createdAt: -1 } },
+          // Add imageCount field for sorting
+          {
+            $addFields: {
+              imageCount: { $size: { $ifNull: ["$imageIds", []] } },
+            },
+          },
+          { $sort: sortObject },
           { $skip: skip },
           { $limit: pageSize },
 
@@ -183,6 +218,7 @@ export async function GET(request: NextRequest) {
               name: 1,
               description: 1,
               imageIds: 1,
+              imageCount: 1,
               primaryImageId: 1,
               orderedImages: 1,
               createdAt: 1,

@@ -29,11 +29,19 @@ import {
   Expand,
   Palette,
   X,
+  ArrowUpDown,
 } from "lucide-react";
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import { BatchCanvasExtensionModal } from "./BatchCanvasExtensionModal";
 import { BatchImageMatteModal } from "./BatchImageMatteModal";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ImageViewModal } from "@/components/cars/ImageViewModal";
 import { ImageData } from "@/app/images/columns";
 
@@ -59,6 +67,8 @@ export function DraggableGalleryGrid({
   const [isBatchImageMatteOpen, setIsBatchImageMatteOpen] =
     React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [sortBy, setSortBy] = React.useState<string>("manual");
+  const [sortOrder, setSortOrder] = React.useState<"asc" | "desc">("asc");
 
   // Image view modal state
   const [isImageViewModalOpen, setIsImageViewModalOpen] = React.useState(false);
@@ -82,14 +92,88 @@ export function DraggableGalleryGrid({
 
   const [items, setItems] = React.useState(() => getOrderedItems(gallery));
 
+  // Sort items based on selected criteria
+  const sortItems = React.useCallback(
+    (itemsToSort: any[], sortBy: string, sortOrder: "asc" | "desc") => {
+      if (sortBy === "manual") {
+        return itemsToSort; // Keep manual order (drag-and-drop)
+      }
+
+      const sorted = [...itemsToSort].sort((a, b) => {
+        const imageA = gallery.images?.find((img: any) => img._id === a.id);
+        const imageB = gallery.images?.find((img: any) => img._id === b.id);
+
+        if (!imageA || !imageB) return 0;
+
+        let comparison = 0;
+
+        switch (sortBy) {
+          case "filename":
+            // Use natural sorting (macOS-style) for filenames
+            comparison = (imageA.filename || "").localeCompare(
+              imageB.filename || "",
+              undefined,
+              {
+                numeric: true,
+                sensitivity: "base",
+              }
+            );
+            break;
+          case "createdAt":
+            comparison =
+              new Date(imageA.createdAt || 0).getTime() -
+              new Date(imageB.createdAt || 0).getTime();
+            break;
+          case "updatedAt":
+            comparison =
+              new Date(imageA.updatedAt || 0).getTime() -
+              new Date(imageB.updatedAt || 0).getTime();
+            break;
+          case "angle":
+            comparison = (imageA.metadata?.angle || "").localeCompare(
+              imageB.metadata?.angle || ""
+            );
+            break;
+          case "view":
+            comparison = (imageA.metadata?.view || "").localeCompare(
+              imageB.metadata?.view || ""
+            );
+            break;
+          case "movement":
+            comparison = (imageA.metadata?.movement || "").localeCompare(
+              imageB.metadata?.movement || ""
+            );
+            break;
+          case "tod":
+            comparison = (imageA.metadata?.tod || "").localeCompare(
+              imageB.metadata?.tod || ""
+            );
+            break;
+          default:
+            return 0;
+        }
+
+        return sortOrder === "asc" ? comparison : -comparison;
+      });
+
+      return sorted;
+    },
+    [gallery.images]
+  );
+
+  // Get sorted items
+  const sortedItems = React.useMemo(() => {
+    return sortItems(items, sortBy, sortOrder);
+  }, [items, sortBy, sortOrder, sortItems]);
+
   // Filter items based on search query
   const filteredItems = React.useMemo(() => {
     if (!searchQuery.trim()) {
-      return items;
+      return sortedItems;
     }
 
     const query = searchQuery.toLowerCase().trim();
-    return items.filter((item) => {
+    return sortedItems.filter((item) => {
       const image = gallery.images?.find((img: any) => img._id === item.id);
       if (!image) return false;
 
@@ -107,7 +191,7 @@ export function DraggableGalleryGrid({
 
       return false;
     });
-  }, [items, searchQuery, gallery.images]);
+  }, [sortedItems, searchQuery, gallery.images]);
 
   // Build ordered list of images for the modal based on current filter/order
   const orderedFilteredImages: ImageData[] = React.useMemo(() => {
@@ -137,9 +221,15 @@ export function DraggableGalleryGrid({
   }, [isSmall, isMedium]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      // Only activate when in manual mode
+      activationConstraint: {
+        distance: sortBy === "manual" ? 8 : Infinity, // Require 8px movement when manual, impossible when sorted
+      },
+    }),
     useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
+      coordinateGetter:
+        sortBy === "manual" ? sortableKeyboardCoordinates : undefined,
     })
   );
 
@@ -158,10 +248,75 @@ export function DraggableGalleryGrid({
     setSearchQuery("");
   }, [gallery._id]);
 
+  // Handle sort change - when switching to manual, preserve current sorted order
+  const handleSortChange = React.useCallback(
+    (newSortBy: string) => {
+      if (newSortBy === "manual" && sortBy !== "manual") {
+        // User is switching from sorted view to manual - preserve the current sorted order
+        const currentSortedOrder = sortItems(items, sortBy, sortOrder);
+        setItems(currentSortedOrder);
+
+        // Update the gallery's orderedImages to reflect this new order
+        const newOrderedImages = currentSortedOrder.map((item, index) => ({
+          id: item.id,
+          order: index,
+        }));
+
+        const updatedGallery = {
+          ...gallery,
+          orderedImages: newOrderedImages,
+        };
+
+        // Call the parent's onOrderChange to save this new order
+        onOrderChange(updatedGallery);
+      }
+      setSortBy(newSortBy);
+    },
+    [sortBy, sortOrder, items, sortItems, gallery, onOrderChange]
+  );
+
+  // Update gallery order whenever sort criteria changes (not just when switching to manual)
+  // Use a ref to track the last saved order to prevent infinite loops
+  const lastSavedOrderRef = React.useRef<string>("");
+
+  React.useEffect(() => {
+    if (sortBy !== "manual") {
+      // Apply the current sort and save it to the gallery
+      const currentSortedOrder = sortItems(items, sortBy, sortOrder);
+
+      // Create a unique key for this order to detect changes
+      const orderKey = `${sortBy}-${sortOrder}-${currentSortedOrder.map((item) => item.id).join(",")}`;
+
+      // Only update if the order actually changed
+      if (orderKey !== lastSavedOrderRef.current) {
+        lastSavedOrderRef.current = orderKey;
+
+        // Update the gallery's orderedImages to reflect this sorted order
+        const newOrderedImages = currentSortedOrder.map((item, index) => ({
+          id: item.id,
+          order: index,
+        }));
+
+        const updatedGallery = {
+          ...gallery,
+          orderedImages: newOrderedImages,
+        };
+
+        // Call the parent's onOrderChange to save this new order
+        onOrderChange(updatedGallery);
+      }
+    }
+  }, [sortBy, sortOrder, items, sortItems]); // Removed gallery and onOrderChange from dependencies
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (!active || !over || active.id === over.id) return;
+
+    // Only allow drag and drop when in manual mode
+    if (sortBy !== "manual") {
+      return;
+    }
 
     const oldIndex = items.findIndex((item) => item.id === active.id);
     const newIndex = items.findIndex((item) => item.id === over.id);
@@ -318,8 +473,8 @@ export function DraggableGalleryGrid({
 
   return (
     <div className="space-y-4">
-      {/* Search Input */}
-      <div className="flex items-center gap-2">
+      {/* Search and Sort Controls */}
+      <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -329,6 +484,35 @@ export function DraggableGalleryGrid({
             className="pl-10"
           />
         </div>
+
+        {/* Sort Controls */}
+        <Select value={sortBy} onValueChange={handleSortChange}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Sort by..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="manual">Manual Order</SelectItem>
+            <SelectItem value="filename">Filename</SelectItem>
+            <SelectItem value="createdAt">Date Created</SelectItem>
+            <SelectItem value="updatedAt">Date Updated</SelectItem>
+            <SelectItem value="angle">Angle</SelectItem>
+            <SelectItem value="view">View</SelectItem>
+            <SelectItem value="movement">Movement</SelectItem>
+            <SelectItem value="tod">Time of Day</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+          className="px-3"
+          title={`Currently sorting ${sortOrder === "asc" ? "ascending" : "descending"}. Click to toggle.`}
+          disabled={sortBy === "manual"}
+        >
+          <ArrowUpDown className="h-4 w-4" />
+        </Button>
+
         {searchQuery && (
           <Button
             variant="outline"
@@ -361,6 +545,11 @@ export function DraggableGalleryGrid({
           <span className="text-sm text-muted-foreground">
             {filteredItems.length} of {items.length} images
             {searchQuery && ` matching "${searchQuery}"`}
+            {sortBy !== "manual" && (
+              <span className="text-blue-600 ml-2">
+                • Sorted by {sortBy} ({sortOrder})
+              </span>
+            )}
           </span>
           <Button
             variant={isBatchMode ? "default" : "outline"}

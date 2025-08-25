@@ -31,6 +31,7 @@ import {
   ZoomIn,
   ZoomOut,
   List,
+  ArrowUpDown,
 } from "lucide-react";
 import {
   Dialog,
@@ -63,6 +64,10 @@ export default function GalleriesClient() {
   const page = Number(searchParams?.get("page") || "1");
   const pageSize = Number(searchParams?.get("limit") || "20");
   const searchQuery = searchParams?.get("search") || "";
+  const sortBy = searchParams?.get("sortBy") || "updatedAt";
+  const sortOrder = (searchParams?.get("sortOrder") || "desc") as
+    | "asc"
+    | "desc";
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -117,6 +122,8 @@ export default function GalleriesClient() {
     search: searchQuery,
     page,
     limit: pageSize,
+    sortBy,
+    sortOrder,
   });
 
   // Debug logging - let's see what's actually happening
@@ -177,6 +184,32 @@ export default function GalleriesClient() {
       leading: false,
       trailing: true,
     }
+  );
+
+  // Handle sorting changes
+  const handleSortChange = useCallback(
+    (newSortBy: string, newSortOrder?: "asc" | "desc") => {
+      if (!mounted.current) return;
+
+      try {
+        const params = new URLSearchParams(searchParams?.toString() || "");
+        params.set("sortBy", newSortBy);
+        params.set(
+          "sortOrder",
+          newSortOrder ||
+            (newSortBy === sortBy && sortOrder === "desc" ? "asc" : "desc")
+        );
+        params.set("page", "1"); // Reset to page 1 when sorting
+
+        router.push(`${pathname}?${params.toString()}`, { scroll: false });
+      } catch (error) {
+        console.warn(
+          "🛡️ Router navigation failed (component may be unmounted):",
+          error
+        );
+      }
+    },
+    [router, pathname, searchParams, mounted, sortBy, sortOrder]
   );
 
   // Store the debounced function reference for cleanup
@@ -299,7 +332,7 @@ export default function GalleriesClient() {
           <div className="space-y-4">
             {/* Search and Controls Row */}
             <div className="flex flex-wrap items-center gap-3 justify-between">
-              {/* Left side: Search */}
+              {/* Left side: Search and Sort */}
               <div className="flex items-center gap-3">
                 <Input
                   placeholder="Search galleries..."
@@ -307,6 +340,37 @@ export default function GalleriesClient() {
                   onChange={handleSearchInput}
                   className="w-[250px]"
                 />
+
+                {/* Sort Controls */}
+                <Select
+                  value={sortBy}
+                  onValueChange={(value) => handleSortChange(value)}
+                >
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Sort by..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="updatedAt">Last Updated</SelectItem>
+                    <SelectItem value="createdAt">Date Created</SelectItem>
+                    <SelectItem value="name">Name</SelectItem>
+                    <SelectItem value="imageCount">Image Count</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    handleSortChange(
+                      sortBy,
+                      sortOrder === "asc" ? "desc" : "asc"
+                    )
+                  }
+                  className="px-3"
+                  title={`Currently sorting ${sortOrder === "asc" ? "ascending" : "descending"}. Click to toggle.`}
+                >
+                  <ArrowUpDown className="h-4 w-4" />
+                </Button>
               </div>
 
               {/* Right side: Controls */}
@@ -500,10 +564,15 @@ export default function GalleriesClient() {
                       </div>
 
                       {/* Image count badge */}
-                      {gallery.imageIds && gallery.imageIds.length > 0 && (
+                      {((gallery as any).imageCount ||
+                        gallery.imageIds?.length ||
+                        0) > 0 && (
                         <div className="absolute bottom-2 left-2">
                           <div className="bg-black/70 text-white text-xs px-2 py-1 rounded">
-                            {gallery.imageIds.length} images
+                            {(gallery as any).imageCount ||
+                              gallery.imageIds?.length ||
+                              0}{" "}
+                            images
                           </div>
                         </div>
                       )}
