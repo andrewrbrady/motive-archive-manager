@@ -13,7 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Archive, Edit3, Loader2, Trash2, Copy, Plus } from "lucide-react";
+import { Edit3, Loader2, Trash2, Copy, Plus, Archive } from "lucide-react";
+import { ToolbarRow } from "./ToolbarRow";
 import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { api } from "@/lib/api-client";
 import { LoadedComposition } from "./types";
@@ -167,42 +168,31 @@ export function CompositionsList({
 
   return (
     <div className="space-y-4">
-      {/* Simplified Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Archive className="h-5 w-5" />
-          <span className="font-medium">Saved Compositions</span>
-          {!isLoading && compositions.length > 0 && (
-            <Badge variant="secondary" className="bg-muted/20">
-              {compositions.length}
-            </Badge>
+      {/* Header actions only (title removed) */}
+      <ToolbarRow>
+        <Button
+          onClick={onCreateNew}
+          variant="default"
+          size="sm"
+          className="bg-primary hover:bg-primary/90"
+        >
+          <Plus className="h-4 w-4 mr-1" />
+          New
+        </Button>
+        <Button
+          onClick={() => refetch()}
+          variant="ghost"
+          size="sm"
+          disabled={isLoading}
+          className="hover:bg-muted/20"
+        >
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            "Refresh"
           )}
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button
-            onClick={onCreateNew}
-            variant="default"
-            size="sm"
-            className="bg-primary hover:bg-primary/90"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            New
-          </Button>
-          <Button
-            onClick={() => refetch()}
-            variant="ghost"
-            size="sm"
-            disabled={isLoading}
-            className="hover:bg-muted/20"
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              "Refresh"
-            )}
-          </Button>
-        </div>
-      </div>
+        </Button>
+      </ToolbarRow>
 
       {/* Loading State */}
       {isLoading && (
