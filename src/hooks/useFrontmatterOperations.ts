@@ -18,6 +18,7 @@ export interface FrontmatterState {
   callToAction: string;
   callToActionUrl: string;
   gallery: Array<{ id: string; src: string; alt: string }>;
+  carousel: Array<{ id: string; src: string; alt: string }>;
 }
 
 export interface FrontmatterInfo {
@@ -50,6 +51,7 @@ export function useFrontmatterOperations(
     callToAction: "",
     callToActionUrl: "",
     gallery: [],
+    carousel: [],
   });
 
   /**

@@ -40,6 +40,9 @@ export interface EmailContainerConfig {
   // Mobile responsiveness
   mobileMaxWidth: string;
   mobilePadding: string;
+
+  // Global block spacing applied across all blocks (td bottom padding)
+  blockSpacing?: string;
 }
 
 // Default email container configuration (simplified)
@@ -62,6 +65,9 @@ export const defaultEmailContainerConfig: EmailContainerConfig = {
   // Mobile responsiveness
   mobileMaxWidth: "100%",
   mobilePadding: "15px",
+
+  // Global spacing default
+  blockSpacing: "12px",
 };
 
 interface EmailSettingsModalProps {
@@ -233,6 +239,17 @@ export function EmailSettingsModal({
                   placeholder="8px"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs">Block Spacing (all blocks)</Label>
+              <Input
+                value={config.blockSpacing || ""}
+                onChange={(e) =>
+                  updateConfig({ blockSpacing: e.target.value || "" })
+                }
+                placeholder="12px"
+              />
             </div>
           </div>
 

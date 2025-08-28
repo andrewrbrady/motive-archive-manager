@@ -82,14 +82,14 @@ export const AccurateEmailPreview: React.FC<AccurateEmailPreviewProps> = ({
   }
 
   const renderContent = () => {
+    // Remove extra wrapper margins so spacing mirrors exported HTML (table td padding)
     return contentBlocks.map((block) => (
-      <div key={block.id} className="mb-4 last:mb-0">
-        <EmailBlock
-          block={block}
-          containerConfig={containerConfig}
-          stylesheetData={stylesheetData}
-        />
-      </div>
+      <EmailBlock
+        key={block.id}
+        block={block}
+        containerConfig={containerConfig}
+        stylesheetData={stylesheetData}
+      />
     ));
   };
 
@@ -112,7 +112,7 @@ export const AccurateEmailPreview: React.FC<AccurateEmailPreviewProps> = ({
       >
         {/* Container header (logo) - only show if enabled */}
         {shouldShowContainerHeader && containerConfig.logoUrl && (
-          <div className="text-center mb-4">
+          <div className="text-center">
             <img
               src={containerConfig.logoUrl}
               alt={containerConfig.logoAlt}
@@ -129,7 +129,7 @@ export const AccurateEmailPreview: React.FC<AccurateEmailPreviewProps> = ({
         {headerImages.map((block) => (
           <div
             key={block.id}
-            className="w-full mb-4 last:mb-0"
+            className="w-full"
             style={{
               backgroundColor: block.email?.backgroundColor || "#111111",
             }}
@@ -188,42 +188,62 @@ export const AccurateEmailPreview: React.FC<AccurateEmailPreviewProps> = ({
   function SendGridPreview() {
     return (
       <div className="content-studio-preview content-blocks-area email-preview sendgrid-preview accurate-email-preview">
-        <style jsx>{`
-          .email-container {
-            max-width: ${containerConfig.maxWidth};
-            margin: 0 auto;
-            background-color: ${containerConfig.backgroundColor};
-            border-radius: ${containerConfig.borderRadius};
-            box-shadow: ${containerConfig.boxShadow};
-            overflow: hidden;
-          }
-          .email-content {
-            background-color: ${containerConfig.contentBackgroundColor};
-            padding: ${containerConfig.contentPadding};
-            color: ${containerConfig.textColor};
-          }
-          .email-content a {
-            color: ${containerConfig.linkColor};
-          }
-          ${containerConfig.customCSS}
-        `}</style>
+        {/* Use table-based structure like the actual SendGrid export */}
+        <table
+          role="presentation"
+          cellSpacing={0}
+          cellPadding={0}
+          style={{ width: "100%", backgroundColor: "#f4f4f4" }}
+        >
+          <tbody>
+            <tr>
+              <td align="center" style={{ padding: "20px" }}>
+                <table
+                  role="presentation"
+                  cellSpacing={0}
+                  cellPadding={0}
+                  style={{
+                    backgroundColor: "#ffffff",
+                    margin: "0 auto",
+                    width: "100%",
+                    maxWidth: "600px",
+                  }}
+                >
+                  <tbody>
+                    {/* Header */}
+                    {(containerConfig.headerEnabled ||
+                      headerImages.length > 0) && (
+                      <tr>
+                        <td style={{ padding: "0" }}>{renderHeader()}</td>
+                      </tr>
+                    )}
 
-        <div className="email-container">
-          {renderHeader()}
+                    {/* Content */}
+                    <tr>
+                      <td style={{ padding: "20px" }}>
+                        {contentBlocks.length === 0 ? (
+                          <div className="text-center py-12 text-gray-500">
+                            <div className="text-4xl mb-4">📧</div>
+                            <p>Add content blocks to see your email preview</p>
+                          </div>
+                        ) : (
+                          renderContent()
+                        )}
+                      </td>
+                    </tr>
 
-          <div className="email-content">
-            {contentBlocks.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <div className="text-4xl mb-4">📧</div>
-                <p>Add content blocks to see your email preview</p>
-              </div>
-            ) : (
-              renderContent()
-            )}
-          </div>
-
-          {renderFooter()}
-        </div>
+                    {/* Footer */}
+                    {containerConfig.footerEnabled && (
+                      <tr>
+                        <td>{renderFooter()}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     );
   }
@@ -231,26 +251,6 @@ export const AccurateEmailPreview: React.FC<AccurateEmailPreviewProps> = ({
   function MailchimpPreview() {
     return (
       <div className="content-studio-preview content-blocks-area email-preview mailchimp-preview accurate-email-preview">
-        <style jsx>{`
-          .email-table {
-            width: 100%;
-            max-width: ${containerConfig.maxWidth};
-            margin: 0 auto;
-            background-color: ${containerConfig.backgroundColor};
-            border-radius: ${containerConfig.borderRadius};
-            box-shadow: ${containerConfig.boxShadow};
-          }
-          .email-content-cell {
-            background-color: ${containerConfig.contentBackgroundColor};
-            padding: ${containerConfig.contentPadding};
-            color: ${containerConfig.textColor};
-          }
-          .email-content-cell a {
-            color: ${containerConfig.linkColor};
-          }
-          ${containerConfig.customCSS}
-        `}</style>
-
         <table className="email-table" cellSpacing={0} cellPadding={0}>
           <tbody>
             {/* Header - show if container header enabled OR header images exist */}
@@ -350,6 +350,31 @@ export const AccurateEmailPreview: React.FC<AccurateEmailPreviewProps> = ({
   }
 
   function GenericPreview() {
+    // DEBUG: Log what we're receiving for debugging
+    React.useEffect(() => {
+      console.log(`🔍 AccurateEmailPreview DEBUG:`, {
+        hasStylesheetData: !!stylesheetData,
+        stylesheetId: selectedStylesheetId,
+        cssContentLength: stylesheetData?.cssContent?.length || 0,
+        cssContentSample:
+          stylesheetData?.cssContent?.substring(0, 200) || "No CSS",
+        containerPlatform: containerConfig.platform,
+      });
+
+      // Also check if StylesheetInjector has created any style elements
+      const stylesheetElements = document.querySelectorAll(
+        'style[id^="stylesheet-"]'
+      );
+      console.log(
+        `📊 Found ${stylesheetElements.length} stylesheet elements in DOM:`,
+        Array.from(stylesheetElements).map((el) => ({
+          id: el.id,
+          contentLength: el.textContent?.length || 0,
+          contentSample: el.textContent?.substring(0, 100) || "No content",
+        }))
+      );
+    }, [stylesheetData, selectedStylesheetId, containerConfig]);
+
     return (
       <div className="content-studio-preview content-blocks-area email-preview generic-preview accurate-email-preview">
         <div
@@ -385,13 +410,6 @@ export const AccurateEmailPreview: React.FC<AccurateEmailPreviewProps> = ({
 
           {renderFooter()}
         </div>
-
-        <style jsx>{`
-          .email-content a {
-            color: ${containerConfig.linkColor};
-          }
-          ${containerConfig.customCSS}
-        `}</style>
       </div>
     );
   }
@@ -419,106 +437,131 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
     );
 
     if (currentCSSClass) {
-      return classToEmailInlineStyles(
+      const styles = classToEmailInlineStyles(
         currentCSSClass,
         containerConfig.platform
       );
+
+      // DEBUG: Log CSS class application
+      console.log(`🎨 CSS Class Applied for ${block.type} block:`, {
+        blockId: block.id,
+        cssClassName: block.cssClassName,
+        cssClassFound: !!currentCSSClass,
+        stylesApplied: styles,
+        platform: containerConfig.platform,
+        stylesheetDataAvailable: !!stylesheetData,
+        totalStylesheetClasses: stylesheetData?.classes?.length || 0,
+      });
+
+      return styles;
     }
     return {};
   }, [stylesheetData, block.cssClassName, containerConfig.platform]);
+
+  // Standard spacing for all blocks (honor global blockSpacing override)
+  const getBlockSpacing = (defaultBottom: string = "12px") => {
+    const bottom = containerConfig.blockSpacing || defaultBottom;
+    return {
+      paddingTop: "0px",
+      paddingBottom: bottom,
+    };
+  };
 
   switch (block.type) {
     case "html": {
       const htmlBlock = block as HTMLBlock;
       const rawContent = htmlBlock.content || "<p>No HTML content provided</p>";
-
-      // CRITICAL FIX: Strip inline styles and rely on CSS injection + wrapper styling
-      // CSS injection will handle the styling for email preview
-      const content = useMemo(() => {
-        const strippedContent = stripInlineStyles(rawContent);
-        console.log(
-          "🧹 AccurateEmailPreview - Stripped inline styles (using CSS injection):"
-        );
-        console.log("- Original:", rawContent.substring(0, 150) + "...");
-        console.log("- Stripped:", strippedContent.substring(0, 150) + "...");
-        return strippedContent;
-      }, [rawContent]);
+      const spacing = getBlockSpacing("12px");
 
       return (
-        <div
-          style={{
-            margin: "20px 0",
-            fontFamily: "inherit",
-            lineHeight: "inherit",
-            ...customStyles,
-          }}
-          className={`html-block ${block.cssClassName || ""}`}
-          data-block-type="html"
-          data-block-id={htmlBlock.id}
-          dangerouslySetInnerHTML={{ __html: content }}
-        />
+        <table
+          role="presentation"
+          cellSpacing={0}
+          cellPadding={0}
+          style={{ width: "100%" }}
+        >
+          <tbody>
+            <tr>
+              <td style={spacing}>
+                <div
+                  className={`html-block ${block.cssClassName || ""}`}
+                  style={{
+                    fontFamily: "inherit",
+                    lineHeight: "inherit",
+                    ...customStyles,
+                  }}
+                  data-block-type="html"
+                  data-block-id={htmlBlock.id}
+                  dangerouslySetInnerHTML={{ __html: rawContent }}
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
       );
     }
 
     case "list": {
       const listBlock = block as any;
       const items = listBlock.items || [];
+      const spacing = getBlockSpacing("12px");
 
       if (items.length === 0) {
         return (
-          <div
-            style={{
-              color: "#666",
-              fontStyle: "italic",
-              margin: "20px 0",
-              ...customStyles,
-            }}
-            className={block.cssClassName || ""}
+          <table
+            role="presentation"
+            cellSpacing={0}
+            cellPadding={0}
+            style={{ width: "100%" }}
           >
-            Empty list
-          </div>
+            <tbody>
+              <tr>
+                <td style={spacing}>
+                  <div
+                    style={{
+                      color: "#666",
+                      fontStyle: "italic",
+                      ...customStyles,
+                    }}
+                    className={block.cssClassName || ""}
+                  >
+                    Empty list
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         );
       }
 
-      // CRITICAL FIX: For email preview, apply stylesheet styles as inline styles
-      const ulStyles = useMemo(() => {
-        const baseStyles = {
-          margin: "20px 0",
-          paddingLeft: "40px",
-          listStyleType: "disc",
-        };
-
-        // Get stylesheet styles for ul elements
-        const stylesheetUlStyles = getElementStylesFromStylesheet(
-          "ul",
-          stylesheetData,
-          true // emailMode = true
-        );
-
-        return {
-          ...baseStyles,
-          ...stylesheetUlStyles, // Stylesheet styles override defaults
-          ...customStyles, // User-defined styles always take precedence
-        };
-      }, [stylesheetData, customStyles]);
-
-      const liStyles = useMemo(() => {
-        // Get stylesheet styles for li elements
-        return getElementStylesFromStylesheet(
-          "li",
-          stylesheetData,
-          true // emailMode = true
-        );
-      }, [stylesheetData]);
-
       return (
-        <ul style={ulStyles} className={block.cssClassName || ""}>
-          {items.map((item: string, index: number) => (
-            <li key={index} style={liStyles}>
-              {item}
-            </li>
-          ))}
-        </ul>
+        <table
+          role="presentation"
+          cellSpacing={0}
+          cellPadding={0}
+          style={{ width: "100%" }}
+        >
+          <tbody>
+            <tr>
+              <td style={spacing}>
+                <ul
+                  style={{
+                    margin: "0",
+                    paddingLeft: "40px",
+                    listStyleType: "disc",
+                    ...customStyles,
+                  }}
+                  className={block.cssClassName || ""}
+                  data-block-type="list"
+                >
+                  {items.map((item: string, index: number) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       );
     }
 
@@ -573,76 +616,130 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
         return stripInlineStyles(formattedContent);
       }, [formattedContent]);
 
-      // Get element styles from stylesheet for the wrapper
+      // FIXED: Apply CSS class styles as inline styles with proper precedence
       const elementStyles = useMemo(() => {
-        const baseStyles = {
+        // Base container styles
+        const baseStyles: React.CSSProperties = {
+          // Fallback color if no CSS class or formatting provides it
           color: containerConfig.textColor,
         };
 
-        // Include text alignment from block formatting
+        // Include text alignment from block formatting (only if not defined in CSS class)
         const blockFormatting = textBlock.formatting || {};
-        const formattingStyles = {
-          textAlign: blockFormatting.textAlign || "left",
-          fontSize: blockFormatting.fontSize,
-          fontWeight: blockFormatting.fontWeight,
-          color: blockFormatting.color,
-          lineHeight: blockFormatting.lineHeight,
-          marginTop: blockFormatting.marginTop,
-          marginBottom: blockFormatting.marginBottom,
+        const formattingStyles: React.CSSProperties = {};
+
+        // Only apply block formatting if the CSS class doesn't already define these properties
+        if (!customStyles.textAlign && blockFormatting.textAlign) {
+          formattingStyles.textAlign = blockFormatting.textAlign as any;
+        }
+        if (!customStyles.fontSize && blockFormatting.fontSize) {
+          formattingStyles.fontSize = blockFormatting.fontSize;
+        }
+        if (!customStyles.fontWeight && blockFormatting.fontWeight) {
+          formattingStyles.fontWeight = blockFormatting.fontWeight;
+        }
+        if (!customStyles.color && blockFormatting.color) {
+          formattingStyles.color = blockFormatting.color;
+        }
+        if (!customStyles.lineHeight && blockFormatting.lineHeight) {
+          formattingStyles.lineHeight = blockFormatting.lineHeight;
+        }
+
+        // CRITICAL: CSS classes take PRECEDENCE over block formatting
+        // This ensures CSS classes are never overridden by block formatting
+        const finalStyles = {
+          ...baseStyles, // Base fallbacks
+          ...formattingStyles, // Block formatting (only for properties not in CSS class)
+          ...customStyles, // CSS class styles - HIGHEST PRIORITY
+          margin: "0", // Remove margins, use table cell padding instead
         };
 
-        const stylesheetElementStyles = getElementStylesFromStylesheet(
-          element,
-          stylesheetData,
-          true // emailMode = true
-        );
-
-        return {
-          ...baseStyles,
-          ...stylesheetElementStyles, // Stylesheet styles override defaults
-          ...formattingStyles, // Block formatting styles
-          ...customStyles, // User-defined styles always take precedence
-        };
+        return finalStyles;
       }, [
-        element,
-        stylesheetData,
-        containerConfig.textColor,
         customStyles,
         textBlock.formatting,
+        containerConfig.textColor,
+        element,
+        textBlock.cssClassName,
       ]);
 
-      console.log(
-        `📧 AccurateEmailPreview - ${element.toUpperCase()} with stylesheet styles:`,
-        elementStyles
-      );
+      const spacing = getBlockSpacing("12px");
 
-      if (contentHasHtml) {
-        // Content contains HTML tags - use div wrapper
-        return (
-          <div
-            style={elementStyles}
-            className={textBlock.cssClassName || ""}
-            dangerouslySetInnerHTML={{ __html: processedContent }}
-          />
-        );
-      } else {
-        // Content is plain text - use appropriate element
-        return React.createElement(element, {
-          style: elementStyles,
-          className: textBlock.cssClassName || "",
-          dangerouslySetInnerHTML: { __html: processedContent },
-        });
-      }
+      return (
+        <table
+          role="presentation"
+          cellSpacing={0}
+          cellPadding={0}
+          style={{ width: "100%" }}
+        >
+          <tbody>
+            <tr>
+              <td style={spacing}>
+                {textBlock.cssClassName ? (
+                  // If has CSS class, use wrapper structure
+                  <div
+                    className=""
+                    data-block-type="text"
+                    data-block-id={textBlock.id}
+                  >
+                    <div
+                      className={`${textBlock.cssClassName} whitespace-pre-wrap`}
+                      style={elementStyles}
+                      data-element={element}
+                      dangerouslySetInnerHTML={{ __html: processedContent }}
+                      data-css-class={textBlock.cssClassName}
+                    />
+                  </div>
+                ) : (
+                  // If no CSS class, use the proper HTML element (h1, h2, p, etc.)
+                  React.createElement(element, {
+                    style: elementStyles,
+                    className: "whitespace-pre-wrap",
+                    "data-block-type": "text",
+                    "data-element": element,
+                    "data-block-id": textBlock.id,
+                    dangerouslySetInnerHTML: { __html: processedContent },
+                  })
+                )}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      );
     }
 
     case "image": {
       const imageBlock = block as ImageBlock;
+      const spacing = getBlockSpacing("12px");
+
       if (!imageBlock.imageUrl) {
         return (
-          <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-300 rounded">
-            <div className="text-2xl mb-2">🖼️</div>
-            <p>Image will appear here</p>
-          </div>
+          <table
+            role="presentation"
+            cellSpacing={0}
+            cellPadding={0}
+            style={{ width: "100%" }}
+          >
+            <tbody>
+              <tr>
+                <td style={spacing}>
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "20px",
+                      color: "#666",
+                      border: "2px dashed #ccc",
+                    }}
+                  >
+                    <div style={{ fontSize: "24px", marginBottom: "8px" }}>
+                      🖼️
+                    </div>
+                    <p style={{ margin: "0" }}>Image will appear here</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         );
       }
 
@@ -655,35 +752,82 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
         );
       }, [stylesheetData]);
 
-      // Let CSS injection handle ALL image styling
+      const alignment = imageBlock.alignment || "center";
+      const alignStyle =
+        alignment === "center"
+          ? "center"
+          : alignment === "right"
+            ? "right"
+            : "left";
+      const linkUrl = imageBlock.linkUrl?.trim();
+      const hasLink = linkUrl && linkUrl.length > 0;
+
+      // Apply CSS class styles as inline styles for images to match export behavior
       const imageStyles = {
-        // Only apply minimal fallback styles if no stylesheet data exists
-        ...((!stylesheetData ||
-          !stylesheetData.parsedCSS?.globalStyles?.img) && {
-          maxWidth: "100%",
-          height: "auto",
-          display: "block",
-        }),
-        ...customStyles, // User-defined styles always take precedence
+        display: "block",
+        maxWidth: "100%",
+        height: "auto",
+        border: "0",
+        outline: "none",
+        textDecoration: "none",
+        ...customStyles, // CSS class styles applied as inline styles
       };
 
-      return (
-        <div className="text-center">
-          <img
-            src={imageBlock.imageUrl}
-            alt={imageBlock.altText || "Email image"}
-            style={imageStyles}
-            className={imageBlock.cssClassName || ""}
-          />
+      const imageTag = (
+        <img
+          src={imageBlock.imageUrl}
+          alt={imageBlock.altText || "Email image"}
+          style={imageStyles}
+          className={imageBlock.cssClassName || ""}
+          data-block-type="image"
+        />
+      );
+
+      const wrappedImage = hasLink ? (
+        <a
+          href={linkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "inherit", textDecoration: "none" }}
+        >
+          {imageTag}
+        </a>
+      ) : (
+        imageTag
+      );
+
+      const imageContent = (
+        <div style={{ textAlign: alignStyle }}>
+          {wrappedImage}
           {imageBlock.caption && (
             <p
-              className="text-sm text-gray-600 mt-2"
-              style={{ fontSize: "12px", margin: "8px 0 0 0" }}
+              style={{
+                textAlign: alignStyle,
+                fontSize: "14px",
+                color: "#666",
+                margin: "8px 0 0 0",
+                fontStyle: "italic",
+              }}
             >
               {imageBlock.caption}
             </p>
           )}
         </div>
+      );
+
+      return (
+        <table
+          role="presentation"
+          cellSpacing={0}
+          cellPadding={0}
+          style={{ width: "100%" }}
+        >
+          <tbody>
+            <tr>
+              <td style={spacing}>{imageContent}</td>
+            </tr>
+          </tbody>
+        </table>
       );
     }
 
@@ -691,20 +835,42 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
       const videoBlock = block as any;
       const videoUrl = videoBlock.url || videoBlock.videoUrl;
       const videoTitle = videoBlock.title || videoBlock.videoTitle || "Video";
+      const spacing = getBlockSpacing("12px");
 
       if (!videoUrl) {
         return (
-          <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-300 rounded">
-            <div className="text-2xl mb-2">🎥</div>
-            <p>Video will appear here</p>
-          </div>
+          <table
+            role="presentation"
+            cellSpacing={0}
+            cellPadding={0}
+            style={{ width: "100%" }}
+          >
+            <tbody>
+              <tr>
+                <td style={spacing}>
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "20px",
+                      color: "#666",
+                      border: "2px dashed #ccc",
+                    }}
+                  >
+                    <div style={{ fontSize: "24px", marginBottom: "8px" }}>
+                      🎥
+                    </div>
+                    <p style={{ margin: "0" }}>Video will appear here</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         );
       }
 
-      return (
-        <div className="text-center">
+      const videoContent = (
+        <div style={{ textAlign: "center" }}>
           <div
-            className="bg-gray-100 border-2 border-dashed border-gray-300 rounded p-8"
             style={{
               backgroundColor: "#f0f0f0",
               padding: "40px",
@@ -712,50 +878,84 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
               border: "2px solid #ddd",
             }}
           >
-            <div className="text-2xl mb-3">🎥</div>
-            <h3 className="font-bold mb-2" style={{ margin: "0 0 8px 0" }}>
+            <div style={{ fontSize: "24px", marginBottom: "12px" }}>🎥</div>
+            <h3 style={{ margin: "0 0 8px 0", fontWeight: "bold" }}>
               {videoTitle}
             </h3>
             <p
-              className="text-sm text-gray-600"
-              style={{ margin: "0", fontSize: "14px" }}
+              style={{ margin: "0 0 16px 0", fontSize: "14px", color: "#666" }}
             >
               Click to watch video
             </p>
-            <div className="mt-4">
-              <a
-                href={videoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                style={{
-                  backgroundColor: containerConfig.linkColor,
-                  color: "#ffffff",
-                  padding: "8px 16px",
-                  borderRadius: "4px",
-                  textDecoration: "none",
-                  display: "inline-block",
-                }}
-              >
-                Watch Video
-              </a>
-            </div>
+            <a
+              href={videoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                backgroundColor: containerConfig.linkColor,
+                color: "#ffffff",
+                padding: "8px 16px",
+                borderRadius: "4px",
+                textDecoration: "none",
+                display: "inline-block",
+                fontWeight: "500",
+                ...customStyles,
+              }}
+            >
+              Watch Video
+            </a>
           </div>
         </div>
+      );
+
+      return (
+        <table
+          role="presentation"
+          cellSpacing={0}
+          cellPadding={0}
+          style={{ width: "100%" }}
+        >
+          <tbody>
+            <tr>
+              <td style={spacing}>{videoContent}</td>
+            </tr>
+          </tbody>
+        </table>
       );
     }
 
     case "divider": {
+      const dividerBlock = block as any;
+      const thickness = dividerBlock.thickness || "1px";
+      const color = dividerBlock.color || "#e1e4e8";
+      const spacing = getBlockSpacing("24px");
+
       return (
-        <hr
-          style={{
-            border: "none",
-            borderTop: "1px solid #ddd",
-            margin: "30px 0",
-            ...customStyles,
-          }}
-          className={block.cssClassName || ""}
-        />
+        <table
+          role="presentation"
+          cellSpacing={0}
+          cellPadding={0}
+          style={{ width: "100%" }}
+        >
+          <tbody>
+            <tr>
+              <td style={spacing}>
+                <hr
+                  style={{
+                    border: "none",
+                    borderTop: `${thickness} solid ${color}`,
+                    height: "1px",
+                    fontSize: "1px",
+                    lineHeight: "1px",
+                    margin: "0",
+                    ...customStyles,
+                  }}
+                  className={block.cssClassName || ""}
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
       );
     }
 
@@ -764,8 +964,8 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
       const buttonText = buttonBlock.text || "Button";
       const buttonUrl = buttonBlock.url || "#";
 
-      return (
-        <div className="text-center">
+      const buttonContent = (
+        <div style={{ textAlign: "center" }}>
           <a
             href={buttonUrl}
             target="_blank"
@@ -788,28 +988,77 @@ const EmailBlock: React.FC<EmailBlockProps> = ({
           </a>
         </div>
       );
+
+      return (
+        <table
+          role="presentation"
+          cellSpacing={0}
+          cellPadding={0}
+          style={{ width: "100%" }}
+        >
+          <tbody>
+            <tr>
+              <td style={getBlockSpacing("24px")}>{buttonContent}</td>
+            </tr>
+          </tbody>
+        </table>
+      );
     }
 
     case "spacer": {
       const spacerBlock = block as any;
       const height = spacerBlock.height || "20px";
 
-      return (
+      const spacerContent = (
         <div
           style={{
             height,
+            fontSize: "1px",
+            lineHeight: "1px",
             ...customStyles,
           }}
           className={block.cssClassName || ""}
-        />
+        >
+          &nbsp;
+        </div>
+      );
+
+      return (
+        <table
+          role="presentation"
+          cellSpacing={0}
+          cellPadding={0}
+          style={{ width: "100%" }}
+        >
+          <tbody>
+            <tr>
+              <td style={getBlockSpacing("0px")}>{spacerContent}</td>
+            </tr>
+          </tbody>
+        </table>
       );
     }
 
-    default:
-      return (
-        <div className="text-center py-4 text-gray-500">
-          <p>Unsupported block type: {block.type}</p>
+    default: {
+      const defaultContent = (
+        <div style={{ textAlign: "center", padding: "16px", color: "#666" }}>
+          <p style={{ margin: "0" }}>Unsupported block type: {block.type}</p>
         </div>
       );
+      return (
+        <table
+          role="presentation"
+          cellSpacing={0}
+          cellPadding={0}
+          style={{ width: "100%" }}
+        >
+          <tbody>
+            <tr>
+              <td style={getBlockSpacing("12px")}>{defaultContent}</td>
+            </tr>
+          </tbody>
+        </table>
+      );
+    }
   }
 };

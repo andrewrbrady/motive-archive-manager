@@ -340,6 +340,8 @@ export function ExportModal({
               </div>
             )}
 
+            {/* Global Block Spacing - removed; controlled from toolbar */}
+
             {/* Action Selection */}
             <div className="space-y-3">
               <Label className="text-sm font-medium">Export Action</Label>

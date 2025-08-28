@@ -50,6 +50,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Extract global block spacing from metadata if provided
+    const globalBlockSpacing =
+      (metadata && (metadata as any).blockSpacing) || null;
+
     // Generate HTML from blocks based on format
     const html =
       format === "email"
@@ -59,7 +63,8 @@ export async function POST(request: NextRequest) {
             metadata,
             stylesheetCSS,
             emailPlatform,
-            includeCSS
+            includeCSS,
+            globalBlockSpacing as string | null
           )
         : generateHTMLFromBlocks(blocks, template, metadata, stylesheetCSS);
 
@@ -215,7 +220,8 @@ function generateEmailHTMLFromBlocks(
   metadata: any,
   stylesheetCSS: string | null = null,
   emailPlatform: string = "generic",
-  includeCSS: boolean = true
+  includeCSS: boolean = true,
+  globalBlockSpacing: string | null = null
 ): string {
   const title = metadata?.name || "Untitled Email Composition";
   const exportedAt = metadata?.exportedAt || new Date().toISOString();
@@ -231,7 +237,10 @@ function generateEmailHTMLFromBlocks(
   const headerHTML = headerImages
     .map((block) => generateFullWidthImageHTML(block))
     .join("\n");
-  const contentHTML = generateEmailBlocksHTML(contentBlocks);
+  const contentHTML =
+    emailPlatform === "sendgrid"
+      ? generateSendGridBlocksHTMLWithSpacing(contentBlocks, globalBlockSpacing)
+      : generateEmailBlocksHTML(contentBlocks);
 
   // Generate dynamic CSS for responsive hero images
   const dynamicCSS = generateDynamicImageCSS([
@@ -257,18 +266,7 @@ function generateEmailHTMLFromBlocks(
     );
   }
 
-  // ADD MOBILE RESPONSIVE PADDING: Override inline styles for mobile
-  if (processedStylesheetCSS) {
-    processedStylesheetCSS += `
-
-/* Mobile responsive padding override for inline styles */
-@media screen and (max-width: 600px) {
-    .inner-pad {
-        padding-left: 6px !important;
-        padding-right: 6px !important;
-    }
-}`;
-  }
+  // Mobile responsive padding will be handled by the Motive CSS .content class
 
   // Generate platform-specific HTML
   switch (emailPlatform) {
@@ -302,7 +300,7 @@ function generateEmailHTMLFromBlocks(
 
 /**
  * Generate SendGrid-compatible email HTML
- * Uses CSS classes like the working email structure for proper Gmail compatibility
+ * Uses table-based structure for maximum email client compatibility
  */
 function generateSendGridHTML(
   headerImages: any[],
@@ -317,7 +315,6 @@ function generateSendGridHTML(
     .join("\n");
   const contentHTML = generateSendGridBlocksHTML(contentBlocks);
 
-  // Generate clean div-based structure like the working template
   // Use the stylesheet CSS only if includeCSS is true and CSS has actual content
   const cleanCSS =
     includeCSS && processedStylesheetCSS && processedStylesheetCSS.trim()
@@ -329,51 +326,64 @@ function generateSendGridHTML(
   const shouldShowContainerHeader = false; // Disable by default to prevent duplicate headers
   const shouldShowAnyHeader = shouldShowContainerHeader || hasHeaderImages;
 
-  // Generate header content
-  let headerContent = "";
-  if (shouldShowAnyHeader) {
-    headerContent = `
-    <!-- Header -->
-    <div class="header">`;
-
-    // Only show company logo if container header is enabled
-    if (shouldShowContainerHeader) {
-      headerContent += `
-      <img src="https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/ca378627-6b5c-4c8c-088d-5a0bdb76ae00/public" alt="Motive Archive" class="logo">`;
-    }
-
-    // Always show content header images if they exist
-    if (hasHeaderImages) {
-      headerContent += `
-      ${headerHTML}`;
-    }
-
-    headerContent += `
-    </div>`;
-  }
-
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="x-apple-disable-message-reformatting">
   <title>${escapeHtml(title)}</title>
+  <!--[if mso]>
+  <noscript>
+      <xml>
+          <o:OfficeDocumentSettings>
+              <o:PixelsPerInch>96</o:PixelsPerInch>
+          </o:OfficeDocumentSettings>
+      </xml>
+  </noscript>
+  <![endif]-->
   ${
     cleanCSS && cleanCSS.trim()
-      ? `<style>
-    ${cleanCSS}
+      ? `<style type="text/css">
+    ${dynamicCSS ? dynamicCSS + "\n\n" : ""}${cleanCSS}
   </style>`
       : ""
   }
 </head>
-<body>
-  <div class="email-container">${headerContent}
-
-    <!-- Content -->
-    <div class="content inner-pad" style="padding: 0 25px;">
-      ${contentHTML}
-    </div>
-  </div>
+<body style="margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #f4f4f4; width: 100%; overflow-x: hidden;" class="email-body">
+    <!-- Full-width header images (if any) -->
+    ${headerHTML}
+    
+    <!-- Wrapper -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="email-wrapper">
+        <tr>
+            <td align="center">
+                <!-- Main content -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="main-table" style="background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px;">
+                    <tr>
+                        <td class="content" style="padding: 20px;">
+                            ${
+                              shouldShowContainerHeader
+                                ? `
+                            <!-- Container Header -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 20px;">
+                                <tr>
+                                    <td align="center">
+                                        <img src="https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/ca378627-6b5c-4c8c-088d-5a0bdb76ae00/public" alt="Motive Archive" class="logo" style="display: block; max-width: 200px; height: auto;">
+                                    </td>
+                                </tr>
+                            </table>
+                            `
+                                : ""
+                            }
+                            ${contentHTML}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>`;
 }
@@ -436,7 +446,7 @@ function generateMailchimpHTML(
                 <!-- Main content -->
                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="main-table">
                     <tr>
-                        <td class="inner-pad" style="padding: 0 25px;">
+                        <td class="content">
                             ${contentHTML}
                         </td>
                     </tr>
@@ -503,7 +513,7 @@ function generateGenericEmailHTML(
 <body>
     ${headerHTML}
     <div class="container">
-        <div class="content inner-pad" style="padding: 0 25px;">
+        <div class="content">
             ${contentHTML}
         </div>
     </div>
@@ -513,7 +523,7 @@ function generateGenericEmailHTML(
 
 /**
  * Generate SendGrid-specific image HTML
- * Simplified structure for SendGrid compatibility
+ * Table-based structure for SendGrid compatibility
  */
 function generateSendGridImageHTML(block: any): string {
   const altText = block.altText || "";
@@ -523,23 +533,95 @@ function generateSendGridImageHTML(block: any): string {
   // Use CSS classes for styling like the working email
   const finalImageClasses = generateEmailClasses("", block);
 
-  const imageTag = `<img src="${escapeHtml(block.imageUrl)}" alt="${escapeHtml(altText)}"${finalImageClasses ? ` class="${finalImageClasses}"` : ""}>`;
+  const imageTag = `<img src="${escapeHtml(block.imageUrl)}" alt="${escapeHtml(altText)}" style="display: block; max-width: 100%; height: auto; border: 0; outline: none; text-decoration: none;"${finalImageClasses ? ` class="${finalImageClasses}"` : ""}>`;
 
   const wrappedImage = hasLink
-    ? `<a href="${escapeHtml(linkUrl)}" target="_blank">${imageTag}</a>`
+    ? `<a href="${escapeHtml(linkUrl)}" target="_blank" style="color: inherit; text-decoration: none;">${imageTag}</a>`
     : imageTag;
 
-  return `<div class="image-spacing">
-    ${wrappedImage}
-    ${block.caption ? `<p class="image-caption" style="text-align:center;">${escapeHtml(block.caption)}</p>` : ""}
-  </div>`;
+  return `<!-- Full-width header image -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="min-width:100%;width:100%;">
+    <tr>
+        <td align="center" bgcolor="${block.email?.backgroundColor || "#111111"}" style="padding:0;">
+            ${wrappedImage}
+            ${
+              block.caption
+                ? `
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                    <td align="center" style="padding: 8px 20px 0; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px; color: #666666; font-style: italic;">
+                        ${escapeHtml(block.caption)}
+                    </td>
+                </tr>
+            </table>`
+                : ""
+            }
+        </td>
+    </tr>
+</table>`;
 }
 
 // Removed generateSendGridBasicImageHTML - replaced with CSS class-based approach
 
 /**
- * Generate SendGrid-specific blocks HTML with CSS classes
- * Clean structure that matches the working email format
+ * Default margin configuration for email blocks
+ * These can be overridden by CSS classes or block-specific settings
+ */
+const DEFAULT_EMAIL_MARGINS = {
+  blockBottom: "12px",
+  blockTop: "0px", 
+  buttonVertical: "24px",
+  dividerVertical: "24px",
+  listItemBottom: "8px",
+  textBlockBottom: "12px",
+  imageBlockBottom: "12px",
+  htmlBlockBottom: "12px",
+  videoBlockBottom: "12px",
+};
+
+/**
+ * Extract margin value from CSS styles or block configuration
+ * Priority: block.styles > CSS class > default
+ */
+function getBlockMargin(
+  block: any,
+  position: "top" | "bottom" | "vertical",
+  defaultValue: string
+): string {
+  // LEGACY SPACING REMOVAL: ignore block.styles.margin* and block.margin
+  // Always fall back to the standardized defaults for export spacing
+  return position === "vertical" ? `${defaultValue} 0` : defaultValue;
+}
+
+/**
+ * Generate table wrapper with configurable margins
+ */
+function createTableWrapper(
+  content: string,
+  block: any,
+  defaultMargin: string = DEFAULT_EMAIL_MARGINS.blockBottom,
+  globalSpacing?: string
+): string {
+  const bottomPadding =
+    globalSpacing || getBlockMargin(block, "bottom", defaultMargin);
+  const customClasses = generateEmailClasses("", block);
+  
+  // Use td padding for spacing (more reliable in email clients than table margins)
+  // Nest provided content inside an inner table to preserve valid structure
+  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%"${customClasses ? ` class="${customClasses}"` : ""}>
+    <tr>
+      <td style="padding: 0 0 ${bottomPadding} 0;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+    ${content}
+        </table>
+      </td>
+    </tr>
+  </table>`;
+}
+
+/**
+ * Generate SendGrid-specific blocks HTML with table structure
+ * Table-based structure with configurable margins
  */
 function generateSendGridBlocksHTML(blocks: any[]): string {
   return blocks
@@ -550,8 +632,13 @@ function generateSendGridBlocksHTML(blocks: any[]): string {
           const content = htmlBlock.content || "";
           const customClasses = generateEmailClasses("", block);
 
-          // For SendGrid, include HTML content directly with optional CSS classes
-          return `<div${customClasses ? ` class="${customClasses}"` : ""} style="margin-bottom: 12px;">${content}</div>`;
+          // For SendGrid, wrap HTML content in table structure with configurable margins
+          const cellContent = `<td${customClasses ? ` class="${customClasses}"` : ""}>${content}</td>`;
+          return createTableWrapper(
+            `<tr>${cellContent}</tr>`,
+            block,
+            DEFAULT_EMAIL_MARGINS.htmlBlockBottom
+          );
         }
         case "text": {
           const textBlock = block as TextBlock;
@@ -560,22 +647,22 @@ function generateSendGridBlocksHTML(blocks: any[]): string {
 
           // Get formatting from block formatting property
           const formatting = textBlock.formatting || {};
-          const textAlign = formatting.textAlign || "left";
+          const textAlign = formatting.textAlign;
           const fontSize = formatting.fontSize;
           const fontWeight = formatting.fontWeight;
           const color = formatting.color;
           const lineHeight = formatting.lineHeight;
-          const marginTop = formatting.marginTop;
-          const marginBottom = formatting.marginBottom;
+          // Ignore legacy margins from formatting to avoid spacing bugs
 
-          // Build inline style string from formatting
-          let inlineStyles = `text-align: ${textAlign};`;
-          if (fontSize) inlineStyles += ` font-size: ${fontSize};`;
-          if (fontWeight) inlineStyles += ` font-weight: ${fontWeight};`;
-          if (color) inlineStyles += ` color: ${color};`;
-          if (lineHeight) inlineStyles += ` line-height: ${lineHeight};`;
-          if (marginTop) inlineStyles += ` margin-top: ${marginTop};`;
-          if (marginBottom) inlineStyles += ` margin-bottom: ${marginBottom};`;
+          // Build inline style string ONLY from user-specified formatting
+          // Let CSS handle defaults so custom styles can override them
+          const inlineStyles = [];
+          if (textAlign) inlineStyles.push(`text-align: ${textAlign}`);
+          if (fontSize) inlineStyles.push(`font-size: ${fontSize}`);
+          if (fontWeight) inlineStyles.push(`font-weight: ${fontWeight}`);
+          if (color) inlineStyles.push(`color: ${color}`);
+          if (lineHeight) inlineStyles.push(`line-height: ${lineHeight}`);
+          // Do not push marginTop/marginBottom
 
           // Process rich formatting if available, otherwise use raw content
           let processedContent = textBlock.content || "";
@@ -598,7 +685,18 @@ function generateSendGridBlocksHTML(blocks: any[]): string {
             ? processedContent
             : escapeHtml(processedContent);
 
-          return `<${element}${customClasses ? ` class="${customClasses}"` : ""} style="${inlineStyles} margin-bottom: 12px;">${finalContent}</${element}>`;
+          // Only add style attribute if there are actual inline styles
+          const styleAttr =
+            inlineStyles.length > 0
+              ? ` style="${inlineStyles.join("; ")}"`
+              : "";
+          
+          const textElement = `<${element}${customClasses ? ` class="${customClasses}"` : ""}${styleAttr}>${finalContent}</${element}>`;
+          return createTableWrapper(
+            `<tr><td>${textElement}</td></tr>`,
+            block,
+            DEFAULT_EMAIL_MARGINS.textBlockBottom
+          );
         }
         case "list": {
           const listBlock = block as any;
@@ -606,42 +704,107 @@ function generateSendGridBlocksHTML(blocks: any[]): string {
           const customClasses = generateEmailClasses("", block);
 
           if (items.length === 0) {
-            return `<div${customClasses ? ` class="${customClasses}"` : ""} style="color: #666; font-style: italic; margin-bottom: 12px;">Empty list</div>`;
+            const emptyContent = `<tr><td${customClasses ? ` class="${customClasses}"` : ""} style="color: #666; font-style: italic;">Empty list</td></tr>`;
+            return createTableWrapper(
+              emptyContent,
+              block,
+              DEFAULT_EMAIL_MARGINS.blockBottom
+            );
           }
 
+          const listItemMargin = getBlockMargin(
+            block,
+            "bottom",
+            DEFAULT_EMAIL_MARGINS.listItemBottom
+          );
           const listItems = items
             .map(
               (item: string) =>
-                `<li style="margin-bottom: 8px;">${escapeHtml(item)}</li>`
+                `<li style="margin-bottom: ${listItemMargin};">${escapeHtml(item)}</li>`
             )
             .join("");
 
-          return `<ul${customClasses ? ` class="${customClasses} block-spacing"` : ' class="block-spacing"'} style="margin: 0 0 12px 0; padding-left: 20px; list-style-type: disc;">${listItems}</ul>`;
+          const listContent = `<tr><td><ul${customClasses ? ` class="${customClasses}"` : ""} style="padding-left: 20px; list-style-type: disc; margin: 0;">${listItems}</ul></td></tr>`;
+          return createTableWrapper(
+            listContent,
+            block,
+            DEFAULT_EMAIL_MARGINS.blockBottom
+          );
         }
-        case "image":
-          return generateSendGridImageHTML(block);
+        case "image": {
+          const imageBlock = block as ImageBlock;
+          if (!imageBlock.imageUrl) {
+            const placeholderContent = `<tr><td style="text-align: center; padding: 20px; color: #666; border: 2px dashed #ccc;">
+                      <div style="font-size: 24px; margin-bottom: 8px;">🖼️</div>
+                      <p style="margin: 0;">Image will appear here</p>
+                  </td></tr>`;
+            return createTableWrapper(
+              placeholderContent,
+              block,
+              DEFAULT_EMAIL_MARGINS.imageBlockBottom
+            );
+          }
+
+          const altText = imageBlock.altText || "";
+          const linkUrl = imageBlock.linkUrl?.trim();
+          const hasLink = linkUrl && linkUrl.length > 0;
+          const alignment = imageBlock.alignment || "center";
+          const customClasses = generateEmailClasses("", block);
+
+          const alignStyle =
+            alignment === "center"
+              ? "center"
+              : alignment === "right"
+                ? "right"
+                : "left";
+
+          const imageTag = `<img src="${escapeHtml(imageBlock.imageUrl)}" alt="${escapeHtml(altText)}" style="display: block; max-width: 100%; height: auto; border: 0; outline: none; text-decoration: none;"${customClasses ? ` class="${customClasses}"` : ""}>`;
+
+          const wrappedImage = hasLink
+            ? `<a href="${escapeHtml(linkUrl)}" target="_blank" style="color: inherit; text-decoration: none;">${imageTag}</a>`
+            : imageTag;
+
+          const imageContent = `<tr><td align="${alignStyle}">
+                    ${wrappedImage}
+                    ${imageBlock.caption ? `<p style="text-align: ${alignStyle}; font-size: 14px; color: #666; margin: 8px 0 0 0; font-style: italic;">${escapeHtml(imageBlock.caption)}</p>` : ""}
+                </td></tr>`;
+          return createTableWrapper(
+            imageContent,
+            block,
+            DEFAULT_EMAIL_MARGINS.imageBlockBottom
+          );
+        }
         case "divider": {
           const dividerBlock = block as DividerBlock;
           const thickness = dividerBlock.thickness || "1px";
           const color = dividerBlock.color || "#e1e4e8";
-          const margin = dividerBlock.margin || "24px";
+          const dividerClasses = generateEmailClasses("", block);
 
           // Default divider styles and apply block styles for SendGrid
-          const defaultDividerStyles = `border: none; border-top: ${thickness} solid ${color}; margin: ${margin} 0; height: 1px; font-size: 1px; line-height: 1px`;
+          const defaultDividerStyles = `border: none; border-top: ${thickness} solid ${color}; height: 1px; font-size: 1px; line-height: 1px`;
           const finalDividerStyles = mergeEmailStyles(
             defaultDividerStyles,
             block.styles || {}
           );
-          const dividerClasses = generateEmailClasses("", block);
 
-          return `<hr${dividerClasses ? ` class="${dividerClasses} divider-spacing divider-line"` : ' class="divider-spacing divider-line"'} style="${finalDividerStyles}">`;
+          const dividerContent = `<tr><td><hr${dividerClasses ? ` class="${dividerClasses}"` : ""} style="${finalDividerStyles}"></td></tr>`;
+          return createTableWrapper(
+            dividerContent,
+            block,
+            DEFAULT_EMAIL_MARGINS.dividerVertical
+          );
         }
         case "video": {
           const videoClasses = generateEmailClasses("", block);
-          return `<div${videoClasses ? ` class="${videoClasses} block-spacing"` : ' class="block-spacing"'} style="margin:0 0 12px 0;">
-            <p><strong>Video:</strong> ${escapeHtml(block.title || "Video Content")}</p>
-            <p><a href="${escapeHtml(block.videoUrl)}" target="_blank" style="color: #0066cc;">Watch Video</a></p>
-          </div>`;
+          const videoContent = `<tr><td${videoClasses ? ` class="${videoClasses}"` : ""}>
+                    <p style="margin: 0 0 8px 0;"><strong>Video:</strong> ${escapeHtml(block.title || "Video Content")}</p>
+                    <p style="margin: 0;"><a href="${escapeHtml(block.videoUrl)}" target="_blank" style="color: #0066cc; text-decoration: underline;">Watch Video</a></p>
+                </td></tr>`;
+          return createTableWrapper(
+            videoContent,
+            block,
+            DEFAULT_EMAIL_MARGINS.videoBlockBottom
+          );
         }
         case "button": {
           const buttonBlock = block as ButtonBlock;
@@ -654,24 +817,224 @@ function generateSendGridBlocksHTML(blocks: any[]): string {
           const customClasses = generateEmailClasses("", block);
 
           // Use table structure for better email client compatibility and mobile centering
-          return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 24px 0;" class="button-spacing">
-            <tr>
-                <td align="center" class="mobile-center"${customClasses ? ` ${customClasses}` : ""}>
-                    <a href="${escapeHtml(buttonUrl)}" target="_blank" rel="noopener noreferrer" class="email-button" style="background-color: ${backgroundColor}; color: ${textColor}; padding: ${padding}; border-radius: ${borderRadius};">${escapeHtml(buttonText)}</a>
-                </td>
-            </tr>
-          </table>`;
+          const buttonContent = `<tr><td align="center"${customClasses ? ` class="${customClasses}"` : ""}>
+                    <a href="${escapeHtml(buttonUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: ${backgroundColor}; color: ${textColor}; padding: ${padding}; border-radius: ${borderRadius}; text-decoration: none; font-weight: 500;">${escapeHtml(buttonText)}</a>
+                </td></tr>`;
+          return createTableWrapper(
+            buttonContent,
+            block,
+            DEFAULT_EMAIL_MARGINS.buttonVertical
+          );
         }
         default: {
           const defaultClasses = generateEmailClasses("", block);
-          return `<div${defaultClasses ? ` class="${defaultClasses}"` : ""}>${escapeHtml(block.content || "")}</div>`;
+          const defaultContent = `<tr><td${defaultClasses ? ` class="${defaultClasses}"` : ""}>${escapeHtml(block.content || "")}</td></tr>`;
+          return createTableWrapper(
+            defaultContent,
+            block,
+            DEFAULT_EMAIL_MARGINS.blockBottom
+          );
         }
       }
     })
     .join("\n");
 }
 
-// Removed generateSendGridBasicBlocksHTML - replaced with CSS class-based approach
+/**
+ * Generate SendGrid-specific blocks HTML with configurable margins
+ */
+function generateSendGridBlocksHTMLWithSpacing(
+  blocks: any[],
+  globalBlockSpacing: string | null
+): string {
+  return blocks
+    .map((block) => {
+      switch (block.type) {
+        case "html": {
+          const htmlBlock = block as HTMLBlock;
+          const content = htmlBlock.content || "";
+          const customClasses = generateEmailClasses("", block);
+          const cellContent = `<td${customClasses ? ` class="${customClasses}"` : ""}>${content}</td>`;
+          return createTableWrapper(
+            `<tr>${cellContent}</tr>`,
+            block,
+            DEFAULT_EMAIL_MARGINS.htmlBlockBottom,
+            globalBlockSpacing || undefined
+          );
+        }
+        case "text": {
+          const textBlock = block as TextBlock;
+          const element = textBlock.element || "p";
+          const customClasses = generateEmailClasses("", block);
+          const formatting = textBlock.formatting || {};
+          const textAlign = formatting.textAlign;
+          const fontSize = formatting.fontSize;
+          const fontWeight = formatting.fontWeight;
+          const color = formatting.color;
+          const lineHeight = formatting.lineHeight;
+          const inlineStyles: string[] = [];
+          if (textAlign) inlineStyles.push(`text-align: ${textAlign}`);
+          if (fontSize) inlineStyles.push(`font-size: ${fontSize}`);
+          if (fontWeight) inlineStyles.push(`font-weight: ${fontWeight}`);
+          if (color) inlineStyles.push(`color: ${color}`);
+          if (lineHeight) inlineStyles.push(`line-height: ${lineHeight}`);
+          let processedContent = textBlock.content || "";
+          if (textBlock.richFormatting?.formattedContent) {
+            processedContent = textBlock.richFormatting.formattedContent;
+          }
+          processedContent = processedContent
+            .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+            .replace(
+              /\[([^\]]+)\]\(([^)]+)\)/g,
+              '<a href="$2" style="color: #0066cc; text-decoration: underline;">$1</a>'
+            )
+            .replace(/\n/g, "<br>");
+          const hasHtmlTags = /<[^>]+>/.test(processedContent);
+          const finalContent = hasHtmlTags
+            ? processedContent
+            : escapeHtml(processedContent);
+          const styleAttr =
+            inlineStyles.length > 0
+              ? ` style="${inlineStyles.join("; ")}"`
+              : "";
+          const textElement = `<${element}${customClasses ? ` class="${customClasses}"` : ""}${styleAttr}>${finalContent}</${element}>`;
+          return createTableWrapper(
+            `<tr><td>${textElement}</td></tr>`,
+            block,
+            DEFAULT_EMAIL_MARGINS.textBlockBottom,
+            globalBlockSpacing || undefined
+          );
+        }
+        case "list": {
+          const listBlock = block as any;
+          const items = listBlock.items || [];
+          const customClasses = generateEmailClasses("", block);
+          if (items.length === 0) {
+            const emptyContent = `<tr><td${customClasses ? ` class="${customClasses}"` : ""} style="color: #666; font-style: italic;">Empty list</td></tr>`;
+            return createTableWrapper(
+              emptyContent,
+              block,
+              DEFAULT_EMAIL_MARGINS.blockBottom,
+              globalBlockSpacing || undefined
+            );
+          }
+          const listItemMargin = getBlockMargin(
+            block,
+            "bottom",
+            DEFAULT_EMAIL_MARGINS.listItemBottom
+          );
+          const listItems = items
+            .map(
+              (item: string) =>
+                `<li style="margin-bottom: ${listItemMargin};">${escapeHtml(item)}</li>`
+            )
+            .join("");
+          const listContent = `<tr><td><ul${customClasses ? ` class="${customClasses}"` : ""} style="padding-left: 20px; list-style-type: disc; margin: 0;">${listItems}</ul></td></tr>`;
+          return createTableWrapper(
+            listContent,
+            block,
+            DEFAULT_EMAIL_MARGINS.blockBottom,
+            globalBlockSpacing || undefined
+          );
+        }
+        case "image": {
+          const imageBlock = block as ImageBlock;
+          if (!imageBlock.imageUrl) {
+            const placeholderContent = `<tr><td style="text-align: center; padding: 20px; color: #666; border: 2px dashed #ccc;"><div style="font-size: 24px; margin-bottom: 8px;">🖼️</div><p style="margin: 0;">Image will appear here</p></td></tr>`;
+            return createTableWrapper(
+              placeholderContent,
+              block,
+              DEFAULT_EMAIL_MARGINS.imageBlockBottom,
+              globalBlockSpacing || undefined
+            );
+          }
+          const altText = imageBlock.altText || "";
+          const linkUrl = imageBlock.linkUrl?.trim();
+          const hasLink = linkUrl && linkUrl.length > 0;
+          const alignment = imageBlock.alignment || "center";
+          const customClasses = generateEmailClasses("", block);
+          const alignStyle =
+            alignment === "center"
+              ? "center"
+              : alignment === "right"
+                ? "right"
+                : "left";
+          const imageTag = `<img src="${escapeHtml(imageBlock.imageUrl)}" alt="${escapeHtml(altText)}" style="display: block; max-width: 100%; height: auto; border: 0; outline: none; text-decoration: none;"${customClasses ? ` class="${customClasses}"` : ""}>`;
+          const wrappedImage = hasLink
+            ? `<a href="${escapeHtml(linkUrl)}" target="_blank" style="color: inherit; text-decoration: none;">${imageTag}</a>`
+            : imageTag;
+          const imageContent = `<tr><td align="${alignStyle}">${wrappedImage}${imageBlock.caption ? `<p style="text-align: ${alignStyle}; font-size: 14px; color: #666; margin: 8px 0 0 0; font-style: italic;">${escapeHtml(imageBlock.caption)}</p>` : ""}</td></tr>`;
+          return createTableWrapper(
+            imageContent,
+            block,
+            DEFAULT_EMAIL_MARGINS.imageBlockBottom,
+            globalBlockSpacing || undefined
+          );
+        }
+        case "divider": {
+          const dividerBlock = block as DividerBlock;
+          const thickness = dividerBlock.thickness || "1px";
+          const color = dividerBlock.color || "#e1e4e8";
+          const dividerClasses = generateEmailClasses("", block);
+          const defaultDividerStyles = `border: none; border-top: ${thickness} solid ${color}; height: 1px; font-size: 1px; line-height: 1px`;
+          const finalDividerStyles = mergeEmailStyles(
+            defaultDividerStyles,
+            block.styles || {}
+          );
+          const dividerContent = `<tr><td><hr${dividerClasses ? ` class="${dividerClasses}"` : ""} style="${finalDividerStyles}"></td></tr>`;
+          return createTableWrapper(
+            dividerContent,
+            block,
+            DEFAULT_EMAIL_MARGINS.dividerVertical,
+            globalBlockSpacing || undefined
+          );
+        }
+        case "video": {
+          const videoClasses = generateEmailClasses("", block);
+          const videoContent = `<tr><td${videoClasses ? ` class="${videoClasses}"` : ""}>
+                    <p style="margin: 0 0 8px 0;"><strong>Video:</strong> ${escapeHtml(block.title || "Video Content")}</p>
+                    <p style="margin: 0;"><a href="${escapeHtml(block.videoUrl)}" target="_blank" style="color: #0066cc; text-decoration: underline;">Watch Video</a></p>
+                </td></tr>`;
+          return createTableWrapper(
+            videoContent,
+            block,
+            DEFAULT_EMAIL_MARGINS.videoBlockBottom,
+            globalBlockSpacing || undefined
+          );
+        }
+        case "button": {
+          const buttonBlock = block as ButtonBlock;
+          const buttonText = buttonBlock.text || "Button";
+          const buttonUrl = buttonBlock.url || "#";
+          const backgroundColor = buttonBlock.backgroundColor || "#0066cc";
+          const textColor = buttonBlock.textColor || "#ffffff";
+          const borderRadius = buttonBlock.borderRadius || "4px";
+          const padding = buttonBlock.padding || "12px 24px";
+          const customClasses = generateEmailClasses("", block);
+          const buttonContent = `<tr><td align="center"${customClasses ? ` class="${customClasses}"` : ""}>
+                    <a href="${escapeHtml(buttonUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: ${backgroundColor}; color: ${textColor}; padding: ${padding}; border-radius: ${borderRadius}; text-decoration: none; font-weight: 500;">${escapeHtml(buttonText)}</a>
+                </td></tr>`;
+          return createTableWrapper(
+            buttonContent,
+            block,
+            DEFAULT_EMAIL_MARGINS.buttonVertical,
+            globalBlockSpacing || undefined
+          );
+        }
+        default: {
+          const defaultClasses = generateEmailClasses("", block);
+          const defaultContent = `<tr><td${defaultClasses ? ` class="${defaultClasses}"` : ""}>${escapeHtml(block.content || "")}</td></tr>`;
+          return createTableWrapper(
+            defaultContent,
+            block,
+            DEFAULT_EMAIL_MARGINS.blockBottom,
+            globalBlockSpacing || undefined
+          );
+        }
+      }
+    })
+    .join("\n");
+}
 
 /**
  * Separate full-width header images from regular content blocks
@@ -907,8 +1270,7 @@ function generateEmailBlockHTML(block: ContentBlock): string {
       const fontWeight = formatting.fontWeight;
       const color = formatting.color;
       const lineHeight = formatting.lineHeight;
-      const marginTop = formatting.marginTop;
-      const marginBottom = formatting.marginBottom;
+      // Ignore legacy margins from formatting
 
       // ONLY user-specified formatting goes inline (for Gmail compatibility)
       // Let CSS handle defaults so custom styles can override them
@@ -920,8 +1282,7 @@ function generateEmailBlockHTML(block: ContentBlock): string {
       if (fontWeight) criticalStyles.push(`font-weight: ${fontWeight}`);
       if (color) criticalStyles.push(`color: ${color}`);
       if (lineHeight) criticalStyles.push(`line-height: ${lineHeight}`);
-      if (marginTop) criticalStyles.push(`margin-top: ${marginTop}`);
-      if (marginBottom) criticalStyles.push(`margin-bottom: ${marginBottom}`);
+      // Do not include marginTop/marginBottom
 
       const defaultStyles = criticalStyles.join("; ");
 
@@ -1066,7 +1427,7 @@ function generateEmailBlockHTML(block: ContentBlock): string {
 <!-- Resume main content table -->
 <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px;" class="dark-bg mobile-stack main-table">
     <tr>
-        <td class="inner-pad" style="padding: 0 25px;">`;
+        <td class="content">`;
       }
 
       // Standard image block (non-full-width)
@@ -1151,7 +1512,7 @@ function generateEmailBlockHTML(block: ContentBlock): string {
       const dividerBlock = block as DividerBlock;
       const thickness = dividerBlock.thickness || "1px";
       const color = dividerBlock.color || "#e1e4e8";
-      const margin = dividerBlock.margin || "24px";
+      // Ignore legacy divider margins; spacing handled by wrapper tables
 
       // Default divider styles and apply block styles
       const defaultDividerStyles = `border-top: ${thickness} solid ${color}; font-size: 1px; line-height: 1px`;
@@ -1252,18 +1613,7 @@ function generateHTMLFromBlocks(
     );
   }
 
-  // ADD MOBILE RESPONSIVE PADDING: Override inline styles for mobile
-  if (processedStylesheetCSS) {
-    processedStylesheetCSS += `
-
-/* Mobile responsive padding override for inline styles */
-@media screen and (max-width: 600px) {
-    .inner-pad {
-        padding-left: 6px !important;
-        padding-right: 6px !important;
-    }
-}`;
-  }
+  // Mobile responsive padding will be handled by the Motive CSS .content class
 
   // Create complete HTML document
   const html = `<!DOCTYPE html>
@@ -1358,7 +1708,7 @@ function generateHTMLFromBlocks(
     </style>
 </head>
 <body>
-    <div class="content inner-pad" style="padding: 0 25px;">
+    <div class="content">
         ${blockHTML}
     </div>
 </body>
@@ -1459,11 +1809,11 @@ function generateBlockHTML(block: ContentBlock): string {
       const dividerBlock = block as DividerBlock;
       const thickness = dividerBlock.thickness || "1px";
       const color = dividerBlock.color || "#e1e4e8";
-      const margin = dividerBlock.margin || "24px";
+      // Ignore legacy margin property
 
       const styles = generateInlineStyles({
         borderTop: `${thickness} solid ${color}`,
-        margin: `${margin} 0`,
+        // Spacing is controlled by surrounding layout, not inline margins
         ...block.styles,
       });
 
@@ -1518,9 +1868,21 @@ function mergeEmailStyles(
 
   // Add block styles, overriding defaults
   Object.entries(blockStyles).forEach(([key, value]) => {
+    // Filter out legacy spacing keys to avoid incorrect spacing in exports
+    const lowerKey = key.toLowerCase();
+    if (
+      lowerKey === "margin" ||
+      lowerKey === "margintop" ||
+      lowerKey === "marginbottom" ||
+      lowerKey === "marginleft" ||
+      lowerKey === "marginright"
+    ) {
+      return; // skip legacy margin fields
+    }
+
     // Convert camelCase to kebab-case
     const kebabKey = key.replace(/([A-Z])/g, "-$1").toLowerCase();
-    existing[kebabKey] = value;
+    existing[kebabKey] = value as any;
   });
 
   // Convert back to style string

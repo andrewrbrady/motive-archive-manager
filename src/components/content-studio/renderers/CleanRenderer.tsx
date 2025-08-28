@@ -499,7 +499,7 @@ const CleanPreviewBlock = React.memo<CleanPreviewBlockProps>(
         const dividerStyle = {
           height: dividerBlock.thickness || "1px",
           backgroundColor: dividerBlock.color || "#e5e7eb",
-          margin: dividerBlock.margin || "20px 0",
+          margin: "20px 0",
           ...customStyles,
         };
 

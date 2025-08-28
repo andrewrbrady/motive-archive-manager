@@ -74,6 +74,7 @@ export interface BaseComposerProps extends BlockComposerProps {
   supportsCSSEditor?: boolean;
   supportsEmailContainer?: boolean;
   supportsFrontmatter?: boolean;
+  emailPlatform?: string;
 }
 
 export interface PreviewRenderProps {
@@ -139,6 +140,7 @@ export function BaseComposer({
   supportsCSSEditor = true,
   supportsEmailContainer = false,
   supportsFrontmatter = false,
+  emailPlatform = "generic",
 }: BaseComposerProps) {
   const { toast } = useToast();
   const api = useAPI();
@@ -1059,7 +1061,7 @@ export function BaseComposer({
                 blocks={blocks}
                 selectedStylesheetId={selectedStylesheetId}
                 previewMode={previewMode === "email" ? "email" : "clean"}
-                emailPlatform="generic"
+                emailPlatform={emailPlatform}
                 activeBlockId={activeBlockId}
                 draggedBlockId={draggedBlockId}
                 draggedOverIndex={draggedOverIndex}
@@ -1088,6 +1090,8 @@ export function BaseComposer({
           <IntegratedPreviewEditor
             blocks={blocks}
             selectedStylesheetId={selectedStylesheetId}
+            previewMode={previewMode === "email" ? "email" : "clean"}
+            emailPlatform={emailPlatform}
             activeBlockId={activeBlockId}
             draggedBlockId={draggedBlockId}
             draggedOverIndex={draggedOverIndex}

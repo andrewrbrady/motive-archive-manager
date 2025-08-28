@@ -23,7 +23,7 @@ interface FilterParams {
 export default async function CarsPage(props: any) {
   try {
     const searchParams = props.searchParams || {};
-    const resolvedParams = await Promise.resolve(searchParams);
+    const resolvedParams = searchParams;
 
     const page = Number(resolvedParams.page) || 1;
     const pageSize = Number(resolvedParams.pageSize) || 48;

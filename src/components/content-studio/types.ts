@@ -47,8 +47,6 @@ export interface TextBlock extends BaseContentBlock {
     color?: string;
     textAlign?: "left" | "center" | "right";
     lineHeight?: string;
-    marginTop?: string;
-    marginBottom?: string;
   };
   // Rich text formatting support for bold and links
   richFormatting?: {
@@ -99,7 +97,6 @@ export interface DividerBlock extends BaseContentBlock {
   type: "divider";
   thickness?: string;
   color?: string;
-  margin?: string;
 }
 
 export interface ButtonBlock extends BaseContentBlock {

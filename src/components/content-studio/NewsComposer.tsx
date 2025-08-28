@@ -58,6 +58,8 @@ export function NewsComposer(props: NewsComposerProps) {
 
   // Gallery selection state
   const [selectedGalleryId, setSelectedGalleryId] = useState<string>("none");
+  // Carousel selection state
+  const [selectedCarouselId, setSelectedCarouselId] = useState<string>("none");
 
   // Fetch available galleries
   const { data: galleriesData } = useGalleries({ limit: 100 });
@@ -94,10 +96,15 @@ export function NewsComposer(props: NewsComposerProps) {
           selectedGalleryId && selectedGalleryId !== "none"
             ? [selectedGalleryId]
             : [];
+        const carouselIds =
+          selectedCarouselId && selectedCarouselId !== "none"
+            ? [selectedCarouselId]
+            : [];
         exportToMDX(
           exportProps.blocks,
           exportProps.compositionName,
-          galleryIds
+          galleryIds,
+          carouselIds
         );
       };
 
@@ -130,6 +137,33 @@ export function NewsComposer(props: NewsComposerProps) {
             </SelectContent>
           </Select>
 
+          {/* Carousel Selection Dropdown */}
+          <Select
+            value={selectedCarouselId}
+            onValueChange={setSelectedCarouselId}
+          >
+            <SelectTrigger className="w-[200px] bg-background border-border/40">
+              <ImageIcon className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Select carousel..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No Carousel</SelectItem>
+              {galleries.map((gallery) => (
+                <SelectItem key={gallery._id} value={gallery._id}>
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    <div>
+                      <div className="font-medium">{gallery.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {gallery.imageIds.length} images
+                      </div>
+                    </div>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           {/* Export MDX Button */}
           <Button
             onClick={handleExportMDX}
@@ -143,7 +177,7 @@ export function NewsComposer(props: NewsComposerProps) {
         </div>
       );
     },
-    [exportToMDX, selectedGalleryId, galleries]
+    [exportToMDX, selectedGalleryId, selectedCarouselId, galleries]
   );
 
   // News-specific controls

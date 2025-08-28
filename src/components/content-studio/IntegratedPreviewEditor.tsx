@@ -32,6 +32,7 @@ import {
 import { EmailHeaderState } from "./EmailHeaderConfig";
 import { BlockContent } from "./BlockContent";
 import { CSSClassSelector } from "../BlockComposer/CSSClassSelector";
+
 import {
   CSSClass,
   classToInlineStyles,
@@ -524,6 +525,7 @@ const EditablePreviewBlock = React.memo<EditablePreviewBlockProps>(
                     </div>
                   )}
                 </div>
+
                 <BlockContent
                   block={block}
                   blocks={blocks}

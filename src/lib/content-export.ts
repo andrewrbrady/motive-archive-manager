@@ -36,6 +36,8 @@ export interface ExportOptions {
   action: "download" | "copy";
   includeCSS: boolean;
   fileName?: string;
+  // Global spacing applied across blocks in email export
+  blockSpacing?: string;
 }
 
 /**
@@ -55,7 +57,8 @@ export class ContentExporter {
     carId?: string,
     selectedStylesheetId?: string | null,
     emailPlatform: "mailchimp" | "sendgrid" | "generic" = "generic",
-    includeCSS: boolean = true
+    includeCSS: boolean = true,
+    blockSpacing?: string
   ): Promise<string> {
     const metadata: ExportMetadata = {
       name: compositionName,
@@ -63,6 +66,9 @@ export class ContentExporter {
       projectId,
       carId,
       previewText: "", // Can be extracted from blocks if needed
+      // Pass global block spacing through metadata to the export route
+      // so the generator can honor it across all table wrappers
+      ...(blockSpacing ? ({ blockSpacing } as any) : {}),
     };
 
     const requestBody = {
@@ -108,7 +114,8 @@ export class ContentExporter {
       carId,
       selectedStylesheetId,
       options.emailPlatform || "generic",
-      options.includeCSS
+      options.includeCSS,
+      options.blockSpacing
     );
 
     if (options.action === "download") {
@@ -245,7 +252,8 @@ export class ContentExporter {
   static async exportToMDX(
     blocks: ContentBlock[],
     compositionName: string,
-    galleryIds?: string[]
+    galleryIds?: string[],
+    carouselIds?: string[]
   ): Promise<string> {
     const frontmatterBlocks = blocks.filter(
       (block) => block.type === "frontmatter"
@@ -257,7 +265,9 @@ export class ContentExporter {
     // Generate frontmatter
     let frontmatter = "";
     let hasFrontmatterContent =
-      frontmatterBlocks.length > 0 || (galleryIds && galleryIds.length > 0);
+      frontmatterBlocks.length > 0 ||
+      (galleryIds && galleryIds.length > 0) ||
+      (carouselIds && carouselIds.length > 0);
 
     if (hasFrontmatterContent) {
       frontmatter = "---\n";
@@ -333,6 +343,70 @@ export class ContentExporter {
         } catch (error) {
           console.error("Failed to fetch gallery data for MDX export:", error);
           // Continue without gallery data if fetch fails
+        }
+      }
+
+      // Add carousel data if carousel galleries are selected
+      if (carouselIds && carouselIds.length > 0) {
+        try {
+          // Fetch carousel gallery data for each selected carousel gallery
+          const carouselPromises = carouselIds.map(async (carouselId) => {
+            const gallery = (await api.get(
+              `/api/galleries/${carouselId}`
+            )) as any;
+            return gallery;
+          });
+
+          const carouselGalleries = await Promise.all(carouselPromises);
+
+          // Combine all images from all selected carousel galleries into one flat array
+          const allCarouselImages: any[] = [];
+          let carouselImageCounter = 1;
+
+          for (const gallery of carouselGalleries) {
+            if (gallery && gallery.images) {
+              // Get ordered images array, falling back to default order if not available
+              const orderedImageIds = gallery.orderedImages?.length
+                ? gallery.orderedImages
+                    .sort((a: any, b: any) => a.order - b.order)
+                    .map((item: any) => item.id)
+                : gallery.imageIds;
+
+              // Create a map of images by their ID for quick lookup
+              const imageMap = new Map(
+                gallery.images?.map((image: any) => [image._id, image]) || []
+              );
+
+              // Map the ordered IDs to their corresponding images
+              orderedImageIds.forEach((id: string) => {
+                const image = imageMap.get(id) as any;
+                if (image) {
+                  allCarouselImages.push({
+                    id: `img${carouselImageCounter}`,
+                    src: getBaseImageUrl(image.url), // Use base URL without variant
+                    alt:
+                      image.alt ||
+                      image.filename ||
+                      `Carousel Image ${carouselImageCounter}`,
+                  });
+                  carouselImageCounter++;
+                }
+              });
+            }
+          }
+
+          // Add carousel to frontmatter in the requested format (above gallery)
+          if (allCarouselImages.length > 0) {
+            frontmatter += "carousel:\n";
+            allCarouselImages.forEach((image) => {
+              frontmatter += `  - id: "${image.id}"\n`;
+              frontmatter += `    src: "${image.src}"\n`;
+              frontmatter += `    alt: "${image.alt}"\n`;
+            });
+          }
+        } catch (error) {
+          console.error("Failed to fetch carousel data for MDX export:", error);
+          // Continue without carousel data if fetch fails
         }
       }
 

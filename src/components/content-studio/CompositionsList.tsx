@@ -1,24 +1,19 @@
 "use client";
 
 import React, { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
 import {
-  Archive,
-  Edit3,
-  Calendar,
-  FileText,
-  Loader2,
-  Trash2,
-  Copy,
-  Download,
-  Palette,
-  Plus,
-} from "lucide-react";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Archive, Edit3, Loader2, Trash2, Copy, Plus } from "lucide-react";
 import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { api } from "@/lib/api-client";
 import { LoadedComposition } from "./types";
@@ -140,21 +135,6 @@ export function CompositionsList({
     });
   };
 
-  const getBlockSummary = (blocks: LoadedComposition["blocks"]) => {
-    if (!blocks || blocks.length === 0) return "No blocks";
-
-    const blockTypes = blocks.reduce((acc: any, block) => {
-      acc[block.type] = (acc[block.type] || 0) + 1;
-      return acc;
-    }, {});
-
-    const summary = Object.entries(blockTypes)
-      .map(([type, count]) => `${count} ${type}`)
-      .join(", ");
-
-    return summary;
-  };
-
   if (error) {
     return (
       <Card>
@@ -186,182 +166,147 @@ export function CompositionsList({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <Card className="bg-transparent border border-border/40">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Archive className="h-5 w-5" />
-              <span>Saved Compositions</span>
-              {!isLoading && compositions.length > 0 && (
-                <Badge variant="secondary" className="bg-muted/20">
-                  {compositions.length} compositions
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                onClick={onCreateNew}
-                variant="default"
-                size="sm"
-                className="bg-primary hover:bg-primary/90"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New
-              </Button>
-              <Button
-                onClick={() => refetch()}
-                variant="ghost"
-                size="sm"
-                disabled={isLoading}
-                className="hover:bg-muted/20"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "Refresh"
-                )}
-              </Button>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        {!isLoading && compositions.length > 0 && (
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Your saved compositions for this {projectId ? "project" : "car"}.
-              Click "Load" to edit a composition in the Block Composer.
-            </p>
-          </CardContent>
-        )}
-      </Card>
+    <div className="space-y-4">
+      {/* Simplified Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <Archive className="h-5 w-5" />
+          <span className="font-medium">Saved Compositions</span>
+          {!isLoading && compositions.length > 0 && (
+            <Badge variant="secondary" className="bg-muted/20">
+              {compositions.length}
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button
+            onClick={onCreateNew}
+            variant="default"
+            size="sm"
+            className="bg-primary hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            New
+          </Button>
+          <Button
+            onClick={() => refetch()}
+            variant="ghost"
+            size="sm"
+            disabled={isLoading}
+            className="hover:bg-muted/20"
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "Refresh"
+            )}
+          </Button>
+        </div>
+      </div>
 
       {/* Loading State */}
       {isLoading && (
-        <Card>
-          <CardContent className="py-8">
-            <div className="flex items-center justify-center space-x-2">
-              <Loader2 className="h-6 w-6 animate-spin" />
-              <span className="text-sm text-muted-foreground">
-                Loading your compositions...
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center justify-center py-8">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span className="text-sm text-muted-foreground">
+              Loading compositions...
+            </span>
+          </div>
+        </div>
       )}
 
       {/* Empty State */}
       {!isLoading && compositions.length === 0 && (
-        <Card>
-          <CardContent className="py-8">
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 mx-auto bg-muted/20 rounded-full flex items-center justify-center">
-                <Archive className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <div className="space-y-2">
-                <h3 className="font-medium">No Compositions Yet</h3>
-                <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  You haven't saved any compositions for this{" "}
-                  {projectId ? "project" : "car"} yet. Create your first
-                  composition using the Copy Selection and Block Composer tabs.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="text-center py-8">
+          <div className="w-16 h-16 mx-auto bg-muted/20 rounded-full flex items-center justify-center mb-4">
+            <Archive className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="font-medium mb-2">No Compositions Yet</h3>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            Create your first composition using the Copy Selection and Block
+            Composer tabs.
+          </p>
+        </div>
       )}
 
-      {/* Compositions List */}
+      {/* Compositions Table */}
       {!isLoading && compositions.length > 0 && (
-        <ScrollArea className="h-[600px]">
-          <div className="space-y-4">
-            {compositions.map((composition) => (
-              <Card
-                key={composition._id}
-                className="bg-transparent border border-border/40 hover:border-border/60 transition-colors"
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 space-y-3">
-                      {/* Header */}
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <h4 className="font-medium text-base">
-                            {composition.name}
-                          </h4>
-                          <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                            <div className="flex items-center space-x-1">
-                              <Calendar className="h-3 w-3" />
-                              <span>
-                                {formatDate(composition.metadata?.createdAt)}
-                              </span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Palette className="h-3 w-3" />
-                              <span>{composition.type || "email"}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <Badge
-                          variant="outline"
-                          className="bg-transparent text-xs"
-                        >
-                          {composition.blocks?.length || 0} blocks
-                        </Badge>
-                      </div>
-
-                      {/* Block Summary */}
-                      <div className="text-sm text-muted-foreground">
-                        <div className="flex items-center space-x-1">
-                          <FileText className="h-3 w-3" />
-                          <span>{getBlockSummary(composition.blocks)}</span>
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      {/* Actions */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            onClick={() => onLoadComposition(composition)}
-                            size="sm"
-                            className="bg-primary hover:bg-primary/90"
-                          >
-                            <Edit3 className="h-3 w-3 mr-1" />
-                            Load & Edit
-                          </Button>
-                          <Button
-                            onClick={() => handleDuplicate(composition)}
-                            variant="outline"
-                            size="sm"
-                            className="bg-transparent border-border/40 hover:bg-muted/20"
-                          >
-                            <Copy className="h-3 w-3 mr-1" />
-                            Duplicate
-                          </Button>
-                        </div>
-                        <Button
-                          onClick={() => handleDelete(composition._id)}
-                          variant="ghost"
-                          size="sm"
-                          disabled={deletingId === composition._id}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          {deletingId === composition._id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-3 w-3" />
-                          )}
-                        </Button>
-                      </div>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {compositions.map((composition) => (
+                <TableRow
+                  key={composition._id}
+                  className="hover:bg-muted/50 cursor-pointer"
+                  onClick={() => onLoadComposition(composition)}
+                >
+                  <TableCell className="font-medium">
+                    {composition.name}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize">
+                      {composition.type || "email"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {formatDate(composition.metadata?.createdAt)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end space-x-2">
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onLoadComposition(composition);
+                        }}
+                        size="sm"
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        <Edit3 className="h-3 w-3 mr-1" />
+                        Load
+                      </Button>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDuplicate(composition);
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent border-border/40 hover:bg-muted/20"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(composition._id);
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        disabled={deletingId === composition._id}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        {deletingId === composition._id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3" />
+                        )}
+                      </Button>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </ScrollArea>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   );

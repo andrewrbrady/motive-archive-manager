@@ -169,7 +169,19 @@ export function BlockComposerImageUploader({
       try {
         // If we have uploaded image data with IDs, add them to the gallery
         if (uploadedImageData.length > 0 && api) {
-          const imageIds = uploadedImageData.map((img) => img._id);
+          const imageIds = uploadedImageData
+            .map((img) => img._id)
+            .filter((id) => id != null); // Filter out null/undefined IDs
+
+          console.log("🔍 [GALLERY UPLOAD] Image IDs to add:", imageIds);
+          console.log(
+            "🔍 [GALLERY UPLOAD] Full image data:",
+            uploadedImageData
+          );
+
+          if (imageIds.length === 0) {
+            throw new Error("No valid image IDs found in uploaded data");
+          }
 
           // Add images to gallery via API
           await api.patch(`/galleries/${galleryId}/add-images`, {

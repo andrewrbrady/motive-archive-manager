@@ -2,8 +2,17 @@
 
 import React, { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, Copy, Settings } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Download, Copy, Settings, Mail } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 import {
   BaseComposer,
@@ -47,7 +56,7 @@ interface EmailComposerProps
  * EmailComposer - Specialized composer for email content
  *
  * This component extends BaseComposer with email-specific functionality:
- * - Email preview modes (clean, email, sendgrid, mailchimp)
+ * - Table-based email preview (SendGrid, Mailchimp, Generic platforms)
  * - HTML export with email-specific formatting
  * - Email container configuration
  * - Email platform-specific optimizations
@@ -61,6 +70,9 @@ export function EmailComposer(props: EmailComposerProps) {
   const [emailContainerConfig, setEmailContainerConfig] =
     useState<NewEmailContainerConfig>(defaultEmailContainerConfig);
   const [showEmailSettingsModal, setShowEmailSettingsModal] = useState(false);
+  const [selectedEmailPlatform, setSelectedEmailPlatform] = useState<
+    "sendgrid" | "mailchimp" | "generic"
+  >("sendgrid");
 
   // Export functionality
   const { exportWithOptions, hasEmailFeatures } = useContentExport();
@@ -92,20 +104,23 @@ export function EmailComposer(props: EmailComposerProps) {
     []
   );
 
-  // Email preview modes
-  const supportedPreviewModes = [
-    { value: "clean", label: "Clean" },
-    { value: "email", label: "Email" },
-  ];
+  // Email composer only supports email preview mode (table-based layout)
+  const supportedPreviewModes = [{ value: "email", label: "Email Preview" }];
 
   // Handle export with options
   const handleExportWithOptions = useCallback(
     async (options: ExportOptions, selectedStylesheetId?: string | null) => {
+      const mergedOptions: ExportOptions = {
+        ...options,
+        // If not explicitly overridden in the modal, use current toolbar/preview spacing
+        blockSpacing: options.blockSpacing ?? emailContainerConfig.blockSpacing,
+      };
+
       await exportWithOptions(
         props.blocks,
         props.template?.id || null,
         options.fileName || "email-composition", // Use filename from options or default
-        options,
+        mergedOptions,
         props.selectedCopies[0]?.projectId || props.projectId,
         props.selectedCopies[0]?.carId || props.carId,
         selectedStylesheetId || null // Use the actual selected stylesheet ID
@@ -131,12 +146,15 @@ export function EmailComposer(props: EmailComposerProps) {
           compositionName={previewProps.compositionName}
           frontmatter={previewProps.frontmatter}
           selectedStylesheetId={previewProps.selectedStylesheetId}
-          emailContainerConfig={convertToOldConfig(emailContainerConfig)}
+          emailContainerConfig={{
+            ...convertToOldConfig(emailContainerConfig),
+            platform: selectedEmailPlatform, // Pass the selected platform
+          }}
           stylesheetData={previewProps.stylesheetData}
         />
       );
     },
-    [emailContainerConfig, convertToOldConfig]
+    [emailContainerConfig, convertToOldConfig, selectedEmailPlatform]
   );
 
   // Email export buttons
@@ -144,6 +162,28 @@ export function EmailComposer(props: EmailComposerProps) {
     (exportProps: ExportButtonsProps) => {
       return (
         <>
+          {/* Global Block Spacing (Toolbar, header row) */}
+          <div className="flex items-center gap-2">
+            <Label
+              htmlFor="toolbar-block-spacing"
+              className="text-sm font-medium"
+            >
+              Block Spacing:
+            </Label>
+            <Input
+              id="toolbar-block-spacing"
+              value={emailContainerConfig.blockSpacing || ""}
+              onChange={(e) =>
+                setEmailContainerConfig({
+                  ...emailContainerConfig,
+                  blockSpacing: e.target.value,
+                })
+              }
+              placeholder="12px"
+              className="w-24 h-8 text-sm"
+            />
+          </div>
+
           <Button
             onClick={() => setShowExportModal(true)}
             variant="outline"
@@ -177,7 +217,12 @@ export function EmailComposer(props: EmailComposerProps) {
         </>
       );
     },
-    [hasEmailFeatures, showExportModal, handleExportWithOptions]
+    [
+      hasEmailFeatures,
+      showExportModal,
+      handleExportWithOptions,
+      emailContainerConfig,
+    ]
   );
 
   // Email-specific controls
@@ -185,24 +230,57 @@ export function EmailComposer(props: EmailComposerProps) {
     (controlsProps: SpecializedControlsProps) => {
       return (
         <>
-          {/* Email Settings Button - Show only in email preview mode */}
-          {controlsProps.previewMode === "email" && (
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => setShowEmailSettingsModal(true)}
-                variant="outline"
-                size="sm"
-                className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Email Settings
-              </Button>
-            </div>
-          )}
+          {/* Email Platform Selector */}
+          <div className="flex items-center gap-2">
+            <Label htmlFor="email-platform" className="text-sm font-medium">
+              Platform:
+            </Label>
+            <Select
+              value={selectedEmailPlatform}
+              onValueChange={(value: "sendgrid" | "mailchimp" | "generic") =>
+                setSelectedEmailPlatform(value)
+              }
+            >
+              <SelectTrigger id="email-platform" className="w-40">
+                <SelectValue placeholder="Select platform" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sendgrid">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    SendGrid
+                  </div>
+                </SelectItem>
+                <SelectItem value="mailchimp">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Mailchimp
+                  </div>
+                </SelectItem>
+                <SelectItem value="generic">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Generic
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Email Settings Button - Always show since we only have email preview mode */}
+          <Button
+            onClick={() => setShowEmailSettingsModal(true)}
+            variant="outline"
+            size="sm"
+            className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Email Settings
+          </Button>
         </>
       );
     },
-    []
+    [selectedEmailPlatform]
   );
 
   return (
@@ -217,11 +295,12 @@ export function EmailComposer(props: EmailComposerProps) {
         onLoadComposition={props.onLoadComposition}
         onCreateNewWithCopy={props.onCreateNewWithCopy}
         onCompositionSaved={props.onCompositionSaved}
-        defaultPreviewMode="clean"
+        defaultPreviewMode="email"
         supportedPreviewModes={supportedPreviewModes}
         supportsCSSEditor={true}
         supportsEmailContainer={true}
         supportsFrontmatter={false}
+        emailPlatform={selectedEmailPlatform}
       />
 
       {/* Email Settings Modal */}

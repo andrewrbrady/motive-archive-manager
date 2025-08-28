@@ -153,10 +153,16 @@ export function useContentExport() {
     async (
       blocks: ContentBlock[],
       compositionName: string,
-      galleryIds?: string[]
+      galleryIds?: string[],
+      carouselIds?: string[]
     ) => {
       try {
-        await ContentExporter.exportToMDX(blocks, compositionName, galleryIds);
+        await ContentExporter.exportToMDX(
+          blocks,
+          compositionName,
+          galleryIds,
+          carouselIds
+        );
         toast({
           title: "MDX Export Complete",
           description: "MDX file downloaded successfully.",

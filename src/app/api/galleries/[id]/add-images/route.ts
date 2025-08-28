@@ -27,9 +27,23 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Convert string IDs to ObjectIds
-    const processedImageIds = imageIds.map((id: string) => {
+    console.log("🔍 [ADD-IMAGES] Processing imageIds:", imageIds);
+
+    const processedImageIds = imageIds.map((id: string, index: number) => {
+      console.log(
+        `🔍 [ADD-IMAGES] Processing ID ${index}: ${id} (type: ${typeof id})`
+      );
+
+      if (id === null || id === undefined) {
+        throw new Error(
+          `Invalid image ID format: ${id} (null or undefined at index ${index})`
+        );
+      }
+
       if (!ObjectId.isValid(id)) {
-        throw new Error(`Invalid image ID format: ${id}`);
+        throw new Error(
+          `Invalid image ID format: ${id} (invalid ObjectId format at index ${index})`
+        );
       }
       return new ObjectId(id);
     });

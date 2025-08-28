@@ -107,7 +107,9 @@ export interface UnifiedUploadProgress {
 
 export interface UnifiedImageUploaderProps {
   // Core functionality
-  onUploadComplete?: (results: { url: string; metadata: any }[]) => void;
+  onUploadComplete?: (
+    results: { url: string; metadata: any; _id?: string; [key: string]: any }[]
+  ) => void;
   onProgress?: (progress: UnifiedUploadProgress[]) => void;
   onError?: (error: string) => void;
 
@@ -582,7 +584,12 @@ export const UnifiedImageUploader: React.FC<UnifiedImageUploaderProps> = ({
             progress: 100,
           });
 
-          return { url: imageUrl, metadata: uploadedImage.metadata || {} };
+          return {
+            url: imageUrl,
+            metadata: uploadedImage.metadata || {},
+            // Include all image data from the upload response for gallery operations
+            ...uploadedImage,
+          };
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : "Upload failed";

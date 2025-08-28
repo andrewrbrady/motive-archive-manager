@@ -97,6 +97,11 @@ const scopeCSS = (css: string): string => {
           `.clean-preview .html-block${trimmedSelector}`,
           // Target within data-block-type containers
           `[data-block-type="html"] .html-block${trimmedSelector}`,
+          // Text blocks: cssClassName is applied to inner wrapper
+          `.content-studio-preview [data-block-type="text"] ${trimmedSelector}`,
+          `.email-preview [data-block-type="text"] ${trimmedSelector}`,
+          `.clean-preview [data-block-type="text"] ${trimmedSelector}`,
+          `.accurate-email-preview [data-block-type="text"] ${trimmedSelector}`,
           // Direct targeting for maximum compatibility
           `.html-block${trimmedSelector}`,
         ];
@@ -111,7 +116,7 @@ const scopeCSS = (css: string): string => {
       // These are class selectors with element descendants (more comprehensive pattern)
       const isMixedDescendantSelector =
         /^\.[\w-]+(\s+[a-zA-Z][a-zA-Z0-9]*)+$/.test(trimmedSelector) ||
-        /^\.[\w-]+\s+\.[\w-]+\s+[a-zA-Z][a-zA-Z0-9]*$/.test(trimmedSelector);
+        /^\.[\w-]+\s+\.[\w-]+(\s+[a-zA-Z][a-zA-Z0-9]*)+$/.test(trimmedSelector);
 
       if (isMixedDescendantSelector) {
         // Handle selectors like ".content img", ".cta-section a", etc.
@@ -163,6 +168,12 @@ const scopeCSS = (css: string): string => {
           `[data-block-type="html"] ${trimmedSelector}`,
           `[data-block-type="text"] ${trimmedSelector}`,
           `[data-block-type="list"] ${trimmedSelector}`,
+          // Direct class targeting for blocks using a class on their wrapper (e.g., .intro-text)
+          `.content-studio-preview ${trimmedSelector}`,
+          `.email-preview ${trimmedSelector}`,
+          `.sendgrid-preview ${trimmedSelector}`,
+          `.mailchimp-preview ${trimmedSelector}`,
+          `.generic-preview ${trimmedSelector}`,
           // EMAIL CONTAINER TARGETING
           `.email-container ${trimmedSelector}`,
           `.content-studio-preview .email-container ${trimmedSelector}`,

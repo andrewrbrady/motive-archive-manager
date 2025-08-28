@@ -75,7 +75,6 @@ export function parseMarkdownToBlocks(markdown: string): MarkdownParseResult {
         order,
         thickness: "1px",
         color: "#dddddd",
-        margin: "20px",
         styles: {},
         metadata: {
           source: "markdown-paste",

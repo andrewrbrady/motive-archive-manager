@@ -60,6 +60,9 @@ export interface EmailContainerConfig {
   // Advanced
   customCSS: string;
   inlineStyles: boolean;
+
+  // Global block spacing (applied across all table elements)
+  blockSpacing?: string;
 }
 
 // Default email container configuration
@@ -105,6 +108,9 @@ export const defaultEmailContainerConfig: EmailContainerConfig = {
   // Advanced
   customCSS: "",
   inlineStyles: true,
+
+  // Global block spacing
+  blockSpacing: "12px",
 };
 
 interface EmailContainerConfigProps {
@@ -468,6 +474,17 @@ export const EmailContainerConfig: React.FC<EmailContainerConfigProps> = ({
                   updateConfig({ contentPadding: e.target.value })
                 }
                 placeholder="30px"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs">Block Spacing (all blocks)</Label>
+              <Input
+                value={config.blockSpacing || ""}
+                onChange={(e) =>
+                  updateConfig({ blockSpacing: e.target.value || "" })
+                }
+                placeholder="12px"
               />
             </div>
 

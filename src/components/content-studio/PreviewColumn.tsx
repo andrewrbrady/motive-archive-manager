@@ -289,8 +289,8 @@ const HeadingBlockPreview = React.memo<{ block: TextBlock }>(
         fontWeight: formatting.fontWeight || "bold",
         color: formatting.color || "currentColor",
         textAlign: formatting.textAlign || "left",
-        marginTop: formatting.marginTop || (level <= 2 ? "24px" : "20px"),
-        marginBottom: formatting.marginBottom || (level <= 2 ? "16px" : "12px"),
+        marginTop: level <= 2 ? "24px" : "20px",
+        marginBottom: level <= 2 ? "16px" : "12px",
       };
 
       switch (level) {
@@ -342,8 +342,6 @@ const HeadingBlockPreview = React.memo<{ block: TextBlock }>(
       formatting.fontWeight,
       formatting.color,
       formatting.textAlign,
-      formatting.marginTop,
-      formatting.marginBottom,
       formatting.fontSize,
     ]);
 
@@ -630,9 +628,9 @@ const DividerBlockPreview = React.memo<{ block: DividerBlock }>(
     // Performance optimization: Memoize divider container styles
     const containerStyles = useMemo(
       () => ({
-        margin: block.margin || "20px 0",
+        margin: "20px 0",
       }),
-      [block.margin]
+      []
     );
 
     // Performance optimization: Memoize divider line styles

@@ -112,7 +112,6 @@ const areBlockContentPropsEqual = (
       return (
         prevDivider.thickness === nextDivider.thickness &&
         prevDivider.color === nextDivider.color &&
-        prevDivider.margin === nextDivider.margin &&
         JSON.stringify(prevDivider.styles) ===
           JSON.stringify(nextDivider.styles)
       );
@@ -1855,13 +1854,6 @@ const DividerBlockContent = React.memo<DividerBlockContentProps>(
       [onUpdate]
     );
 
-    const handleMarginChange = useMemo(
-      () => (e: React.ChangeEvent<HTMLInputElement>) => {
-        onUpdate({ margin: e.target.value } as Partial<DividerBlock>);
-      },
-      [onUpdate]
-    );
-
     return (
       <div className="space-y-3">
         {/* Divider Preview with Toggle Button */}
@@ -1872,7 +1864,7 @@ const DividerBlockContent = React.memo<DividerBlockContentProps>(
                 border: "0",
                 height: block.thickness || "1px",
                 backgroundColor: block.color || "#dddddd",
-                margin: `${block.margin || "20px"} 0`,
+                margin: "20px 0",
                 width: "100%",
               }}
             />
@@ -1932,8 +1924,8 @@ const DividerBlockContent = React.memo<DividerBlockContentProps>(
                 <Input
                   id={`divider-margin-${block.id}`}
                   placeholder="20px"
-                  value={block.margin || "20px"}
-                  onChange={handleMarginChange}
+                  value="20px"
+                  disabled
                   className="bg-transparent border-border/40 focus:border-border/60 text-sm"
                 />
               </div>

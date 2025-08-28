@@ -27,6 +27,16 @@ interface EmailRendererProps {
 }
 
 /**
+ * Default margin configuration for email blocks
+ * These can be overridden by block-specific settings
+ */
+const DEFAULT_EMAIL_MARGINS = {
+  blockVertical: "20px",
+  dividerVertical: "30px",
+  buttonVertical: "24px",
+};
+
+/**
  * EmailRenderer - Generates HTML email templates using the Motive Archive format
  *
  * This component takes content blocks and converts them into email-compatible HTML
@@ -60,7 +70,7 @@ export function EmailRenderer({
       box-shadow:0 4px 6px rgba(0,0,0,.1);
       overflow:hidden;
     `,
-    content: `padding:10px 30px;`,
+    content: ``, // Padding handled by Motive CSS .content class
     image: `max-width:100%!important;width:100%!important;height:auto!important;display:block!important;`,
     header: `margin:0;padding:0;text-align:center;`,
     h1: `font-size:36px;color:#2c2c2c;font-weight:600;margin:0 0 30px;line-height:1.2;`,
@@ -104,12 +114,16 @@ export function EmailRenderer({
         const htmlBlock = block as HTMLBlock;
         const content = htmlBlock.content || "";
 
-        // For email rendering, we'll wrap the HTML content in a container
-        // with some basic email-safe styling
+        // For email rendering, wrap HTML content in table structure
+
         return `
-          <div style="margin: 20px 0; font-family: inherit; line-height: inherit;">
-            ${content}
-          </div>
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0 0 20px 0;">
+            <tr>
+              <td style="font-family: inherit; line-height: inherit;">
+                ${content}
+              </td>
+            </tr>
+          </table>
         `;
       }
 
@@ -120,7 +134,7 @@ export function EmailRenderer({
         if (items.length === 0) return "";
 
         const listStyle = `
-          margin: 20px 0;
+          margin: 0;
           padding-left: 40px;
           list-style-type: disc;
           color: #666;
@@ -133,9 +147,15 @@ export function EmailRenderer({
         `;
 
         return `
-          <ul style="${listStyle}">
-            ${items.map((item) => `<li style="${itemStyle}">${item}</li>`).join("")}
-          </ul>
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0 0 20px 0;">
+            <tr>
+              <td>
+                <ul style="${listStyle}">
+                  ${items.map((item) => `<li style="${itemStyle}">${item}</li>`).join("")}
+                </ul>
+              </td>
+            </tr>
+          </table>
         `;
       }
 
@@ -174,7 +194,15 @@ export function EmailRenderer({
             .replace(/\n/g, "<br>");
         }
 
-        return `<${element} style="${style}">${processedContent}</${element}>`;
+        return `
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0 0 20px 0;">
+            <tr>
+              <td>
+                <${element} style="${style}">${processedContent}</${element}>
+              </td>
+            </tr>
+          </table>
+        `;
       }
 
       case "image": {
@@ -186,12 +214,16 @@ export function EmailRenderer({
           : "";
 
         return `
-          <div style="margin:20px 0;">
-            <img src="${imageBlock.imageUrl}" 
-                 alt="${imageBlock.altText || ""}" 
-                 style="${emailStyles.image}" />
-            ${caption}
-          </div>
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0 0 20px 0;">
+            <tr>
+              <td align="center">
+                <img src="${imageBlock.imageUrl}" 
+                     alt="${imageBlock.altText || ""}" 
+                     style="${emailStyles.image}" />
+                ${caption}
+              </td>
+            </tr>
+          </table>
         `;
       }
 
@@ -210,38 +242,50 @@ export function EmailRenderer({
           videoBlock.platform === "youtube" ? "YouTube" : "Vimeo";
 
         return `
-          <div style="margin:20px 0;text-align:center;">
-            <a href="${videoBlock.url}" style="text-decoration:none;">
-              ${
-                videoBlock.platform === "youtube"
-                  ? `
-                <img src="${thumbnailUrl}" 
-                     alt="${videoLinkText}" 
-                     style="${emailStyles.image}border-radius:8px;" />
-              `
-                  : `
-                <div style="background:#f0f0f0;padding:40px;border-radius:8px;border:2px solid #ddd;">
-                  <h3 style="margin:0 0 10px;color:#1a224e;">🎥 ${videoLinkText}</h3>
-                  <p style="margin:0;color:#666;">Click to watch on ${platformName}</p>
-                </div>
-              `
-              }
-            </a>
-            ${
-              videoBlock.title
-                ? `
-              <p style="text-align:center;font-size:14px;color:#666;margin:10px 0 0;">
-                ${videoBlock.title}
-              </p>
-            `
-                : ""
-            }
-          </div>
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0 0 20px 0;">
+            <tr>
+              <td align="center">
+                <a href="${videoBlock.url}" style="text-decoration:none;">
+                  ${
+                    videoBlock.platform === "youtube"
+                      ? `
+                    <img src="${thumbnailUrl}" 
+                         alt="${videoLinkText}" 
+                         style="${emailStyles.image}border-radius:8px;" />
+                  `
+                      : `
+                    <div style="background:#f0f0f0;padding:40px;border-radius:8px;border:2px solid #ddd;">
+                      <h3 style="margin:0 0 10px;color:#1a224e;">🎥 ${videoLinkText}</h3>
+                      <p style="margin:0;color:#666;">Click to watch on ${platformName}</p>
+                    </div>
+                  `
+                  }
+                </a>
+                ${
+                  videoBlock.title
+                    ? `
+                  <p style="text-align:center;font-size:14px;color:#666;margin:10px 0 0;">
+                    ${videoBlock.title}
+                  </p>
+                `
+                    : ""
+                }
+              </td>
+            </tr>
+          </table>
         `;
       }
 
       case "divider": {
-        return `<hr style="border:none;border-top:1px solid #ddd;margin:30px 0;">`;
+        return `
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0 0 20px 0;">
+            <tr>
+              <td>
+                <hr style="border:none;border-top:1px solid #ddd;margin:0;">
+              </td>
+            </tr>
+          </table>
+        `;
       }
 
       case "frontmatter": {
@@ -263,12 +307,23 @@ export function EmailRenderer({
 
     return `
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="x-apple-disable-message-reformatting">
   <title>${frontmatter?.title || compositionName || "Motive Archive Email"}</title>
-  <style>
+  <!--[if mso]>
+  <noscript>
+      <xml>
+          <o:OfficeDocumentSettings>
+              <o:PixelsPerInch>96</o:PixelsPerInch>
+          </o:OfficeDocumentSettings>
+      </xml>
+  </noscript>
+  <![endif]-->
+  <style type="text/css">
     ${emailStyles.reset}
     body{${emailStyles.body}}
     .email-container{${emailStyles.container}}
@@ -296,44 +351,62 @@ export function EmailRenderer({
     }
   </style>
 </head>
-<body>
-  <div class="email-container">
-    <!-- Header -->
-    <div class="header">
-      <img src="https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/ca378627-6b5c-4c8c-088d-5a0bdb76ae00/public" alt="Motive Archive" class="logo">
-    </div>
+<body style="margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #f5f5f5; width: 100%; overflow-x: hidden;">
+  <!-- Wrapper -->
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
+    <tr>
+      <td align="center" style="padding: 20px;">
+        <!-- Email Container -->
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="email-container" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,.1); overflow: hidden;">
+          <!-- Header -->
+          <tr>
+            <td class="header" style="margin: 0; padding: 0; text-align: center;">
+              <img src="https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/ca378627-6b5c-4c8c-088d-5a0bdb76ae00/public" alt="Motive Archive" class="logo" style="max-width: 100% !important; width: 100% !important; height: auto !important; display: block !important;">
+            </td>
+          </tr>
 
-    <!-- Content -->
-    <div class="content">
-      ${blockHTML}
-      
-      ${
-        frontmatter?.callToAction
-          ? `
-      <!-- CTA Section -->
-      <div class="cta-section">
-        <h2 style="${emailStyles.h2}color:#fff;">${frontmatter.callToAction}</h2>
-        ${
-          frontmatter.callToActionUrl
-            ? `
-        <a href="${frontmatter.callToActionUrl}" class="cta-button" style="${emailStyles.ctaButton}">
-          GET STARTED
-        </a>
-        `
-            : ""
-        }
-      </div>
-      `
-          : ""
-      }
-    </div>
+          <!-- Content -->
+          <tr>
+            <td class="content" style="padding: 20px;">
+              ${blockHTML}
+              
+              ${
+                frontmatter?.callToAction
+                  ? `
+              <!-- CTA Section -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="cta-section" style="background: #1a224e; color: #fff; padding: 50px 30px; text-align: center; margin: 50px 0;">
+                <tr>
+                  <td align="center">
+                    <h2 style="${emailStyles.h2}color:#fff;">${frontmatter.callToAction}</h2>
+                    ${
+                      frontmatter.callToActionUrl
+                        ? `
+                    <a href="${frontmatter.callToActionUrl}" class="cta-button" style="${emailStyles.ctaButton}">
+                      GET STARTED
+                    </a>
+                    `
+                        : ""
+                    }
+                  </td>
+                </tr>
+              </table>
+              `
+                  : ""
+              }
+            </td>
+          </tr>
 
-    <!-- Footer -->
-    <div class="footer">
-      <p>The Collector's Resource</p>
-      <p>© 2024 Motive Archive. All rights reserved.</p>
-    </div>
-  </div>
+          <!-- Footer -->
+          <tr>
+            <td class="footer" style="text-align: center; padding: 30px; color: #999; font-size: 14px;">
+              <p style="margin: 0 0 8px 0;">The Collector's Resource</p>
+              <p style="margin: 0;">© 2024 Motive Archive. All rights reserved.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
     `.trim();

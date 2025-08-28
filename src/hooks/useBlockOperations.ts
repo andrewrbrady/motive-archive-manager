@@ -274,7 +274,6 @@ export function useBlockOperations(
       order: 0, // Will be set by insertBlock
       thickness: "1px",
       color: "#dddddd",
-      margin: "20px",
       styles: {},
       metadata: { source: "manual", createdAt: new Date().toISOString() },
     };
