@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,6 @@ import {
 import {
   Save,
   Loader2,
-  Palette,
   ChevronDown,
   ChevronUp,
   Download,
@@ -49,6 +48,7 @@ import {
 } from "./EmailContainerConfig";
 import { CSSEditor } from "./CSSEditor";
 import { MarkdownPasteModal } from "./MarkdownPasteModal";
+import { ToolbarRow } from "./ToolbarRow";
 
 // Custom hooks
 import { useFrontmatterOperations } from "@/hooks/useFrontmatterOperations";
@@ -684,14 +684,9 @@ export function BlockComposer({
       <StylesheetInjector selectedStylesheetId={selectedStylesheetId} />
 
       {/* Header Controls - Full Width */}
-      <Card className="bg-transparent border border-border/40">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <Palette className="h-5 w-5" />
-              Content Composition
-            </CardTitle>
-            <div className="flex items-center gap-2">
+      <Card className="bg-transparent border-0 shadow-none">
+        <CardHeader className="p-0 border-b-0">
+          <ToolbarRow>
               <Button
                 onClick={saveComposition}
                 disabled={isSaving || !compositionName.trim()}
@@ -820,8 +815,7 @@ export function BlockComposer({
                   <ChevronUp className="h-4 w-4" />
                 )}
               </Button>
-            </div>
-          </div>
+          </ToolbarRow>
         </CardHeader>
         {!isHeaderCollapsed && (
           <CardContent className="space-y-4">

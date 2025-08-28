@@ -173,22 +173,7 @@ export const IntegratedPreviewEditor = React.memo<IntegratedPreviewEditorProps>(
 
     return (
       <div className="h-full">
-        <div className="sticky top-0 bg-background pb-4 border-b border-border/20 z-10">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold">Content Editor</h3>
-              <p className="text-sm text-muted-foreground">
-                Edit your content in context - click any block to start editing
-              </p>
-            </div>
-            {/* Debug info */}
-            <div className="text-xs text-muted-foreground bg-muted/20 px-2 py-1 rounded">
-              {blockCount} block{blockCount !== 1 ? "s" : ""}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4">
+        <div>
           <Card className="min-h-[500px] bg-background border shadow-sm">
             <CardContent className="p-6">
               {/* Email-style container */}
