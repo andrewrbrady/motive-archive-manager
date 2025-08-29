@@ -2,11 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { FileText, Mail, Newspaper, Info, Archive, Plus } from "lucide-react";
+//
 import { api } from "@/lib/api-client";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -512,160 +508,47 @@ export function ContentStudioTab({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center space-x-2">
-            <FileText className="h-5 w-5 text-primary" />
-            <h2 className="text-2xl font-semibold tracking-tight">
-              Content Studio
-            </h2>
-            <Badge variant="secondary" className="text-xs">
-              Phase 1
-            </Badge>
-            {loadedComposition && (
-              <Badge variant="outline" className="text-xs bg-primary/10">
-                Editing: {loadedComposition.name}
-              </Badge>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Enhance your copy with multimedia elements for marketing emails and
-            content
-          </p>
-        </div>
-
-        {/* Context indicator and actions */}
-        <div className="flex items-center space-x-4">
-          <Button
-            onClick={handleCreateNew}
-            variant="default"
-            size="sm"
-            className="bg-primary hover:bg-primary/90"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Composition
-          </Button>
-          {loadedComposition && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleClearComposition}
-              className="flex items-center space-x-2"
-            >
-              <FileText className="h-4 w-4" />
-              <span>Start Fresh</span>
-            </Button>
-          )}
-
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <Info className="h-4 w-4" />
-            <span>
-              {isProjectMode
-                ? `Project: ${entityInfo?.name || "Unknown"}`
-                : `Car: ${entityInfo?.year || ""} ${entityInfo?.make || ""} ${entityInfo?.model || ""}`}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Main Content Tabs */}
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="space-y-6"
-      >
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger
-            value="email-composer"
-            className="flex items-center space-x-2"
-          >
-            <Mail className="h-4 w-4" />
-            <span>Email Composer</span>
-            {activeTab === "email-composer" && blocks.length > 0 && (
-              <Badge
-                variant="secondary"
-                className="ml-1 h-5 w-5 rounded-full p-0 text-xs"
-              >
-                {blocks.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-
-          <TabsTrigger
-            value="news-composer"
-            className="flex items-center space-x-2"
-          >
-            <Newspaper className="h-4 w-4" />
-            <span>News Composer</span>
-            {activeTab === "news-composer" && blocks.length > 0 && (
-              <Badge
-                variant="secondary"
-                className="ml-1 h-5 w-5 rounded-full p-0 text-xs"
-              >
-                {blocks.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-
-          <TabsTrigger
-            value="saved-compositions"
-            className="flex items-center space-x-2"
-          >
-            <Archive className="h-4 w-4" />
-            <span>Saved</span>
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Email Composer Tab */}
-        <TabsContent value="email-composer" className="space-y-6">
-          <EmailComposer
-            selectedCopies={selectedCopies}
-            blocks={blocks}
-            onBlocksChange={handleBlocksChange}
-            template={activeTemplate || undefined}
-            onTemplateChange={handleTemplateChange}
-            loadedComposition={loadedComposition}
-            carId={carId}
-            projectId={projectId}
-            onLoadCopy={handleCopySelect}
-            onLoadComposition={handleLoadComposition}
-            onCreateNewWithCopy={handleCreateNewWithCopy}
-            onCompositionSaved={handleCompositionSaved}
-          />
-        </TabsContent>
-
-        {/* News Composer Tab */}
-        <TabsContent value="news-composer" className="space-y-6">
-          <NewsComposer
-            selectedCopies={selectedCopies}
-            blocks={blocks}
-            onBlocksChange={handleBlocksChange}
-            template={activeTemplate || undefined}
-            onTemplateChange={handleTemplateChange}
-            loadedComposition={loadedComposition}
-            carId={carId}
-            projectId={projectId}
-            onLoadCopy={handleCopySelect}
-            onLoadComposition={handleLoadComposition}
-            onCreateNewWithCopy={handleCreateNewWithCopy}
-            onCompositionSaved={handleCompositionSaved}
-          />
-        </TabsContent>
-
-        {/* Saved Compositions Tab */}
-        <TabsContent value="saved-compositions" className="space-y-6">
-          <CompositionsList
-            carId={carId}
-            projectId={projectId}
-            onLoadComposition={handleLoadComposition}
-            onRefetch={handleCompositionsRefetch}
-            onCreateNew={handleCreateNew}
-          />
-        </TabsContent>
-      </Tabs>
+      {activeTab === "email-composer" ? (
+        <EmailComposer
+          selectedCopies={selectedCopies}
+          blocks={blocks}
+          onBlocksChange={handleBlocksChange}
+          template={activeTemplate || undefined}
+          onTemplateChange={handleTemplateChange}
+          loadedComposition={loadedComposition}
+          carId={carId}
+          projectId={projectId}
+          onLoadCopy={handleCopySelect}
+          onLoadComposition={handleLoadComposition}
+          onCreateNewWithCopy={handleCreateNewWithCopy}
+          onCreateNew={handleCreateNew}
+          onCompositionSaved={handleCompositionSaved}
+          onSwitchComposer={(mode) =>
+            setActiveTab(mode === "email" ? "email-composer" : "news-composer")
+          }
+          currentComposer={"email"}
+        />
+      ) : (
+        <NewsComposer
+          selectedCopies={selectedCopies}
+          blocks={blocks}
+          onBlocksChange={handleBlocksChange}
+          template={activeTemplate || undefined}
+          onTemplateChange={handleTemplateChange}
+          loadedComposition={loadedComposition}
+          carId={carId}
+          projectId={projectId}
+          onLoadCopy={handleCopySelect}
+          onLoadComposition={handleLoadComposition}
+          onCreateNewWithCopy={handleCreateNewWithCopy}
+          onCreateNew={handleCreateNew}
+          onCompositionSaved={handleCompositionSaved}
+          onSwitchComposer={(mode) =>
+            setActiveTab(mode === "email" ? "email-composer" : "news-composer")
+          }
+          currentComposer={"news"}
+        />
+      )}
     </div>
   );
 }

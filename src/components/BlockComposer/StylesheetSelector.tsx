@@ -35,12 +35,15 @@ interface StylesheetSelectorProps {
   selectedStylesheetId?: string;
   onStylesheetChange: (stylesheetId: string | null) => void;
   className?: string;
+  // Controls whether to show stats (class/category counts)
+  showStats?: boolean;
 }
 
 const StylesheetSelectorComponent = React.memo(function StylesheetSelector({
   selectedStylesheetId,
   onStylesheetChange,
   className,
+  showStats = true,
 }: StylesheetSelectorProps) {
   const { toast } = useToast();
   const [stylesheets, setStylesheets] = useState<StylesheetMetadata[]>([]);
@@ -221,28 +224,24 @@ const StylesheetSelectorComponent = React.memo(function StylesheetSelector({
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <div className="flex items-center gap-2">
-        <Palette className="h-4 w-4 text-muted-foreground" />
-        <Label className="text-sm font-medium">Client Style:</Label>
-      </div>
-
       <Select
         value={selectedStylesheetId || "none"}
         onValueChange={(value) =>
           onStylesheetChange(value === "none" ? null : value)
         }
       >
-        <SelectTrigger className="w-48">
-          <SelectValue placeholder="Select stylesheet..." />
+        <SelectTrigger className="w-48 bg-background border-border/40 hover:bg-muted/20 shadow-sm">
+          <Palette className="h-4 w-4 mr-2" />
+          <SelectValue className="truncate" placeholder="Select stylesheet..." />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="none">No stylesheet</SelectItem>
           {stylesheets.map((stylesheet) => (
             <SelectItem key={stylesheet.id} value={stylesheet.id}>
-              <div className="flex items-center gap-2">
-                <span>{stylesheet.name}</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="truncate">{stylesheet.name}</span>
                 {stylesheet.clientName && (
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="text-xs shrink-0">
                     {stylesheet.clientName}
                   </Badge>
                 )}
@@ -252,7 +251,7 @@ const StylesheetSelectorComponent = React.memo(function StylesheetSelector({
         </SelectContent>
       </Select>
 
-      {selectedStylesheet && (
+      {showStats && selectedStylesheet && (
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <span>{selectedStylesheet.classCount} classes</span>
@@ -284,7 +283,7 @@ const StylesheetSelectorComponent = React.memo(function StylesheetSelector({
 
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" size="sm">
+          <Button variant="outline">
             <Plus className="h-3 w-3 mr-1" />
             Upload CSS
           </Button>

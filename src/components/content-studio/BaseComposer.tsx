@@ -14,6 +14,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Save,
   Loader2,
   ChevronDown,
@@ -23,6 +30,7 @@ import {
   Eye,
   Code,
   FileText,
+  Plus,
 } from "lucide-react";
 
 import { ContentInsertionToolbar } from "./ContentInsertionToolbar";
@@ -62,10 +70,13 @@ export interface BaseComposerProps extends BlockComposerProps {
   renderSpecializedControls?: (
     props: SpecializedControlsProps
   ) => React.ReactNode;
+  // Toolbar extras (inline with Save/Load/etc.)
+  toolbarExtras?: React.ReactNode;
   // Load functionality
   onLoadCopy?: (copies: SelectedCopy[]) => void;
   onLoadComposition?: (composition: LoadedComposition) => void;
   onCreateNewWithCopy?: (copies: SelectedCopy[]) => void;
+  onCreateNew?: () => void;
   // Save functionality
   onCompositionSaved?: (composition: LoadedComposition) => void;
   // Optional overrides
@@ -75,6 +86,10 @@ export interface BaseComposerProps extends BlockComposerProps {
   supportsEmailContainer?: boolean;
   supportsFrontmatter?: boolean;
   emailPlatform?: string;
+  // Show/hide badges below toolbar
+  showHeaderInfoBadges?: boolean;
+  // Hide the header expand/collapse toggle button in toolbar
+  hideHeaderToggle?: boolean;
 }
 
 export interface PreviewRenderProps {
@@ -131,9 +146,11 @@ export function BaseComposer({
   renderPreview,
   renderExportButtons,
   renderSpecializedControls,
+  toolbarExtras,
   onLoadCopy,
   onLoadComposition,
   onCreateNewWithCopy,
+  onCreateNew,
   onCompositionSaved,
   defaultPreviewMode = "clean",
   supportedPreviewModes = [{ value: "clean", label: "Clean" }],
@@ -141,6 +158,8 @@ export function BaseComposer({
   supportsEmailContainer = false,
   supportsFrontmatter = false,
   emailPlatform = "generic",
+  showHeaderInfoBadges = true,
+  hideHeaderToggle = false,
 }: BaseComposerProps) {
   const { toast } = useToast();
   const api = useAPI();
@@ -910,19 +929,33 @@ export function BaseComposer({
       <Card className="bg-transparent border-0 shadow-none">
         <CardHeader className="p-0 border-b-0">
           <ToolbarRow>
+              {/* Per-composer toolbar extras */}
+              {toolbarExtras}
+              {/* New Composition - Start fresh */}
+              {onCreateNew && (
+                <Button
+                  onClick={onCreateNew}
+                  variant="outline"
+                  className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+                  title="New composition"
+                  aria-label="New composition"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 onClick={handleSaveClick}
                 disabled={isSaving}
                 variant="default"
-                size="sm"
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
+                title={loadedComposition ? "Update composition" : "Save composition"}
+                aria-label={loadedComposition ? "Update" : "Save"}
               >
                 {isSaving ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4" />
                 )}
-                {loadedComposition ? "Update" : "Save"}
               </Button>
 
               {/* Load Button */}
@@ -930,11 +963,11 @@ export function BaseComposer({
                 <Button
                   onClick={() => setShowLoadModal(true)}
                   variant="outline"
-                  size="sm"
                   className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+                  title="Load"
+                  aria-label="Load"
                 >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Load
+                  <FileText className="h-4 w-4" />
                 </Button>
               )}
 
@@ -943,79 +976,87 @@ export function BaseComposer({
                 selectedStylesheetId={selectedStylesheetId || undefined}
                 onStylesheetChange={handleStylesheetChange}
                 className="w-auto"
+                showStats={composerType !== "news"}
               />
 
               {/* Preview Button - Disabled in CSS mode since preview is always shown */}
               <Button
                 onClick={handleTogglePreview}
-                variant={showPreview ? "default" : "outline"}
-                size="sm"
+                variant="outline"
                 disabled={editorMode === "css"}
-                className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+                className={`border-border/40 hover:bg-muted/20 shadow-sm ${
+                  showPreview ? "border-2" : "border"
+                }`}
               >
-                <Eye className="h-4 w-4 mr-2" />
+                <Eye
+                  className={`h-4 w-4 mr-2 ${
+                    showPreview ? "text-white" : "text-muted-foreground"
+                  }`}
+                />
                 {showPreview ? "Hide Preview" : "Show Preview"}
               </Button>
 
               {/* Preview Mode Selector */}
               {supportedPreviewModes.length > 1 && (
-                <select
-                  value={previewMode}
-                  onChange={(e) => setPreviewMode(e.target.value)}
-                  className="px-3 py-1 text-xs border border-border/40 rounded-md bg-background"
-                >
-                  {supportedPreviewModes.map((mode) => (
-                    <option key={mode.value} value={mode.value}>
-                      {mode.label}
-                    </option>
-                  ))}
-                </select>
+                <Select value={previewMode} onValueChange={setPreviewMode}>
+                  <SelectTrigger className="w-auto min-w-[160px] bg-background border-border/40 hover:bg-muted/20 shadow-sm">
+                    <Eye className="h-4 w-4 mr-2" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {supportedPreviewModes.map((mode) => (
+                      <SelectItem key={mode.value} value={mode.value}>
+                        {mode.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
 
               {/* Export Buttons */}
               {renderExportButtons(exportButtonsProps)}
 
-              {/* Editor Mode Toggle - Show only if CSS editor is supported */}
+              {/* Editor Mode Selector - Dropdown (Blocks / CSS) */}
               {supportsCSSEditor && (
-                <div className="flex items-center bg-muted/20 rounded-md p-1">
-                  <Button
-                    onClick={() => handleEditorModeToggle("blocks")}
-                    variant={editorMode === "blocks" ? "default" : "ghost"}
-                    size="sm"
-                    className="h-8 px-3 text-xs"
-                  >
-                    <FileText className="h-3 w-3 mr-1" />
-                    Blocks
-                  </Button>
-                  <Button
-                    onClick={() => handleEditorModeToggle("css")}
-                    variant={editorMode === "css" ? "default" : "ghost"}
-                    size="sm"
-                    className="h-8 px-3 text-xs"
-                  >
-                    <Code className="h-3 w-3 mr-1" />
-                    CSS
-                  </Button>
-                </div>
+                <Select
+                  value={editorMode}
+                  onValueChange={(value: "blocks" | "css") =>
+                    handleEditorModeToggle(value)
+                  }
+                >
+                  <SelectTrigger className="w-[140px] bg-background border-border/40 hover:bg-muted/20 shadow-sm">
+                    {editorMode === "css" ? (
+                      <Code className="h-4 w-4 mr-2" />
+                    ) : (
+                      <FileText className="h-4 w-4 mr-2" />
+                    )}
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="blocks">Blocks</SelectItem>
+                    <SelectItem value="css">CSS</SelectItem>
+                  </SelectContent>
+                </Select>
               )}
 
-              {/* Header Toggle */}
-              <Button
-                onClick={handleToggleHeader}
-                variant="ghost"
-                size="sm"
-                className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
-              >
-                {isHeaderCollapsed ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronUp className="h-4 w-4" />
-                )}
-              </Button>
+              {/* Header Toggle (optional) */}
+              {!hideHeaderToggle && (
+                <Button
+                  onClick={handleToggleHeader}
+                  variant="ghost"
+                  className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+                >
+                  {isHeaderCollapsed ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronUp className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
           </ToolbarRow>
         </CardHeader>
 
-        {!isHeaderCollapsed && (
+        {!isHeaderCollapsed && showHeaderInfoBadges && (
           <CardContent className="pt-0 space-y-4">
             {/* Specialized Controls */}
             {renderSpecializedControls &&

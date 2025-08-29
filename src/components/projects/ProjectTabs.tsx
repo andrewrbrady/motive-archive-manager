@@ -255,13 +255,10 @@ function ProjectTabsComponent({
         onValueChange={onTabChange}
         className="hidden lg:block space-y-6"
       >
-        <TabsList className="flex flex-wrap w-full bg-transparent border rounded-md h-auto p-1 gap-1">
+        {/* Use shared tabs styling but remove the bottom border for projects */}
+        <TabsList className="flex flex-wrap w-full border-b-0">
           {TABS.map((tab) => (
-            <TabsTrigger
-              key={tab.value}
-              value={tab.value}
-              className="flex-1 min-w-0 data-[state=active]:bg-transparent data-[state=active]:border data-[state=active]:border-border data-[state=active]:shadow-sm rounded-md data-[state=inactive]:border-transparent border hover:bg-accent/10"
-            >
+            <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
             </TabsTrigger>
           ))}

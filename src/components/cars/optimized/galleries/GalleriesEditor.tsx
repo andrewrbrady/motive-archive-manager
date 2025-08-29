@@ -29,6 +29,7 @@ import {
 import { toast } from "sonner";
 import LazyImage from "@/components/LazyImage";
 import { useAPIQuery } from "@/hooks/useAPIQuery";
+import { useAPIQueryClient } from "@/hooks/useAPIQuery";
 import { useAPI } from "@/hooks/useAPI";
 import { Gallery, GalleriesProps } from "./index";
 
@@ -46,7 +47,9 @@ export function GalleriesEditor({
 }: GalleriesEditorProps) {
   const api = useAPI();
   const router = useRouter();
+  const queryClient = useAPIQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
   const [operationInProgress, setOperationInProgress] = useState<Set<string>>(
     new Set()
@@ -66,8 +69,8 @@ export function GalleriesEditor({
   });
 
   // Phase 3C optimization: Convert blocking fetchAvailableGalleries to non-blocking useAPIQuery
-  const searchParams = searchTerm
-    ? `?search=${encodeURIComponent(searchTerm)}`
+  const searchParams = debouncedSearchTerm
+    ? `?search=${encodeURIComponent(debouncedSearchTerm)}`
     : "";
   const {
     data: availableGalleriesData,
@@ -77,6 +80,8 @@ export function GalleriesEditor({
     staleTime: 10 * 60 * 1000, // ✅ Phase 2A: 10min cache for static gallery data
     retry: 1, // ✅ Phase 2A: Reduce retry for non-critical static data
     refetchOnWindowFocus: false,
+    // React Query v5: replace keepPreviousData with placeholderData using previous result
+    placeholderData: (previous) => previous as any,
     enabled: open, // Only fetch when dialog is open
     // Handle API response variations and limit to 50 for performance
     select: (data: any) => {
@@ -135,19 +140,26 @@ export function GalleriesEditor({
           JSON.stringify(requestBody, null, 2)
         );
 
-        const result = (await api.patch(`cars/${carId}`, requestBody)) as {
-          galleryIds?: string[];
-        };
+        // Use atomic server mutations to avoid race conditions
+        if (operation === "attach") {
+          await api.post(`cars/${carId}/galleries/attach`, { galleryId });
+        } else {
+          await api.delete(
+            `cars/${carId}/galleries/detach?galleryId=${encodeURIComponent(
+              galleryId
+            )}`
+          );
+        }
 
-        console.log(
-          `[GalleriesEditor] Response gallery count:`,
-          result.galleryIds?.length || 0
-        );
+        console.log(`[GalleriesEditor] ${operation} operation succeeded`);
 
-        // Add a small delay to ensure the database update is complete
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // Invalidate and refetch car galleries to ensure fresh UI across tabs
+        const queryKey = [`cars/${carId}?includeGalleries=true`];
+        queryClient.invalidateQueries({ queryKey });
+        // Locally refetch this dialog's attached data for immediate feedback
+        await refreshAttachedGalleries();
 
-        // Notify parent component to refresh data
+        // Notify parent component (kept for logging/side-effects)
         onGalleriesUpdated();
 
         toast.success(
@@ -197,8 +209,28 @@ export function GalleriesEditor({
         console.log(
           `[GalleriesEditor] Attaching gallery ${galleryId}. Current: [${currentGalleryIds.join(", ")}], New: [${updatedGalleryIds.join(", ")}]`
         );
+        // Optimistic UI update: insert into attached galleries immediately
+        const key = [`cars/${carId}?includeGalleries=true`];
+        const prevData = queryClient.getQueryData<{ galleries?: Gallery[] }>(
+          key
+        );
+        const candidate =
+          availableGalleries.find((g) => g._id === galleryId) ||
+          ({ _id: galleryId, name: "", imageIds: [], thumbnailImage: null } as any);
 
-        await updateGalleryAttachments(updatedGalleryIds, "attach", galleryId);
+        queryClient.setQueryData<{ galleries?: Gallery[] }>(key, (prev) => {
+          const prevGalleries = prev?.galleries || [];
+          if (prevGalleries.some((g) => g._id === galleryId)) return prev;
+          return { galleries: [...prevGalleries, candidate] };
+        });
+
+        try {
+          await updateGalleryAttachments(updatedGalleryIds, "attach", galleryId);
+        } catch (err) {
+          // Rollback on failure
+          queryClient.setQueryData(key, prevData as any);
+          throw err;
+        }
       } catch (error) {
         console.error(
           `[GalleriesEditor] Failed to attach gallery ${galleryId}:`,
@@ -250,8 +282,23 @@ export function GalleriesEditor({
         console.log(
           `[GalleriesEditor] Detaching gallery ${galleryId}. Current: [${currentGalleryIds.join(", ")}], New: [${updatedGalleryIds.join(", ")}]`
         );
+        // Optimistic UI update: remove from attached galleries immediately
+        const key = [`cars/${carId}?includeGalleries=true`];
+        const prevData = queryClient.getQueryData<{ galleries?: Gallery[] }>(
+          key
+        );
+        queryClient.setQueryData<{ galleries?: Gallery[] }>(key, (prev) => {
+          const prevGalleries = prev?.galleries || [];
+          return { galleries: prevGalleries.filter((g) => g._id !== galleryId) };
+        });
 
-        await updateGalleryAttachments(updatedGalleryIds, "detach", galleryId);
+        try {
+          await updateGalleryAttachments(updatedGalleryIds, "detach", galleryId);
+        } catch (err) {
+          // Rollback on failure
+          queryClient.setQueryData(key, prevData as any);
+          throw err;
+        }
       } catch (error) {
         console.error(
           `[GalleriesEditor] Failed to detach gallery ${galleryId}:`,
@@ -288,6 +335,21 @@ export function GalleriesEditor({
       }
     };
   }, []);
+
+  // Debounce search to prevent excessive refetches and janky UI
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm.trim());
+    }, 300);
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

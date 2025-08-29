@@ -402,14 +402,14 @@ export const ImageGalleryPopup = React.memo<ImageGalleryPopupProps>(
                           setSelectedGallery(val === "__all__" ? "" : val)
                         }
                       >
-                        <SelectTrigger className="w-[200px] h-9 text-sm">
-                          <SelectValue placeholder="Gallery" />
+                        <SelectTrigger className="w-[240px] h-9 text-sm">
+                          <SelectValue className="truncate" placeholder="Gallery" />
                         </SelectTrigger>
                         <SelectContent className="z-[7000]" position="popper">
                           <SelectItem value="__all__">All Galleries</SelectItem>
                           {availableGalleries.map((g) => (
                             <SelectItem key={g} value={g}>
-                              {g}
+                              <span className="block truncate max-w-[220px]">{g}</span>
                             </SelectItem>
                           ))}
                         </SelectContent>

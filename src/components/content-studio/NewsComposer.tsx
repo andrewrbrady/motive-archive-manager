@@ -41,6 +41,10 @@ interface NewsComposerProps
   onLoadComposition?: (composition: LoadedComposition) => void;
   onCreateNewWithCopy?: (copies: SelectedCopy[]) => void;
   onCompositionSaved?: (composition: LoadedComposition) => void;
+  onCreateNew?: () => void;
+  // Composer switch
+  onSwitchComposer?: (mode: "email" | "news") => void;
+  currentComposer?: "email" | "news";
 }
 
 /**
@@ -115,22 +119,15 @@ export function NewsComposer(props: NewsComposerProps) {
             value={selectedGalleryId}
             onValueChange={setSelectedGalleryId}
           >
-            <SelectTrigger className="w-[200px] bg-background border-border/40">
-              <ImageIcon className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Select gallery..." />
+            <SelectTrigger className="w-[260px] bg-background border-border/40">
+              <SelectValue className="truncate" placeholder="Select gallery..." />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">No Gallery</SelectItem>
               {galleries.map((gallery) => (
                 <SelectItem key={gallery._id} value={gallery._id}>
-                  <div className="flex items-center gap-2">
-                    <ImageIcon className="h-4 w-4" />
-                    <div>
-                      <div className="font-medium">{gallery.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {gallery.imageIds.length} images
-                      </div>
-                    </div>
+                  <div className="flex-1 min-w-0 font-medium truncate">
+                    {gallery.name}
                   </div>
                 </SelectItem>
               ))}
@@ -142,22 +139,15 @@ export function NewsComposer(props: NewsComposerProps) {
             value={selectedCarouselId}
             onValueChange={setSelectedCarouselId}
           >
-            <SelectTrigger className="w-[200px] bg-background border-border/40">
-              <ImageIcon className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Select carousel..." />
+            <SelectTrigger className="w-[260px] bg-background border-border/40">
+              <SelectValue className="truncate" placeholder="Select carousel..." />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">No Carousel</SelectItem>
               {galleries.map((gallery) => (
                 <SelectItem key={gallery._id} value={gallery._id}>
-                  <div className="flex items-center gap-2">
-                    <ImageIcon className="h-4 w-4" />
-                    <div>
-                      <div className="font-medium">{gallery.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {gallery.imageIds.length} images
-                      </div>
-                    </div>
+                  <div className="flex-1 min-w-0 font-medium truncate">
+                    {gallery.name}
                   </div>
                 </SelectItem>
               ))}
@@ -168,7 +158,6 @@ export function NewsComposer(props: NewsComposerProps) {
           <Button
             onClick={handleExportMDX}
             variant="outline"
-            size="sm"
             className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
           >
             <Download className="h-4 w-4 mr-2" />
@@ -245,6 +234,28 @@ export function NewsComposer(props: NewsComposerProps) {
     [toast]
   );
 
+  // Toolbar extras (composer switcher on the right)
+  const toolbarExtras = (
+    <>
+      {props.onSwitchComposer && (
+        <div className="order-10">
+        <Select
+          value={props.currentComposer || "news"}
+          onValueChange={(v: "email" | "news") => props.onSwitchComposer?.(v)}
+        >
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Select composer" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="email">Email Composer</SelectItem>
+            <SelectItem value="news">News Composer</SelectItem>
+          </SelectContent>
+        </Select>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <BaseComposer
       {...props}
@@ -252,15 +263,19 @@ export function NewsComposer(props: NewsComposerProps) {
       renderPreview={renderPreview}
       renderExportButtons={renderExportButtons}
       renderSpecializedControls={renderSpecializedControls}
+      toolbarExtras={toolbarExtras}
       onLoadCopy={props.onLoadCopy}
       onLoadComposition={props.onLoadComposition}
       onCreateNewWithCopy={props.onCreateNewWithCopy}
+      onCreateNew={props.onCreateNew}
       onCompositionSaved={props.onCompositionSaved}
       defaultPreviewMode="clean"
       supportedPreviewModes={supportedPreviewModes}
       supportsCSSEditor={true}
       supportsEmailContainer={false}
       supportsFrontmatter={true}
+      showHeaderInfoBadges={false}
+      hideHeaderToggle={true}
     />
   );
 }

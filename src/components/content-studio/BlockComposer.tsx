@@ -691,15 +691,15 @@ export function BlockComposer({
                 onClick={saveComposition}
                 disabled={isSaving || !compositionName.trim()}
                 variant="default"
-                size="sm"
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
+                title={loadedComposition ? "Update composition" : "Save composition"}
+                aria-label={loadedComposition ? "Update" : "Save"}
               >
                 {isSaving ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4" />
                 )}
-                {loadedComposition ? "Update" : "Save"}
               </Button>
 
               {/* Stylesheet Selector */}
@@ -715,7 +715,6 @@ export function BlockComposer({
                 variant={
                   showPreview || editorMode === "css" ? "default" : "outline"
                 }
-                size="sm"
                 className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
                 title={
                   editorMode === "css"
@@ -760,7 +759,6 @@ export function BlockComposer({
               <Button
                 onClick={() => setShowExportModal(true)}
                 variant="outline"
-                size="sm"
                 className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
               >
                 <Download className="h-4 w-4 mr-2" />
@@ -774,38 +772,35 @@ export function BlockComposer({
               <Button
                 onClick={() => exportToMDX(blocks, compositionName)}
                 variant="outline"
-                size="sm"
                 className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Export MDX
               </Button>
-              {/* Editor Mode Toggle - Always Visible */}
-              <div className="flex items-center bg-muted/20 rounded-md p-1">
-                <Button
-                  onClick={() => handleEditorModeToggle("blocks")}
-                  variant={editorMode === "blocks" ? "default" : "ghost"}
-                  size="sm"
-                  className="h-8 px-3 text-xs"
-                >
-                  <FileText className="h-3 w-3 mr-1" />
-                  Blocks
-                </Button>
-                <Button
-                  onClick={() => handleEditorModeToggle("css")}
-                  variant={editorMode === "css" ? "default" : "ghost"}
-                  size="sm"
-                  className="h-8 px-3 text-xs"
-                >
-                  <Code className="h-3 w-3 mr-1" />
-                  CSS
-                </Button>
-              </div>
+              {/* Editor Mode Selector - Dropdown (Blocks / CSS) */}
+              <Select
+                value={editorMode}
+                onValueChange={(value: "blocks" | "css") =>
+                  handleEditorModeToggle(value)
+                }
+              >
+                <SelectTrigger className="w-[140px] bg-background border-border/40 hover:bg-muted/20 shadow-sm">
+                  {editorMode === "css" ? (
+                    <Code className="h-4 w-4 mr-2" />
+                  ) : (
+                    <FileText className="h-4 w-4 mr-2" />
+                  )}
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="blocks">Blocks</SelectItem>
+                  <SelectItem value="css">CSS</SelectItem>
+                </SelectContent>
+              </Select>
 
               <Button
                 onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
                 variant="ghost"
-                size="sm"
                 className="hover:bg-muted/20"
                 title={isHeaderCollapsed ? "Expand header" : "Collapse header"}
               >

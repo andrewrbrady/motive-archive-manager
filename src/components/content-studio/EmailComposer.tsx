@@ -50,6 +50,10 @@ interface EmailComposerProps
   onLoadComposition?: (composition: LoadedComposition) => void;
   onCreateNewWithCopy?: (copies: SelectedCopy[]) => void;
   onCompositionSaved?: (composition: LoadedComposition) => void;
+  onCreateNew?: () => void;
+  // Composer switch
+  onSwitchComposer?: (mode: "email" | "news") => void;
+  currentComposer?: "email" | "news";
 }
 
 /**
@@ -187,7 +191,6 @@ export function EmailComposer(props: EmailComposerProps) {
           <Button
             onClick={() => setShowExportModal(true)}
             variant="outline"
-            size="sm"
             className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
           >
             <Download className="h-4 w-4 mr-2" />
@@ -225,62 +228,70 @@ export function EmailComposer(props: EmailComposerProps) {
     ]
   );
 
-  // Email-specific controls
-  const renderSpecializedControls = useCallback(
-    (controlsProps: SpecializedControlsProps) => {
-      return (
-        <>
-          {/* Email Platform Selector */}
-          <div className="flex items-center gap-2">
-            <Label htmlFor="email-platform" className="text-sm font-medium">
-              Platform:
-            </Label>
-            <Select
-              value={selectedEmailPlatform}
-              onValueChange={(value: "sendgrid" | "mailchimp" | "generic") =>
-                setSelectedEmailPlatform(value)
-              }
-            >
-              <SelectTrigger id="email-platform" className="w-40">
-                <SelectValue placeholder="Select platform" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sendgrid">
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    SendGrid
-                  </div>
-                </SelectItem>
-                <SelectItem value="mailchimp">
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Mailchimp
-                  </div>
-                </SelectItem>
-                <SelectItem value="generic">
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Generic
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+  // Toolbar extras: platform selector + email settings in the main toolbar
+  const toolbarExtras = (
+    <>
+      <div className="flex items-center gap-2">
+        <Mail className="h-4 w-4 text-muted-foreground" aria-label="Platform" />
+        <Select
+          value={selectedEmailPlatform}
+          onValueChange={(value: "sendgrid" | "mailchimp" | "generic") =>
+            setSelectedEmailPlatform(value)
+          }
+        >
+          <SelectTrigger id="email-platform" className="w-40">
+            <SelectValue placeholder="Select platform" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="sendgrid">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                SendGrid
+              </div>
+            </SelectItem>
+            <SelectItem value="mailchimp">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Mailchimp
+              </div>
+            </SelectItem>
+            <SelectItem value="generic">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Generic
+              </div>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-          {/* Email Settings Button - Always show since we only have email preview mode */}
-          <Button
-            onClick={() => setShowEmailSettingsModal(true)}
-            variant="outline"
-            size="sm"
-            className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Email Settings
-          </Button>
-        </>
-      );
-    },
-    [selectedEmailPlatform]
+      <Button
+        onClick={() => setShowEmailSettingsModal(true)}
+        variant="outline"
+        className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+      >
+        <Settings className="h-4 w-4 mr-2" />
+        Settings
+      </Button>
+
+      {/* Composer Switcher */}
+      {props.onSwitchComposer && (
+        <div className="order-10">
+        <Select
+          value={props.currentComposer || "email"}
+          onValueChange={(v: "email" | "news") => props.onSwitchComposer?.(v)}
+        >
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Select composer" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="email">Email Composer</SelectItem>
+            <SelectItem value="news">News Composer</SelectItem>
+          </SelectContent>
+        </Select>
+        </div>
+      )}
+    </>
   );
 
   return (
@@ -290,10 +301,15 @@ export function EmailComposer(props: EmailComposerProps) {
         composerType="email"
         renderPreview={renderPreview}
         renderExportButtons={renderExportButtons}
-        renderSpecializedControls={renderSpecializedControls}
+        // Specialized controls moved into toolbar
+        renderSpecializedControls={undefined as any}
+        toolbarExtras={toolbarExtras}
+        showHeaderInfoBadges={false}
+        hideHeaderToggle={true}
         onLoadCopy={props.onLoadCopy}
         onLoadComposition={props.onLoadComposition}
         onCreateNewWithCopy={props.onCreateNewWithCopy}
+        onCreateNew={props.onCreateNew}
         onCompositionSaved={props.onCompositionSaved}
         defaultPreviewMode="email"
         supportedPreviewModes={supportedPreviewModes}
