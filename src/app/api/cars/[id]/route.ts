@@ -225,8 +225,28 @@ export async function GET(request: Request) {
             $map: {
               input: { $ifNull: ["$imageIds", []] },
               as: "id",
-              in: { $toObjectId: "$$id" },
+              in: {
+                $cond: [
+                  { $eq: [{ $type: "$$id" }, "objectId"] },
+                  "$$id",
+                  {
+                    $cond: [
+                      { $eq: [{ $type: "$$id" }, "string"] },
+                      { $toObjectId: "$$id" },
+                      null,
+                    ],
+                  },
+                ],
+              },
             },
+          },
+        },
+      });
+      // Filter out any nulls from conversion
+      pipeline.push({
+        $addFields: {
+          imageObjectIds: {
+            $filter: { input: "$imageObjectIds", as: "x", cond: { $ne: ["$$x", null] } },
           },
         },
       });
@@ -682,10 +702,34 @@ export async function PUT(request: Request) {
     // Remove _id from updates if present to prevent MongoDB errors
     delete updates._id;
 
+    // Normalize IDs and strip embedded images before updating
+    const $set: Record<string, any> = { ...updates };
+
+    if ($set.images) {
+      delete $set.images;
+    }
+
+    if (typeof $set.client === "string" && ObjectId.isValid($set.client)) {
+      $set.client = new ObjectId($set.client);
+    }
+
+    if (Array.isArray($set.imageIds)) {
+      $set.imageIds = $set.imageIds
+        .filter((id: any) => typeof id === "string" && ObjectId.isValid(id))
+        .map((id: string) => new ObjectId(id));
+    }
+
+    if (
+      typeof $set.primaryImageId === "string" &&
+      ObjectId.isValid($set.primaryImageId)
+    ) {
+      $set.primaryImageId = new ObjectId($set.primaryImageId);
+    }
+
     const db = client.db(DB_NAME);
     const result = await db
       .collection<Car>("cars")
-      .updateOne({ _id: objectId }, { $set: updates });
+      .updateOne({ _id: objectId }, { $set });
 
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });

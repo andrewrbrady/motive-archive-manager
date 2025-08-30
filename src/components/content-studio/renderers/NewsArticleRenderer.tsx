@@ -35,6 +35,33 @@ interface NewsArticleRendererProps {
   stylesheetData?: any; // StylesheetData from useStylesheetData hook
 }
 
+// Ensure Cloudflare Image Delivery URLs include the `large` variant for previews
+function ensureLargeVariant(url?: string): string | undefined {
+  if (!url) return url;
+  // Only handle Cloudflare Images URLs
+  if (!url.includes("imagedelivery.net")) return url;
+
+  // Match: https://imagedelivery.net/<accountHash>/<imageId>[/<suffix>]
+  const m = url.match(
+    /^https:\/\/imagedelivery\.net\/([^/]+)\/([^/]+)(?:\/(.+))?$/
+  );
+  if (!m) return url;
+
+  const accountHash = m[1];
+  const imageId = m[2];
+  const suffix = m[3];
+
+  // If there is a suffix but it's not medium/large, force large for previews
+  if (suffix) {
+    const normalized = suffix.trim().toLowerCase();
+    if (normalized === "large" || normalized === "medium") return url;
+    return `https://imagedelivery.net/${accountHash}/${imageId}/large`;
+  }
+
+  // Append the `large` variant when missing
+  return `https://imagedelivery.net/${accountHash}/${imageId}/large`;
+}
+
 /**
  * NewsArticleRenderer - Renders blocks in news article format
  *
@@ -117,6 +144,7 @@ export const NewsArticleRenderer = React.memo<NewsArticleRendererProps>(
       effectiveFrontmatter?.cover ||
       (contentBlocks.find((block) => block.type === "image") as ImageBlock)
         ?.imageUrl;
+    const coverImageUrl = ensureLargeVariant(coverImage);
     const callToActionText =
       effectiveFrontmatter?.callToAction ||
       "This vehicle is now live on Bring a Trailer.";
@@ -137,14 +165,14 @@ export const NewsArticleRenderer = React.memo<NewsArticleRendererProps>(
           )}
 
           {/* Hero Image with Status Badge */}
-          {coverImage && (
+          {coverImageUrl && (
             <div className="relative mb-8">
               <img
-                src={coverImage}
+                src={coverImageUrl}
                 alt="Featured image"
                 className="w-full h-64 md:h-80 object-cover rounded-lg shadow-lg"
                 onError={(e) => {
-                  console.error("Failed to load cover image:", coverImage);
+                  console.error("Failed to load cover image:", coverImageUrl);
                   e.currentTarget.style.display = "none";
                 }}
               />

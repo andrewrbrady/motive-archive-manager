@@ -1,16 +1,17 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, Plus, Image as ImageIcon } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Download,
+  FileText,
+  Plus,
+  Image as ImageIcon,
+  ChevronsUpDown,
+  Check,
+} from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+// Select removed in favor of searchable combobox
 import { useGalleries } from "@/hooks/use-galleries";
 
 import {
@@ -23,6 +24,28 @@ import {
 import { SelectedCopy, LoadedComposition } from "./types";
 import { RendererFactory } from "./renderers/RendererFactory";
 import { useContentExport } from "@/hooks/useContentExport";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandList,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+import { Command as CommandPrimitive } from "cmdk";
 
 // Remove the composer type and render props from the base props
 interface NewsComposerProps
@@ -64,6 +87,11 @@ export function NewsComposer(props: NewsComposerProps) {
   const [selectedGalleryId, setSelectedGalleryId] = useState<string>("none");
   // Carousel selection state
   const [selectedCarouselId, setSelectedCarouselId] = useState<string>("none");
+  // Combobox open/search state
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [carouselOpen, setCarouselOpen] = useState(false);
+  const [gallerySearch, setGallerySearch] = useState("");
+  const [carouselSearch, setCarouselSearch] = useState("");
 
   // Fetch available galleries
   const { data: galleriesData } = useGalleries({ limit: 100 });
@@ -71,6 +99,64 @@ export function NewsComposer(props: NewsComposerProps) {
 
   // Export functionality
   const { exportToMDX } = useContentExport();
+
+  // Initialize selection state from loaded composition metadata
+  useEffect(() => {
+    const meta = props.loadedComposition?.metadata;
+    if (meta) {
+      // Normalize possible formats: strings, ObjectIds, or single value fallbacks
+      const rawGalleryIds = (meta.galleryIds || meta.selectedGalleryId || []) as any;
+      const rawCarouselIds = (meta.carouselIds || meta.selectedCarouselId || []) as any;
+
+      const galleryArray: string[] = Array.isArray(rawGalleryIds)
+        ? rawGalleryIds.map((v: any) => (v ? String((v as any)._id || v) : "")).filter(Boolean)
+        : rawGalleryIds
+        ? [String((rawGalleryIds as any)._id || rawGalleryIds)]
+        : [];
+
+      const carouselArray: string[] = Array.isArray(rawCarouselIds)
+        ? rawCarouselIds.map((v: any) => (v ? String((v as any)._id || v) : "")).filter(Boolean)
+        : rawCarouselIds
+        ? [String((rawCarouselIds as any)._id || rawCarouselIds)]
+        : [];
+
+      setSelectedGalleryId(galleryArray[0] || "none");
+      setSelectedCarouselId(carouselArray[0] || "none");
+    } else {
+      setSelectedGalleryId("none");
+      setSelectedCarouselId("none");
+    }
+  }, [props.loadedComposition?._id, props.loadedComposition?.metadata?.galleryIds, props.loadedComposition?.metadata?.carouselIds]);
+
+  const galleryOptions = useMemo(() => {
+    const q = gallerySearch.trim().toLowerCase();
+    return q
+      ? galleries.filter((g: any) => g.name?.toLowerCase().includes(q))
+      : galleries;
+  }, [galleries, gallerySearch]);
+
+  const carouselOptions = useMemo(() => {
+    const q = carouselSearch.trim().toLowerCase();
+    return q
+      ? galleries.filter((g: any) => g.name?.toLowerCase().includes(q))
+      : galleries;
+  }, [galleries, carouselSearch]);
+
+  const selectedGalleryLabel = useMemo(() => {
+    if (!selectedGalleryId || selectedGalleryId === "none") return "No Gallery";
+    return (
+      galleries.find((g: any) => g._id === selectedGalleryId)?.name ||
+      "Select gallery..."
+    );
+  }, [galleries, selectedGalleryId]);
+
+  const selectedCarouselLabel = useMemo(() => {
+    if (!selectedCarouselId || selectedCarouselId === "none") return "No Carousel";
+    return (
+      galleries.find((g: any) => g._id === selectedCarouselId)?.name ||
+      "Select carousel..."
+    );
+  }, [galleries, selectedCarouselId]);
 
   // News preview modes
   const supportedPreviewModes = [
@@ -114,45 +200,177 @@ export function NewsComposer(props: NewsComposerProps) {
 
       return (
         <div className="flex items-center gap-2">
-          {/* Gallery Selection Dropdown */}
-          <Select
-            value={selectedGalleryId}
-            onValueChange={setSelectedGalleryId}
+          {/* Gallery Selection (searchable combobox) */}
+          <Popover
+            open={galleryOpen}
+            onOpenChange={(open) => {
+              setGalleryOpen(open);
+              if (open) setCarouselOpen(false);
+              if (!open) setGallerySearch("");
+            }}
           >
-            <SelectTrigger className="w-[260px] bg-background border-border/40">
-              <SelectValue className="truncate" placeholder="Select gallery..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No Gallery</SelectItem>
-              {galleries.map((gallery) => (
-                <SelectItem key={gallery._id} value={gallery._id}>
-                  <div className="flex-1 min-w-0 font-medium truncate">
-                    {gallery.name}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={galleryOpen}
+                className="w-[260px] justify-between bg-background border-border/40"
+                type="button"
+              >
+                <span className="truncate text-left">{selectedGalleryLabel}</span>
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[280px] p-0">
+              <Command>
+                <CommandInput
+                  placeholder="Search galleries..."
+                  value={gallerySearch}
+                  onValueChange={setGallerySearch}
+                  autoFocus
+                />
+                <CommandEmpty>No galleries found.</CommandEmpty>
+                <CommandList>
+                  <CommandGroup className="max-h-64 overflow-auto">
+                  <CommandPrimitive.Item
+                    value="none"
+                    onSelect={() => {
+                      setSelectedGalleryId("none");
+                      setGalleryOpen(false);
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedGalleryId("none");
+                      setGalleryOpen(false);
+                    }}
+                    className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        selectedGalleryId === "none" ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    No Gallery
+                  </CommandPrimitive.Item>
+                  {galleryOptions.map((gallery: any) => (
+                    <CommandPrimitive.Item
+                      key={gallery._id}
+                      value={gallery.name}
+                      onSelect={() => {
+                        setSelectedGalleryId(gallery._id);
+                        setGalleryOpen(false);
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedGalleryId(gallery._id);
+                        setGalleryOpen(false);
+                      }}
+                      className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          selectedGalleryId === gallery._id
+                            ? "opacity-100"
+                            : "opacity-0"
+                        )}
+                      />
+                      <span className="truncate">{gallery.name}</span>
+                    </CommandPrimitive.Item>
+                  ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
 
-          {/* Carousel Selection Dropdown */}
-          <Select
-            value={selectedCarouselId}
-            onValueChange={setSelectedCarouselId}
+          {/* Carousel Selection (searchable combobox) */}
+          <Popover
+            open={carouselOpen}
+            onOpenChange={(open) => {
+              setCarouselOpen(open);
+              if (open) setGalleryOpen(false);
+              if (!open) setCarouselSearch("");
+            }}
           >
-            <SelectTrigger className="w-[260px] bg-background border-border/40">
-              <SelectValue className="truncate" placeholder="Select carousel..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No Carousel</SelectItem>
-              {galleries.map((gallery) => (
-                <SelectItem key={gallery._id} value={gallery._id}>
-                  <div className="flex-1 min-w-0 font-medium truncate">
-                    {gallery.name}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={carouselOpen}
+                className="w-[260px] justify-between bg-background border-border/40"
+                type="button"
+              >
+                <span className="truncate text-left">{selectedCarouselLabel}</span>
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[280px] p-0">
+              <Command>
+                <CommandInput
+                  placeholder="Search carousels..."
+                  value={carouselSearch}
+                  onValueChange={setCarouselSearch}
+                  autoFocus
+                />
+                <CommandEmpty>No carousels found.</CommandEmpty>
+                <CommandList>
+                  <CommandGroup className="max-h-64 overflow-auto">
+                  <CommandPrimitive.Item
+                    value="none"
+                    onSelect={() => {
+                      setSelectedCarouselId("none");
+                      setCarouselOpen(false);
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedCarouselId("none");
+                      setCarouselOpen(false);
+                    }}
+                    className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        selectedCarouselId === "none"
+                          ? "opacity-100"
+                          : "opacity-0"
+                      )}
+                    />
+                    No Carousel
+                  </CommandPrimitive.Item>
+                  {carouselOptions.map((gallery: any) => (
+                    <CommandPrimitive.Item
+                      key={gallery._id}
+                      value={gallery.name}
+                      onSelect={() => {
+                        setSelectedCarouselId(gallery._id);
+                        setCarouselOpen(false);
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCarouselId(gallery._id);
+                        setCarouselOpen(false);
+                      }}
+                      className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          selectedCarouselId === gallery._id
+                            ? "opacity-100"
+                            : "opacity-0"
+                        )}
+                      />
+                      <span className="truncate">{gallery.name}</span>
+                    </CommandPrimitive.Item>
+                  ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
 
           {/* Export MDX Button */}
           <Button
@@ -166,7 +384,21 @@ export function NewsComposer(props: NewsComposerProps) {
         </div>
       );
     },
-    [exportToMDX, selectedGalleryId, selectedCarouselId, galleries]
+    [
+      exportToMDX,
+      selectedGalleryId,
+      selectedCarouselId,
+      galleries,
+      // Include combobox state to avoid stale closures
+      galleryOpen,
+      carouselOpen,
+      gallerySearch,
+      carouselSearch,
+      selectedGalleryLabel,
+      selectedCarouselLabel,
+      galleryOptions,
+      carouselOptions,
+    ]
   );
 
   // News-specific controls
@@ -260,6 +492,17 @@ export function NewsComposer(props: NewsComposerProps) {
     <BaseComposer
       {...props}
       composerType="news"
+      // Persist selected gallery/carousel with compositions
+      selectedGalleryIds={
+        selectedGalleryId && selectedGalleryId !== "none"
+          ? [selectedGalleryId]
+          : []
+      }
+      selectedCarouselIds={
+        selectedCarouselId && selectedCarouselId !== "none"
+          ? [selectedCarouselId]
+          : []
+      }
       renderPreview={renderPreview}
       renderExportButtons={renderExportButtons}
       renderSpecializedControls={renderSpecializedControls}

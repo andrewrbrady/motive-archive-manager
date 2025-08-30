@@ -122,6 +122,10 @@ export function MakesDropdown({
   contentClassName,
   triggerClassName,
 }: MakesDropdownProps) {
+  // Avoid SSR hydration mismatches with Radix Select by rendering after mount
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+
   // Normalize makes data to consistent format
   const normalizedMakes = React.useMemo(() => {
     return makes.map((make, index) => {
@@ -145,6 +149,13 @@ export function MakesDropdown({
   const sortedMakes = React.useMemo(() => {
     return [...normalizedMakes].sort((a, b) => a.label.localeCompare(b.label));
   }, [normalizedMakes]);
+
+  if (!mounted) {
+    // Render a minimal placeholder to keep layout stable
+    return (
+      <div className={cn("h-9 w-full rounded-md border border-input px-3 py-2 text-sm", triggerClassName, className)} />
+    );
+  }
 
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>

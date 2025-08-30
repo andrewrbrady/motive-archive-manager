@@ -10,6 +10,7 @@ import { DB_NAME } from "@/constants";
 import { MongoPipelineStage } from "@/types/mongodb";
 import { StandardizedCar } from "@/types/routes/cars";
 import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 
 // ✅ PERFORMANCE OPTIMIZATION: Use ISR with 3-minute revalidation for cars data
 // This provides a good balance between fresh data and performance
@@ -59,9 +60,37 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Normalize IDs: convert strings to ObjectIds for DB consistency
+    const doc: Record<string, any> = { ...data };
+
+    // Do not allow embedded images in car documents
+    if (doc.images) {
+      delete doc.images;
+    }
+
+    // Convert client to ObjectId if valid string
+    if (typeof doc.client === "string" && ObjectId.isValid(doc.client)) {
+      doc.client = new ObjectId(doc.client);
+    }
+
+    // Convert imageIds into ObjectId[] if provided as strings
+    if (Array.isArray(doc.imageIds)) {
+      doc.imageIds = doc.imageIds
+        .filter((id: any) => typeof id === "string" && ObjectId.isValid(id))
+        .map((id: string) => new ObjectId(id));
+    }
+
+    // Convert primaryImageId into ObjectId if provided as string
+    if (
+      typeof doc.primaryImageId === "string" &&
+      ObjectId.isValid(doc.primaryImageId)
+    ) {
+      doc.primaryImageId = new ObjectId(doc.primaryImageId);
+    }
+
     // Create a new car document
     const result = await db.collection("cars").insertOne({
-      ...data,
+      ...doc,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -333,12 +362,32 @@ export async function GET(request: NextRequest) {
               pipeline.push({
                 $lookup: {
                   from: "images",
-                  let: { imageIds: { $ifNull: ["$imageIds", []] } },
+                  let: {
+                    imageObjectIds: {
+                      $map: {
+                        input: { $ifNull: ["$imageIds", []] },
+                        as: "id",
+                        in: {
+                          $cond: [
+                            { $eq: [{ $type: "$$id" }, "objectId"] },
+                            "$$id",
+                            {
+                              $cond: [
+                                { $eq: [{ $type: "$$id" }, "string"] },
+                                { $toObjectId: "$$id" },
+                                null,
+                              ],
+                            },
+                          ],
+                        },
+                      },
+                    },
+                  },
                   pipeline: [
                     {
                       $match: {
                         $expr: {
-                          $in: [{ $toString: "$_id" }, "$$imageIds"],
+                          $in: ["$_id", "$$imageObjectIds"],
                         },
                       },
                     },
@@ -404,10 +453,7 @@ export async function GET(request: NextRequest) {
             processedCar.images = car.images.map((img: any) => ({
               ...img,
               _id: img._id?.toString() || "unknown-image",
-              url:
-                img.url && img.url.endsWith("/public")
-                  ? img.url
-                  : `${img.url || ""}/public`,
+              url: fixCloudflareImageUrl(img.url || ""),
             }));
           }
 

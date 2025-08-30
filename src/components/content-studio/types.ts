@@ -231,6 +231,9 @@ export interface BlockComposerProps {
   loadedComposition?: any; // For editing existing compositions
   carId?: string; // For compositions not created from selected copies
   projectId?: string; // For compositions not created from selected copies
+  // Optional asset associations to persist with compositions
+  selectedGalleryIds?: string[];
+  selectedCarouselIds?: string[];
 }
 
 // API response types (reusing existing patterns)

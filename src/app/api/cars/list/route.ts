@@ -35,7 +35,13 @@ export async function GET(request: Request) {
               primaryId: {
                 $cond: [
                   { $ifNull: ["$primaryImageId", false] },
-                  { $toObjectId: "$primaryImageId" },
+                  {
+                    $cond: [
+                      { $eq: [{ $type: "$primaryImageId" }, "objectId"] },
+                      "$primaryImageId",
+                      { $toObjectId: "$primaryImageId" },
+                    ],
+                  },
                   null,
                 ],
               },
@@ -63,7 +69,19 @@ export async function GET(request: Request) {
                 $map: {
                   input: { $ifNull: ["$imageIds", []] },
                   as: "id",
-                  in: { $toObjectId: "$$id" },
+                  in: {
+                    $cond: [
+                      { $eq: [{ $type: "$$id" }, "objectId"] },
+                      "$$id",
+                      {
+                        $cond: [
+                          { $eq: [{ $type: "$$id" }, "string"] },
+                          { $toObjectId: "$$id" },
+                          null,
+                        ],
+                      },
+                    ],
+                  },
                 },
               },
               carId: "$_id",

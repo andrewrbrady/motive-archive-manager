@@ -142,6 +142,8 @@ export function BaseComposer({
   loadedComposition,
   carId,
   projectId,
+  selectedGalleryIds,
+  selectedCarouselIds,
   composerType,
   renderPreview,
   renderExportButtons,
@@ -264,6 +266,15 @@ export function BaseComposer({
           composerType,
           projectId: effectiveProjectId,
           carId: effectiveCarId,
+          // Persist associated assets
+          ...(Array.isArray(selectedGalleryIds) && {
+            galleryIds: selectedGalleryIds,
+            selectedGalleryId: selectedGalleryIds[0] || null,
+          }),
+          ...(Array.isArray(selectedCarouselIds) && {
+            carouselIds: selectedCarouselIds,
+            selectedCarouselId: selectedCarouselIds[0] || null,
+          }),
           ...(supportsFrontmatter && { frontmatter }),
         },
       };
@@ -282,6 +293,8 @@ export function BaseComposer({
       effectiveCarId,
       supportsFrontmatter,
       frontmatter,
+      selectedGalleryIds,
+      selectedCarouselIds,
       api,
     ]
   );
@@ -471,6 +484,9 @@ export function BaseComposer({
     template,
     compositionName,
     loadedComposition,
+    // Trigger autosave when associated asset selections change
+    selectedGalleryIds,
+    selectedCarouselIds,
     // Removed scheduleAutosave to prevent infinite loop - callback recreates when deps change
   ]);
 
@@ -609,20 +625,28 @@ export function BaseComposer({
       setIsSaving(true);
 
       try {
-        const compositionData = {
-          name: name,
-          type: composerType,
-          blocks,
-          template: template?.id || null,
-          metadata: {
-            selectedCopies,
-            selectedStylesheetId,
-            composerType,
-            projectId: effectiveProjectId,
-            carId: effectiveCarId,
-            ...(supportsFrontmatter && { frontmatter }),
-          },
-        };
+      const compositionData = {
+        name: name,
+        type: composerType,
+        blocks,
+        template: template?.id || null,
+        metadata: {
+          selectedCopies,
+          selectedStylesheetId,
+          composerType,
+          projectId: effectiveProjectId,
+          carId: effectiveCarId,
+          ...(Array.isArray(selectedGalleryIds) && {
+            galleryIds: selectedGalleryIds,
+            selectedGalleryId: selectedGalleryIds[0] || null,
+          }),
+          ...(Array.isArray(selectedCarouselIds) && {
+            carouselIds: selectedCarouselIds,
+            selectedCarouselId: selectedCarouselIds[0] || null,
+          }),
+          ...(supportsFrontmatter && { frontmatter }),
+        },
+      };
 
         console.log("📦 Sending data:", { name, blocksCount: blocks.length });
 
@@ -726,6 +750,14 @@ export function BaseComposer({
               composerType,
               projectId: effectiveProjectId,
               carId: effectiveCarId,
+              ...(Array.isArray(selectedGalleryIds) && {
+                galleryIds: selectedGalleryIds,
+                selectedGalleryId: selectedGalleryIds[0] || null,
+              }),
+              ...(Array.isArray(selectedCarouselIds) && {
+                carouselIds: selectedCarouselIds,
+                selectedCarouselId: selectedCarouselIds[0] || null,
+              }),
               ...(supportsFrontmatter && { frontmatter }),
             },
             createdAt: loadedComposition?.createdAt || new Date().toISOString(),
@@ -772,6 +804,8 @@ export function BaseComposer({
       composerType,
       supportsFrontmatter,
       frontmatter,
+      selectedGalleryIds,
+      selectedCarouselIds,
       loadedComposition,
       toast,
       onCompositionSaved,
