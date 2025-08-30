@@ -26,7 +26,7 @@ export default async function CarsPage(props: any) {
     const resolvedParams = searchParams;
 
     const page = Number(resolvedParams.page) || 1;
-    const pageSize = Number(resolvedParams.pageSize) || 48;
+    const pageSize = Number(resolvedParams.pageSize) || 96;
     const view = (resolvedParams.view?.toString() || "grid") as "grid" | "list";
     const isEditMode = resolvedParams.edit === "true";
 
@@ -64,7 +64,7 @@ export default async function CarsPage(props: any) {
     return (
       <CarsPageOptimized
         currentPage={1}
-        pageSize={48}
+        pageSize={96}
         view="grid"
         isEditMode={false}
         filters={{}}

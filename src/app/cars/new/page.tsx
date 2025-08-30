@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import CarEntryForm, { CarEntryFormRef } from "@/components/cars/CarEntryForm";
@@ -12,8 +12,9 @@ import { toast } from "sonner";
 import JsonUploadPasteModal from "@/components/common/JsonUploadPasteModal";
 import { useAPI } from "@/hooks/useAPI";
 import Navbar from "@/components/layout/navbar";
+// Suspense is already imported above with React
 
-export default function NewCarPage() {
+function NewCarPageContent() {
   const router = useRouter();
   const api = useAPI();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,25 +70,28 @@ export default function NewCarPage() {
 
   if (!api) {
     return (
-      <div>
-        <Navbar />
-        <div className="container mx-auto py-8">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold mb-4">Authentication Required</h1>
-            <p className="text-muted-foreground">
-              Please log in to create cars
-            </p>
+      <Suspense fallback={<div className="p-6 text-muted-foreground">Loading…</div>}>
+        <div>
+          <Navbar />
+          <div className="container mx-auto py-8">
+            <div className="text-center">
+              <h1 className="text-3xl font-bold mb-4">Authentication Required</h1>
+              <p className="text-muted-foreground">
+                Please log in to create cars
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      </Suspense>
     );
   }
 
   return (
-    <AuthGuard>
-      <div className="min-h-screen bg-background">
-        <main className="container mx-auto px-4 py-8">
-          <div className="max-w-4xl mx-auto">
+    <Suspense fallback={<div className="p-6 text-muted-foreground">Loading…</div>}>
+      <AuthGuard>
+        <div className="min-h-screen bg-background">
+          <main className="container mx-auto px-4 py-8">
+            <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-8">
               <PageTitle title="Add New Car" />
               <div className="flex gap-4">
@@ -136,9 +140,31 @@ export default function NewCarPage() {
                 }
               }
             />
+            </div>
+          </main>
+        </div>
+      </AuthGuard>
+    </Suspense>
+  );
+}
+
+export default function NewCarPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              </div>
+            </div>
           </div>
         </main>
       </div>
-    </AuthGuard>
+    }>
+      <NewCarPageContent />
+    </Suspense>
   );
 }

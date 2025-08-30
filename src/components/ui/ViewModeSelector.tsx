@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LayoutGrid, List } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -9,7 +9,7 @@ interface ViewModeSelectorProps {
   currentView: "grid" | "list";
 }
 
-export function ViewModeSelector({ currentView }: ViewModeSelectorProps) {
+function ViewModeSelectorCore({ currentView }: ViewModeSelectorProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -20,7 +20,7 @@ export function ViewModeSelector({ currentView }: ViewModeSelectorProps) {
   };
 
   return (
-    <div className="flex items-center gap-1 bg-[hsl(var(--secondary))] rounded-md p-1">
+    <div className="flex items-center gap-1 bg-transparent rounded-md p-1">
       <button
         onClick={() => handleViewChange("grid")}
         className={cn(
@@ -46,5 +46,40 @@ export function ViewModeSelector({ currentView }: ViewModeSelectorProps) {
         <List className="h-4 w-4" />
       </button>
     </div>
+  );
+}
+
+export function ViewModeSelector({ currentView }: ViewModeSelectorProps) {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center gap-1 bg-transparent rounded-md p-1">
+        <button
+          disabled
+          className={cn(
+            "p-1.5 rounded-sm transition-colors",
+            currentView === "grid"
+              ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm"
+              : "text-[hsl(var(--muted-foreground))]"
+          )}
+          title="Grid View"
+        >
+          <LayoutGrid className="h-4 w-4" />
+        </button>
+        <button
+          disabled
+          className={cn(
+            "p-1.5 rounded-sm transition-colors",
+            currentView === "list"
+              ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm"
+              : "text-[hsl(var(--muted-foreground))]"
+          )}
+          title="List View"
+        >
+          <List className="h-4 w-4" />
+        </button>
+      </div>
+    }>
+      <ViewModeSelectorCore currentView={currentView} />
+    </Suspense>
   );
 }

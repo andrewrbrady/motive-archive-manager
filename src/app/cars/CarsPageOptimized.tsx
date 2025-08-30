@@ -2,26 +2,14 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAPIQuery } from "@/hooks/useAPIQuery";
-import { useAPI } from "@/hooks/useAPI";
 import { Car } from "@/types/car";
-import { Make } from "@/lib/fetchMakes";
-import { Client } from "@/types/contact";
-import { PageTitle } from "@/components/ui/PageTitle";
-import { LoadingSpinner } from "@/components/ui/loading";
 import { CarsErrorBoundary } from "@/components/cars/CarsErrorBoundary";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, X } from "lucide-react";
+import { Plus, Search, ArrowRight, ZoomIn, ZoomOut } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { MakesDropdown, MakeData } from "@/components/ui/MakesDropdown";
+// Removed unused select and makes dropdown imports after toolbar simplification
 import { useDebounce } from "@/hooks/useDebounce";
 import Pagination from "@/components/Pagination";
 import { ViewModeSelector } from "@/components/ui/ViewModeSelector";
@@ -34,6 +22,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { usePrefetchAPI } from "@/hooks/useAPIQuery";
+import CarsListView from "@/components/cars/ListView";
+import { MakesDropdown, MakeData } from "@/components/ui/MakesDropdown";
 
 interface FilterParams {
   make?: string;
@@ -56,6 +46,8 @@ interface CarsPageOptimizedProps {
 interface CarImageProps {
   car: Car;
   className?: string;
+  hoverImageUrl?: string | null;
+  isHovered?: boolean;
 }
 
 // ✅ PHASE 1C: Optimized image URL helper - reduce blocking operations
@@ -95,7 +87,7 @@ const getEnhancedImageUrl = (
   return baseUrl.replace(/\/public$/, `/${paramString}`);
 };
 
-function CarImage({ car, className = "aspect-video" }: CarImageProps) {
+function CarImage({ car, className = "aspect-video", hoverImageUrl, isHovered = false }: CarImageProps) {
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -149,6 +141,13 @@ function CarImage({ car, className = "aspect-video" }: CarImageProps) {
     return null;
   }, [primaryImageId, imageData?.url, car.images]);
 
+  // Optional hover image (second image) for fade-through effect
+  const hoverUrl = useMemo(() => {
+    if (!hoverImageUrl) return null;
+    const baseUrl = fixCloudflareImageUrl(hoverImageUrl);
+    return getEnhancedImageUrl(baseUrl, "400", "85");
+  }, [hoverImageUrl]);
+
   // ✅ Phase 1A: Implement non-blocking loading states
   const showImageLoading = shouldFetchFromAPI ? isImageLoading : isLoading;
   const hasImageError =
@@ -170,7 +169,7 @@ function CarImage({ car, className = "aspect-video" }: CarImageProps) {
   if (showImageLoading) {
     return (
       <div
-        className={`${className} bg-muted rounded-md overflow-hidden flex items-center justify-center`}
+        className={`${className} bg-muted overflow-hidden flex items-center justify-center`}
       >
         <Skeleton className="w-full h-full animate-pulse" />
       </div>
@@ -181,7 +180,7 @@ function CarImage({ car, className = "aspect-video" }: CarImageProps) {
   if (hasImageError) {
     return (
       <div
-        className={`${className} bg-muted rounded-md overflow-hidden flex items-center justify-center`}
+        className={`${className} bg-muted overflow-hidden flex items-center justify-center`}
       >
         <div className="text-xs text-muted-foreground text-center p-2">
           <div className="w-8 h-8 mx-auto mb-1 opacity-50">📷</div>
@@ -193,9 +192,7 @@ function CarImage({ car, className = "aspect-video" }: CarImageProps) {
 
   // ✅ SMOOTH TRANSITION: Two-layer approach for blur-to-sharp transition
   return (
-    <div
-      className={`${className} bg-muted rounded-md overflow-hidden relative`}
-    >
+    <div className={`${className} bg-muted overflow-hidden relative`}>
       <Image
         src={finalImageUrl!}
         alt={`${car.year} ${car.make} ${car.model}`}
@@ -210,6 +207,18 @@ function CarImage({ car, className = "aspect-video" }: CarImageProps) {
         placeholder="blur"
         blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
       />
+      {hoverUrl && (
+        <Image
+          src={hoverUrl}
+          alt={`${car.year} ${car.make} ${car.model} alternate`}
+          fill
+          className={`object-cover absolute inset-0 transition-opacity duration-300 ${
+            isHovered ? "opacity-100" : "opacity-0"
+          }`}
+          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+          quality={85}
+        />
+      )}
     </div>
   );
 }
@@ -225,9 +234,11 @@ function CarCard({ car, view }: CarCardProps) {
   const [hoverTimeoutId, setHoverTimeoutId] = useState<NodeJS.Timeout | null>(
     null
   );
+  const [isHovered, setIsHovered] = useState(false);
 
   // ✅ Debounced hover handler for car detail prefetching (300ms delay)
   const handleMouseEnter = useCallback(() => {
+    setIsHovered(true);
     // Clear any existing timeout
     if (hoverTimeoutId) {
       clearTimeout(hoverTimeoutId);
@@ -244,6 +255,7 @@ function CarCard({ car, view }: CarCardProps) {
   }, [car._id, prefetch, hoverTimeoutId]);
 
   const handleMouseLeave = useCallback(() => {
+    setIsHovered(false);
     // Clear timeout if user leaves before delay
     if (hoverTimeoutId) {
       clearTimeout(hoverTimeoutId);
@@ -262,49 +274,32 @@ function CarCard({ car, view }: CarCardProps) {
 
   if (view === "grid") {
     return (
-      <div
+      <Link
+        href={`/cars/${car._id}`}
+        prefetch={true}
         key={car._id || `car-${car.make}-${car.model}-${car.year}`}
-        className="bg-card rounded-lg border p-4"
+        className="block bg-card rounded-none border border-[hsl(var(--border-subtle))] hover:border-white hover:ring-1 hover:ring-white/70 transition-colors duration-200 overflow-hidden group"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <CarImage car={car} className="aspect-video mb-3" />
-        <h3 className="font-semibold">
-          {car.year} {car.make} {car.model}
-        </h3>
-        <p className="text-sm text-muted-foreground">{car.status}</p>
-        <Link href={`/cars/${car._id}`} prefetch={true}>
-          <Button variant="outline" size="sm" className="w-full mt-2">
-            View Details
-          </Button>
-        </Link>
-      </div>
+        <CarImage
+          car={car}
+          className="aspect-video"
+          hoverImageUrl={car.images && car.images[1]?.url ? car.images[1].url : null}
+          isHovered={isHovered}
+        />
+        <div className="p-2 flex items-center justify-between">
+          <h3 className="font-semibold truncate">
+            {car.year} {car.make} {car.model}
+          </h3>
+          <ArrowRight className="ml-3 h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+        </div>
+      </Link>
     );
   }
 
-  return (
-    <div
-      key={car._id || `car-list-${car.make}-${car.model}-${car.year}`}
-      className="bg-card rounded-lg border p-4 flex items-center justify-between"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      <div className="flex items-center gap-4">
-        <CarImage car={car} className="w-16 h-16 flex-shrink-0" />
-        <div>
-          <h3 className="font-semibold">
-            {car.year} {car.make} {car.model}
-          </h3>
-          <p className="text-sm text-muted-foreground">{car.status}</p>
-        </div>
-      </div>
-      <Link href={`/cars/${car._id}`} prefetch={true}>
-        <Button variant="outline" size="sm">
-          View Details
-        </Button>
-      </Link>
-    </div>
-  );
+  // List view is handled by parent using unified ListView component
+  return null;
 }
 
 // ✅ Simple Loading Component
@@ -340,7 +335,6 @@ export default function CarsPageOptimized({
   filters,
 }: CarsPageOptimizedProps) {
   // ✅ COMPONENT STATE: Organize state logically
-  const [backgroundLoading, setBackgroundLoading] = useState(true);
   const [hasEverLoaded, setHasEverLoaded] = useState(false);
 
   // ✅ FILTER STATE: Separate filter state management
@@ -356,6 +350,36 @@ export default function CarsPageOptimized({
 
   // ✅ PERFORMANCE TRACKING: Add performance monitoring
   const { logTime, resetTimer } = usePerformanceTimer("CarsPageOptimized");
+  // Zoom controls (like /images)
+  const [zoomLevel, setZoomLevel] = useState(3);
+  useEffect(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem("cars-zoom-level") : null;
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (parsed >= 1 && parsed <= 5) setZoomLevel(parsed);
+    }
+  }, []);
+  const zoomConfigs = {
+    1: { cols: "md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8", label: "8" },
+    2: { cols: "md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6", label: "6" },
+    3: { cols: "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4", label: "4" },
+    4: { cols: "md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3", label: "3" },
+    5: { cols: "md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2", label: "2" },
+  } as const;
+  const handleZoomIn = () => {
+    if (zoomLevel < 5) {
+      const next = zoomLevel + 1;
+      setZoomLevel(next);
+      if (typeof window !== "undefined") localStorage.setItem("cars-zoom-level", next.toString());
+    }
+  };
+  const handleZoomOut = () => {
+    if (zoomLevel > 1) {
+      const next = zoomLevel - 1;
+      setZoomLevel(next);
+      if (typeof window !== "undefined") localStorage.setItem("cars-zoom-level", next.toString());
+    }
+  };
 
   // ✅ PHASE 1C: Optimized query key generation - reduce blocking computations
   const queryKey = useMemo(() => {
@@ -440,31 +464,18 @@ export default function CarsPageOptimized({
   });
 
   // ✅ Phase 1A: Convert blocking background data to non-blocking useAPIQuery pattern
+  // Fetch makes for toolbar filter
   const {
     data: makesResponse,
     isLoading: makesLoading,
-    error: makesError,
   } = useAPIQuery<{ makes: string[] } | string[]>("cars/makes", {
-    staleTime: 10 * 60 * 1000, // ✅ Phase 2A: 10min cache for static data
-    retry: 1, // ✅ Phase 2A: Reduce retry for non-critical static data
+    staleTime: 10 * 60 * 1000,
+    retry: 1,
     refetchOnWindowFocus: false,
   });
 
-  const {
-    data: clientsData,
-    isLoading: clientsLoading,
-    error: clientsError,
-  } = useAPIQuery<{ clients: Client[] }>("clients", {
-    staleTime: 10 * 60 * 1000, // ✅ Phase 2A: 10min cache for static data
-    retry: 1, // ✅ Phase 2A: Reduce retry for non-critical static data
-    refetchOnWindowFocus: false,
-    select: (data: any) => data?.clients || [],
-  });
-
-  // ✅ Phase 1A: Process makes data to MakeData[] format
   const makes: MakeData[] = useMemo(() => {
     if (!makesResponse) return [];
-
     if (Array.isArray(makesResponse)) {
       return makesResponse.map((make: any) =>
         typeof make === "string" ? make : make.name
@@ -472,10 +483,6 @@ export default function CarsPageOptimized({
     }
     return makesResponse?.makes || [];
   }, [makesResponse]);
-
-  // ✅ Phase 1A: Process background data safely with non-blocking patterns
-  const clients = clientsData || [];
-  const backgroundDataLoading = makesLoading || clientsLoading;
 
   // ✅ Phase 1A: Track loading states for progressive enhancement
   useEffect(() => {
@@ -486,12 +493,7 @@ export default function CarsPageOptimized({
   }, [carsData, carsLoading, logTime]);
 
   // ✅ Phase 1A: Update background loading state based on data availability
-  useEffect(() => {
-    if (makesResponse && clientsData) {
-      setBackgroundLoading(false);
-      logTime("Background data loaded");
-    }
-  }, [makesResponse, clientsData, logTime]);
+  // Background clients fetching removed
 
   // ✅ PHASE 1B: Pagination prefetching for seamless user experience
   const { prefetch } = usePrefetchAPI();
@@ -591,20 +593,6 @@ export default function CarsPageOptimized({
     }
   }, []);
 
-  const clearFilters = useCallback(() => {
-    setSearchQuery("");
-    setSelectedMake("");
-    setMinYear("");
-    setMaxYear("");
-
-    const newParams = new URLSearchParams(window.location.search);
-    newParams.delete("search");
-    newParams.delete("make");
-    newParams.delete("minYear");
-    newParams.delete("maxYear");
-    updateURL(newParams);
-  }, [updateURL]);
-
   // ✅ Track search loading state
   const isSearching = searchQuery !== debouncedSearchQuery;
   const isYearFiltering =
@@ -702,85 +690,95 @@ export default function CarsPageOptimized({
         <PerformanceMonitor name="CarsPageOptimized" />
         <div className="min-h-screen bg-background">
           <div className="container mx-auto px-6 py-8">
-            {/* ✅ Header section - loads immediately */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-              <PageTitle title="Cars Collection" />
+            {/* Toolbar */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <ViewModeSelector currentView={view} />
+              <PageSizeSelector currentPageSize={pageSize} options={[12,24,48,96]} />
+              <SortSelector currentSort={filters.sort || "createdAt_desc"} />
+              {view === "grid" && (
+                <div className="flex items-center gap-1 border rounded-md">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleZoomOut}
+                    disabled={zoomLevel <= 1}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+                  <span className="text-xs px-2 text-muted-foreground">
+                    {zoomConfigs[zoomLevel as keyof typeof zoomConfigs].label}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleZoomIn}
+                    disabled={zoomLevel >= 5}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              <MakesDropdown
+                value={selectedMake || "all"}
+                onValueChange={handleMakeChange}
+                makes={makes}
+                loading={makesLoading}
+                placeholder="All Makes"
+                allOptionLabel="All Makes"
+                allOptionValue="all"
+                loadingText="Loading makes..."
+                className="w-64 min-w-[16rem]"
+                triggerClassName="whitespace-nowrap"
+              />
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Min Year"
+                  value={minYear}
+                  onChange={(e) => handleYearChange("min", e.target.value)}
+                  className="w-24"
+                />
+                <Input
+                  placeholder="Max Year"
+                  value={maxYear}
+                  onChange={(e) => handleYearChange("max", e.target.value)}
+                  className="w-24"
+                />
+              </div>
+            </div>
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search cars..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
               <Link href="/cars/new" prefetch={true}>
-                <Button>
+                <Button
+                  variant="ghost"
+                  className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   Add New Car
                 </Button>
               </Link>
             </div>
 
-            {/* ✅ Phase 1A: Show filters interface immediately */}
-            <div className="bg-card rounded-lg border p-6 mb-6 space-y-4">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search cars..."
-                      value={searchQuery}
-                      onChange={(e) => handleSearchChange(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                </div>
-                <div className="w-full sm:w-48">
-                  <MakesDropdown
-                    value={selectedMake || "all"}
-                    onValueChange={handleMakeChange}
-                    makes={makes}
-                    loading={backgroundDataLoading}
-                    placeholder="All Makes"
-                    allOptionLabel="All Makes"
-                    allOptionValue="all"
-                    loadingText="Loading makes..."
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Min Year"
-                    value={minYear}
-                    onChange={(e) => handleYearChange("min", e.target.value)}
-                    className="w-24"
-                  />
-                  <Input
-                    placeholder="Max Year"
-                    value={maxYear}
-                    onChange={(e) => handleYearChange("max", e.target.value)}
-                    className="w-24"
-                  />
-                </div>
-                {hasActiveFilters && (
-                  <Button variant="outline" onClick={clearFilters}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-
-              {/* ✅ Phase 1A: Progressive loading message following established patterns */}
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                <span>
-                  Loading cars... You can interact with the page while data
-                  loads
-                </span>
-              </div>
-            </div>
-
             {/* ✅ Phase 1A: Show skeleton cards instead of blocking spinner */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className={`grid grid-cols-1 ${zoomConfigs[zoomLevel as keyof typeof zoomConfigs].cols} gap-4`}>
               {Array.from({ length: 8 }).map((_, index) => (
-                <div
-                  key={`skeleton-${index}`}
-                  className="bg-card rounded-lg border p-4"
-                >
-                  <Skeleton className="aspect-video mb-3 rounded" />
-                  <Skeleton className="h-5 mb-2 rounded" />
-                  <Skeleton className="h-4 mb-2 w-20 rounded" />
-                  <Skeleton className="h-8 w-full mt-2 rounded" />
+                <div key={`skeleton-${index}`} className="bg-card rounded-none border overflow-hidden">
+                  <Skeleton className="aspect-video" />
+                  <div className="p-2">
+                    <Skeleton className="h-5 w-2/3" />
+                  </div>
+                  <div className="h-9 border-t border-[hsl(var(--border))]/40" />
                 </div>
               ))}
             </div>
@@ -796,11 +794,55 @@ export default function CarsPageOptimized({
       <CarsErrorBoundary>
         <div className="min-h-screen bg-background">
           <div className="container mx-auto px-6 py-8">
-            {/* ✅ Header section */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-              <PageTitle title="Cars Collection" />
+            {/* Toolbar */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <ViewModeSelector currentView={view} />
+              <PageSizeSelector currentPageSize={pageSize} options={[12,24,48,96]} />
+              <SortSelector currentSort={filters.sort || "createdAt_desc"} />
+              <MakesDropdown
+                value={selectedMake || "all"}
+                onValueChange={handleMakeChange}
+                makes={makes}
+                loading={makesLoading}
+                placeholder="All Makes"
+                allOptionLabel="All Makes"
+                allOptionValue="all"
+                loadingText="Loading makes..."
+                className="w-64 min-w-[16rem]"
+                triggerClassName="whitespace-nowrap"
+              />
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Min Year"
+                  value={minYear}
+                  onChange={(e) => handleYearChange("min", e.target.value)}
+                  className="w-24"
+                />
+                <Input
+                  placeholder="Max Year"
+                  value={maxYear}
+                  onChange={(e) => handleYearChange("max", e.target.value)}
+                  className="w-24"
+                />
+              </div>
+            </div>
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search cars..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
               <Link href="/cars/new" prefetch={true}>
-                <Button>
+                <Button
+                  variant="ghost"
+                  className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   Add New Car
                 </Button>
@@ -830,123 +872,99 @@ export default function CarsPageOptimized({
       <PerformanceMonitor name="CarsPageOptimized" />
       <div className="min-h-screen bg-background">
         <div className="container mx-auto px-6 py-8">
-          {/* ✅ Header section - loads immediately */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-            <PageTitle title="Cars Collection" />
+          {/* Unified toolbar */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <ViewModeSelector currentView={view} />
+              <PageSizeSelector currentPageSize={pageSize} options={[12, 24, 48, 96]} />
+              <SortSelector currentSort={filters.sort || "createdAt_desc"} />
+              {view === "grid" && (
+                <div className="flex items-center gap-1 border rounded-md">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleZoomOut}
+                    disabled={zoomLevel <= 1}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+                  <span className="text-xs px-2 text-muted-foreground">
+                    {zoomConfigs[zoomLevel as keyof typeof zoomConfigs].label}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleZoomIn}
+                    disabled={zoomLevel >= 5}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              <MakesDropdown
+                value={selectedMake || "all"}
+                onValueChange={handleMakeChange}
+                makes={makes}
+                loading={makesLoading}
+                placeholder="All Makes"
+                allOptionLabel="All Makes"
+                allOptionValue="all"
+                loadingText="Loading makes..."
+                className="w-64 min-w-[16rem]"
+                triggerClassName="whitespace-nowrap"
+              />
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Min Year"
+                  value={minYear}
+                  onChange={(e) => handleYearChange("min", e.target.value)}
+                  className="w-24"
+                />
+                <Input
+                  placeholder="Max Year"
+                  value={maxYear}
+                  onChange={(e) => handleYearChange("max", e.target.value)}
+                  className="w-24"
+                />
+              </div>
+            </div>
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search cars..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="pl-9 pr-10"
+                />
+                {isSearching && (
+                  <div className="absolute right-3 top-3">
+                    <div className="w-4 h-4 border border-current border-t-transparent rounded-full animate-spin text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+            </div>
             <Link href="/cars/new" prefetch={true}>
-              <Button>
+              <Button
+                variant="ghost"
+                className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Add New Car
               </Button>
             </Link>
           </div>
 
-          {/* ✅ Quick filters - functional immediately with debouncing */}
-          <div className="bg-card rounded-lg border p-6 mb-6 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              {/* Search */}
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search cars..."
-                    value={searchQuery}
-                    onChange={(e) => handleSearchChange(e.target.value)}
-                    className="pl-9 pr-10"
-                  />
-                  {/* Search loading indicator */}
-                  {isSearching && (
-                    <div className="absolute right-3 top-3">
-                      <div className="w-4 h-4 border border-current border-t-transparent rounded-full animate-spin text-muted-foreground" />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Make filter - enhanced when background data loads */}
-              <div className="w-full sm:w-48">
-                <MakesDropdown
-                  value={selectedMake || "all"}
-                  onValueChange={handleMakeChange}
-                  makes={makes}
-                  loading={backgroundDataLoading}
-                  placeholder="All Makes"
-                  allOptionLabel="All Makes"
-                  allOptionValue="all"
-                  loadingText="Loading makes..."
-                />
-              </div>
-
-              {/* Year range */}
-              <div className="flex gap-2">
-                <div className="relative">
-                  <Input
-                    placeholder="Min Year"
-                    value={minYear}
-                    onChange={(e) => handleYearChange("min", e.target.value)}
-                    className="w-24 pr-8"
-                  />
-                  {isYearFiltering && minYear !== debouncedMinYear && (
-                    <div className="absolute right-2 top-3">
-                      <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin text-muted-foreground" />
-                    </div>
-                  )}
-                </div>
-                <div className="relative">
-                  <Input
-                    placeholder="Max Year"
-                    value={maxYear}
-                    onChange={(e) => handleYearChange("max", e.target.value)}
-                    className="w-24 pr-8"
-                  />
-                  {isYearFiltering && maxYear !== debouncedMaxYear && (
-                    <div className="absolute right-2 top-3">
-                      <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin text-muted-foreground" />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Clear filters */}
-              {hasActiveFilters && (
-                <Button variant="outline" onClick={clearFilters}>
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-
-            {/* Background loading indicator */}
-            {backgroundDataLoading && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                <span>Loading advanced filters...</span>
-              </div>
-            )}
-          </div>
-
-          {/* ✅ View controls */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div className="flex items-center gap-4">
-              <ViewModeSelector currentView={view} />
-              <PageSizeSelector
-                currentPageSize={pageSize}
-                options={[12, 24, 48, 96]}
-              />
-              <SortSelector currentSort={filters.sort || "createdAt_desc"} />
-            </div>
-
-            <div className="text-sm text-muted-foreground">
-              Showing {cars.length} of {pagination.totalCount} cars
-              {carsLoading && " (updating...)"}
-            </div>
-          </div>
+          {/* (Old filters and counts removed per updated layout) */}
 
           {/* ✅ Cars grid/list - Progressive enhancement pattern */}
           <div className="mb-8 relative">
             {/* Subtle loading overlay when updating existing data */}
             {isUpdatingResults && (
-              <div className="absolute inset-0 bg-background/50 backdrop-blur-sm rounded-lg z-10 flex items-center justify-center">
-                <div className="bg-card rounded-lg p-4 shadow-lg flex items-center gap-3">
+              <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-10 flex items-center justify-center">
+                <div className="bg-card rounded-none p-4 shadow-lg flex items-center gap-3">
                   <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                   <span className="text-sm font-medium">Updating cars...</span>
                 </div>
@@ -957,7 +975,7 @@ export default function CarsPageOptimized({
               // Show loading spinner only for true initial load
               <CarsLoadingSpinner />
             ) : view === "grid" ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className={`grid grid-cols-1 ${zoomConfigs[zoomLevel as keyof typeof zoomConfigs].cols} gap-4`}>
                 {cars.map((car) => (
                   <CarCard
                     key={car._id || `car-${car.make}-${car.model}-${car.year}`}
@@ -968,15 +986,7 @@ export default function CarsPageOptimized({
               </div>
             ) : (
               <div className="space-y-4">
-                {cars.map((car) => (
-                  <CarCard
-                    key={
-                      car._id || `car-list-${car.make}-${car.model}-${car.year}`
-                    }
-                    car={car}
-                    view={view}
-                  />
-                ))}
+                <CarsListView cars={cars} />
               </div>
             )}
 

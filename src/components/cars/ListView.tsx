@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useAPI } from "@/hooks/useAPI";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { Suspense } from "react";
 
 interface ListViewProps {
   cars: any[];
@@ -24,7 +25,15 @@ type SortField =
   | "location";
 type SortDirection = "asc" | "desc";
 
-export default function ListView({ cars, currentSearchParams }: ListViewProps) {
+function ListViewCore({ cars, currentSearchParams }: ListViewProps) {
+  const formatNumber = (value: unknown) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value.toLocaleString();
+    if (typeof value === "string" && value.trim() !== "") {
+      const n = Number(value);
+      if (Number.isFinite(n)) return n.toLocaleString();
+    }
+    return null;
+  };
   const api = useAPI();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -188,11 +197,11 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
                   className="block w-full h-full"
                   prefetch={true}
                 >
-                  {car.price &&
-                  typeof car.price === "object" &&
-                  car.price.listPrice
-                    ? `$${car.price.listPrice.toLocaleString()}`
-                    : "Price on request"}
+                  {(() => {
+                    const raw = car?.price && typeof car.price === "object" ? car.price.listPrice : undefined;
+                    const formatted = formatNumber(raw);
+                    return formatted ? `$${formatted}` : "Price on request";
+                  })()}
                 </Link>
               </td>
               <td className="w-[12%] py-2 px-3 text-right border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
@@ -201,11 +210,11 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
                   className="block w-full h-full"
                   prefetch={true}
                 >
-                  {car.mileage && car.mileage.value !== null
-                    ? `${car.mileage.value.toLocaleString()} ${
-                        car.mileage.unit
-                      }`
-                    : "-"}
+                  {(() => {
+                    const mv = car?.mileage?.value;
+                    const formatted = formatNumber(mv);
+                    return formatted ? `${formatted} ${car?.mileage?.unit || ""}`.trim() : "-";
+                  })()}
                 </Link>
               </td>
               <td className="w-[8%] py-2 px-3 text-right border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
@@ -214,9 +223,11 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
                   className="block w-full h-full"
                   prefetch={true}
                 >
-                  {car.engine?.power?.hp
-                    ? `${car.engine.power.hp.toLocaleString()} hp`
-                    : "-"}
+                  {(() => {
+                    const hp = car?.engine?.power?.hp as unknown;
+                    const formatted = formatNumber(hp);
+                    return formatted ? `${formatted} hp` : "-";
+                  })()}
                 </Link>
               </td>
               <td className="w-[10%] py-2 px-3 border border-[hsl(var(--border-subtle))]/10 dark:border-[hsl(var(--border-subtle))]/20 text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
@@ -259,5 +270,17 @@ export default function ListView({ cars, currentSearchParams }: ListViewProps) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+export default function ListView({ cars, currentSearchParams }: ListViewProps) {
+  return (
+    <Suspense fallback={
+      <div className="w-full flex items-center justify-center py-8">
+        <LoadingSpinner size="lg" />
+      </div>
+    }>
+      <ListViewCore cars={cars} currentSearchParams={currentSearchParams} />
+    </Suspense>
   );
 }

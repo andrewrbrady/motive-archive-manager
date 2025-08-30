@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Select,
@@ -54,7 +54,7 @@ interface SortSelectorProps {
   currentSort?: string;
 }
 
-export default function SortSelector({
+function SortSelectorCore({
   currentSort = "createdAt_desc",
 }: SortSelectorProps) {
   const router = useRouter();
@@ -80,6 +80,22 @@ export default function SortSelector({
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+export default function SortSelector({
+  currentSort = "createdAt_desc",
+}: SortSelectorProps) {
+  return (
+    <Suspense fallback={
+      <Select value={currentSort} disabled>
+        <SelectTrigger className="text-sm">
+          <SelectValue placeholder="Sort by..." />
+        </SelectTrigger>
+      </Select>
+    }>
+      <SortSelectorCore currentSort={currentSort} />
+    </Suspense>
   );
 }
 

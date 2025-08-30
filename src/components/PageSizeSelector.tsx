@@ -1,15 +1,16 @@
 "use client";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 interface PageSizeSelectorProps {
   currentPageSize: number;
   options: number[];
 }
 
-const PageSizeSelector = ({
+function PageSizeSelectorCore({
   currentPageSize,
   options,
-}: PageSizeSelectorProps) => {
+}: PageSizeSelectorProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -27,7 +28,7 @@ const PageSizeSelector = ({
         id="pageSize"
         value={currentPageSize}
         onChange={(e) => handlePageSizeChange(e.target.value)}
-        className="text-sm border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] rounded-md px-2 py-1.5 focus:outline-none focus:ring-0 focus:border-[hsl(var(--border-primary))] dark:focus:border-[hsl(var(--border-subtle))] w-full"
+        className="text-sm border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] rounded-md px-2 py-1.5 focus:outline-none focus:ring-0 focus:border-[hsl(var(--border-primary))] dark:focus:border-[hsl(var(--border-subtle))] w-24 min-w-[6rem]"
         title="Items per page"
       >
         {options.map((size) => (
@@ -37,6 +38,27 @@ const PageSizeSelector = ({
         ))}
       </select>
     </div>
+  );
+}
+
+const PageSizeSelector = ({
+  currentPageSize,
+  options,
+}: PageSizeSelectorProps) => {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center">
+        <select
+          className="text-sm border border-[hsl(var(--border-subtle))] dark:border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] dark:bg-[var(--background-primary)] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))] rounded-md px-2 py-1.5 focus:outline-none focus:ring-0 focus:border-[hsl(var(--border-primary))] dark:focus:border-[hsl(var(--border-subtle))] w-24 min-w-[6rem]"
+          title="Items per page"
+          disabled
+        >
+          <option value={currentPageSize}>{currentPageSize}</option>
+        </select>
+      </div>
+    }>
+      <PageSizeSelectorCore currentPageSize={currentPageSize} options={options} />
+    </Suspense>
   );
 };
 
