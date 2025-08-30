@@ -186,14 +186,10 @@ export function CustomTabs({
           </Select>
         </div>
       ) : (
-        /* Desktop Tab List */
-        <TabsList className="mb-8 h-auto min-h-[2.5rem] items-center justify-start p-1 text-[hsl(var(--muted-foreground))] w-full gap-2 overflow-visible bg-transparent flex flex-wrap">
+        /* Desktop Tab List: match Projects styling */
+        <TabsList className="flex flex-wrap w-full border-b-0">
           {items.map((item) => (
-            <TabsTrigger
-              key={item.value}
-              value={item.value}
-              className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium relative transition-all duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border border-transparent data-[state=active]:bg-transparent data-[state=active]:text-[hsl(var(--foreground))] data-[state=active]:border-[hsl(var(--border))] data-[state=active]:shadow-sm data-[state=inactive]:text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))/10] hover:text-[hsl(var(--foreground))] hover:border-[hsl(var(--border))]/50 hover:-translate-y-0.5 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[hsl(var(--primary))] after:scale-x-0 after:origin-center after:transition-transform after:duration-200 hover:after:scale-x-100 data-[state=active]:after:scale-x-100 mb-1"
-            >
+            <TabsTrigger key={item.value} value={item.value}>
               {item.label}
             </TabsTrigger>
           ))}

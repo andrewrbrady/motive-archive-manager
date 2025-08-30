@@ -363,9 +363,15 @@ export function useGenericImageGallery({
 
       // Add filters
       Object.entries(currentFilters).forEach(([key, value]) => {
-        if (value && value !== "all" && value !== "") {
-          params.set(key, value);
+        if (!value || value === "all" || value === "") return;
+
+        // Map client key 'tod' to API key 'timeOfDay'
+        if (key === "tod") {
+          params.set("timeOfDay", value);
+          return;
         }
+
+        params.set(key, value);
       });
 
       // Add search
@@ -388,11 +394,8 @@ export function useGenericImageGallery({
       immediate = false
     ) => {
       const doFetch = async () => {
-        if (!api || !entityId) {
-          console.log("❌ [DO FETCH] Missing api or entityId:", {
-            api: !!api,
-            entityId,
-          });
+        if (!entityId) {
+          console.log("❌ [DO FETCH] Missing entityId, cannot fetch images");
           return;
         }
 
@@ -461,7 +464,10 @@ export function useGenericImageGallery({
             apiUrl
           );
 
-          const response = await api.get(apiUrl, { skipAuth: true });
+          // Allow fetching even before auth is ready (these endpoints are public)
+          const response = api
+            ? await api.get(apiUrl, { skipAuth: true })
+            : await fetch(apiUrl).then((r) => r.json());
 
           // Check if request was cancelled
           if (signal.aborted) {
@@ -591,8 +597,33 @@ export function useGenericImageGallery({
     ) => {
       let filtered = [...imageList];
 
-      // Apply metadata filters
+      // Handle special filters first to avoid incorrect metadata matching
+      if (currentFilters.imageType && currentFilters.imageType !== "all") {
+        if (currentFilters.imageType === "processed") {
+          // Processed images have originalImage metadata
+          filtered = filtered.filter((img) => Boolean(img.metadata?.originalImage));
+        } else if (currentFilters.imageType === "with-id") {
+          // Original images do not have originalImage metadata
+          filtered = filtered.filter((img) => !img.metadata?.originalImage);
+        }
+      }
+
+      if (currentFilters.hasImageId) {
+        filtered = filtered.filter(
+          (img) => Boolean(img.imageId || img.metadata?.imageId)
+        );
+      }
+
+      // Apply metadata filters (exclude non-metadata keys)
+      const NON_METADATA_KEYS = new Set([
+        "imageType",
+        "hasImageId",
+        "sortBy",
+        "sortDirection",
+      ]);
+
       Object.entries(currentFilters).forEach(([key, value]) => {
+        if (NON_METADATA_KEYS.has(key)) return;
         if (value && value !== "all" && value !== "") {
           filtered = filtered.filter((image) => {
             const metadataValue = image.metadata?.[key];
@@ -875,13 +906,8 @@ export function useGenericImageGallery({
       hasApi: !!api,
     });
 
-    if (!entityId || !api) {
-      console.log("🚫 [EFFECT] Skipping fetch - missing requirements:", {
-        hasEntityId: !!entityId,
-        hasApi: !!api,
-        apiStatus: api ? "present" : "null",
-        authStatus: "checking...",
-      });
+    if (!entityId) {
+      console.log("🚫 [EFFECT] Skipping fetch - missing entityId");
       return;
     }
 
