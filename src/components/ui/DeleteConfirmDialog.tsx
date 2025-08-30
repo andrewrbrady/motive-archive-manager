@@ -17,6 +17,8 @@ interface DeleteConfirmDialogProps {
   onConfirm: () => void;
   title: string;
   description: string;
+  confirmText?: string;
+  confirmDisabled?: boolean;
 }
 
 export default function DeleteConfirmDialog({
@@ -25,6 +27,8 @@ export default function DeleteConfirmDialog({
   onConfirm,
   title,
   description,
+  confirmText = "Delete",
+  confirmDisabled = false,
 }: DeleteConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -37,9 +41,10 @@ export default function DeleteConfirmDialog({
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
-            className="bg-destructive-600 hover:bg-destructive-700"
+            disabled={confirmDisabled}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            Delete
+            {confirmText}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

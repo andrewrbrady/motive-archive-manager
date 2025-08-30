@@ -735,13 +735,11 @@ export default function JsonGenerationModal({
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(90vh-120px)]">
           {/* Left Column - Configuration */}
-          <div className="space-y-4 overflow-y-auto">
+          <div className="space-y-6 overflow-y-auto pr-1">
             {/* Prompt Template Selection */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">AI Prompt Template</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <div className="pb-4 border-b border-border-primary">
+              <div className="pb-2 text-sm font-medium text-text-primary">AI Prompt Template</div>
+              <div className="space-y-3">
                 {loading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -791,15 +789,13 @@ export default function JsonGenerationModal({
                     </div>
                   </>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* System Prompt Selection */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">System Prompt</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <div className="pb-4 border-b border-border-primary">
+              <div className="pb-2 text-sm font-medium text-text-primary">System Prompt</div>
+              <div className="space-y-3">
                 {loadingSystemPrompts ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -834,66 +830,58 @@ export default function JsonGenerationModal({
                     </SelectContent>
                   </Select>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* LLM Preview */}
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm">LLM Preview</CardTitle>
-                  <div className="flex gap-2">
+            <div className="pb-4 border-b border-border-primary">
+              <div className="flex items-center justify-between pb-2">
+                <div className="text-sm font-medium text-text-primary">LLM Preview</div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleShowPreviewToggle}
+                    disabled={!selectedPromptId || !selectedSystemPromptId}
+                  >
+                    {showPreview ? "Hide Preview" : "Show Preview"}
+                  </Button>
+                  {showPreview && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={handleShowPreviewToggle}
-                      disabled={!selectedPromptId || !selectedSystemPromptId}
+                      onClick={handleRefreshLLMText}
                     >
-                      {showPreview ? "Hide Preview" : "Show Preview"}
+                      Refresh
                     </Button>
-                    {showPreview && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRefreshLLMText}
-                      >
-                        Refresh
-                      </Button>
-                    )}
-                  </div>
+                  )}
                 </div>
-              </CardHeader>
+              </div>
               {showPreview && (
-                <CardContent>
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">
-                      Preview and edit what will be sent to the AI model:
-                    </Label>
-                    <Textarea
-                      value={editableLLMText}
-                      onChange={(e) => setEditableLLMText(e.target.value)}
-                      placeholder="LLM preview will appear here..."
-                      className="min-h-[200px] font-mono text-xs resize-none"
-                    />
-                  </div>
-                </CardContent>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Preview and edit what will be sent to the AI model:
+                  </Label>
+                  <Textarea
+                    value={editableLLMText}
+                    onChange={(e) => setEditableLLMText(e.target.value)}
+                    placeholder="LLM preview will appear here..."
+                    className="min-h-[220px] font-mono text-xs resize-none"
+                  />
+                </div>
               )}
-            </Card>
+            </div>
 
             {/* Additional Context */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Additional Context</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  placeholder="Provide any additional details about the car (special features, modifications, history, etc.)"
-                  value={additionalContext}
-                  onChange={(e) => setAdditionalContext(e.target.value)}
-                  className="min-h-[100px] resize-none"
-                />
-              </CardContent>
-            </Card>
+            <div className="pb-4 border-b border-border-primary">
+              <div className="pb-2 text-sm font-medium text-text-primary">Additional Context</div>
+              <Textarea
+                placeholder="Provide any additional details about the car (special features, modifications, history, etc.)"
+                value={additionalContext}
+                onChange={(e) => setAdditionalContext(e.target.value)}
+                className="min-h-[120px] resize-none"
+              />
+            </div>
 
             {/* Existing Car Data Display */}
             {carData && Object.keys(carData).some((key) => carData[key]) && (

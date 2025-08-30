@@ -844,15 +844,15 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
       "text-lg font-semibold text-text-primary uppercase tracking-tight";
 
     return (
-      <form onSubmit={handleSubmit} className="space-y-8 mb-16">
-        <div className="rounded-lg border border-border-primary divide-y divide-border-primary">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+      <form onSubmit={handleSubmit} className="space-y-4 mb-12">
+        <div className="py-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Basic Information */}
             <div className="space-y-4">
               <h2 className={sectionTitleClasses}>Basic Information</h2>
 
               <div>
-                <label className={labelClasses}>Make</label>
+                <label className={labelClasses}>Make *</label>
                 <input
                   type="text"
                   value={formData.make}
@@ -863,7 +863,7 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
               </div>
 
               <div>
-                <label className={labelClasses}>Model</label>
+                <label className={labelClasses}>Model *</label>
                 <input
                   type="text"
                   value={formData.model}
@@ -1047,10 +1047,23 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
           </div>
         </div>
 
+        {/* Description */}
+        <div className="py-4">
+          <h2 className={sectionTitleClasses}>Description</h2>
+          <div>
+            <textarea
+              value={formData.description}
+              onChange={(e) => handleChange("description", e.target.value)}
+              rows={8}
+              className={`${inputClasses} min-h-[200px]`}
+            />
+          </div>
+        </div>
+
         {/* Engine Information */}
-        <div className="rounded-lg border border-border-primary divide-y divide-border-primary p-6">
+        <div className="py-4">
           <h2 className={sectionTitleClasses}>Engine Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div>
               <label className={labelClasses}>Engine Type</label>
               <input
@@ -1099,9 +1112,9 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
         </div>
 
         {/* Vehicle Details */}
-        <div className="rounded-lg border border-border-primary divide-y divide-border-primary p-6">
+        <div className="py-4">
           <h2 className={sectionTitleClasses}>Vehicle Details</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div>
               <label className={labelClasses}>Series</label>
               <input
@@ -1192,9 +1205,9 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
         </div>
 
         {/* Manufacturing Information */}
-        <div className="rounded-lg border border-border-primary divide-y divide-border-primary p-6">
+        <div className="py-4">
           <h2 className={sectionTitleClasses}>Manufacturing Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div>
               <label className={labelClasses}>Plant City</label>
               <input
@@ -1248,19 +1261,6 @@ const CarEntryForm = forwardRef<CarEntryFormRef, CarEntryFormProps>(
                 className={inputClasses}
               />
             </div>
-          </div>
-        </div>
-
-        {/* Description */}
-        <div className="rounded-lg border border-border-primary divide-y divide-border-primary p-6">
-          <h2 className={sectionTitleClasses}>Description</h2>
-          <div>
-            <textarea
-              value={formData.description}
-              onChange={(e) => handleChange("description", e.target.value)}
-              rows={4}
-              className={inputClasses}
-            />
           </div>
         </div>
 

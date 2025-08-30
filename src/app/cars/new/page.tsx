@@ -106,18 +106,7 @@ function NewCarPageContent() {
               </div>
             </div>
 
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h3 className="text-sm font-medium text-blue-900 mb-2">
-                JSON Import Instructions
-              </h3>
-              <p className="text-sm text-blue-700">
-                Upload a JSON file or paste a JSON object to automatically
-                populate the form fields with car data. The JSON must contain at
-                least <code className="bg-blue-100 px-1 rounded">make</code> and{" "}
-                <code className="bg-blue-100 px-1 rounded">model</code> fields.
-                You can review and edit the populated data before submitting.
-              </p>
-            </div>
+            {/* Removed JSON Import Instructions per design update */}
 
             <CarEntryForm
               ref={carFormRef}

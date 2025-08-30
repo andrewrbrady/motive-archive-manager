@@ -315,7 +315,7 @@ export default function JsonUploadPasteModal({
               }
               value={jsonText}
               onChange={(e) => handleTextChange(e.target.value)}
-              className="min-h-[200px] font-mono text-sm"
+              className="min-h-[320px] font-mono text-sm"
             />
           </div>
 
@@ -356,16 +356,20 @@ export default function JsonUploadPasteModal({
             </Card>
           )}
 
-          {/* Example format hint */}
-          <Card className="bg-blue-50 border-blue-200">
+          {/* Example format hint (smaller, truncated, with copy) */}
+          <Card className="bg-blue-50 border-blue-200 relative">
             <CardContent className="pt-4">
-              <p className="text-sm text-blue-800 font-medium mb-2">
-                Expected format for {expectedType}:
-              </p>
-              <pre className="text-xs text-blue-700 overflow-x-auto">
-                {(() => {
-                  if (expectedType === "events") {
-                    return `[
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-blue-800 font-medium">
+                  Expected format for {expectedType}:
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const fullExample = (() => {
+                      if (expectedType === "events") {
+                        return `[
   {
     "type": "PRODUCTION",
     "title": "Video Shoot",
@@ -375,8 +379,8 @@ export default function JsonUploadPasteModal({
     "isAllDay": false
   }
 ]`;
-                  } else if (expectedType === "deliverables") {
-                    return `[
+                      } else if (expectedType === "deliverables") {
+                        return `[
   {
     "title": "Instagram Reel",
     "platform": "Instagram Reels",
@@ -389,8 +393,8 @@ export default function JsonUploadPasteModal({
     "status": "not_started"
   }
 ]`;
-                  } else if (expectedType === "models") {
-                    return `{
+                      } else if (expectedType === "models") {
+                        return `{
   "make": "BMW",
   "model": "3 Series",
   "generation": {
@@ -433,34 +437,77 @@ export default function JsonUploadPasteModal({
   "description": "Compact executive car",
   "tags": ["luxury", "performance", "sedan"]
 }`;
-                  } else {
-                    return `{
-  "make": "Toyota",
-  "model": "Camry",
-  "year": 2020,
-  "color": "Silver",
-  "mileage": {
-    "value": 50000,
-    "unit": "miles"
-  },
-  "vin": "1HGBH41JXMN109186",
-  "status": "available",
-  "condition": "excellent",
+                      } else {
+                        // Full working example for a Car (matches CarEntryForm schema)
+                        return `{
+  "make": "BMW",
+  "model": "M3",
+  "year": 2017,
   "price": {
-    "listPrice": 25000,
-    "priceHistory": []
+    "listPrice": 48900,
+    "soldPrice": null,
+    "priceHistory": [
+      { "type": "list", "price": 49900, "date": "2024-05-01T00:00:00.000Z", "notes": "Initial listing" },
+      { "type": "list", "price": 48900, "date": "2024-05-15T00:00:00.000Z", "notes": "Price adjustment" }
+    ]
   },
+  "mileage": { "value": 32500, "unit": "mi" },
+  "color": "Alpine White",
+  "horsepower": 425,
+  "location": "San Francisco, CA",
+  "description": "Well-maintained M3 with competition package.",
+  "type": "Sedan",
+  "vin": "WBS8M9C54H5A12345",
+  "interior_color": "Black",
+  "status": "available",
+  "client": "",
   "engine": {
-    "type": "4-cylinder",
-    "displacement": {
-      "value": 2.5,
-      "unit": "L"
-    }
+    "type": "3.0L Twin-Turbo I6",
+    "displacement": { "value": 3.0, "unit": "L" },
+    "power": { "hp": 425, "kW": 317, "ps": 431 },
+    "torque": { "lb-ft": 406, "Nm": 550 },
+    "features": ["Twin-turbocharged", "Direct injection"]
   },
-  "transmission": {
-    "type": "automatic"
-  }
+  "manufacturing": {
+    "series": "F80",
+    "trim": "Competition",
+    "bodyClass": "Sedan",
+    "plant": { "city": "Munich", "country": "Germany", "company": "BMW" }
+  },
+  "safety": { "tpms": true },
+  "dimensions": {
+    "wheelbase": { "value": 110.7, "unit": "in" },
+    "weight": { "value": 3540, "unit": "lbs" },
+    "gvwr": { "value": 4519, "unit": "lbs" },
+    "trackWidth": { "value": 62.5, "unit": "in" }
+  },
+  "doors": 4
 }`;
+                      }
+                    })();
+                    navigator.clipboard
+                      .writeText(fullExample)
+                      .then(() => toast.success("Example copied"))
+                      .catch(() => toast.error("Copy failed"));
+                  }}
+                >
+                  Copy Example
+                </Button>
+              </div>
+              <pre className="text-[11px] text-blue-700 overflow-x-auto max-h-48">
+                {(() => {
+                  if (expectedType === "events") {
+                    return `[
+  { "type": "PRODUCTION", "title": "Video Shoot", "description": "Main video production", "start": "2024-01-15T09:00:00.000Z", "end": "2024-01-15T17:00:00.000Z", "isAllDay": false }
+]`;
+                  } else if (expectedType === "deliverables") {
+                    return `[
+  { "title": "Instagram Reel", "platform": "Instagram Reels", "type": "Video", "duration": 15, "aspect_ratio": "9:16", "edit_deadline": "2024-01-20T17:00:00.000Z", "release_date": "2024-01-22T12:00:00.000Z", "editor": "John Doe", "status": "not_started" }
+]`;
+                  } else if (expectedType === "models") {
+                    return `{"make":"BMW","model":"3 Series","generation":{"code":"F30","year_range":{"start":2012,"end":2019}}}`;
+                  } else {
+                    return `{"make":"Toyota","model":"Camry","year":2020,"vin":"1HGBH41JXMN109186"}`;
                   }
                 })()}
               </pre>

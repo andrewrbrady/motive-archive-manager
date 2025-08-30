@@ -20,10 +20,13 @@ interface FilterParams {
   search?: string;
 }
 
-export default async function CarsPage(props: any) {
+export default async function CarsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   try {
-    const searchParams = props.searchParams || {};
-    const resolvedParams = searchParams;
+    const resolvedParams = (await searchParams) || {};
 
     const page = Number(resolvedParams.page) || 1;
     const pageSize = Number(resolvedParams.pageSize) || 96;

@@ -5,7 +5,7 @@ import { useAPIQuery } from "@/hooks/useAPIQuery";
 import { Car } from "@/types/car";
 import { CarsErrorBoundary } from "@/components/cars/CarsErrorBoundary";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, ArrowRight, ZoomIn, ZoomOut } from "lucide-react";
+import { Plus, Search, ArrowRight, ZoomIn, ZoomOut, Edit, Trash2, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
@@ -21,8 +21,9 @@ import {
 } from "@/components/performance/PerformanceMonitor";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fixCloudflareImageUrl } from "@/lib/image-utils";
-import { usePrefetchAPI } from "@/hooks/useAPIQuery";
+import { usePrefetchAPI, useAPIQueryClient } from "@/hooks/useAPIQuery";
 import CarsListView from "@/components/cars/ListView";
+import DeleteConfirmDialog from "@/components/ui/DeleteConfirmDialog";
 import { MakesDropdown, MakeData } from "@/components/ui/MakesDropdown";
 
 interface FilterParams {
@@ -227,9 +228,12 @@ function CarImage({ car, className = "aspect-video", hoverImageUrl, isHovered = 
 interface CarCardProps {
   car: Car;
   view: "grid" | "list";
+  isBatchMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
-function CarCard({ car, view }: CarCardProps) {
+function CarCard({ car, view, isBatchMode = false, isSelected = false, onToggleSelect }: CarCardProps) {
   const { prefetch } = usePrefetchAPI();
   const [hoverTimeoutId, setHoverTimeoutId] = useState<NodeJS.Timeout | null>(
     null
@@ -273,27 +277,61 @@ function CarCard({ car, view }: CarCardProps) {
   }, []); // ✅ Empty dependency array to prevent infinite re-renders
 
   if (view === "grid") {
+    const className =
+      "block bg-card rounded-none border border-[hsl(var(--border-subtle))] hover:border-white hover:ring-1 hover:ring-white/70 transition-colors duration-200 overflow-hidden group";
+
+    const inner = (
+      <>
+        <div className={`relative ${isBatchMode ? "cursor-pointer" : ""}`}>
+          {isBatchMode && (
+            <div className="absolute top-2 left-2 z-10 bg-background/80 rounded-full p-1.5 border border-[hsl(var(--border-subtle))]">
+              <CheckCircle2 className={`h-5 w-5 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+            </div>
+          )}
+          <CarImage
+            car={car}
+            className={`aspect-video ${isSelected ? "ring-2 ring-primary" : ""}`}
+            hoverImageUrl={car.images && car.images[1]?.url ? car.images[1].url : null}
+            isHovered={isHovered}
+          />
+        </div>
+        <div className="p-2 flex items-center justify-between">
+          <h3 className="font-semibold truncate">
+            {car.year} {car.make} {car.model}
+          </h3>
+          {!isBatchMode && (
+            <ArrowRight className="ml-3 h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+          )}
+        </div>
+      </>
+    );
+
+    if (isBatchMode) {
+      return (
+        <div
+          key={car._id || `car-${car.make}-${car.model}-${car.year}`}
+          className={className}
+          onClick={() => onToggleSelect && onToggleSelect(car._id)}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          role="button"
+          aria-pressed={isSelected}
+        >
+          {inner}
+        </div>
+      );
+    }
+
     return (
       <Link
         href={`/cars/${car._id}`}
         prefetch={true}
         key={car._id || `car-${car.make}-${car.model}-${car.year}`}
-        className="block bg-card rounded-none border border-[hsl(var(--border-subtle))] hover:border-white hover:ring-1 hover:ring-white/70 transition-colors duration-200 overflow-hidden group"
+        className={className}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <CarImage
-          car={car}
-          className="aspect-video"
-          hoverImageUrl={car.images && car.images[1]?.url ? car.images[1].url : null}
-          isHovered={isHovered}
-        />
-        <div className="p-2 flex items-center justify-between">
-          <h3 className="font-semibold truncate">
-            {car.year} {car.make} {car.model}
-          </h3>
-          <ArrowRight className="ml-3 h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-        </div>
+        {inner}
       </Link>
     );
   }
@@ -336,6 +374,15 @@ export default function CarsPageOptimized({
 }: CarsPageOptimizedProps) {
   // ✅ COMPONENT STATE: Organize state logically
   const [hasEverLoaded, setHasEverLoaded] = useState(false);
+  // Mount guard to avoid SSR/CSR hydration mismatches
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
+  // Cache-busting flag to bypass ISR/CDN after destructive actions
+  const [cacheBust, setCacheBust] = useState<string>("");
+  // Batch delete mode state
+  const [isBatchMode, setIsBatchMode] = useState<boolean>(isEditMode);
+  const [selectedCarIds, setSelectedCarIds] = useState<string[]>([]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // ✅ FILTER STATE: Separate filter state management
   const [searchQuery, setSearchQuery] = useState(filters.search || "");
@@ -426,6 +473,7 @@ export default function CarsPageOptimized({
     if (debouncedMaxYear) params.push(`maxYear=${debouncedMaxYear}`);
     if (filters.sort) params.push(`sort=${filters.sort}`);
     if (filters.clientId) params.push(`clientId=${filters.clientId}`);
+    if (cacheBust) params.push(`_=${cacheBust}`);
 
     return params.join("&");
   }, [
@@ -438,6 +486,7 @@ export default function CarsPageOptimized({
     debouncedMaxYear,
     filters.sort,
     filters.clientId,
+    cacheBust,
   ]);
 
   // ✅ CRITICAL PATH: Cars data with React Query caching
@@ -497,6 +546,7 @@ export default function CarsPageOptimized({
 
   // ✅ PHASE 1B: Pagination prefetching for seamless user experience
   const { prefetch } = usePrefetchAPI();
+  const queryClient = useAPIQueryClient();
 
   // ✅ PHASE 1C: Non-blocking URL update function - defer heavy operations
   const updateURL = useCallback((newParams: URLSearchParams) => {
@@ -507,6 +557,67 @@ export default function CarsPageOptimized({
       window.history.pushState({}, "", newUrl);
     }, 0);
   }, []);
+
+  // Toggle batch mode and sync URL param `edit`
+  const toggleBatchMode = useCallback(() => {
+    setIsBatchMode((prev) => {
+      const next = !prev;
+      const params = new URLSearchParams(window.location.search);
+      if (next) params.set("edit", "true");
+      else params.delete("edit");
+      setTimeout(() => {
+        const url = new URL(window.location.href);
+        url.search = params.toString();
+        window.history.pushState({}, "", url.toString());
+      }, 0);
+      if (!next) setSelectedCarIds([]);
+      return next;
+    });
+  }, []);
+
+  const onToggleSelect = useCallback((id: string) => {
+    setSelectedCarIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }, []);
+
+  const onDeleteSelected = useCallback(async () => {
+    if (selectedCarIds.length === 0) return;
+    // Optimistically remove cars from the current cache
+    try {
+      queryClient.setQueryData(["cars", queryKey], (prev: any) => {
+        if (!prev) return prev;
+        const remaining = (prev.cars || []).filter(
+          (c: Car) => !selectedCarIds.includes(c._id)
+        );
+        const pagination = prev.pagination || {};
+        const newTotal = Math.max((pagination.totalCount || 0) - selectedCarIds.length, 0);
+        return {
+          ...prev,
+          cars: remaining,
+          pagination: {
+            ...pagination,
+            totalCount: newTotal,
+          },
+        };
+      });
+    } catch {}
+    try {
+      await Promise.all(
+        selectedCarIds.map((id) => fetch(`/api/cars/${id}`, { method: "DELETE" }))
+      );
+      setShowDeleteDialog(false);
+      setSelectedCarIds([]);
+      setIsBatchMode(false);
+      // Invalidate and refetch to ensure freshness beyond CDN cache
+      queryClient.invalidateQueries({ queryKey: ["cars"] });
+      // Bypass ISR/CDN cache for the next fetch
+      setCacheBust(Date.now().toString());
+      await refreshCars();
+    } catch (err) {
+      console.error("Batch delete cars failed", err);
+    }
+  }, [selectedCarIds, refreshCars, queryClient, queryKey]);
 
   // ✅ PHASE 1C: Optimized URL updates - batch and defer operations
   useEffect(() => {
@@ -683,8 +794,9 @@ export default function CarsPageOptimized({
     prefetch,
   ]);
 
-  // ✅ Phase 1A: Progressive loading - show skeleton cards instead of blocking spinner
-  if (isInitialLoad) {
+  // ✅ Phase 1A: Progressive loading & hydration-safe initial pass
+  // Also render skeleton until mounted to keep SSR/CSR markup identical
+  if (!isMounted || isInitialLoad) {
     return (
       <CarsErrorBoundary>
         <PerformanceMonitor name="CarsPageOptimized" />
@@ -759,15 +871,48 @@ export default function CarsPageOptimized({
                   />
                 </div>
               </div>
-              <Link href="/cars/new" prefetch={true}>
-                <Button
-                  variant="ghost"
-                  className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add New Car
-                </Button>
-              </Link>
+              {!isBatchMode ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
+                    onClick={toggleBatchMode}
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </Button>
+                  <Link href="/cars/new" prefetch={true}>
+                    <Button
+                      variant="ghost"
+                      className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add New Car
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">{selectedCarIds.length} selected</span>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    disabled={selectedCarIds.length === 0}
+                    onClick={() => setShowDeleteDialog(true)}
+                    aria-label="Delete selected cars"
+                    title="Delete selected"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="h-9 px-3"
+                    onClick={toggleBatchMode}
+                  >
+                    Done
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* ✅ Phase 1A: Show skeleton cards instead of blocking spinner */}
@@ -946,15 +1091,48 @@ export default function CarsPageOptimized({
                 )}
               </div>
             </div>
-            <Link href="/cars/new" prefetch={true}>
-              <Button
-                variant="ghost"
-                className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add New Car
-              </Button>
-            </Link>
+            {!isBatchMode ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
+                  onClick={toggleBatchMode}
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <Link href="/cars/new" prefetch={true}>
+                  <Button
+                    variant="ghost"
+                    className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add New Car
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{selectedCarIds.length} selected</span>
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  disabled={selectedCarIds.length === 0}
+                  onClick={() => setShowDeleteDialog(true)}
+                  aria-label="Delete selected cars"
+                  title="Delete selected"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="h-9 px-3"
+                  onClick={toggleBatchMode}
+                >
+                  Done
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* (Old filters and counts removed per updated layout) */}
@@ -981,10 +1159,13 @@ export default function CarsPageOptimized({
                     key={car._id || `car-${car.make}-${car.model}-${car.year}`}
                     car={car}
                     view={view}
+                    isBatchMode={isBatchMode}
+                    isSelected={selectedCarIds.includes(car._id)}
+                    onToggleSelect={onToggleSelect}
                   />
                 ))}
               </div>
-            ) : (
+          ) : (
               <div className="space-y-4">
                 <CarsListView cars={cars} />
               </div>
@@ -1021,6 +1202,19 @@ export default function CarsPageOptimized({
               />
             </div>
           )}
+          {/* Delete confirmation dialog */}
+          <DeleteConfirmDialog
+            open={showDeleteDialog}
+            onOpenChange={setShowDeleteDialog}
+            onConfirm={onDeleteSelected}
+            title={`Delete ${selectedCarIds.length} car${selectedCarIds.length === 1 ? "" : "s"}?`}
+            description={
+              selectedCarIds.length === 1
+                ? "This car will be permanently deleted. This action cannot be undone."
+                : "All selected cars will be permanently deleted. This action cannot be undone."
+            }
+            confirmText={selectedCarIds.length === 1 ? "Delete Car" : "Delete Selected"}
+          />
         </div>
       </div>
     </CarsErrorBoundary>
