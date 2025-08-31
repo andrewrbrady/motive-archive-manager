@@ -15,8 +15,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { PageTitle } from "@/components/ui/PageTitle";
-import { Plus, Search, Calendar, Users, ImageIcon } from "lucide-react";
+import AutoGrid from "@/components/ui/AutoGrid";
+import { ToolbarRow } from "@/components/ui/ToolbarRow";
+import { gridCardClasses } from "@/components/ui/gridCard";
+import { Plus, Search, Calendar, Users, ImageIcon, ZoomIn, ZoomOut } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import Image from "next/image";
@@ -31,6 +33,36 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  // Zoom controls (aligned with /cars and /galleries)
+  const [zoomLevel, setZoomLevel] = useState(3);
+  useEffect(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem("projects-zoom-level") : null;
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (parsed >= 1 && parsed <= 5) setZoomLevel(parsed);
+    }
+  }, []);
+  const zoomConfigs = {
+    1: { cols: "md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8", label: "8" },
+    2: { cols: "md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6", label: "6" },
+    3: { cols: "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4", label: "4" },
+    4: { cols: "md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3", label: "3" },
+    5: { cols: "md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2", label: "2" },
+  } as const;
+  const handleZoomIn = () => {
+    if (zoomLevel < 5) {
+      const next = zoomLevel + 1;
+      setZoomLevel(next);
+      if (typeof window !== "undefined") localStorage.setItem("projects-zoom-level", next.toString());
+    }
+  };
+  const handleZoomOut = () => {
+    if (zoomLevel > 1) {
+      const next = zoomLevel - 1;
+      setZoomLevel(next);
+      if (typeof window !== "undefined") localStorage.setItem("projects-zoom-level", next.toString());
+    }
+  };
 
   // Use the new React Query hook for projects with image loading
   const {
@@ -129,59 +161,83 @@ export default function ProjectsPage() {
     <div className="min-h-screen bg-background">
       <main className="container-wide px-6 py-8">
         <div className="space-y-6 sm:space-y-8">
-          <PageTitle title="Projects" count={projects.length} />
-
-          {/* Search, Filters, and Controls Row */}
-          <div className="flex flex-wrap items-center gap-4 justify-between">
-            {/* Left side: Search and Filters */}
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2 min-w-[300px]">
-                <Search className="h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search projects..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="flex-1"
+          {/* Unified toolbar (single line) */}
+          <ToolbarRow
+            left={
+              <>
+                <div className="flex items-center gap-2 min-w-[280px]">
+                  <Search className="h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search projects..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="flex-1"
+                  />
+                </div>
+                <div className="flex items-center gap-1 border rounded-md">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleZoomOut}
+                    disabled={zoomLevel <= 1}
+                    className="h-8 w-8 p-0"
+                    title="Zoom out (more columns)"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+                  <span className="text-xs px-2 text-muted-foreground">
+                    {zoomConfigs[zoomLevel as keyof typeof zoomConfigs].label}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleZoomIn}
+                    disabled={zoomLevel >= 5}
+                    className="h-8 w-8 p-0"
+                    title="Zoom in (fewer columns)"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                </div>
+                <CustomDropdown
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  options={[
+                    { value: "all", label: "All Status" },
+                    { value: "active", label: "Active" },
+                    { value: "in_review", label: "In Review" },
+                    { value: "completed", label: "Completed" },
+                    { value: "archived", label: "Archived" },
+                  ]}
+                  placeholder="Status"
+                  className="w-[150px]"
                 />
-              </div>
-
-              <CustomDropdown
-                value={statusFilter}
-                onChange={setStatusFilter}
-                options={[
-                  { value: "all", label: "All Status" },
-                  { value: "active", label: "Active" },
-                  { value: "in_review", label: "In Review" },
-                  { value: "completed", label: "Completed" },
-                  { value: "archived", label: "Archived" },
-                ]}
-                placeholder="Status"
-                className="w-[150px]"
-              />
-
-              <CustomDropdown
-                value={typeFilter}
-                onChange={setTypeFilter}
-                options={[
-                  { value: "all", label: "All Types" },
-                  { value: "documentation", label: "Documentation" },
-                  { value: "media_campaign", label: "Media Campaign" },
-                  { value: "event_coverage", label: "Event Coverage" },
-                  { value: "custom", label: "Custom" },
-                ]}
-                placeholder="Type"
-                className="w-[150px]"
-              />
-            </div>
-
-            {/* Right side: Add Project Button */}
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <Button onClick={() => router.push("/projects/new")}>
+                <CustomDropdown
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                  options={[
+                    { value: "all", label: "All Types" },
+                    { value: "documentation", label: "Documentation" },
+                    { value: "media_campaign", label: "Media Campaign" },
+                    { value: "event_coverage", label: "Event Coverage" },
+                    { value: "custom", label: "Custom" },
+                  ]}
+                  placeholder="Type"
+                  className="w-[150px]"
+                />
+              </>
+            }
+            right={
+              <Button
+                variant="ghost"
+                className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
+                onClick={() => router.push("/projects/new")}
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Add Project
               </Button>
-            </div>
-          </div>
+            }
+          />
 
           {/* Projects Grid */}
           {projects.length === 0 ? (
@@ -192,16 +248,21 @@ export default function ProjectsPage() {
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <AutoGrid
+              zoomLevel={zoomLevel}
+              colsMap={zoomConfigs as any}
+              baseCols="grid grid-cols-1"
+              gap="gap-6"
+            >
               {projects.map((project) => {
                 return (
                   <Card
                     key={project._id}
-                    className="cursor-pointer hover:shadow-lg transition-shadow overflow-hidden"
+                    className={gridCardClasses()}
                     onClick={() => router.push(`/projects/${project._id}`)}
                   >
                     {/* Primary Image - Now properly loaded from React Query */}
-                    <div className="relative aspect-[16/9]">
+                    <div className="relative aspect-[16/9] overflow-hidden">
                       <ProjectImageDisplay
                         primaryImageUrl={project.primaryImageUrl}
                         primaryImageId={project.primaryImageId}
@@ -255,7 +316,7 @@ export default function ProjectsPage() {
                   </Card>
                 );
               })}
-            </div>
+            </AutoGrid>
           )}
         </div>
       </main>

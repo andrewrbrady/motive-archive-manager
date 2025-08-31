@@ -88,7 +88,7 @@ export function ProjectImageDisplay({
             alt={`${projectTitle} cover image`}
             fill
             className={cn(
-              "object-cover transition-opacity duration-300",
+              "object-cover transition-opacity duration-300 hover-zoom-media",
               imageLoaded ? "opacity-100" : "opacity-0"
             )}
             sizes={sizes}

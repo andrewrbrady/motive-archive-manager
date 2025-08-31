@@ -58,7 +58,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "use-debounce";
-import { PageTitle } from "@/components/ui/PageTitle";
+// Page title removed for unified toolbar
 
 // Define the allowed values for each field used in image metadata filtering
 const allowedValues = {
@@ -352,7 +352,8 @@ export default function ImagesClient() {
     <div className="min-h-screen bg-background">
       <main className="container-wide px-6 py-8">
         <div className="space-y-6 sm:space-y-8">
-          <PageTitle title="Images" count={data?.pagination?.total || 0}>
+          {/* Unified toolbar (single line) */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 mb-2">
             <div className="flex items-center gap-2">
               {/* Zoom Controls */}
               <div className="flex items-center gap-1 border rounded-md">
@@ -379,11 +380,24 @@ export default function ImagesClient() {
                 </Button>
               </div>
 
+              {/* Page Size Selector */}
+              <div className="flex items-center gap-1">
+                <List className="h-4 w-4 text-muted-foreground" />
+                <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                  <SelectTrigger className="w-[80px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Upload Dialog */}
-              <Dialog
-                open={isUploadDialogOpen}
-                onOpenChange={setIsUploadDialogOpen}
-              >
+              <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
                 <DialogTrigger asChild>
                   <Button>
                     <Plus className="h-4 w-4 mr-2" />
@@ -441,7 +455,18 @@ export default function ImagesClient() {
                 </DialogContent>
               </Dialog>
             </div>
-          </PageTitle>
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search images..."
+                  value={searchInput}
+                  onChange={handleSearchInput}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+          </div>
 
           {/* Search and Filters */}
           <div className="flex flex-col gap-4">

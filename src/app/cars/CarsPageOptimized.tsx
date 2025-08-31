@@ -25,6 +25,8 @@ import { usePrefetchAPI, useAPIQueryClient } from "@/hooks/useAPIQuery";
 import CarsListView from "@/components/cars/ListView";
 import DeleteConfirmDialog from "@/components/ui/DeleteConfirmDialog";
 import { MakesDropdown, MakeData } from "@/components/ui/MakesDropdown";
+import AutoGrid from "@/components/ui/AutoGrid";
+import { ToolbarRow } from "@/components/ui/ToolbarRow";
 
 interface FilterParams {
   make?: string;
@@ -198,7 +200,7 @@ function CarImage({ car, className = "aspect-video", hoverImageUrl, isHovered = 
         src={finalImageUrl!}
         alt={`${car.year} ${car.make} ${car.model}`}
         fill
-        className={`object-cover transition-opacity duration-300 ${
+        className={`object-cover transition-opacity duration-300 hover-zoom-media ${
           imageLoaded ? "opacity-100" : "opacity-0"
         }`}
         onLoad={() => setImageLoaded(true)}
@@ -213,7 +215,7 @@ function CarImage({ car, className = "aspect-video", hoverImageUrl, isHovered = 
           src={hoverUrl}
           alt={`${car.year} ${car.make} ${car.model} alternate`}
           fill
-          className={`object-cover absolute inset-0 transition-opacity duration-300 ${
+          className={`object-cover absolute inset-0 transition-opacity duration-300 hover-zoom-media ${
             isHovered ? "opacity-100" : "opacity-0"
           }`}
           sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
@@ -801,9 +803,10 @@ export default function CarsPageOptimized({
       <CarsErrorBoundary>
         <PerformanceMonitor name="CarsPageOptimized" />
         <div className="min-h-screen bg-background">
-          <div className="container mx-auto px-6 py-8">
+          <div className="container-wide px-6 py-8">
+            <div className="space-y-6 sm:space-y-8">
             {/* Toolbar */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 mb-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             <div className="flex items-center gap-3">
               <ViewModeSelector currentView={view} />
               <PageSizeSelector currentPageSize={pageSize} options={[12,24,48,96]} />
@@ -916,7 +919,12 @@ export default function CarsPageOptimized({
             </div>
 
             {/* ✅ Phase 1A: Show skeleton cards instead of blocking spinner */}
-            <div className={`grid grid-cols-1 ${zoomConfigs[zoomLevel as keyof typeof zoomConfigs].cols} gap-4`}>
+            <AutoGrid
+              zoomLevel={zoomLevel}
+              colsMap={zoomConfigs as any}
+              baseCols="grid grid-cols-1"
+              gap="gap-6"
+            >
               {Array.from({ length: 8 }).map((_, index) => (
                 <div key={`skeleton-${index}`} className="bg-card rounded-none border overflow-hidden">
                   <Skeleton className="aspect-video" />
@@ -926,6 +934,7 @@ export default function CarsPageOptimized({
                   <div className="h-9 border-t border-[hsl(var(--border))]/40" />
                 </div>
               ))}
+            </AutoGrid>
             </div>
           </div>
         </div>
@@ -938,9 +947,10 @@ export default function CarsPageOptimized({
     return (
       <CarsErrorBoundary>
         <div className="min-h-screen bg-background">
-          <div className="container mx-auto px-6 py-8">
+          <div className="container-wide px-6 py-8">
+            <div className="space-y-6 sm:space-y-8">
             {/* Toolbar */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 mb-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             <div className="flex items-center gap-3">
               <ViewModeSelector currentView={view} />
               <PageSizeSelector currentPageSize={pageSize} options={[12,24,48,96]} />
@@ -1005,6 +1015,7 @@ export default function CarsPageOptimized({
                 <Button onClick={() => refreshCars()}>Try Again</Button>
               </div>
             </div>
+            </div>
           </div>
         </div>
       </CarsErrorBoundary>
@@ -1016,129 +1027,87 @@ export default function CarsPageOptimized({
     <CarsErrorBoundary>
       <PerformanceMonitor name="CarsPageOptimized" />
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-6 py-8">
+        <div className="container-wide px-6 py-8">
+          <div className="space-y-6 sm:space-y-8">
           {/* Unified toolbar */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 mb-6">
-            <div className="flex items-center gap-3">
-              <ViewModeSelector currentView={view} />
-              <PageSizeSelector currentPageSize={pageSize} options={[12, 24, 48, 96]} />
-              <SortSelector currentSort={filters.sort || "createdAt_desc"} />
-              {view === "grid" && (
-                <div className="flex items-center gap-1 border rounded-md">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleZoomOut}
-                    disabled={zoomLevel <= 1}
-                    className="h-8 w-8 p-0"
-                  >
-                    <ZoomOut className="h-4 w-4" />
-                  </Button>
-                  <span className="text-xs px-2 text-muted-foreground">
-                    {zoomConfigs[zoomLevel as keyof typeof zoomConfigs].label}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleZoomIn}
-                    disabled={zoomLevel >= 5}
-                    className="h-8 w-8 p-0"
-                  >
-                    <ZoomIn className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-              <MakesDropdown
-                value={selectedMake || "all"}
-                onValueChange={handleMakeChange}
-                makes={makes}
-                loading={makesLoading}
-                placeholder="All Makes"
-                allOptionLabel="All Makes"
-                allOptionValue="all"
-                loadingText="Loading makes..."
-                className="w-64 min-w-[16rem]"
-                triggerClassName="whitespace-nowrap"
-              />
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="Min Year"
-                  value={minYear}
-                  onChange={(e) => handleYearChange("min", e.target.value)}
-                  className="w-24"
-                />
-                <Input
-                  placeholder="Max Year"
-                  value={maxYear}
-                  onChange={(e) => handleYearChange("max", e.target.value)}
-                  className="w-24"
-                />
-              </div>
-            </div>
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search cars..."
-                  value={searchQuery}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  className="pl-9 pr-10"
-                />
-                {isSearching && (
-                  <div className="absolute right-3 top-3">
-                    <div className="w-4 h-4 border border-current border-t-transparent rounded-full animate-spin text-muted-foreground" />
+          <ToolbarRow
+            left={
+              <>
+                <ViewModeSelector currentView={view} />
+                <PageSizeSelector currentPageSize={pageSize} options={[12, 24, 48, 96]} />
+                <SortSelector currentSort={filters.sort || "createdAt_desc"} />
+                {view === "grid" && (
+                  <div className="flex items-center gap-1 border rounded-md">
+                    <Button variant="ghost" size="sm" onClick={handleZoomOut} disabled={zoomLevel <= 1} className="h-8 w-8 p-0">
+                      <ZoomOut className="h-4 w-4" />
+                    </Button>
+                    <span className="text-xs px-2 text-muted-foreground">
+                      {zoomConfigs[zoomLevel as keyof typeof zoomConfigs].label}
+                    </span>
+                    <Button variant="ghost" size="sm" onClick={handleZoomIn} disabled={zoomLevel >= 5} className="h-8 w-8 p-0">
+                      <ZoomIn className="h-4 w-4" />
+                    </Button>
                   </div>
                 )}
-              </div>
-            </div>
-            {!isBatchMode ? (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
-                  onClick={toggleBatchMode}
-                >
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-                <Link href="/cars/new" prefetch={true}>
-                  <Button
-                    variant="ghost"
-                    className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add New Car
+                <MakesDropdown
+                  value={selectedMake || "all"}
+                  onValueChange={handleMakeChange}
+                  makes={makes}
+                  loading={makesLoading}
+                  placeholder="All Makes"
+                  allOptionLabel="All Makes"
+                  allOptionValue="all"
+                  loadingText="Loading makes..."
+                  className="w-64 min-w-[16rem]"
+                  triggerClassName="whitespace-nowrap"
+                />
+                <div className="flex items-center gap-2">
+                  <Input placeholder="Min Year" value={minYear} onChange={(e) => handleYearChange("min", e.target.value)} className="w-24" />
+                  <Input placeholder="Max Year" value={maxYear} onChange={(e) => handleYearChange("max", e.target.value)} className="w-24" />
+                </div>
+              </>
+            }
+            right={
+              !isBatchMode ? (
+                <>
+                  <div className="relative mr-2">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Search cars..." value={searchQuery} onChange={(e) => handleSearchChange(e.target.value)} className="pl-9 pr-10" />
+                    {isSearching && (
+                      <div className="absolute right-3 top-3">
+                        <div className="w-4 h-4 border border-current border-t-transparent rounded-full animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <Button variant="ghost" className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors" onClick={toggleBatchMode}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
                   </Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">{selectedCarIds.length} selected</span>
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  disabled={selectedCarIds.length === 0}
-                  onClick={() => setShowDeleteDialog(true)}
-                  aria-label="Delete selected cars"
-                  title="Delete selected"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="secondary"
-                  className="h-9 px-3"
-                  onClick={toggleBatchMode}
-                >
-                  Done
-                </Button>
-              </div>
-            )}
-          </div>
+                  <Link href="/cars/new" prefetch={true}>
+                    <Button variant="ghost" className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add New Car
+                    </Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <span className="text-sm text-muted-foreground mr-2">{selectedCarIds.length} selected</span>
+                  <Button variant="destructive" size="icon" disabled={selectedCarIds.length === 0} onClick={() => setShowDeleteDialog(true)} aria-label="Delete selected cars" title="Delete selected">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Button variant="secondary" className="h-9 px-3 ml-2" onClick={toggleBatchMode}>
+                    Done
+                  </Button>
+                </>
+              )
+            }
+          />
 
           {/* (Old filters and counts removed per updated layout) */}
 
           {/* ✅ Cars grid/list - Progressive enhancement pattern */}
-          <div className="mb-8 relative">
+          <div className="relative">
             {/* Subtle loading overlay when updating existing data */}
             {isUpdatingResults && (
               <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-10 flex items-center justify-center">
@@ -1153,7 +1122,12 @@ export default function CarsPageOptimized({
               // Show loading spinner only for true initial load
               <CarsLoadingSpinner />
             ) : view === "grid" ? (
-              <div className={`grid grid-cols-1 ${zoomConfigs[zoomLevel as keyof typeof zoomConfigs].cols} gap-4`}>
+              <AutoGrid
+                zoomLevel={zoomLevel}
+                colsMap={zoomConfigs as any}
+                baseCols="grid grid-cols-1"
+                gap="gap-6"
+              >
                 {cars.map((car) => (
                   <CarCard
                     key={car._id || `car-${car.make}-${car.model}-${car.year}`}
@@ -1164,7 +1138,7 @@ export default function CarsPageOptimized({
                     onToggleSelect={onToggleSelect}
                   />
                 ))}
-              </div>
+              </AutoGrid>
           ) : (
               <div className="space-y-4">
                 <CarsListView cars={cars} />
@@ -1215,6 +1189,7 @@ export default function CarsPageOptimized({
             }
             confirmText={selectedCarIds.length === 1 ? "Delete Car" : "Delete Selected"}
           />
+          </div>
         </div>
       </div>
     </CarsErrorBoundary>

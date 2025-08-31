@@ -168,6 +168,18 @@
   }
 }
 
+@layer components {
+  /* Reusable interactive card hover effect */
+  .interactive-card {
+    @apply transform-gpu transition-transform duration-200 will-change-transform hover:scale-[1.01];
+  }
+
+  /* Reusable image/media hover zoom used across grid cards */
+  .hover-zoom-media {
+    @apply transform-gpu transition-transform duration-200 will-change-transform group-hover:scale-[1.02];
+  }
+}
+
 /* Remove the default overflow-hidden */
 body {
   color: rgb(var(--foreground-rgb));

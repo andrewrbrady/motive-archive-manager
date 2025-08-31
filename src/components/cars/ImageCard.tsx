@@ -12,6 +12,7 @@ import {
   Crop,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { gridCardClasses } from "@/components/ui/gridCard";
 
 interface ImageCardProps {
   image: ImageData;
@@ -178,12 +179,7 @@ export function ImageCard({
 
   return (
     <div
-      className={cn(
-        "relative overflow-hidden rounded-lg cursor-pointer group",
-        "border border-border hover:shadow-md transition-all duration-200",
-        "min-h-[200px] max-h-[400px] flex items-center",
-        isSelected && "ring-2 ring-primary"
-      )}
+      className={cn(gridCardClasses(), "min-h-[200px] max-h-[400px] flex items-center", isSelected && "ring-2 ring-primary")}
       onClick={() => onImageView?.(image)}
     >
       {/* Action buttons (top right, visible on hover) */}
@@ -246,7 +242,7 @@ export function ImageCard({
         alt={image.filename || "Car image"}
         width={0}
         height={0}
-        className="w-full h-auto object-contain min-h-[200px] max-h-[400px]"
+        className="w-full h-auto object-contain min-h-[200px] max-h-[400px] hover-zoom-media"
         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
         style={{ width: "100%", height: "auto" }}
       />

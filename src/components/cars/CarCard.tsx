@@ -12,6 +12,7 @@ import { LoadingSpinner } from "@/components/ui/loading";
 import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { useAPI } from "@/hooks/useAPI";
 import { Badge } from "@/components/ui/badge";
+import { gridCardClasses } from "@/components/ui/gridCard";
 
 // Helper function to build enhanced Cloudflare URL for car card thumbnails
 import { getEnhancedImageUrl } from "@/lib/imageUtils";
@@ -196,12 +197,9 @@ const CarCard = memo(function CarCard({
   };
 
   return (
-    <Link
-      href={`/cars/${car._id}`}
-      className="block bg-background rounded-lg border border-border-primary overflow-hidden hover:border-border-secondary transition-colors relative group"
-    >
+    <Link href={`/cars/${car._id}`} className={gridCardClasses("relative block")}> 
       {/* Image */}
-      <div className="relative aspect-[16/9]">
+      <div className="relative aspect-[16/9] overflow-hidden">
         {loading ? (
           <div className="w-full h-full bg-background-primary/50 flex flex-col items-center justify-center gap-4">
             <LoadingSpinner size="lg" />
@@ -211,7 +209,7 @@ const CarCard = memo(function CarCard({
             src={primaryImage.url}
             alt={generateCarTitle()}
             fill
-            className="object-cover"
+            className="object-cover hover-zoom-media"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             loading="lazy"
             placeholder="blur"

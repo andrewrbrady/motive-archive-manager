@@ -20,6 +20,7 @@ import { ImageLightbox } from "./ImageLightbox";
 import { ImageData } from "@/app/images/columns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ImageCard } from "./ImageCard";
+import AutoGrid from "@/components/ui/AutoGrid";
 import { toast } from "@/components/ui/use-toast";
 
 interface Car {
@@ -111,14 +112,7 @@ export function SimpleImageGallery({
     5: "xl:grid-cols-2",
   };
 
-  // Get grid classes based on zoom level
-  const getGridClasses = () => {
-    const baseClasses = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
-    const zoomClass = zoomLevel
-      ? zoomConfigs[zoomLevel as keyof typeof zoomConfigs]
-      : "xl:grid-cols-4";
-    return `${baseClasses} ${zoomClass} gap-6`;
-  };
+  // Get grid classes based on zoom level (moved to AutoGrid)
 
   if (isLoading) {
     return (
@@ -217,7 +211,18 @@ export function SimpleImageGallery({
   );
 
   return (
-    <div className={getGridClasses()}>
+    <AutoGrid
+      zoomLevel={zoomLevel}
+      colsMap={{
+        1: "md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8",
+        2: "md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6",
+        3: "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+        4: "md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3",
+        5: "md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2",
+      }}
+      baseCols="grid grid-cols-1"
+      gap="gap-6"
+    >
       {data.map((image) => (
         <ImageCard
           key={image._id}
@@ -236,6 +241,6 @@ export function SimpleImageGallery({
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       )}
-    </div>
+    </AutoGrid>
   );
 }

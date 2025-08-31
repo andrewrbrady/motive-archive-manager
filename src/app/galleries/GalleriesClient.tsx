@@ -45,11 +45,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
-import { PageTitle } from "@/components/ui/PageTitle";
 import LazyImage from "@/components/LazyImage";
 import Pagination from "@/components/ui/pagination";
 import { useDebounce } from "use-debounce";
 import { CloudflareImage } from "@/components/ui/CloudflareImage";
+import AutoGrid from "@/components/ui/AutoGrid";
+import { ToolbarRow } from "@/components/ui/ToolbarRow";
+import { gridCardClasses } from "@/components/ui/gridCard";
 
 export default function GalleriesClient() {
   const router = useRouter();
@@ -102,14 +104,14 @@ export default function GalleriesClient() {
     }
   }, []);
 
-  // Zoom level configurations
+  // Zoom level configurations (aligned with /cars)
   const zoomConfigs = {
-    1: { cols: "lg:grid-cols-8", label: "8 cols" },
-    2: { cols: "lg:grid-cols-6", label: "6 cols" },
-    3: { cols: "lg:grid-cols-4", label: "4 cols" },
-    4: { cols: "lg:grid-cols-3", label: "3 cols" },
-    5: { cols: "lg:grid-cols-2", label: "2 cols" },
-  };
+    1: { cols: "md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8", label: "8" },
+    2: { cols: "md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6", label: "6" },
+    3: { cols: "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4", label: "4" },
+    4: { cols: "md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3", label: "3" },
+    5: { cols: "md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2", label: "2" },
+  } as const;
 
   // Get grid classes based on zoom level
   const getGridClasses = () => {
@@ -327,173 +329,101 @@ export default function GalleriesClient() {
     <div className="min-h-screen bg-background">
       <main className="container-wide px-6 py-8">
         <div className="space-y-6 sm:space-y-8">
-          <PageTitle title="Galleries" count={data?.pagination?.total} />
-
           <div className="space-y-4">
-            {/* Search and Controls Row */}
-            <div className="flex flex-wrap items-center gap-3 justify-between">
-              {/* Left side: Search and Sort */}
-              <div className="flex items-center gap-3">
-                <Input
-                  placeholder="Search galleries..."
-                  value={searchInput}
-                  onChange={handleSearchInput}
-                  className="w-[250px]"
-                />
-
-                {/* Sort Controls */}
-                <Select
-                  value={sortBy}
-                  onValueChange={(value) => handleSortChange(value)}
-                >
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Sort by..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="updatedAt">Last Updated</SelectItem>
-                    <SelectItem value="createdAt">Date Created</SelectItem>
-                    <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="imageCount">Image Count</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    handleSortChange(
-                      sortBy,
-                      sortOrder === "asc" ? "desc" : "asc"
-                    )
-                  }
-                  className="px-3"
-                  title={`Currently sorting ${sortOrder === "asc" ? "ascending" : "descending"}. Click to toggle.`}
-                >
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Right side: Controls */}
-              <div className="flex items-center gap-2">
-                {/* Page Size Selector */}
-                <div className="flex items-center gap-1">
-                  <List className="h-4 w-4 text-muted-foreground" />
-                  <Select
-                    value={pageSize.toString()}
-                    onValueChange={handlePageSizeChange}
-                  >
-                    <SelectTrigger className="w-[80px]">
-                      <SelectValue />
+            <ToolbarRow
+              left={
+                <>
+                  <Input
+                    placeholder="Search galleries..."
+                    value={searchInput}
+                    onChange={handleSearchInput}
+                    className="w-[250px]"
+                  />
+                  <Select value={sortBy} onValueChange={(value) => handleSortChange(value)}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Sort by..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="12">12</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="40">40</SelectItem>
-                      <SelectItem value="60">60</SelectItem>
+                      <SelectItem value="updatedAt">Last Updated</SelectItem>
+                      <SelectItem value="createdAt">Date Created</SelectItem>
+                      <SelectItem value="name">Name</SelectItem>
+                      <SelectItem value="imageCount">Image Count</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-
-                {/* Zoom Controls */}
-                <div className="hidden lg:flex items-center gap-1">
                   <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleZoomOut}
-                    disabled={zoomLevel === 1}
-                    title="Zoom out (more columns)"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleSortChange(sortBy, sortOrder === "asc" ? "desc" : "asc")}
+                    className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
+                    title={`Currently sorting ${sortOrder === "asc" ? "ascending" : "descending"}. Click to toggle.`}
                   >
-                    <ZoomOut className="h-4 w-4" />
+                    <ArrowUpDown className="h-4 w-4" />
                   </Button>
-                  <span className="text-xs text-muted-foreground px-3 min-w-[60px] text-center">
-                    {zoomConfigs[zoomLevel as keyof typeof zoomConfigs].label}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleZoomIn}
-                    disabled={zoomLevel === 5}
-                    title="Zoom in (fewer columns)"
-                  >
-                    <ZoomIn className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Create Gallery Button */}
-                <Dialog
-                  open={isCreateDialogOpen}
-                  onOpenChange={setIsCreateDialogOpen}
-                >
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create Gallery
+                </>
+              }
+              right={
+                <>
+                  <div className="flex items-center gap-1">
+                    <List className="h-4 w-4 text-muted-foreground" />
+                    <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                      <SelectTrigger className="w-[80px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="12">12</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="40">40</SelectItem>
+                        <SelectItem value="60">60</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="hidden lg:flex items-center gap-1 border rounded-md">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={handleZoomOut} disabled={zoomLevel === 1} title="Zoom out (more columns)">
+                      <ZoomOut className="h-4 w-4" />
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                      <DialogTitle>Create New Gallery</DialogTitle>
-                      <DialogDescription>
-                        Create a new gallery to organize your images
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Name</Label>
-                        <Input
-                          id="name"
-                          value={newGallery.name}
-                          onChange={(e) =>
-                            setNewGallery({
-                              ...newGallery,
-                              name: e.target.value,
-                            })
-                          }
-                          placeholder="Enter gallery name"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="description">Description</Label>
-                        <Textarea
-                          id="description"
-                          value={newGallery.description}
-                          onChange={(e) =>
-                            setNewGallery({
-                              ...newGallery,
-                              description: e.target.value,
-                            })
-                          }
-                          placeholder="Enter gallery description (optional)"
-                          rows={3}
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
+                    <span className="text-xs text-muted-foreground px-3 min-w-[60px] text-center">
+                      {zoomConfigs[zoomLevel as keyof typeof zoomConfigs].label}
+                    </span>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={handleZoomIn} disabled={zoomLevel === 5} title="Zoom in (fewer columns)">
+                      <ZoomIn className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                    <DialogTrigger asChild>
                       <Button
-                        variant="outline"
-                        onClick={() => setIsCreateDialogOpen(false)}
-                        disabled={isCreating}
+                        variant="ghost"
+                        className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
                       >
-                        Cancel
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create Gallery
                       </Button>
-                      <Button
-                        onClick={handleCreateGallery}
-                        disabled={!newGallery.name.trim() || isCreating}
-                      >
-                        {isCreating ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Creating...
-                          </>
-                        ) : (
-                          "Create Gallery"
-                        )}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </div>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Create New Gallery</DialogTitle>
+                        <DialogDescription>Create a new gallery to organize your images</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="name">Name</Label>
+                          <Input id="name" value={newGallery.name} onChange={(e) => setNewGallery({ ...newGallery, name: e.target.value })} placeholder="Enter gallery name" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="description">Description</Label>
+                          <Textarea id="description" value={newGallery.description} onChange={(e) => setNewGallery({ ...newGallery, description: e.target.value })} placeholder="Enter gallery description (optional)" rows={3} />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} disabled={isCreating}>Cancel</Button>
+                        <Button onClick={handleCreateGallery} disabled={!newGallery.name.trim() || isCreating}>
+                          {isCreating ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating...</>) : ("Create Gallery")}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </>
+              }
+            />
           </div>
 
           {isLoading ? (
@@ -511,11 +441,16 @@ export default function GalleriesClient() {
             </div>
           ) : data?.galleries && data.galleries.length > 0 ? (
             <>
-              <div className={getGridClasses()}>
+              <AutoGrid
+                zoomLevel={zoomLevel}
+                colsMap={zoomConfigs as any}
+                baseCols="grid grid-cols-1"
+                gap="gap-6"
+              >
                 {data.galleries.map((gallery, index) => (
                   <div
                     key={gallery._id}
-                    className="group relative bg-card border rounded-lg overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer"
+                    className={gridCardClasses()}
                     onClick={() => router.push(`/galleries/${gallery._id}`)}
                   >
                     {/* Gallery Image */}
@@ -526,7 +461,7 @@ export default function GalleriesClient() {
                           alt={gallery.name}
                           fill
                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                          className="object-cover group-hover:scale-105 transition-transform duration-200"
+                          className="object-cover hover-zoom-media"
                           priority={index < 8}
                           isAboveFold={index < 8}
                           showError={true}
@@ -604,7 +539,7 @@ export default function GalleriesClient() {
                     </div>
                   </div>
                 ))}
-              </div>
+              </AutoGrid>
 
               {/* Pagination */}
               {data?.pagination && data.pagination.pages > 1 && (
