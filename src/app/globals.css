@@ -171,12 +171,18 @@
 @layer components {
   /* Reusable interactive card hover effect */
   .interactive-card {
-    @apply transform-gpu transition-transform duration-200 will-change-transform hover:scale-[1.01];
+    @apply transform-gpu will-change-transform hover:scale-[1.01];
+    /* Ensure transform transitions are not overridden by Tailwind utilities */
+    transition: transform 300ms ease-out !important;
+    backface-visibility: hidden;
   }
 
   /* Reusable image/media hover zoom used across grid cards */
   .hover-zoom-media {
-    @apply transform-gpu transition-transform duration-200 will-change-transform group-hover:scale-[1.02];
+    @apply transform-gpu will-change-transform group-hover:scale-[1.02];
+    /* Force transform transition so utilities like transition-opacity don’t override */
+    transition: transform 300ms ease-out !important;
+    backface-visibility: hidden;
   }
 }
 

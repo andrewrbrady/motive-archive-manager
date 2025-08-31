@@ -50,6 +50,17 @@ interface DraggableGalleryGridProps {
   onOrderChange: (gallery: Gallery) => void;
   onImageSelect: (image: any) => void;
   onImageProcessed?: (originalImageId: string, newImageData: any) => void;
+  hideControls?: boolean;
+  searchQuery?: string;
+  onSearchQueryChange?: (q: string) => void;
+  sortBy?: string;
+  onSortByChange?: (v: string) => void;
+  sortOrder?: "asc" | "desc";
+  onSortOrderChange?: (v: "asc" | "desc") => void;
+  gridColumns?: number;
+  onGridColumnsChange?: (v: number) => void;
+  isBatchMode?: boolean;
+  onBatchModeToggle?: () => void;
 }
 
 export function DraggableGalleryGrid({
@@ -57,6 +68,17 @@ export function DraggableGalleryGrid({
   onOrderChange,
   onImageSelect,
   onImageProcessed,
+  hideControls,
+  searchQuery: controlledSearch,
+  onSearchQueryChange,
+  sortBy: controlledSortBy,
+  onSortByChange,
+  sortOrder: controlledSortOrder,
+  onSortOrderChange,
+  gridColumns: controlledGridColumns,
+  onGridColumnsChange,
+  isBatchMode: controlledBatchMode,
+  onBatchModeToggle,
 }: DraggableGalleryGridProps) {
   const [isBatchMode, setIsBatchMode] = React.useState(false);
   const [selectedImageIds, setSelectedImageIds] = React.useState<Set<string>>(
@@ -162,17 +184,23 @@ export function DraggableGalleryGrid({
   );
 
   // Get sorted items
+  // Effective (controlled) values fall back to internal state
+  const effectiveSearchQuery = controlledSearch ?? searchQuery;
+  const effectiveSortBy = controlledSortBy ?? sortBy;
+  const effectiveSortOrder = controlledSortOrder ?? sortOrder;
+  const effectiveIsBatchMode = controlledBatchMode ?? isBatchMode;
+
   const sortedItems = React.useMemo(() => {
-    return sortItems(items, sortBy, sortOrder);
-  }, [items, sortBy, sortOrder, sortItems]);
+    return sortItems(items, effectiveSortBy, effectiveSortOrder);
+  }, [items, effectiveSortBy, effectiveSortOrder, sortItems]);
 
   // Filter items based on search query
   const filteredItems = React.useMemo(() => {
-    if (!searchQuery.trim()) {
+    if (!effectiveSearchQuery.trim()) {
       return sortedItems;
     }
 
-    const query = searchQuery.toLowerCase().trim();
+    const query = effectiveSearchQuery.toLowerCase().trim();
     return sortedItems.filter((item) => {
       const image = gallery.images?.find((img: any) => img._id === item.id);
       if (!image) return false;
@@ -220,16 +248,19 @@ export function DraggableGalleryGrid({
     setGridColumns(getDefaultColumns());
   }, [isSmall, isMedium]);
 
+  // Effective grid columns (controlled prop fallback to internal state)
+  const effectiveGridColumns = controlledGridColumns ?? gridColumns;
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       // Only activate when in manual mode
       activationConstraint: {
-        distance: sortBy === "manual" ? 8 : Infinity, // Require 8px movement when manual, impossible when sorted
+        distance: effectiveSortBy === "manual" ? 8 : Infinity, // Require 8px movement when manual, impossible when sorted
       },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter:
-        sortBy === "manual" ? sortableKeyboardCoordinates : undefined,
+        effectiveSortBy === "manual" ? sortableKeyboardCoordinates : undefined,
     })
   );
 
@@ -251,9 +282,13 @@ export function DraggableGalleryGrid({
   // Handle sort change - when switching to manual, preserve current sorted order
   const handleSortChange = React.useCallback(
     (newSortBy: string) => {
-      if (newSortBy === "manual" && sortBy !== "manual") {
+      if (newSortBy === "manual" && effectiveSortBy !== "manual") {
         // User is switching from sorted view to manual - preserve the current sorted order
-        const currentSortedOrder = sortItems(items, sortBy, sortOrder);
+        const currentSortedOrder = sortItems(
+          items,
+          effectiveSortBy,
+          effectiveSortOrder
+        );
         setItems(currentSortedOrder);
 
         // Update the gallery's orderedImages to reflect this new order
@@ -270,9 +305,13 @@ export function DraggableGalleryGrid({
         // Call the parent's onOrderChange to save this new order
         onOrderChange(updatedGallery);
       }
-      setSortBy(newSortBy);
+      if (onSortByChange) {
+        onSortByChange(newSortBy);
+      } else {
+        setSortBy(newSortBy);
+      }
     },
-    [sortBy, sortOrder, items, sortItems, gallery, onOrderChange]
+    [effectiveSortBy, effectiveSortOrder, items, sortItems, gallery, onOrderChange, onSortByChange]
   );
 
   // Update gallery order whenever sort criteria changes (not just when switching to manual)
@@ -280,12 +319,18 @@ export function DraggableGalleryGrid({
   const lastSavedOrderRef = React.useRef<string>("");
 
   React.useEffect(() => {
-    if (sortBy !== "manual") {
+    if (effectiveSortBy !== "manual") {
       // Apply the current sort and save it to the gallery
-      const currentSortedOrder = sortItems(items, sortBy, sortOrder);
+      const currentSortedOrder = sortItems(
+        items,
+        effectiveSortBy,
+        effectiveSortOrder
+      );
 
       // Create a unique key for this order to detect changes
-      const orderKey = `${sortBy}-${sortOrder}-${currentSortedOrder.map((item) => item.id).join(",")}`;
+      const orderKey = `${effectiveSortBy}-${effectiveSortOrder}-${currentSortedOrder
+        .map((item) => item.id)
+        .join(",")}`;
 
       // Only update if the order actually changed
       if (orderKey !== lastSavedOrderRef.current) {
@@ -306,7 +351,7 @@ export function DraggableGalleryGrid({
         onOrderChange(updatedGallery);
       }
     }
-  }, [sortBy, sortOrder, items, sortItems]); // Removed gallery and onOrderChange from dependencies
+  }, [effectiveSortBy, effectiveSortOrder, items, sortItems]); // Removed gallery and onOrderChange from dependencies
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -314,7 +359,7 @@ export function DraggableGalleryGrid({
     if (!active || !over || active.id === over.id) return;
 
     // Only allow drag and drop when in manual mode
-    if (sortBy !== "manual") {
+    if (effectiveSortBy !== "manual") {
       return;
     }
 
@@ -355,11 +400,19 @@ export function DraggableGalleryGrid({
   };
 
   const handleZoomChange = (value: number[]) => {
-    setGridColumns(value[0]);
+    if (onGridColumnsChange) {
+      onGridColumnsChange(value[0]);
+    } else {
+      setGridColumns(value[0]);
+    }
   };
 
   const handleBatchModeToggle = () => {
-    setIsBatchMode(!isBatchMode);
+    if (onBatchModeToggle) {
+      onBatchModeToggle();
+    } else {
+      setIsBatchMode(!isBatchMode);
+    }
     setSelectedImageIds(new Set());
   };
 
@@ -376,7 +429,7 @@ export function DraggableGalleryGrid({
   };
 
   const handleSelectAll = () => {
-    const allImageIds = searchQuery
+    const allImageIds = effectiveSearchQuery
       ? filteredItems.map((item) => item.id)
       : items.map((item) => item.id);
     setSelectedImageIds(new Set(allImageIds));
@@ -387,7 +440,7 @@ export function DraggableGalleryGrid({
   };
 
   const getSelectedImages = () => {
-    const relevantItems = searchQuery ? filteredItems : items;
+    const relevantItems = effectiveSearchQuery ? filteredItems : items;
     return relevantItems
       .filter((item) => selectedImageIds.has(item.id))
       .map((item) => gallery.images?.find((img: any) => img._id === item.id))
@@ -474,19 +527,24 @@ export function DraggableGalleryGrid({
   return (
     <div className="space-y-4">
       {/* Search and Sort Controls */}
+      {!hideControls && (
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search gallery images..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={effectiveSearchQuery}
+            onChange={(e) =>
+              onSearchQueryChange
+                ? onSearchQueryChange(e.target.value)
+                : setSearchQuery(e.target.value)
+            }
             className="pl-10"
           />
         </div>
 
         {/* Sort Controls */}
-        <Select value={sortBy} onValueChange={handleSortChange}>
+        <Select value={effectiveSortBy} onValueChange={handleSortChange}>
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Sort by..." />
           </SelectTrigger>
@@ -505,36 +563,46 @@ export function DraggableGalleryGrid({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+          onClick={() =>
+            onSortOrderChange
+              ? onSortOrderChange(
+                  effectiveSortOrder === "asc" ? "desc" : "asc"
+                )
+              : setSortOrder(effectiveSortOrder === "asc" ? "desc" : "asc")
+          }
           className="px-3"
-          title={`Currently sorting ${sortOrder === "asc" ? "ascending" : "descending"}. Click to toggle.`}
-          disabled={sortBy === "manual"}
+          title={`Currently sorting ${effectiveSortOrder === "asc" ? "ascending" : "descending"}. Click to toggle.`}
+          disabled={effectiveSortBy === "manual"}
         >
           <ArrowUpDown className="h-4 w-4" />
         </Button>
 
-        {searchQuery && (
+        {effectiveSearchQuery && (
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setSearchQuery("")}
+            onClick={() =>
+              onSearchQueryChange ? onSearchQueryChange("") : setSearchQuery("")
+            }
           >
             <X className="h-4 w-4 mr-2" />
             Clear
           </Button>
         )}
       </div>
+      )}
 
       {/* Grid Controls */}
+      {!hideControls && (
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4 px-2">
           <ZoomOut className="h-4 w-4 text-muted-foreground" />
           <Slider
-            defaultValue={[gridColumns]}
+            defaultValue={[effectiveGridColumns]}
             min={isSmall ? 1 : 2}
             max={isSmall ? 4 : 8}
             step={1}
-            value={[gridColumns]}
+            value={[effectiveGridColumns]}
             onValueChange={handleZoomChange}
             className="w-[200px]"
           />
@@ -544,19 +612,19 @@ export function DraggableGalleryGrid({
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
             {filteredItems.length} of {items.length} images
-            {searchQuery && ` matching "${searchQuery}"`}
-            {sortBy !== "manual" && (
+            {effectiveSearchQuery && ` matching "${effectiveSearchQuery}"`}
+            {effectiveSortBy !== "manual" && (
               <span className="text-blue-600 ml-2">
-                • Sorted by {sortBy} ({sortOrder})
+                • Sorted by {effectiveSortBy} ({effectiveSortOrder})
               </span>
             )}
           </span>
           <Button
-            variant={isBatchMode ? "default" : "outline"}
+            variant={effectiveIsBatchMode ? "default" : "outline"}
             size="sm"
             onClick={handleBatchModeToggle}
           >
-            {isBatchMode ? (
+            {effectiveIsBatchMode ? (
               <>
                 <X className="h-4 w-4 mr-2" />
                 Exit Batch
@@ -570,15 +638,16 @@ export function DraggableGalleryGrid({
           </Button>
         </div>
       </div>
+      )}
 
       {/* Show no results message when search returns no results */}
-      {searchQuery && filteredItems.length === 0 && (
+      {effectiveSearchQuery && filteredItems.length === 0 && (
         <div className="text-center py-8 text-muted-foreground">
-          No images found matching "{searchQuery}"
+          No images found matching "{effectiveSearchQuery}"
         </div>
       )}
 
-      {isBatchMode && (
+      {effectiveIsBatchMode && (
         <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium">
@@ -587,7 +656,7 @@ export function DraggableGalleryGrid({
             </span>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleSelectAll}>
-                Select All{searchQuery ? " Filtered" : ""}
+                Select All{effectiveSearchQuery ? " Filtered" : ""}
               </Button>
               <Button variant="outline" size="sm" onClick={handleDeselectAll}>
                 Deselect All
@@ -632,7 +701,7 @@ export function DraggableGalleryGrid({
           <div
             className="grid gap-4"
             style={{
-              gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
+              gridTemplateColumns: `repeat(${effectiveGridColumns}, minmax(0, 1fr))`,
               alignItems: "start",
             }}
           >

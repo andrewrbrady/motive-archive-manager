@@ -19,6 +19,9 @@ import {
   ArrowLeft,
   Code,
   DownloadCloud,
+  ZoomIn,
+  ZoomOut,
+  ArrowUpDown,
 } from "lucide-react";
 import {
   Dialog,
@@ -47,6 +50,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ToolbarRow } from "@/components/ui/ToolbarRow";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 // import Footer from "@/components/layout/footer";
 
 // Utility to get base URL without any variant for frontmatter
@@ -84,6 +96,43 @@ export default function GalleryPage() {
     "gallery"
   );
   const [isAddByNamesOpen, setIsAddByNamesOpen] = useState(false);
+  const [openYaml, setOpenYaml] = useState(false);
+  const [openMdx, setOpenMdx] = useState(false);
+  const [openGalleryComponent, setOpenGalleryComponent] = useState(false);
+  const [openFullWidth, setOpenFullWidth] = useState(false);
+  const [toolbarSearch, setToolbarSearch] = useState("");
+  const [toolbarSortBy, setToolbarSortBy] = useState<string>("manual");
+  const [toolbarSortOrder, setToolbarSortOrder] = useState<"asc" | "desc">(
+    "asc"
+  );
+  const [toolbarGridCols, setToolbarGridCols] = useState<number>(4);
+  const [toolbarBatchMode, setToolbarBatchMode] = useState<boolean>(false);
+
+  // Zoom UI parity with /cars, /galleries, /projects
+  const zoomConfigs = {
+    1: { cols: 8, label: "8" },
+    2: { cols: 6, label: "6" },
+    3: { cols: 4, label: "4" },
+    4: { cols: 3, label: "3" },
+    5: { cols: 2, label: "2" },
+  } as const;
+  const [toolbarZoomLevel, setToolbarZoomLevel] = useState<number>(3);
+  React.useEffect(() => {
+    const saved = localStorage.getItem("gallery-detail-zoom-level");
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (parsed >= 1 && parsed <= 5) setToolbarZoomLevel(parsed);
+    }
+  }, []);
+  React.useEffect(() => {
+    const cols = zoomConfigs[toolbarZoomLevel as keyof typeof zoomConfigs].cols;
+    setToolbarGridCols(cols);
+    localStorage.setItem("gallery-detail-zoom-level", String(toolbarZoomLevel));
+  }, [toolbarZoomLevel]);
+  const handleZoomIn = () =>
+    setToolbarZoomLevel((z) => Math.min(5, z + 1));
+  const handleZoomOut = () =>
+    setToolbarZoomLevel((z) => Math.max(1, z - 1));
 
   // Clean up URL parameters when viewing gallery (these should only be used during image selection)
   React.useEffect(() => {
@@ -768,24 +817,152 @@ export default function GalleryPage() {
           </div>
 
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold tracking-tight">
-                Gallery Images
-              </h2>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsAddByNamesOpen(true)}
-                >
-                  Paste Filenames
-                </Button>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <Code className="h-4 w-4 mr-2" />
-                      Generate YAML
+            {/* Toolbar */}
+            <ToolbarRow
+              left={
+                <>
+                  <Input
+                    placeholder="Search gallery images..."
+                    value={toolbarSearch}
+                    onChange={(e) => setToolbarSearch(e.target.value)}
+                    className="w-[250px]"
+                  />
+                  <Select
+                    value={toolbarSortBy}
+                    onValueChange={(value) => setToolbarSortBy(value)}
+                  >
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Sort by..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manual">Manual Order</SelectItem>
+                      <SelectItem value="filename">Filename</SelectItem>
+                      <SelectItem value="createdAt">Date Created</SelectItem>
+                      <SelectItem value="updatedAt">Date Updated</SelectItem>
+                      <SelectItem value="angle">Angle</SelectItem>
+                      <SelectItem value="view">View</SelectItem>
+                      <SelectItem value="movement">Movement</SelectItem>
+                      <SelectItem value="tod">Time of Day</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setToolbarSortOrder(
+                        toolbarSortOrder === "asc" ? "desc" : "asc"
+                      )
+                    }
+                    className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors"
+                    title={`Currently sorting ${
+                      toolbarSortOrder === "asc" ? "ascending" : "descending"
+                    }. Click to toggle.`}
+                  >
+                    <ArrowUpDown className="h-4 w-4" />
+                  </Button>
+                </>
+              }
+              right={
+                <>
+                  <div className="hidden lg:flex items-center gap-1 border rounded-md">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={handleZoomOut}
+                      disabled={toolbarZoomLevel === 1}
+                      title="Zoom out (more columns)"
+                    >
+                      <ZoomOut className="h-4 w-4" />
                     </Button>
-                  </DialogTrigger>
+                    <span className="text-xs text-muted-foreground px-3 min-w-[60px] text-center">
+                      {zoomConfigs[toolbarZoomLevel as keyof typeof zoomConfigs].label}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={handleZoomIn}
+                      disabled={toolbarZoomLevel === 5}
+                      title="Zoom in (fewer columns)"
+                    >
+                      <ZoomIn className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <Button
+                    variant={toolbarBatchMode ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setToolbarBatchMode((v) => !v)}
+                  >
+                    {toolbarBatchMode ? "Exit Batch" : "Batch Select"}
+                  </Button>
+
+                  <Button
+                    variant={isAddingImages ? "secondary" : "default"}
+                    size={isAddingImages ? "default" : "icon"}
+                    onClick={() =>
+                      isAddingImages
+                        ? handleDoneAddingImages()
+                        : setIsAddingImages(true)
+                    }
+                    title={isAddingImages ? "Done" : "Add Images"}
+                  >
+                    {isAddingImages ? "Done" : <Plus className="h-4 w-4" />}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsAddByNamesOpen(true)}
+                  >
+                    Paste Filenames
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    onClick={handleDownloadAllImages}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <DownloadCloud className="h-4 w-4 mr-2" />
+                    )}
+                    {isDownloading ? "Downloading..." : "Download All"}
+                  </Button>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline">
+                        <Code className="h-4 w-4 mr-2" />
+                        Generate
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Export/Generate</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setOpenYaml(true)}>
+                        YAML
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setOpenMdx(true)}>
+                        MDX Lightbox
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setOpenGalleryComponent(true)}
+                      >
+                        Gallery Component
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setOpenFullWidth(true)}>
+                        Full Width Gallery
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              }
+            />
+
+            {/* YAML Dialog (controlled) */}
+            <Dialog open={openYaml} onOpenChange={setOpenYaml}>
                   <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
                     <DialogHeader>
                       <DialogTitle>Gallery YAML</DialogTitle>
@@ -862,13 +1039,8 @@ ${(() => {
                   </DialogContent>
                 </Dialog>
 
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <Code className="h-4 w-4 mr-2" />
-                      Generate MDX
-                    </Button>
-                  </DialogTrigger>
+                {/* MDX Dialog (controlled) */}
+                <Dialog open={openMdx} onOpenChange={setOpenMdx}>
                   <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
                     <DialogHeader>
                       <DialogTitle>MDX Gallery Code</DialogTitle>
@@ -1038,13 +1210,11 @@ ${(() => {
                   </DialogContent>
                 </Dialog>
 
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <Code className="h-4 w-4 mr-2" />
-                      Generate Gallery Component
-                    </Button>
-                  </DialogTrigger>
+                {/* Gallery Component Dialog (controlled) */}
+                <Dialog
+                  open={openGalleryComponent}
+                  onOpenChange={setOpenGalleryComponent}
+                >
                   <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
                     <DialogHeader>
                       <DialogTitle>Image Gallery Component Code</DialogTitle>
@@ -1117,13 +1287,8 @@ ${(() => {
                   </DialogContent>
                 </Dialog>
 
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <Code className="h-4 w-4 mr-2" />
-                      Generate Full Width Gallery
-                    </Button>
-                  </DialogTrigger>
+                {/* Full Width Dialog (controlled) */}
+                <Dialog open={openFullWidth} onOpenChange={setOpenFullWidth}>
                   <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
                     <DialogHeader>
                       <DialogTitle>
@@ -1193,41 +1358,6 @@ ${(() => {
                   </DialogContent>
                 </Dialog>
 
-                <Button
-                  variant="outline"
-                  onClick={handleDownloadAllImages}
-                  disabled={isDownloading}
-                >
-                  {isDownloading ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <DownloadCloud className="h-4 w-4 mr-2" />
-                  )}
-                  {isDownloading ? "Downloading..." : "Download All"}
-                </Button>
-
-                <Button
-                  onClick={() => {
-                    if (isAddingImages) {
-                      handleDoneAddingImages();
-                    } else {
-                      setIsAddingImages(true);
-                    }
-                  }}
-                  variant={isAddingImages ? "secondary" : "default"}
-                >
-                  {isAddingImages ? (
-                    "Done"
-                  ) : (
-                    <>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Images
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-
             {isAddingImages ? (
               /* 
                 GalleryImageSelector: Used for selecting images to add to the gallery.
@@ -1250,6 +1380,17 @@ ${(() => {
                 onOrderChange={handleOrderChange}
                 onImageSelect={handleImageSelect}
                 onImageProcessed={handleImageProcessed}
+                hideControls
+                searchQuery={toolbarSearch}
+                onSearchQueryChange={setToolbarSearch}
+                sortBy={toolbarSortBy}
+                onSortByChange={setToolbarSortBy}
+                sortOrder={toolbarSortOrder}
+                onSortOrderChange={setToolbarSortOrder}
+                gridColumns={toolbarGridCols}
+                onGridColumnsChange={setToolbarGridCols}
+                isBatchMode={toolbarBatchMode}
+                onBatchModeToggle={() => setToolbarBatchMode((v) => !v)}
               />
             ) : (
               <div className="text-center text-muted-foreground py-8">
