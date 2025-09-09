@@ -284,8 +284,8 @@ export async function POST(request: NextRequest) {
 
       const result = await response.json();
 
-      // Construct the image URL using the new ID
-      const imageUrl = `https://imagedelivery.net/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/${result.result.id}/public`;
+      // Construct BASE image URL (no variant). Rendering/analysis can append variant or directives.
+      const imageUrl = `https://imagedelivery.net/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/${result.result.id}`;
 
       await sendProgress({
         type: "progress",

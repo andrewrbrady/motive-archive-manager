@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { SimpleImageGallery } from "@/components/cars/SimpleImageGallery";
 import {
   ImageProcessingModal,
@@ -58,6 +58,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "use-debounce";
+import { ToolbarRow } from "@/components/ui/ToolbarRow";
 // Page title removed for unified toolbar
 
 // Define the allowed values for each field used in image metadata filtering
@@ -130,14 +131,14 @@ export default function ImagesClient() {
     }
   }, []);
 
-  // Zoom level configurations
+  // Zoom level configurations (aligned with /cars, /projects, /galleries)
   const zoomConfigs = {
-    1: { cols: "xl:grid-cols-8", label: "8 cols" },
-    2: { cols: "xl:grid-cols-6", label: "6 cols" },
-    3: { cols: "xl:grid-cols-4", label: "4 cols" },
-    4: { cols: "xl:grid-cols-3", label: "3 cols" },
-    5: { cols: "xl:grid-cols-2", label: "2 cols" },
-  };
+    1: { cols: "md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8", label: "8" },
+    2: { cols: "md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6", label: "6" },
+    3: { cols: "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4", label: "4" },
+    4: { cols: "md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3", label: "3" },
+    5: { cols: "md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2", label: "2" },
+  } as const;
 
   // Fetch cars for car filter
   const { data: carsData } = useCars({ limit: 1000, sortDirection: "desc" });
@@ -353,181 +354,76 @@ export default function ImagesClient() {
       <main className="container-wide px-6 py-8">
         <div className="space-y-6 sm:space-y-8">
           {/* Unified toolbar (single line) */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 mb-2">
-            <div className="flex items-center gap-2">
-              {/* Zoom Controls */}
-              <div className="flex items-center gap-1 border rounded-md">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleZoomOut}
-                  disabled={zoomLevel <= 1}
-                  className="h-8 w-8 p-0"
-                >
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <span className="text-xs px-2 text-muted-foreground">
-                  {zoomConfigs[zoomLevel as keyof typeof zoomConfigs].label}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleZoomIn}
-                  disabled={zoomLevel >= 5}
-                  className="h-8 w-8 p-0"
-                >
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Page Size Selector */}
-              <div className="flex items-center gap-1">
-                <List className="h-4 w-4 text-muted-foreground" />
-                <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
-                  <SelectTrigger className="w-[80px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Upload Dialog */}
-              <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Upload Images
+          <ToolbarRow
+            left={
+              <>
+                {/* Zoom Controls */}
+                <div className="flex items-center gap-1 border rounded-md">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleZoomOut}
+                    disabled={zoomLevel <= 1}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ZoomOut className="h-4 w-4" />
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
-                  <DialogHeader>
-                    <DialogTitle>Upload Images</DialogTitle>
-                    <DialogDescription>
-                      Select images to upload to the gallery.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <UnifiedImageUploader
-                    context={
-                      carFilter && carFilter !== "all" ? "car" : "general"
-                    }
-                    carId={
-                      carFilter && carFilter !== "all" ? carFilter : undefined
-                    }
-                    metadata={{
-                      category: "unclassified",
-                      angle: "unknown",
-                      movement: "unknown",
-                      tod: "unknown",
-                      view: "unknown",
-                    }}
-                    onComplete={() => {
-                      toast({
-                        title: "Upload successful",
-                        description: "Images uploaded successfully",
-                      });
-                      mutate();
-                      setIsUploadDialogOpen(false);
-                    }}
-                    onError={(error: string) => {
-                      toast({
-                        title: "Upload failed",
-                        description:
-                          error || "Failed to upload images. Please try again.",
-                        variant: "destructive",
-                      });
-                    }}
-                    showDropzone={true}
-                    showAnalysisOptions={true}
-                  />
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsUploadDialogOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search images..."
-                  value={searchInput}
-                  onChange={handleSearchInput}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-          </div>
+                  <span className="text-xs px-2 text-muted-foreground">
+                    {zoomConfigs[zoomLevel as keyof typeof zoomConfigs].label}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleZoomIn}
+                    disabled={zoomLevel >= 5}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                </div>
 
-          {/* Search and Filters */}
-          <div className="flex flex-col gap-4">
-            {/* Search Bar */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search images..."
-                value={searchInput}
-                onChange={handleSearchInput}
-                className="pl-10"
-              />
-            </div>
+                {/* Page Size Selector */}
+                <div className="flex items-center gap-1">
+                  <List className="h-4 w-4 text-muted-foreground" />
+                  <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                    <SelectTrigger className="w-[80px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            {/* Filters */}
-            <div className="flex flex-wrap gap-4 items-center">
-              {/* Car Filter */}
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">Car</label>
-                <Popover open={carSearchOpen} onOpenChange={setCarSearchOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={carSearchOpen}
-                      className="w-[200px] justify-between"
-                    >
-                      {currentCarName}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[200px] p-0">
-                    <Command>
-                      <CommandInput
-                        placeholder="Search cars..."
-                        value={carSearchQuery}
-                        onValueChange={setCarSearchQuery}
-                      />
-                      <CommandEmpty>No cars found.</CommandEmpty>
-                      <CommandGroup className="max-h-64 overflow-auto">
-                        <CommandItem
-                          value="all"
-                          onSelect={() => handleCarChange("all")}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
-                          className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4 pointer-events-none",
-                              carId === "all" ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          <span className="pointer-events-none">All Cars</span>
-                        </CommandItem>
-                        {sortedCars.map((car) => (
+                {/* Car Filter */}
+                <div className="flex flex-col gap-1">
+                  <Popover open={carSearchOpen} onOpenChange={setCarSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={carSearchOpen}
+                        className="w-[200px] justify-between"
+                      >
+                        {currentCarName}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0">
+                      <Command>
+                        <CommandInput
+                          placeholder="Search cars..."
+                          value={carSearchQuery}
+                          onValueChange={setCarSearchQuery}
+                        />
+                        <CommandEmpty>No cars found.</CommandEmpty>
+                        <CommandGroup className="max-h-64 overflow-auto">
                           <CommandItem
-                            key={car._id}
-                            value={`${car.year} ${car.make} ${car.model}`}
-                            onSelect={() => handleCarChange(car._id)}
+                            value="all"
+                            onSelect={() => handleCarChange("all")}
                             onClick={(e) => {
                               e.stopPropagation();
                             }}
@@ -536,106 +432,182 @@ export default function ImagesClient() {
                             <Check
                               className={cn(
                                 "mr-2 h-4 w-4 pointer-events-none",
-                                carId === car._id ? "opacity-100" : "opacity-0"
+                                carId === "all" ? "opacity-100" : "opacity-0"
                               )}
                             />
-                            <span className="pointer-events-none">
-                              {car.year} {car.make} {car.model}
-                            </span>
+                            <span className="pointer-events-none">All Cars</span>
                           </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
+                          {sortedCars.map((car) => (
+                            <CommandItem
+                              key={car._id}
+                              value={`${car.year} ${car.make} ${car.model}`}
+                              onSelect={() => handleCarChange(car._id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                              }}
+                              className="relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground !pointer-events-auto"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4 pointer-events-none",
+                                  carId === car._id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <span className="pointer-events-none">
+                                {car.year} {car.make} {car.model}
+                              </span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
 
-              {/* Angle Filter */}
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">Angle</label>
-                <Select value={angle} onValueChange={handleAngleChange}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Angles</SelectItem>
-                    {allowedValues.angle.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {value}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                {/* Angle Filter */}
+                <div className="flex flex-col gap-1">
+                  <Select value={angle} onValueChange={handleAngleChange}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Angles</SelectItem>
+                      {allowedValues.angle.map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              {/* View Filter */}
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">View</label>
-                <Select value={view} onValueChange={handleViewChange}>
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Views</SelectItem>
-                    {allowedValues.view.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {value}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                {/* View Filter */}
+                <div className="flex flex-col gap-1">
+                  <Select value={view} onValueChange={handleViewChange}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Views</SelectItem>
+                      {allowedValues.view.map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              {/* Movement Filter */}
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">Movement</label>
-                <Select value={movement} onValueChange={handleMovementChange}>
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Movement</SelectItem>
-                    {allowedValues.movement.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {value}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                {/* Movement Filter */}
+                <div className="flex flex-col gap-1">
+                  <Select value={movement} onValueChange={handleMovementChange}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Movement</SelectItem>
+                      {allowedValues.movement.map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              {/* Time of Day Filter */}
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">Time of Day</label>
-                <Select value={tod} onValueChange={handleTodChange}>
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Times</SelectItem>
-                    {allowedValues.tod.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {value}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                {/* Time of Day Filter */}
+                <div className="flex flex-col gap-1">
+                  <Select value={tod} onValueChange={handleTodChange}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Times</SelectItem>
+                      {allowedValues.tod.map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              {/* Clear Filters */}
-              {activeFiltersCount > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={resetAllFilters}
-                  className="mt-6"
-                >
-                  <FilterX className="h-4 w-4 mr-2" />
-                  Clear Filters ({activeFiltersCount})
-                </Button>
-              )}
-            </div>
-          </div>
+                {/* Clear Filters */}
+                {activeFiltersCount > 0 && (
+                  <Button variant="outline" size="sm" onClick={resetAllFilters} className="mt-6">
+                    <FilterX className="h-4 w-4 mr-2" />
+                    Clear Filters ({activeFiltersCount})
+                  </Button>
+                )}
+              </>
+            }
+            right={
+              <>
+                {/* Search */}
+                <div className="relative mr-2">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search images..."
+                    value={searchInput}
+                    onChange={handleSearchInput}
+                    className="pl-9 pr-10"
+                  />
+                </div>
+                {/* Upload Dialog */}
+                <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="h-9 px-3 bg-transparent border border-[hsl(var(--border-subtle))] text-[hsl(var(--foreground))] hover:border-white hover:bg-transparent transition-colors">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Upload Images
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
+                    <DialogHeader>
+                      <DialogTitle>Upload Images</DialogTitle>
+                      <DialogDescription>
+                        Select images to upload to the gallery.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <UnifiedImageUploader
+                      context={carFilter && carFilter !== "all" ? "car" : "general"}
+                      carId={carFilter && carFilter !== "all" ? carFilter : undefined}
+                      metadata={{
+                        category: "unclassified",
+                        angle: "unknown",
+                        movement: "unknown",
+                        tod: "unknown",
+                        view: "unknown",
+                      }}
+                      onComplete={() => {
+                        toast({
+                          title: "Upload successful",
+                          description: "Images uploaded successfully",
+                        });
+                        mutate();
+                        setIsUploadDialogOpen(false);
+                      }}
+                      onError={(error: string) => {
+                        toast({
+                          title: "Upload failed",
+                          description: error || "Failed to upload images. Please try again.",
+                          variant: "destructive",
+                        });
+                      }}
+                      showDropzone={true}
+                      showAnalysisOptions={true}
+                    />
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </>
+            }
+          />
+
+          {/* Filters are fully integrated into ToolbarRow above */}
 
           {/* Images Grid */}
           {isLoading ? (

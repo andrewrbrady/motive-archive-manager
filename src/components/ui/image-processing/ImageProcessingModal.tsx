@@ -39,6 +39,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useImageProcessing } from "@/lib/hooks/useImageProcessing";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
+import { getMediumVariantUrl } from "@/lib/imageUtils";
 import { CropControls } from "./CropControls";
 import { CanvasExtensionControls } from "./CanvasExtensionControls";
 import { MatteControls } from "./MatteControls";
@@ -174,15 +175,15 @@ export function ImageProcessingModal({
               const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
               setLivePreviewUrl(dataUrl);
             } else {
-              // No valid crop area, show original
-              setLivePreviewUrl(image.url);
+              // No valid crop area, show normalized original
+              setLivePreviewUrl(getMediumVariantUrl(image.url));
             }
 
             setPreviewProcessingTime(Date.now() - startTime);
           };
 
           img.crossOrigin = "anonymous";
-          img.src = image.url;
+          img.src = getMediumVariantUrl(image.url);
         } else if (
           processingType === "canvas-extension" &&
           processing.parameters?.desiredHeight &&
@@ -259,17 +260,17 @@ export function ImageProcessingModal({
                 setLivePreviewUrl(processedUrl);
                 setPreviewProcessingTime(Date.now() - startTime);
               } else {
-                // Fallback to original image
-                setLivePreviewUrl(image.url);
+                // Fallback to normalized original image
+                setLivePreviewUrl(getMediumVariantUrl(image.url));
               }
             } else {
-              // Fallback to original image on error
-              setLivePreviewUrl(image.url);
+              // Fallback to normalized original image on error
+              setLivePreviewUrl(getMediumVariantUrl(image.url));
             }
           } catch (error) {
             console.error("Canvas extension preview error:", error);
-            // Fallback to original image
-            setLivePreviewUrl(image.url);
+            // Fallback to normalized original image
+            setLivePreviewUrl(getMediumVariantUrl(image.url));
           } finally {
             setIsGeneratingPreview(false);
           }
@@ -340,20 +341,20 @@ export function ImageProcessingModal({
                 setLivePreviewUrl(processedUrl);
                 setPreviewProcessingTime(Date.now() - startTime);
               } else {
-                setLivePreviewUrl(image.url);
+                setLivePreviewUrl(getMediumVariantUrl(image.url));
               }
             } else {
-              setLivePreviewUrl(image.url);
+              setLivePreviewUrl(getMediumVariantUrl(image.url));
             }
           } catch (error) {
             console.error("Matte preview error:", error);
-            setLivePreviewUrl(image.url);
+            setLivePreviewUrl(getMediumVariantUrl(image.url));
           } finally {
             setIsGeneratingPreview(false);
           }
         } else {
-          // For other processing types or missing parameters, show original image
-          setLivePreviewUrl(image.url);
+          // For other processing types or missing parameters, show normalized original image
+          setLivePreviewUrl(getMediumVariantUrl(image.url));
           setPreviewProcessingTime(Date.now() - startTime);
         }
       },
@@ -459,7 +460,9 @@ export function ImageProcessingModal({
         ctx.strokeRect(2, 2, canvasWidth - 4, canvasHeight - 4);
       }
     };
-    img.src = image.url;
+    // Use CORS-safe, variant-normalized URL for canvas drawing
+    img.crossOrigin = "anonymous";
+    img.src = getMediumVariantUrl(image.url);
   }, [
     image?.url,
     processing.originalDimensions,

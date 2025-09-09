@@ -179,7 +179,8 @@
 
   /* Reusable image/media hover zoom used across grid cards */
   .hover-zoom-media {
-    @apply transform-gpu will-change-transform group-hover:scale-[1.02];
+    /* Support both default and named card groups */
+    @apply transform-gpu will-change-transform group-hover:scale-[1.02] group-hover/card:scale-[1.02];
     /* Force transform transition so utilities like transition-opacity don’t override */
     transition: transform 300ms ease-out !important;
     backface-visibility: hidden;

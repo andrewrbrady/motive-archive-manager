@@ -153,8 +153,10 @@ export async function uploadToCloudflare(
       ? result.imageUrl.replace(/\/[^\/]+$/, "") // Remove the last part of the URL (filename)
       : `https://imagedelivery.net/veo1agD2ekS5yYAVWyZXBA/${imageId}`;
 
-    // Ensure the URL is properly constructed with /public at the end
-    const imageUrl = result.imageUrl || `${baseUrl}/public`;
+    // Store base Cloudflare URL (no variant) — UI/loader will handle variants
+    const imageUrl = result.imageUrl
+      ? getFormattedImageUrl(result.imageUrl)
+      : baseUrl;
 
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Final image URL:", imageUrl);
 

@@ -6,6 +6,7 @@ import { Deliverable } from "@/types/deliverable";
 import { toast } from "sonner";
 import { useAPI } from "@/hooks/useAPI";
 import { getValidToken } from "@/lib/api-client";
+import { fixCloudflareImageUrl } from "@/lib/image-utils";
 
 interface ThumbnailSelectorProps {
   deliverable: Deliverable;
@@ -35,13 +36,11 @@ export default function ThumbnailSelector({
 
   const handleImageSelect = async (imageId: string, imageUrl: string) => {
     try {
-      // Ensure the URL has a proper variant for CloudflareImage component
-      let thumbnailUrl = imageUrl;
-      if (thumbnailUrl.includes("imagedelivery.net")) {
-        // Remove any existing variant and use /public for original quality
-        thumbnailUrl = thumbnailUrl.replace(/\/[^\/]+$/, "");
-        thumbnailUrl = `${thumbnailUrl}/public`;
-      }
+      // Store base Cloudflare URL (no variant); rendering handles size/variant
+      const thumbnailUrl =
+        imageUrl && imageUrl.includes("imagedelivery.net")
+          ? fixCloudflareImageUrl(imageUrl)
+          : imageUrl;
 
       console.log("Image selection:", {
         imageId,
@@ -49,10 +48,7 @@ export default function ThumbnailSelector({
         finalUrl: thumbnailUrl,
       });
 
-      await onUpdate({
-        primaryImageId: imageId,
-        thumbnailUrl: thumbnailUrl,
-      });
+      await onUpdate({ primaryImageId: imageId, thumbnailUrl });
       setIsSelecting(false);
       toast.success("Thumbnail updated successfully");
     } catch (error) {
@@ -116,13 +112,8 @@ export default function ThumbnailSelector({
       const result = await response.json();
 
       if (result.success && result.imageId && result.imageUrl) {
-        // Ensure the URL has a proper variant for CloudflareImage component
-        let thumbnailUrl = result.imageUrl;
-        if (thumbnailUrl.includes("imagedelivery.net")) {
-          // Remove any existing variant and use /public for original quality
-          thumbnailUrl = thumbnailUrl.replace(/\/[^\/]+$/, "");
-          thumbnailUrl = `${thumbnailUrl}/public`;
-        }
+        // Normalize to base Cloudflare URL (no variant) for storage
+        const thumbnailUrl = fixCloudflareImageUrl(result.imageUrl);
 
         console.log("Upload result:", {
           imageId: result.imageId,
@@ -130,10 +121,7 @@ export default function ThumbnailSelector({
           finalUrl: thumbnailUrl,
         });
 
-        await onUpdate({
-          primaryImageId: result.imageId,
-          thumbnailUrl: thumbnailUrl,
-        });
+        await onUpdate({ primaryImageId: result.imageId, thumbnailUrl });
 
         toast.success("Thumbnail uploaded and set successfully");
       } else {

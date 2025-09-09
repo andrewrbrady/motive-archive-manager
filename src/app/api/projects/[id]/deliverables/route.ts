@@ -64,8 +64,12 @@ export async function GET(
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📦 Project deliverable IDs:", project.deliverableIds);
 
     // Fetch actual deliverables from the deliverables collection
+    const deliverableObjectIds = (project.deliverableIds || [])
+      .filter((id: any) => id)
+      .map((id: any) => (id instanceof ObjectId ? id : new ObjectId(id)));
+
     const deliverables = await Deliverable.find({
-      _id: { $in: project.deliverableIds.map((id) => new ObjectId(id)) },
+      _id: { $in: deliverableObjectIds },
     });
 
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Found deliverables:", deliverables.length);
@@ -167,8 +171,12 @@ export async function POST(
         );
       }
 
-      // Check if deliverable is already linked to this project
-      if (project.deliverableIds.includes(body.deliverableId)) {
+      // Check if deliverable is already linked to this project (handle string/ObjectId)
+      const exists = (project.deliverableIds || []).some((id: any) => {
+        const idStr = id instanceof ObjectId ? id.toString() : id;
+        return idStr === body.deliverableId;
+      });
+      if (exists) {
         // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("❌ Deliverable already linked to project");
         return NextResponse.json(
           { error: "Deliverable is already linked to this project" },
@@ -176,8 +184,8 @@ export async function POST(
         );
       }
 
-      // Add deliverable ID to project's deliverableIds array
-      project.deliverableIds.push(body.deliverableId);
+      // Add deliverable ID to project's deliverableIds array as ObjectId
+      project.deliverableIds.push(new ObjectId(body.deliverableId) as any);
       project.updatedAt = new Date();
       await project.save();
 
@@ -225,12 +233,12 @@ export async function POST(
 
     await deliverable.save();
 
-    // Add deliverable ID to project's deliverableIds array
+    // Add deliverable ID to project's deliverableIds array (store as ObjectId)
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📌 Adding deliverable ID to project...");
     if (!project.deliverableIds) {
       project.deliverableIds = [];
     }
-    project.deliverableIds.push((deliverable._id as any).toString());
+    project.deliverableIds.push(deliverable._id as any);
     project.updatedAt = new Date();
 
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("💾 Saving project with new deliverable ID...");
@@ -344,9 +352,10 @@ export async function DELETE(
     }
 
     const initialLength = project.deliverableIds.length;
-    project.deliverableIds = project.deliverableIds.filter(
-      (id: string) => id !== deliverableId
-    );
+    project.deliverableIds = project.deliverableIds.filter((id: any) => {
+      const idStr = id instanceof ObjectId ? id.toString() : id;
+      return idStr !== deliverableId;
+    });
 
     if (project.deliverableIds.length === initialLength) {
       return NextResponse.json(

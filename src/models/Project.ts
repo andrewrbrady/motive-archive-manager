@@ -251,7 +251,7 @@ const projectSchema = new mongoose.Schema<
     type: {
       type: String,
       required: true,
-      enum: ["bring_a_trailer", "documentation", "media_campaign", "custom"],
+      enum: ["documentation", "media_campaign", "event_coverage", "custom"],
     },
     status: {
       type: String,

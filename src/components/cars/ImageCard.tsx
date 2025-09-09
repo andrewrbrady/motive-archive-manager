@@ -179,11 +179,16 @@ export function ImageCard({
 
   return (
     <div
-      className={cn(gridCardClasses(), "min-h-[200px] max-h-[400px] flex items-center", isSelected && "ring-2 ring-primary")}
+      className={cn(
+        gridCardClasses(),
+        // Ensure positioned context for absolute overlays
+        "relative min-h-[200px] max-h-[400px] flex items-center",
+        isSelected && "ring-2 ring-primary"
+      )}
       onClick={() => onImageView?.(image)}
     >
       {/* Action buttons (top right, visible on hover) */}
-      <div className="absolute top-2 right-2 z-20 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+      <div className="absolute top-2 right-2 z-20 flex gap-1 opacity-0 group-hover/card:opacity-100 focus-within:opacity-100 transition-opacity">
         {/* Canvas Extension button */}
         {onCanvasExtension && (
           <button
@@ -248,10 +253,10 @@ export function ImageCard({
       />
 
       {/* Gradient overlay on hover */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity duration-200" />
 
       {/* Hover info overlay */}
-      <div className="absolute bottom-0 left-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col gap-1.5 text-white">
+      <div className="absolute bottom-0 left-0 right-0 p-3 opacity-0 group-hover/card:opacity-100 transition-opacity duration-200 flex flex-col gap-1.5 text-white">
         {/* Filename row */}
         {image.filename && (
           <div className="flex items-center justify-between">
