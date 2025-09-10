@@ -34,7 +34,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const imageIds = ids.split(",").map((id) => new ObjectId(id));
+    // Sanitize and validate IDs before converting to ObjectId
+    const rawIds = ids
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
+
+    const validIds = rawIds.filter((id) => ObjectId.isValid(id));
+
+    // If no valid IDs after validation, return empty result (graceful handling)
+    if (validIds.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    const imageIds = validIds.map((id) => new ObjectId(id));
 
     client = await MongoClient.connect(MONGODB_URI as string);
     const db = client.db(DB_NAME);

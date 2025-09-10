@@ -87,9 +87,12 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
     onBlocksChange,
     carId,
   }) {
-    // Show image gallery button only if we have the necessary props and images
-    const showImageGallery =
-      finalImages.length > 0 && onRefreshImages && onAddImage;
+    // Show image gallery button if we have context (project or car) and required handlers
+    // Previously this was gated on images length > 0, which hid the picker when
+    // images were still loading or when galleries were empty. The popup itself
+    // gracefully handles empty states, so we always show it when handlers exist.
+    const hasContext = Boolean(projectId || carId);
+    const showImageGallery = Boolean(hasContext && onRefreshImages && onAddImage);
 
     return (
       <>
@@ -162,8 +165,8 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                       projectId={projectId}
                       carId={carId}
                       activeBlockId={activeBlockId}
-                      onRefreshImages={onRefreshImages}
-                      onAddImage={onAddImage}
+                      onRefreshImages={onRefreshImages!}
+                      onAddImage={onAddImage!}
                     >
                       <Button
                         variant="ghost"
@@ -342,8 +345,8 @@ export const ContentInsertionToolbar = React.memo<ContentInsertionToolbarProps>(
                       projectId={projectId}
                       carId={carId}
                       activeBlockId={activeBlockId}
-                      onRefreshImages={onRefreshImages}
-                      onAddImage={onAddImage}
+                      onRefreshImages={onRefreshImages!}
+                      onAddImage={onAddImage!}
                     >
                       <Button
                         variant="outline"

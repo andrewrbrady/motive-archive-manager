@@ -1,5 +1,7 @@
 import { useMemo } from "react";
 import { useAPIQuery } from "@/hooks/useAPIQuery";
+import { useAPI, useAPIStatus } from "@/hooks/useAPI";
+import { useQuery } from "@tanstack/react-query";
 import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { SelectedCopy } from "@/components/content-studio/types";
 
@@ -130,15 +132,28 @@ export function useBlockComposerImages(
   }, [carDataWithGalleries?.galleries]);
 
   // Fetch metadata for gallery images in car context (these may not have carId)
-  const { data: carGalleryImageMetadata } = useAPIQuery<any[]>(
-    carGalleryImageIds.length > 0
-      ? `images/metadata?ids=${carGalleryImageIds.join(",")}`
-      : "null-query",
-    {
-      enabled: carGalleryImageIds.length > 0,
-      staleTime: 5 * 60 * 1000,
-    }
-  );
+  const api = useAPI();
+  const { isReady } = useAPIStatus();
+  function chunk<T>(arr: T[], size: number): T[][] {
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  }
+
+  const { data: carGalleryImageMetadata } = useQuery({
+    queryKey: ["images/metadata", carGalleryImageIds],
+    enabled: isReady && carGalleryImageIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      if (!api) throw new Error("Authentication required");
+      const CHUNK_SIZE = 100;
+      const batches = chunk(carGalleryImageIds, CHUNK_SIZE);
+      const results = await Promise.all(
+        batches.map((ids) => api.get<any[]>(`images/metadata?ids=${ids.join(",")}`))
+      );
+      return results.flat().filter(Boolean);
+    },
+  });
 
   // Extract all images from linked galleries (for projects) - OPTIMIZED
   const galleryImages = useMemo(() => {
@@ -172,17 +187,20 @@ export function useBlockComposerImages(
   }, [galleryImages]);
 
   // Fetch actual image data for the image IDs (for projects)
-  const { data: imageMetadata, isLoading: loadingImageData } = useAPIQuery<
-    any[]
-  >(
-    imageIds.length > 0
-      ? `images/metadata?ids=${imageIds.join(",")}`
-      : "null-query",
-    {
-      enabled: imageIds.length > 0,
-      staleTime: 5 * 60 * 1000, // 5 minutes cache
-    }
-  );
+  const { data: imageMetadata, isLoading: loadingImageData } = useQuery({
+    queryKey: ["images/metadata", imageIds],
+    enabled: isReady && imageIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      if (!api) throw new Error("Authentication required");
+      const CHUNK_SIZE = 100;
+      const batches = chunk(imageIds, CHUNK_SIZE);
+      const results = await Promise.all(
+        batches.map((ids) => api.get<any[]>(`images/metadata?ids=${ids.join(",")}`))
+      );
+      return results.flat().filter(Boolean);
+    },
+  });
 
   // Combine gallery context with image data (for projects) - OPTIMIZED
   const enrichedGalleryImages = useMemo((): EnrichedImage[] => {
