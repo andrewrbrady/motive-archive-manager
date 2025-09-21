@@ -381,9 +381,9 @@ async function getProjects(request: NextRequest) {
     const includeImages = searchParams.get("includeImages") === "true";
 
     // Build base match query
-    const matchQuery: any = {
-      $or: [{ ownerId: userId }, { "members.userId": userId }],
-    };
+    // Changed: show all projects (no ownership/membership filter)
+    // Rationale: requirement to list projects even if they have no owner or members
+    const matchQuery: any = {};
 
     // Enhanced search implementation following cars/deliverables pattern
     if (search && search.trim()) {
