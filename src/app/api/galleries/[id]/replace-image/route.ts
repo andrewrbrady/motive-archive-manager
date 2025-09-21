@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
       {
         $set: {
           [`imageIds.${originalImageIndex}`]: new ObjectId(newImageId),
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(),
         },
       }
     );

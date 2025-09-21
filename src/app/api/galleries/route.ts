@@ -4,6 +4,46 @@ import { ObjectId } from "mongodb";
 import { fixCloudflareImageUrl } from "@/lib/image-utils";
 import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 
+const NUMERIC_DATE_TYPES = ["int", "long", "double", "decimal"] as const;
+const FALLBACK_DATE = new Date(0);
+
+function normalizeDateExpression(fieldPath: string) {
+  return {
+    $let: {
+      vars: { valueType: { $type: fieldPath } },
+      in: {
+        $switch: {
+          branches: [
+            {
+              case: { $eq: ["$$valueType", "date"] },
+              then: fieldPath,
+            },
+            {
+              case: { $eq: ["$$valueType", "string"] },
+              then: {
+                $dateFromString: {
+                  dateString: fieldPath,
+                  onError: FALLBACK_DATE,
+                  onNull: FALLBACK_DATE,
+                },
+              },
+            },
+            {
+              case: { $in: ["$$valueType", NUMERIC_DATE_TYPES] },
+              then: { $toDate: fieldPath },
+            },
+            {
+              case: { $eq: ["$$valueType", "timestamp"] },
+              then: { $toDate: fieldPath },
+            },
+          ],
+          default: FALLBACK_DATE,
+        },
+      },
+    },
+  };
+}
+
 // Types
 interface OrderedImage {
   id: ObjectId;
@@ -17,8 +57,8 @@ interface Gallery {
   imageIds: ObjectId[];
   primaryImageId?: ObjectId;
   orderedImages?: OrderedImage[];
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // GET galleries with pagination
@@ -106,15 +146,24 @@ export async function GET(request: NextRequest) {
         : "updatedAt";
       const validSortOrder = sortOrder === "asc" ? 1 : -1;
 
+      const sortFieldMap: Record<string, string> = {
+        name: "name",
+        imageCount: "imageCount",
+        createdAt: "normalizedCreatedAt",
+        updatedAt: "normalizedUpdatedAt",
+      };
+
+      const primarySortField = sortFieldMap[validSortBy] || "normalizedUpdatedAt";
+
       if (validSortBy === "imageCount") {
         // For imageCount, we'll add it in the aggregation pipeline
-        sortObject["imageCount"] = validSortOrder;
-        sortObject["updatedAt"] = -1; // Secondary sort
+        sortObject[primarySortField] = validSortOrder;
+        sortObject["normalizedUpdatedAt"] = -1; // Secondary sort for recency
       } else {
-        sortObject[validSortBy] = validSortOrder;
-        // Add secondary sort for consistency
-        if (validSortBy !== "updatedAt") {
-          sortObject["updatedAt"] = -1;
+        sortObject[primarySortField] = validSortOrder;
+        // Add secondary sort for consistency when not already sorting by updatedAt
+        if (primarySortField !== "normalizedUpdatedAt") {
+          sortObject["normalizedUpdatedAt"] = -1;
         }
       }
 
@@ -124,9 +173,11 @@ export async function GET(request: NextRequest) {
         .collection("galleries")
         .aggregate([
           { $match: query },
-          // Add imageCount field for sorting
+          // Normalize date fields and add imageCount for consistent sorting
           {
             $addFields: {
+              normalizedUpdatedAt: normalizeDateExpression("$updatedAt"),
+              normalizedCreatedAt: normalizeDateExpression("$createdAt"),
               imageCount: { $size: { $ifNull: ["$imageIds", []] } },
             },
           },
@@ -221,8 +272,20 @@ export async function GET(request: NextRequest) {
               imageCount: 1,
               primaryImageId: 1,
               orderedImages: 1,
-              createdAt: 1,
-              updatedAt: 1,
+              createdAt: {
+                $dateToString: {
+                  date: "$normalizedCreatedAt",
+                  format: "%Y-%m-%dT%H:%M:%S.%LZ",
+                  timezone: "UTC",
+                },
+              },
+              updatedAt: {
+                $dateToString: {
+                  date: "$normalizedUpdatedAt",
+                  format: "%Y-%m-%dT%H:%M:%S.%LZ",
+                  timezone: "UTC",
+                },
+              },
               thumbnailImage: {
                 $cond: {
                   if: "$thumbnailImage",
@@ -242,6 +305,14 @@ export async function GET(request: NextRequest) {
       // Process galleries to format URLs and convert ObjectIds to strings
       const processedGalleries = galleries.map((gallery) => ({
         ...gallery,
+        createdAt:
+          gallery.createdAt instanceof Date
+            ? gallery.createdAt.toISOString()
+            : gallery.createdAt,
+        updatedAt:
+          gallery.updatedAt instanceof Date
+            ? gallery.updatedAt.toISOString()
+            : gallery.updatedAt,
         _id: gallery._id.toString(),
         imageIds: gallery.imageIds.map((id: ObjectId) => id.toString()),
         primaryImageId: gallery.primaryImageId?.toString(),
@@ -326,6 +397,8 @@ export async function POST(request: Request) {
     const db = await getDatabase();
     const galleriesCollection = db.collection("galleries");
 
+    const now = new Date();
+
     const gallery: Gallery = {
       name,
       description,
@@ -334,8 +407,8 @@ export async function POST(request: Request) {
       primaryImageId:
         processedImageIds.length > 0 ? processedImageIds[0] : undefined,
       orderedImages,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
 
     const result = await galleriesCollection.insertOne(gallery);
@@ -343,13 +416,16 @@ export async function POST(request: Request) {
     // Convert ObjectIds back to strings for the response
     return NextResponse.json({
       _id: result.insertedId.toString(),
-      ...gallery,
+      name: gallery.name,
+      description: gallery.description,
       imageIds: gallery.imageIds.map((id) => id.toString()),
       primaryImageId: gallery.primaryImageId?.toString(),
       orderedImages: gallery.orderedImages?.map((item) => ({
         id: item.id.toString(),
         order: item.order,
       })),
+      createdAt: gallery.createdAt.toISOString(),
+      updatedAt: gallery.updatedAt.toISOString(),
     });
   } catch (error) {
     console.error("[API] Error creating gallery:", error);

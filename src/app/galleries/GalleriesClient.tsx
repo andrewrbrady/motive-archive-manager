@@ -283,7 +283,7 @@ export default function GalleriesClient() {
       await createGallery(newGallery);
       setIsCreateDialogOpen(false);
       setNewGallery({ name: "", description: "" });
-      mutate();
+      await mutate({ forceRefresh: true });
       toast({
         title: "Success",
         description: "Gallery created successfully",
@@ -309,7 +309,7 @@ export default function GalleriesClient() {
     try {
       setDuplicatingGalleryId(galleryId);
       await duplicateGallery(galleryId);
-      mutate();
+      await mutate({ forceRefresh: true });
       toast({
         title: "Success",
         description: `Gallery "${galleryName}" duplicated successfully`,

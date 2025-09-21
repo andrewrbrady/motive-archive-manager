@@ -65,7 +65,7 @@ export async function PATCH(request: NextRequest) {
       { _id: new ObjectId(galleryId) },
       {
         $addToSet: { imageIds: { $each: processedImageIds } },
-        $set: { updatedAt: new Date().toISOString() },
+        $set: { updatedAt: new Date() },
       }
     );
 

@@ -81,7 +81,7 @@ export async function GET(request: Request) {
           $set: {
             imageIds: cleanImageIds,
             orderedImages: cleanOrderedImages,
-            updatedAt: new Date().toISOString(),
+            updatedAt: new Date(),
           },
         }
       );
@@ -133,7 +133,7 @@ export async function GET(request: Request) {
         {
           $set: {
             orderedImages: rebuiltOrderedImages,
-            updatedAt: new Date().toISOString(),
+            updatedAt: new Date(),
           },
         }
       );
@@ -147,8 +147,24 @@ export async function GET(request: Request) {
     }
 
     // Process the response
+    const createdAt =
+      gallery.createdAt instanceof Date
+        ? gallery.createdAt.toISOString()
+        : typeof gallery.createdAt === "string"
+        ? gallery.createdAt
+        : null;
+
+    const updatedAt =
+      gallery.updatedAt instanceof Date
+        ? gallery.updatedAt.toISOString()
+        : typeof gallery.updatedAt === "string"
+        ? gallery.updatedAt
+        : null;
+
     return NextResponse.json({
       ...gallery,
+      createdAt,
+      updatedAt,
       _id: gallery._id.toString(),
       imageIds: foundImageIds, // Return only the valid image IDs
       orderedImages:
@@ -233,7 +249,7 @@ export async function PUT(request: Request) {
         imageIds: processedImageIds,
         primaryImageId: processedPrimaryImageId,
         orderedImages: orderedImages || null,
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date(),
       },
     };
 
@@ -247,9 +263,25 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Gallery not found" }, { status: 404 });
     }
 
+    const responseCreatedAt =
+      result.createdAt instanceof Date
+        ? result.createdAt.toISOString()
+        : typeof result.createdAt === "string"
+        ? result.createdAt
+        : null;
+
+    const responseUpdatedAt =
+      result.updatedAt instanceof Date
+        ? result.updatedAt.toISOString()
+        : typeof result.updatedAt === "string"
+        ? result.updatedAt
+        : null;
+
     // Convert ObjectIds back to strings for the response
     return NextResponse.json({
       ...result,
+      createdAt: responseCreatedAt,
+      updatedAt: responseUpdatedAt,
       _id: result._id.toString(),
       imageIds: result.imageIds.map((id: ObjectId) => id.toString()),
       primaryImageId: result.primaryImageId?.toString(),

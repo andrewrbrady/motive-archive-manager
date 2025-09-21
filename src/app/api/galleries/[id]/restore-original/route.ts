@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
           carId: processedImage.carId, // Use the carId from the processed image
           createdAt:
             originalImageMetadata.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(),
         };
 
         await imagesCollection.insertOne(originalImageRecord);
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
           [`imageIds.${processedImageIndex}`]: new ObjectId(
             originalImageMetadata._id
           ),
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(),
         },
       }
     );

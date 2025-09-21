@@ -35,6 +35,10 @@ interface PaginationData {
   pages: number;
 }
 
+interface MutateOptions {
+  forceRefresh?: boolean;
+}
+
 interface UseGalleriesResponse {
   data: {
     galleries: Gallery[];
@@ -42,7 +46,7 @@ interface UseGalleriesResponse {
   } | null;
   isLoading: boolean;
   error: Error | null;
-  mutate: () => Promise<void>;
+  mutate: (options?: MutateOptions) => Promise<void>;
 }
 
 interface UseGalleriesOptions {
@@ -61,7 +65,7 @@ export function useGalleries(
   const [error, setError] = useState<Error | null>(null);
   const { data: session, status } = useSession();
 
-  const fetchGalleries = useCallback(async () => {
+  const fetchGalleries = useCallback(async (forceRefresh = false) => {
     // Only fetch when authenticated
     if (status !== "authenticated" || !session?.user) {
       console.log("🐛 useGalleries: Waiting for authentication...", {
@@ -80,6 +84,9 @@ export function useGalleries(
       if (options.limit) searchParams.set("limit", options.limit.toString());
       if (options.sortBy) searchParams.set("sortBy", options.sortBy);
       if (options.sortOrder) searchParams.set("sortOrder", options.sortOrder);
+      if (forceRefresh) {
+        searchParams.set("_", Date.now().toString());
+      }
 
       console.log(
         "🐛 useGalleries: Fetching data from:",
@@ -89,7 +96,18 @@ export function useGalleries(
       const result = await api.get<{
         galleries: Gallery[];
         pagination: PaginationData;
-      }>(`/galleries?${searchParams.toString()}`);
+      }>(
+        `/galleries?${searchParams.toString()}`,
+        forceRefresh
+          ? {
+              cache: "no-store",
+              headers: {
+                "Cache-Control": "no-cache",
+                Pragma: "no-cache",
+              },
+            }
+          : undefined
+      );
 
       // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🐛 useGalleries: Raw API result:", result);
       // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🐛 useGalleries: Result type:", typeof result);
@@ -126,9 +144,12 @@ export function useGalleries(
     session,
   ]);
 
-  const mutate = useCallback(async () => {
-    await fetchGalleries();
-  }, [fetchGalleries]);
+  const mutate = useCallback(
+    async (options?: MutateOptions) => {
+      await fetchGalleries(Boolean(options?.forceRefresh));
+    },
+    [fetchGalleries]
+  );
 
   // Initial fetch - only when authentication is ready
   useEffect(() => {

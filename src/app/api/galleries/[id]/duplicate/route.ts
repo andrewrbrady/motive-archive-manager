@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the duplicated gallery
-    const now = new Date().toISOString();
+    const now = new Date();
     const duplicatedGallery = {
       _id: new ObjectId(),
       name: `${originalGallery.name} (Copy)`,
@@ -58,6 +58,8 @@ export async function POST(request: NextRequest) {
       _id: duplicatedGallery._id.toString(),
       imageIds: duplicatedGallery.imageIds.map((id: ObjectId) => id.toString()),
       primaryImageId: duplicatedGallery.primaryImageId?.toString(),
+      createdAt: duplicatedGallery.createdAt.toISOString(),
+      updatedAt: duplicatedGallery.updatedAt.toISOString(),
     };
 
     return NextResponse.json({
