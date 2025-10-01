@@ -81,12 +81,12 @@ export const PERFORMANCE_INDEXES: IndexDefinition[] = [
   },
   {
     collection: "events",
-    index: { car_id: 1, start: 1 },
+    index: { carId: 1, start: 1 },
     options: { name: "events_car_start_idx", sparse: true, background: true },
   },
   {
     collection: "events",
-    index: { project_id: 1, start: 1 },
+    index: { projectId: 1, start: 1 },
     options: {
       name: "events_project_start_idx",
       sparse: true,

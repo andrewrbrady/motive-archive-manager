@@ -1,16 +1,9 @@
-import { MongoClient } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
+import { getMongoClient } from "@/lib/mongodb";
 
-const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
 const dbName = process.env.MONGODB_DB || "arb_assets";
 
-async function getClient() {
-  const client = await MongoClient.connect(uri);
-  return client;
-}
-
 export async function GET(request: NextRequest) {
-  let client;
   try {
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get("page") || "1");
@@ -20,7 +13,7 @@ export async function GET(request: NextRequest) {
     const sortDirection = searchParams.get("sortDirection") || "desc";
     const skip = (page - 1) * limit;
 
-    client = await getClient();
+    const client = await getMongoClient();
     const db = client.db(dbName);
     const collection = db.collection("raw_assets");
 
@@ -68,13 +61,10 @@ export async function GET(request: NextRequest) {
       },
       { status: 500 }
     );
-  } finally {
-    if (client) await client.close();
   }
 }
 
 export async function POST(request: NextRequest) {
-  let client;
   try {
     const body = await request.json();
 
@@ -86,7 +76,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    client = await getClient();
+    const client = await getMongoClient();
     const db = client.db(dbName);
     const collection = db.collection("raw_assets");
 
@@ -112,7 +102,5 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
-  } finally {
-    if (client) await client.close();
   }
 }

@@ -24,10 +24,16 @@ export async function GET(request: Request) {
 
     const db = await getDatabase();
     const carId = id;
+    const limitParam = url.searchParams.get("limit");
+    const parsedLimit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
+    const limit =
+      parsedLimit && Number.isFinite(parsedLimit)
+        ? Math.max(1, Math.min(parsedLimit, 1000))
+        : undefined;
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Fetching events for car ID:", carId); // Debug log
 
     const eventModel = new EventModel(db);
-    const events = await eventModel.findByCarId(carId);
+    const events = await eventModel.findByCarId(carId, { limit });
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Found events from database:", events); // Debug log
 
     // Transform the events to match the Event interface
@@ -94,8 +100,8 @@ export async function POST(request: NextRequest) {
     // Convert teamMemberIds to ObjectIds with validation
     const teamMemberIds = Array.isArray(data.teamMemberIds || data.assignees)
       ? (data.teamMemberIds || data.assignees)
-          .filter((id: string) => id && ObjectId.isValid(id))
-          .map((id: string) => new ObjectId(id))
+          .filter((id: string) => typeof id === "string" && id.trim().length > 0)
+          .map((id: string) => id.trim())
       : [];
 
     // Convert location ID to ObjectId if provided with validation
@@ -114,20 +120,20 @@ export async function POST(request: NextRequest) {
       .map((id: string) => new ObjectId(id));
 
     // Create event object matching DbEvent type
-    const eventData: Omit<DbEvent, "_id" | "created_at" | "updated_at"> = {
-      car_id: carId.toString(),
+    const eventData: Omit<DbEvent, "_id" | "createdAt" | "updatedAt"> = {
+      carId: carId.toString(),
       type: data.type,
       title: data.title.trim(),
       description: data.description || "",
       url: data.url || undefined,
       start: new Date(data.start),
       end: data.end ? new Date(data.end) : undefined,
-      is_all_day: data.isAllDay || false,
+      isAllDay: Boolean(data.isAllDay),
       teamMemberIds,
-      location_id: locationId,
-      primary_image_id: primaryImageId,
-      image_ids: imageIds.length > 0 ? imageIds : undefined,
-      created_by: userId, // Track who created the event
+      locationId: locationId,
+      primaryImageId: primaryImageId,
+      imageIds: imageIds.length > 0 ? imageIds : undefined,
+      createdBy: userId, // Track who created the event
     };
 
     const newEventId = await eventModel.create(eventData);
@@ -180,8 +186,8 @@ export async function PUT(request: Request) {
     // Convert teamMemberIds to ObjectIds with validation
     const teamMemberIds = Array.isArray(data.teamMemberIds || data.assignees)
       ? (data.teamMemberIds || data.assignees)
-          .filter((id: string) => id && ObjectId.isValid(id))
-          .map((id: string) => new ObjectId(id))
+          .filter((id: string) => typeof id === "string" && id.trim().length > 0)
+          .map((id: string) => id.trim())
       : [];
 
     // Convert location ID to ObjectId if provided with validation
@@ -201,7 +207,7 @@ export async function PUT(request: Request) {
 
     // Map the frontend fields to database fields
     const mappedUpdates: any = {
-      updated_at: new Date(),
+      updatedAt: new Date(),
     };
 
     if (data.type) mappedUpdates.type = data.type;
@@ -218,19 +224,19 @@ export async function PUT(request: Request) {
     }
 
     if (typeof data.isAllDay === "boolean")
-      mappedUpdates.is_all_day = data.isAllDay;
+      mappedUpdates.isAllDay = data.isAllDay;
 
     // Handle location field
     if (data.locationId !== undefined) {
-      mappedUpdates.location_id = locationId;
+      mappedUpdates.locationId = locationId;
     }
 
     // Handle image fields
     if (data.primaryImageId !== undefined) {
-      mappedUpdates.primary_image_id = primaryImageId;
+      mappedUpdates.primaryImageId = primaryImageId;
     }
     if (data.imageIds !== undefined) {
-      mappedUpdates.image_ids = imageIds.length > 0 ? imageIds : [];
+      mappedUpdates.imageIds = imageIds.length > 0 ? imageIds : [];
     }
 
     // Always update teamMemberIds array
@@ -297,12 +303,12 @@ export async function DELETE(request: Request) {
     }
 
     // Remove the eventId from the car's eventIds array to prevent orphaned references
-    if (event.car_id) {
+    if (event.carId) {
       try {
         await db
           .collection<Car>("cars")
           .updateOne(
-            { _id: new ObjectId(event.car_id) },
+            { _id: new ObjectId(event.carId) },
             { $pull: { eventIds: eventId } }
           );
       } catch (error) {

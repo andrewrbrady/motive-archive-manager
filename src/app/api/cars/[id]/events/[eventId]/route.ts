@@ -23,7 +23,7 @@ export async function DELETE(request: Request) {
     }
 
     // Verify the event belongs to the specified car
-    if (event.car_id !== carId) {
+    if (event.carId !== carId) {
       return NextResponse.json(
         { error: "Event does not belong to this car" },
         { status: 400 }
@@ -79,12 +79,14 @@ export async function PUT(request: Request) {
 
     // Ensure teamMemberIds is always an array - keep as strings since they are Firebase UIDs
     const teamMemberIds = Array.isArray(data.teamMemberIds || data.assignees)
-      ? data.teamMemberIds || data.assignees
+      ? (data.teamMemberIds || data.assignees)
+          .filter((id: string) => typeof id === "string" && id.trim().length > 0)
+          .map((id: string) => id.trim())
       : [];
 
     // Map the frontend fields to database fields
     const mappedUpdates: any = {
-      updated_at: new Date(),
+      updatedAt: new Date(),
     };
 
     if (data.type) mappedUpdates.type = data.type;
@@ -100,7 +102,7 @@ export async function PUT(request: Request) {
     }
 
     if (typeof data.isAllDay === "boolean")
-      mappedUpdates.is_all_day = data.isAllDay;
+      mappedUpdates.isAllDay = data.isAllDay;
 
     // Always update teamMemberIds array
     mappedUpdates.teamMemberIds = teamMemberIds;

@@ -32,11 +32,6 @@ async function getProjectEvents(
 
     const userId =
       tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
-    const isAdmin =
-      tokenData.tokenType !== "api_token" &&
-      Array.isArray(tokenData.roles) &&
-      tokenData.roles.includes("admin");
-
     const { id: projectId } = await params;
 
     if (!ObjectId.isValid(projectId)) {
@@ -58,12 +53,8 @@ async function getProjectEvents(
 
     // ⚡ OPTIMIZED: Use indexed query with field projection
     console.time("getProjectEvents-project-check");
-    const projectQuery: any = { _id: new ObjectId(projectId) };
-    if (!isAdmin) {
-      projectQuery.$or = [{ ownerId: userId }, { "members.userId": userId }];
-    }
-    const project = await db.collection("projects").findOne(projectQuery, {
-      projection: { _id: 1, ownerId: 1, members: 1 }, // Only get fields we need
+    const project = await db.collection("projects").findOne({
+      _id: new ObjectId(projectId),
     });
     console.timeEnd("getProjectEvents-project-check");
 
@@ -80,25 +71,25 @@ async function getProjectEvents(
       // Get events created directly for this project with field projection
       db
         .collection("events")
-        .find({ project_id: projectId })
+        .find({ projectId })
         .project({
           _id: 1,
-          project_id: 1,
-          car_id: 1,
+          projectId: 1,
+          carId: 1,
           type: 1,
           title: 1,
           description: 1,
           url: 1,
           start: 1,
           end: 1,
-          is_all_day: 1,
+          isAllDay: 1,
           teamMemberIds: 1,
-          location_id: 1,
-          primary_image_id: 1,
-          image_ids: 1,
-          created_by: 1,
-          created_at: 1,
-          updated_at: 1,
+          locationId: 1,
+          primaryImageId: 1,
+          imageIds: 1,
+          createdBy: 1,
+          createdAt: 1,
+          updatedAt: 1,
         })
         .sort({ start: -1 })
         .skip(offset)
@@ -125,22 +116,22 @@ async function getProjectEvents(
         .find({ _id: { $in: attachedEventIds } })
         .project({
           _id: 1,
-          project_id: 1,
-          car_id: 1,
+          projectId: 1,
+          carId: 1,
           type: 1,
           title: 1,
           description: 1,
           url: 1,
           start: 1,
           end: 1,
-          is_all_day: 1,
+          isAllDay: 1,
           teamMemberIds: 1,
-          location_id: 1,
-          primary_image_id: 1,
-          image_ids: 1,
-          created_by: 1,
-          created_at: 1,
-          updated_at: 1,
+          locationId: 1,
+          primaryImageId: 1,
+          imageIds: 1,
+          createdBy: 1,
+          createdAt: 1,
+          updatedAt: 1,
         })
         .sort({ start: -1 })
         .skip(offset)
@@ -154,7 +145,7 @@ async function getProjectEvents(
       ...createdEventsResult,
       ...attachedEvents.map((event) => ({
         ...event,
-        project_id: projectId, // Ensure project_id is set for attached events
+        projectId: projectId, // Ensure projectId is set for attached events
       })),
     ];
 
@@ -171,7 +162,7 @@ async function getProjectEvents(
       console.time("getProjectEvents-fetch-cars");
 
       const carIds = uniqueEvents
-        .map((event) => event.car_id)
+        .map((event) => event.carId)
         .filter((id) => id && ObjectId.isValid(id))
         .map((id) => new ObjectId(id));
 
@@ -189,13 +180,13 @@ async function getProjectEvents(
           .toArray();
 
         cars.forEach((car) => {
-          carsMap.set(car._id.toString(), {
-            _id: car._id.toString(),
-            make: car.make,
-            model: car.model,
-            year: car.year,
-            primaryImageId: car.primaryImageId?.toString(),
-          });
+        carsMap.set(car._id.toString(), {
+          _id: car._id.toString(),
+          make: car.make,
+          model: car.model,
+          year: car.year,
+          primaryImageId: car.primaryImageId?.toString(),
+        });
         });
       }
       console.timeEnd("getProjectEvents-fetch-cars");
@@ -207,9 +198,9 @@ async function getProjectEvents(
       const apiEvent = eventModel.transformToApiEvent(event);
 
       // Add car data if requested and available
-      if (includeCars && event.car_id && carsMap.has(event.car_id)) {
-        (apiEvent as any).car = carsMap.get(event.car_id);
-        (apiEvent as any).isAttached = event.project_id !== projectId;
+      if (includeCars && event.carId && carsMap.has(event.carId)) {
+        (apiEvent as any).car = carsMap.get(event.carId);
+        (apiEvent as any).isAttached = event.projectId !== projectId;
       }
 
       return apiEvent;
@@ -267,20 +258,9 @@ async function createProjectEvent(
 
     const db = await getDatabase();
 
-    // Check if user has write access to this project
+    // Check if project exists
     const project = await db.collection("projects").findOne({
       _id: new ObjectId(projectId),
-      $or: [
-        { ownerId: userId },
-        {
-          members: {
-            $elemMatch: {
-              userId: userId,
-              permissions: { $in: ["write", "manage_timeline"] },
-            },
-          },
-        },
-      ],
     });
 
     if (!project) {
@@ -302,9 +282,11 @@ async function createProjectEvent(
     }
 
     // Convert teamMemberIds to ObjectIds with validation
-    const teamMemberIds = (data.teamMemberIds || [])
-      .filter((id: string) => id && ObjectId.isValid(id))
-      .map((id: string) => new ObjectId(id));
+    const teamMemberIds = Array.isArray(data.teamMemberIds)
+      ? data.teamMemberIds
+          .filter((id: string) => typeof id === "string" && id.trim().length > 0)
+          .map((id: string) => id.trim())
+      : [];
 
     // Convert image IDs to ObjectIds if provided with validation
     const primaryImageId =
@@ -322,21 +304,21 @@ async function createProjectEvent(
         : undefined;
 
     // Create event object
-    const eventData: Omit<DbEvent, "_id" | "created_at" | "updated_at"> = {
-      project_id: projectId,
-      car_id: data.car_id, // Optional - can be associated with specific car in project
+    const eventData: Omit<DbEvent, "_id" | "createdAt" | "updatedAt"> = {
+      projectId: projectId,
+      carId: data.car_id || data.carId, // Optional - can be associated with specific car in project
       type: data.type,
       title: data.title.trim(),
       description: data.description || "",
       url: data.url || undefined,
       start: new Date(data.start),
       end: data.end ? new Date(data.end) : undefined,
-      is_all_day: data.isAllDay || false,
+      isAllDay: Boolean(data.isAllDay),
       teamMemberIds,
-      location_id: locationId,
-      primary_image_id: primaryImageId,
-      image_ids: imageIds.length > 0 ? imageIds : undefined,
-      created_by: userId, // Track who created the event
+      locationId: locationId,
+      primaryImageId: primaryImageId,
+      imageIds: imageIds.length > 0 ? imageIds : undefined,
+      createdBy: userId, // Track who created the event
     };
 
     const newEventId = await eventModel.create(eventData);

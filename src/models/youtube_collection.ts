@@ -1,4 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { dbConnect } from "@/lib/mongodb";
+
+dbConnect().catch(console.error);
 
 export interface IYoutubeCollection {
   name: string;

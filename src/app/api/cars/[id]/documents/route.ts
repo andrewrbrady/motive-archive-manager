@@ -1,10 +1,11 @@
-import { MongoClient, ObjectId } from "mongodb";
+import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 import { getMongoClient } from "@/lib/mongodb";
 
 export const dynamic = "force-dynamic";
 
-const DB_NAME = process.env.MONGODB_DB_NAME || "motive";
+const DB_NAME =
+  process.env.MONGODB_DB_NAME || process.env.MONGODB_DB || "motive";
 
 // GET documents for a car
 export async function GET(request: Request) {
@@ -14,20 +15,16 @@ export async function GET(request: Request) {
     const id = segments[segments.length - 2];
 
     const client = await getMongoClient();
-    try {
-      const db = client.db(DB_NAME);
-      const car = await db.collection("cars").findOne({
-        _id: new ObjectId(id),
-      });
+    const db = client.db(DB_NAME);
+    const car = await db.collection("cars").findOne({
+      _id: new ObjectId(id),
+    });
 
-      if (!car) {
-        return NextResponse.json({ error: "Car not found" }, { status: 404 });
-      }
-
-      return NextResponse.json({ documents: car.documents || [] });
-    } finally {
-      await client.close();
+    if (!car) {
+      return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
+
+    return NextResponse.json({ documents: car.documents || [] });
   } catch (error) {
     console.error("Error fetching car documents:", error);
     return NextResponse.json(
@@ -43,30 +40,26 @@ export async function POST(request: Request) {
     const segments = url.pathname.split("/");
     const id = segments[segments.length - 2];
 
+    const { documents } = await request.json();
     const client = await getMongoClient();
-    try {
-      const { documents } = await request.json();
-      const db = client.db(DB_NAME);
-      const now = new Date();
+    const db = client.db(DB_NAME);
+    const now = new Date();
 
-      const result = await db.collection("cars").updateOne(
-        { _id: new ObjectId(id) },
-        {
-          $set: {
-            documents,
-            updatedAt: now,
-          },
-        }
-      );
-
-      if (result.matchedCount === 0) {
-        return NextResponse.json({ error: "Car not found" }, { status: 404 });
+    const result = await db.collection("cars").updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          documents,
+          updatedAt: now,
+        },
       }
+    );
 
-      return NextResponse.json({ success: true });
-    } finally {
-      await client.close();
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error updating car documents:", error);
     return NextResponse.json(

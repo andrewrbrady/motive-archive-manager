@@ -37,20 +37,21 @@ export interface Event {
 // Database representation
 export interface DbEvent {
   _id: ObjectId;
-  car_id?: string;
-  project_id?: string;
+  carId?: string | ObjectId;
+  car_id?: string | ObjectId;
+  projectId?: string;
   type: EventType;
   title: string;
   description: string;
   url?: string;
   start: Date;
   end?: Date;
-  is_all_day?: boolean;
+  isAllDay?: boolean;
   teamMemberIds: string[];
-  location_id?: ObjectId;
-  primary_image_id?: ObjectId;
-  image_ids?: ObjectId[];
-  created_by: string;
-  created_at: Date;
-  updated_at: Date;
+  locationId?: ObjectId;
+  primaryImageId?: ObjectId;
+  imageIds?: ObjectId[];
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
 }

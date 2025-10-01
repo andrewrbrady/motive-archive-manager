@@ -47,7 +47,6 @@ async function detachEventFromProject(
     // Check if user has access to this project
     const project = await db.collection("projects").findOne({
       _id: new ObjectId(projectId),
-      $or: [{ ownerId: userId }, { "members.userId": userId }],
     });
 
     if (!project) {

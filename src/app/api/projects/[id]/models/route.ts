@@ -42,7 +42,6 @@ async function getProjectModels(
     // Get project and verify user has access
     const project = await db.collection("projects").findOne({
       _id: projectId,
-      $or: [{ ownerId: userId }, { "members.userId": userId }],
     });
 
     if (!project) {
@@ -153,13 +152,6 @@ async function linkModelToProject(
     // Verify project exists and user has access
     const project = await db.collection("projects").findOne({
       _id: projectId,
-      $or: [
-        { ownerId: userId },
-        {
-          "members.userId": userId,
-          "members.role": { $in: ["owner", "manager"] },
-        },
-      ],
     });
 
     if (!project) {
@@ -261,13 +253,6 @@ async function unlinkModelFromProject(
     // Verify project exists and user has access
     const project = await db.collection("projects").findOne({
       _id: projectId,
-      $or: [
-        { ownerId: userId },
-        {
-          "members.userId": userId,
-          "members.role": { $in: ["owner", "manager"] },
-        },
-      ],
     });
 
     if (!project) {

@@ -1,4 +1,7 @@
 import mongoose from "mongoose";
+import { dbConnect } from "@/lib/mongodb";
+
+dbConnect().catch(console.error);
 
 // Check if the model is already defined to prevent overwriting
 const Car =

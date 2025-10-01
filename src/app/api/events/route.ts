@@ -49,10 +49,10 @@ export async function GET(request: NextRequest) {
         searchParams.get("teamMember") || searchParams.get("assignee");
     }
     if (searchParams.has("car_id")) {
-      query.car_id = searchParams.get("car_id");
+      query.carId = searchParams.get("car_id");
     }
     if (searchParams.has("project_id")) {
-      query.project_id = searchParams.get("project_id");
+      query.projectId = searchParams.get("project_id");
     }
     if (searchParams.has("from")) {
       query.start = {

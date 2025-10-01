@@ -43,17 +43,6 @@ async function updateProjectEvent(
     // Check if user has write access to this project
     const project = await db.collection("projects").findOne({
       _id: new ObjectId(projectId),
-      $or: [
-        { ownerId: userId },
-        {
-          members: {
-            $elemMatch: {
-              userId: userId,
-              permissions: { $in: ["write", "manage_timeline"] },
-            },
-          },
-        },
-      ],
     });
 
     if (!project) {
@@ -67,11 +56,11 @@ async function updateProjectEvent(
     const eventObjectId = new ObjectId(eventId);
     const data = await request.json();
 
-    // Ensure teamMemberIds is always an array and convert to ObjectIds with validation
+    // Ensure teamMemberIds is always an array of strings (Firebase UIDs)
     const teamMemberIds = Array.isArray(data.teamMemberIds)
       ? data.teamMemberIds
-          .filter((id: string) => id && ObjectId.isValid(id))
-          .map((id: string) => new ObjectId(id))
+          .filter((id: string) => typeof id === "string" && id.trim().length > 0)
+          .map((id: string) => id.trim())
       : [];
 
     // Convert image IDs to ObjectIds if provided with validation
@@ -93,7 +82,7 @@ async function updateProjectEvent(
 
     // Map the frontend fields to database fields
     const mappedUpdates: any = {
-      updated_at: new Date(),
+      updatedAt: new Date(),
     };
 
     if (data.type) mappedUpdates.type = data.type;
@@ -109,20 +98,21 @@ async function updateProjectEvent(
     }
 
     if (typeof data.isAllDay === "boolean")
-      mappedUpdates.is_all_day = data.isAllDay;
-    if (data.car_id !== undefined) mappedUpdates.car_id = data.car_id;
+      mappedUpdates.isAllDay = data.isAllDay;
+    if (data.car_id !== undefined || data.carId !== undefined)
+      mappedUpdates.carId = (data.carId ?? data.car_id) || undefined;
 
     // Handle location field
     if (data.locationId !== undefined) {
-      mappedUpdates.location_id = locationId;
+      mappedUpdates.locationId = locationId;
     }
 
     // Handle image fields
     if (data.primaryImageId !== undefined) {
-      mappedUpdates.primary_image_id = primaryImageId;
+      mappedUpdates.primaryImageId = primaryImageId;
     }
     if (data.imageIds !== undefined) {
-      mappedUpdates.image_ids = imageIds.length > 0 ? imageIds : [];
+      mappedUpdates.imageIds = imageIds.length > 0 ? imageIds : [];
     }
 
     // Always update teamMemberIds array

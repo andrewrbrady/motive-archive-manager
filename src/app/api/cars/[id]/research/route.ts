@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId, UpdateFilter } from "mongodb";
+import { ObjectId, UpdateFilter } from "mongodb";
 import { ResearchFile } from "@/models/ResearchFile";
 import {
   uploadResearchFile,

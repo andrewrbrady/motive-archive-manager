@@ -1,16 +1,16 @@
-import { MongoClient, ObjectId } from "mongodb";
+import type { Db } from "mongodb";
+import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 import { StandardizedCar } from "@/types/routes/cars";
 import { cleanAiAnalysis, convertToPlainObject } from "@/utils/car-helpers";
 import { fixCloudflareImageUrl } from "@/lib/image-utils";
-
-const MONGODB_URI = process.env.MONGODB_URI;
+import { getDatabase, getMongoClient } from "@/lib/mongodb";
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
 
 // ✅ PERFORMANCE FIX: Use ISR instead of force-dynamic
 export const revalidate = 300; // 5 minutes
 
-if (!MONGODB_URI) {
+if (!process.env.MONGODB_URI) {
   throw new Error("Please add your Mongo URI to .env.local");
 }
 
@@ -154,19 +154,8 @@ type PipelineStage = {
   $unwind?: string | { path: string; preserveNullAndEmptyArrays?: boolean };
 };
 
-// Helper function to get MongoDB client
-async function getMongoClient() {
-  const client = new MongoClient(MONGODB_URI as string, {
-    connectTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-  });
-  await client.connect();
-  return client;
-}
-
 // GET car by ID
 export async function GET(request: Request) {
-  let client;
   try {
     const url = new URL(request.url);
     const segments = url.pathname.split("/");
@@ -186,8 +175,17 @@ export async function GET(request: Request) {
     const imageCategory = url.searchParams.get("imageCategory");
     const includeGalleries = url.searchParams.get("includeGalleries");
 
-    client = await getMongoClient();
-    const db = client.db(DB_NAME);
+    let db: Db;
+    try {
+      db = await getDatabase();
+    } catch (connectionError) {
+      console.error(
+        "Error acquiring pooled MongoDB connection, attempting fresh client",
+        connectionError
+      );
+      const fallbackClient = await getMongoClient();
+      db = fallbackClient.db(DB_NAME);
+    }
 
     // Create a projection object based on requested fields
     let projection: Record<string, number> = {};
@@ -675,16 +673,11 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Error fetching car:", error);
     return NextResponse.json({ error: "Failed to fetch car" }, { status: 500 });
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 }
 
 // PUT/PATCH to update car information
 export async function PUT(request: Request) {
-  const client = await getMongoClient();
   try {
     const url = new URL(request.url);
     const segments = url.pathname.split("/");
@@ -726,7 +719,7 @@ export async function PUT(request: Request) {
       $set.primaryImageId = new ObjectId($set.primaryImageId);
     }
 
-    const db = client.db(DB_NAME);
+    const db = await getDatabase();
     const result = await db
       .collection<Car>("cars")
       .updateOne({ _id: objectId }, { $set });
@@ -747,14 +740,11 @@ export async function PUT(request: Request) {
       { error: "Failed to update car" },
       { status: 500 }
     );
-  } finally {
-    await client.close();
   }
 }
 
 // DELETE car
 export async function DELETE(request: Request) {
-  let client;
   try {
     const url = new URL(request.url);
     const segments = url.pathname.split("/");
@@ -768,8 +758,7 @@ export async function DELETE(request: Request) {
     }
     const objectId = new ObjectId(id);
 
-    client = await getMongoClient();
-    const db = client.db(DB_NAME);
+    const db = await getDatabase();
 
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Deleting car with ID: ${id}`);
     const result = await db.collection("cars").deleteOne({
@@ -788,17 +777,11 @@ export async function DELETE(request: Request) {
       { error: "Failed to delete car" },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`Closing MongoDB connection for car`);
-      await client.close();
-    }
   }
 }
 
 // PATCH to update car information
 export async function PATCH(request: Request) {
-  let client;
   try {
     const url = new URL(request.url);
     const segments = url.pathname.split("/").filter(Boolean);
@@ -971,8 +954,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    client = await getMongoClient();
-    const db = client.db(DB_NAME);
+    const db = await getDatabase();
 
     // Validate car ID
     if (!ObjectId.isValid(id)) {
@@ -1047,10 +1029,6 @@ export async function PATCH(request: Request) {
       },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 }
 

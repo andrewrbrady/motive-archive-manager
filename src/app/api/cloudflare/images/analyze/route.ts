@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId, Collection } from "mongodb";
+import { ObjectId, Collection } from "mongodb";
 import { getDatabase } from "@/lib/mongodb";
 
 export const maxDuration = 300;

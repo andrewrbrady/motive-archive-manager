@@ -170,14 +170,6 @@ export async function GET(request: Request) {
       },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      try {
-        await client.close();
-      } catch (closeError) {
-        console.error(`[Image API] Error closing client:`, closeError);
-      }
-    }
   }
 }
 

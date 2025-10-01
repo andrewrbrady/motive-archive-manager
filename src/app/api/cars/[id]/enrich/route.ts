@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { MongoClient, ObjectId } from "mongodb";
+import { ObjectId } from "mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { Car, MeasurementValue } from "@/types/car";
 
 export const dynamic = "force-dynamic";
@@ -18,16 +19,6 @@ interface SerperResult {
 }
 
 // Helper function to get MongoDB client
-async function getMongoClient() {
-  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔄 Connecting to MongoDB...");
-  const client = new MongoClient(
-    process.env.MONGODB_URI || "mongodb://localhost:27017"
-  );
-  await client.connect();
-  // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ MongoDB connected");
-  return client;
-}
-
 async function searchVehicleInfo(query: string) {
   // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log(`\n🔍 Searching Serper for: "${query}"`);
   const response = await fetch("https://google.serper.dev/search", {
@@ -566,8 +557,6 @@ export async function POST(request: Request) {
         },
         { status: 500 }
       );
-    } finally {
-      await client.close();
     }
   } catch (error) {
     console.error("Error:", error);

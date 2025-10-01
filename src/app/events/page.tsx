@@ -86,9 +86,10 @@ export default function EventsPage() {
       if (filters.from) queryParams.append("from", filters.from);
       if (filters.to) queryParams.append("to", filters.to);
 
-      const data = (await api.get(
-        `/api/events?${queryParams.toString()}`
-      )) as Event[];
+      const response = await api.get(`/api/events?${queryParams.toString()}`);
+      const data = Array.isArray(response)
+        ? (response as Event[])
+        : ((response as { events?: Event[] }).events ?? []);
 
       // Fetch car information for each event
       const eventsWithCars = await Promise.all(

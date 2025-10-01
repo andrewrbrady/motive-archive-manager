@@ -1,4 +1,7 @@
 import mongoose from "mongoose";
+import { dbConnect } from "@/lib/mongodb";
+
+dbConnect().catch(console.error);
 
 const ChecklistItemSchema = new mongoose.Schema({
   id: {

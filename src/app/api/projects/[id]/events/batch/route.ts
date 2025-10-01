@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { EventType } from "@/types/event";
+import { DbEvent, EventType } from "@/types/event";
 import { EventModel } from "@/models/Event";
 import {
   withFirebaseAuth,
@@ -85,35 +85,55 @@ async function createBatchEvents(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Create all events with project_id
-    const eventsToCreate = events.map((event) => ({
-      id: new ObjectId().toString(),
-      project_id: projectId,
-      car_id: event.car_id || null, // Optional car association
-      type: event.type || EventType.OTHER,
-      title: event.title,
-      description: event.description || "",
-      url: event.url || "",
-      start: event.start || new Date().toISOString(),
-      end: event.end || null,
-      isAllDay: event.isAllDay || false,
-      teamMemberIds: event.teamMemberIds || [],
-      locationId: event.locationId || null,
-      primaryImageId: event.primaryImageId || null,
-      imageIds: event.imageIds || [],
-      createdBy: event.createdBy || "system",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }));
+    const eventModel = new EventModel(db);
+    const createdEventIds = [] as ObjectId[];
+    const toObjectId = (value: string | ObjectId | null | undefined) =>
+      value && ObjectId.isValid(value) ? new ObjectId(value) : undefined;
 
-    // Insert all events
-    const result = await db.collection("events").insertMany(eventsToCreate);
+    for (const event of events) {
+      const now = new Date();
+      const carId = event.car_id || event.carId;
+
+      const document = {
+        projectId: projectId,
+        carId: carId || undefined,
+        type: event.type || EventType.OTHER,
+        title: event.title.trim(),
+        description: event.description || "",
+        url: event.url || undefined,
+        start: event.start ? new Date(event.start) : now,
+        end: event.end ? new Date(event.end) : undefined,
+        isAllDay: Boolean(event.isAllDay),
+        teamMemberIds: Array.isArray(event.teamMemberIds)
+          ? event.teamMemberIds
+              .filter(
+                (id: string | ObjectId) =>
+                  (typeof id === "string" && id.trim().length > 0) ||
+                  id instanceof ObjectId
+              )
+              .map((id: string | ObjectId) =>
+                id instanceof ObjectId ? id.toString() : id.trim()
+              )
+          : [],
+        locationId: toObjectId(event.location_id || event.locationId),
+        primaryImageId: toObjectId(
+          event.primary_image_id || event.primaryImageId
+        ),
+        imageIds: Array.isArray(event.image_ids || event.imageIds)
+          ? (event.image_ids || event.imageIds)
+              .map((id: string | ObjectId) => toObjectId(id))
+              .filter((id: ObjectId | undefined): id is ObjectId => Boolean(id))
+          : undefined,
+        createdBy: event.createdBy || "system",
+      } as Omit<DbEvent, "_id" | "createdAt" | "updatedAt">;
+
+      const insertedId = await eventModel.create(document);
+      createdEventIds.push(insertedId);
+    }
 
     const createdEvents = await db
       .collection("events")
-      .find({
-        _id: { $in: Object.values(result.insertedIds) },
-      })
+      .find({ _id: { $in: createdEventIds } })
       .toArray();
 
     return NextResponse.json({
@@ -150,11 +170,6 @@ async function deleteBatchEvents(
 
     const userId =
       tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
-    const isAdmin =
-      tokenData.tokenType !== "api_token" &&
-      Array.isArray(tokenData.roles) &&
-      tokenData.roles.includes("admin");
-
     const { id: projectId } = await params;
 
     if (!ObjectId.isValid(projectId)) {
@@ -201,45 +216,16 @@ async function deleteBatchEvents(
       projectId,
       userId,
       tokenType: tokenData.tokenType,
-      isAdmin,
     });
 
-    // Check if user has write access to this project
-    // Admins can access any project, others need to be owner or member with permissions
-    const projectQuery: any = { _id: new ObjectId(projectId) };
-    if (!isAdmin) {
-      projectQuery.$or = [
-        { ownerId: userId },
-        {
-          members: {
-            $elemMatch: {
-              userId: userId,
-              permissions: { $in: ["write", "manage_timeline"] },
-            },
-          },
-        },
-      ];
-    }
-
-    const project = await db.collection("projects").findOne(projectQuery);
+    const project = await db.collection("projects").findOne({
+      _id: new ObjectId(projectId),
+    });
 
     console.log("🔍 Project found:", !!project);
 
     if (!project) {
       // Additional debugging - check if project exists at all
-      const projectExists = await db.collection("projects").findOne({
-        _id: new ObjectId(projectId),
-      });
-
-      console.log(
-        "🔍 Project exists without permission check:",
-        !!projectExists
-      );
-      if (projectExists) {
-        console.log("🔍 Project owner:", projectExists.ownerId);
-        console.log("🔍 Project members:", projectExists.members);
-      }
-
       return NextResponse.json(
         { error: "Project not found or insufficient permissions" },
         { status: 404 }

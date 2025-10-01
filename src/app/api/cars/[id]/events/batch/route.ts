@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { EventType } from "@/types/event";
+import { DbEvent, EventType } from "@/types/event";
+import { EventModel } from "@/models/Event";
 
 export async function POST(
   request: NextRequest,
@@ -75,34 +76,50 @@ export async function POST(
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    // Create all events with car_id
-    const eventsToCreate = events.map((event) => ({
-      id: new ObjectId().toString(),
-      car_id: carId,
-      type: event.type || EventType.OTHER,
-      title: event.title,
-      description: event.description || "",
-      url: event.url || "",
-      start: event.start || new Date().toISOString(),
-      end: event.end || null,
-      isAllDay: event.isAllDay || false,
-      teamMemberIds: event.teamMemberIds || [],
-      locationId: event.locationId || null,
-      primaryImageId: event.primaryImageId || null,
-      imageIds: event.imageIds || [],
-      createdBy: event.createdBy || "system",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }));
+    const eventModel = new EventModel(db);
 
-    // Insert all events
-    const result = await db.collection("events").insertMany(eventsToCreate);
+    const createdEventIds = [] as ObjectId[];
+
+    const toObjectId = (value: string | ObjectId | null | undefined) =>
+      value && ObjectId.isValid(value) ? new ObjectId(value) : undefined;
+
+    for (const event of events) {
+      const now = new Date();
+      const projectId = event.project_id || event.projectId;
+      const document = {
+        carId: carId,
+        projectId: projectId || undefined,
+        type: event.type || EventType.OTHER,
+        title: event.title.trim(),
+        description: event.description || "",
+        url: event.url || undefined,
+        start: event.start ? new Date(event.start) : now,
+        end: event.end ? new Date(event.end) : undefined,
+        isAllDay: Boolean(event.isAllDay),
+        teamMemberIds: Array.isArray(event.teamMemberIds)
+          ? event.teamMemberIds.map((id: string | ObjectId) =>
+              id instanceof ObjectId ? id.toString() : String(id)
+            )
+          : [],
+        locationId: toObjectId(event.location_id || event.locationId),
+        primaryImageId: toObjectId(
+          event.primary_image_id || event.primaryImageId
+        ),
+        imageIds: Array.isArray(event.image_ids || event.imageIds)
+          ? (event.image_ids || event.imageIds)
+              .map((id: string | ObjectId) => toObjectId(id))
+              .filter((id: ObjectId | undefined): id is ObjectId => Boolean(id))
+          : undefined,
+        createdBy: event.createdBy || "system",
+      } as Omit<DbEvent, "_id" | "createdAt" | "updatedAt">;
+
+      const insertedId = await eventModel.create(document);
+      createdEventIds.push(insertedId);
+    }
 
     const createdEvents = await db
       .collection("events")
-      .find({
-        _id: { $in: Object.values(result.insertedIds) },
-      })
+      .find({ _id: { $in: createdEventIds } })
       .toArray();
 
     return NextResponse.json({

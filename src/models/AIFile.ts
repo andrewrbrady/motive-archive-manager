@@ -1,4 +1,7 @@
 import mongoose from "mongoose";
+import { dbConnect } from "@/lib/mongodb";
+
+dbConnect().catch(console.error);
 
 // AI File document interface
 export interface IAIFileDocument extends mongoose.Document {

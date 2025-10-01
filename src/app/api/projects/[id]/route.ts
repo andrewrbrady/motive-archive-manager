@@ -81,7 +81,6 @@ async function getProject(
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 getProject: Searching for project...");
     const project = await Project.findOne({
       _id: projectId,
-      $or: [{ ownerId: userId }, { "members.userId": userId }],
     });
 
     if (!project) {
@@ -197,27 +196,9 @@ async function updateProject(
       );
     }
 
-    // Check if user has permission to update this project
+    // Check that the project exists before applying updates
     const existingProject = await Project.findOne({
       _id: projectId,
-      $or: [
-        { ownerId: userId },
-        {
-          members: {
-            $elemMatch: {
-              userId: userId,
-              permissions: {
-                $in: [
-                  "write",
-                  "manage_team",
-                  "manage_budget",
-                  "manage_timeline",
-                ],
-              },
-            },
-          },
-        },
-      ],
     });
 
     if (!existingProject) {
@@ -230,11 +211,11 @@ async function updateProject(
       );
       return NextResponse.json(
         {
-          error: "Access denied",
-          details: "Project not found or insufficient permissions",
-          code: "INSUFFICIENT_PERMISSIONS",
+          error: "Project not found",
+          details: "Project not found",
+          code: "PROJECT_NOT_FOUND",
         },
-        { status: 403 }
+        { status: 404 }
       );
     }
 

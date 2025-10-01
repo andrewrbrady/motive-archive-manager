@@ -45,9 +45,6 @@ async function preloadProjectData(
       );
     }
 
-    const userId =
-      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
-
     const { id: projectId } = await params;
 
     if (!ObjectId.isValid(projectId)) {
@@ -72,12 +69,9 @@ async function preloadProjectData(
     // ⚡ OPTIMIZED: Single project verification with minimal field projection
     console.time("preload-auth-check");
     const project = await db.collection("projects").findOne(
+      { _id: new ObjectId(projectId) },
       {
-        _id: new ObjectId(projectId),
-        $or: [{ ownerId: userId }, { "members.userId": userId }],
-      },
-      {
-        projection: { _id: 1, ownerId: 1, members: 1, carIds: 1, modelIds: 1 },
+        projection: { _id: 1, carIds: 1, modelIds: 1 },
       }
     );
     console.timeEnd("preload-auth-check");
@@ -155,18 +149,18 @@ async function fetchEventsData(
   const [createdEvents, attachments] = await Promise.all([
     db
       .collection("events")
-      .find({ project_id: projectId })
+      .find({ projectId })
       .project({
         _id: 1,
-        project_id: 1,
-        car_id: 1,
+        projectId: 1,
+        carId: 1,
         type: 1,
         title: 1,
         start: 1,
         end: 1,
-        is_all_day: 1,
-        primary_image_id: 1,
-        created_at: 1,
+        isAllDay: 1,
+        primaryImageId: 1,
+        createdAt: 1,
       })
       .sort({ start: -1 })
       .limit(limit)
@@ -189,15 +183,15 @@ async function fetchEventsData(
       .find({ _id: { $in: attachedEventIds } })
       .project({
         _id: 1,
-        project_id: 1,
-        car_id: 1,
+        projectId: 1,
+        carId: 1,
         type: 1,
         title: 1,
         start: 1,
         end: 1,
-        is_all_day: 1,
-        primary_image_id: 1,
-        created_at: 1,
+        isAllDay: 1,
+        primaryImageId: 1,
+        createdAt: 1,
       })
       .sort({ start: -1 })
       .limit(limit)
@@ -211,7 +205,7 @@ async function fetchEventsData(
   let carsMap = new Map();
   if (includeCars && allEvents.length > 0) {
     const carIds = allEvents
-      .map((e) => e.car_id)
+      .map((e) => e.carId)
       .filter((id) => id && ObjectId.isValid(id))
       .map((id) => new ObjectId(id));
 
@@ -238,20 +232,20 @@ async function fetchEventsData(
   const transformedEvents = allEvents.map((event) => {
     const transformed = {
       id: event._id.toString(),
-      project_id: event.project_id,
-      car_id: event.car_id,
+      project_id: event.projectId,
+      car_id: event.carId,
       type: event.type,
       title: event.title,
       start: event.start,
       end: event.end,
-      is_all_day: event.is_all_day,
-      primary_image_id: event.primary_image_id?.toString(),
-      created_at: event.created_at,
+      is_all_day: event.isAllDay,
+      primary_image_id: event.primaryImageId?.toString(),
+      created_at: event.createdAt,
     };
 
-    if (includeCars && event.car_id && carsMap.has(event.car_id)) {
-      (transformed as any).car = carsMap.get(event.car_id);
-      (transformed as any).isAttached = event.project_id !== projectId;
+    if (includeCars && event.carId && carsMap.has(event.carId)) {
+      (transformed as any).car = carsMap.get(event.carId);
+      (transformed as any).isAttached = event.projectId !== projectId;
     }
 
     return transformed;

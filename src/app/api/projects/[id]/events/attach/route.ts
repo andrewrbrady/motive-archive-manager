@@ -47,7 +47,6 @@ async function attachEventToProject(
     // Check if user has access to this project
     const project = await db.collection("projects").findOne({
       _id: new ObjectId(projectId),
-      $or: [{ ownerId: userId }, { "members.userId": userId }],
     });
 
     if (!project) {
@@ -79,21 +78,21 @@ async function attachEventToProject(
       );
     }
 
-    // If event has a car_id, check if we should update the event's primary image
-    if (event.car_id) {
+    // If event has a carId, check if we should update the event's primary image
+    if (event.carId) {
       try {
         const car = await db.collection("cars").findOne({
-          _id: new ObjectId(event.car_id),
+          _id: new ObjectId(event.carId),
         });
 
         // If car has a primary image and event doesn't have one, set it
-        if (car?.primaryImageId && !event.primary_image_id) {
+        if (car?.primaryImageId && !event.primaryImageId) {
           await db.collection("events").updateOne(
             { _id: new ObjectId(eventId) },
             {
               $set: {
-                primary_image_id: new ObjectId(car.primaryImageId),
-                updated_at: new Date(),
+                primaryImageId: new ObjectId(car.primaryImageId),
+                updatedAt: new Date(),
               },
             }
           );

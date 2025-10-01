@@ -431,11 +431,6 @@ export async function connectToDatabase() {
   }
 }
 
-// Initialize Mongoose connection
-if (!isBuildTime && !isStaticGeneration) {
-  dbConnect().catch(console.error);
-}
-
 // Graceful shutdown handlers
 if (!isBuildTime && !isStaticGeneration) {
   ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {

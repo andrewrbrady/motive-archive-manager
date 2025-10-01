@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId, Collection } from "mongodb";
+import { ObjectId, Collection } from "mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
@@ -30,20 +31,13 @@ interface Image {
   updatedAt: string;
 }
 
-async function getMongoClient() {
-  const client = new MongoClient(MONGODB_URI as string);
-  await client.connect();
-  return client;
-}
-
 export async function GET(request: NextRequest) {
-  let client;
   try {
     const url = new URL(request.url);
     const segments = url.pathname.split("/");
     const id = segments[segments.length - 1]; // -1 because URL is /cloudflare/metadata/[id]
 
-    client = await getMongoClient();
+    const client = await getMongoClient();
     const db = client.db(DB_NAME);
     const collection: Collection<Image> = db.collection("images");
 
@@ -73,15 +67,10 @@ export async function GET(request: NextRequest) {
       { error: "Failed to fetch metadata" },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 }
 
 export async function PATCH(request: NextRequest) {
-  let client;
   try {
     const url = new URL(request.url);
     const segments = url.pathname.split("/");
@@ -89,7 +78,7 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json();
 
-    client = await getMongoClient();
+    const client = await getMongoClient();
     const db = client.db(DB_NAME);
     const collection: Collection<Image> = db.collection("images");
 
@@ -134,10 +123,6 @@ export async function PATCH(request: NextRequest) {
       { error: "Failed to update metadata" },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 }
 

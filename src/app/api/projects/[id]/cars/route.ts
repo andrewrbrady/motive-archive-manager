@@ -28,9 +28,6 @@ async function getProjectCars(
       );
     }
 
-    const userId =
-      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
-
     const { id } = await params;
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -42,10 +39,9 @@ async function getProjectCars(
     const db = await getDatabase();
     const projectId = new ObjectId(id);
 
-    // Get project and verify user has access
+    // Get project without ownership restrictions
     const project = await db.collection("projects").findOne({
       _id: projectId,
-      $or: [{ ownerId: userId }, { "members.userId": userId }],
     });
 
     if (!project) {
@@ -143,9 +139,6 @@ async function linkCarToProject(
       );
     }
 
-    const userId =
-      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
-
     const { id } = await params;
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -166,13 +159,6 @@ async function linkCarToProject(
     // Verify project exists and user has access
     const project = await db.collection("projects").findOne({
       _id: projectId,
-      $or: [
-        { ownerId: userId },
-        {
-          "members.userId": userId,
-          "members.role": { $in: ["owner", "manager"] },
-        },
-      ],
     });
 
     if (!project) {
@@ -243,9 +229,6 @@ async function unlinkCarFromProject(
       );
     }
 
-    const userId =
-      tokenData.tokenType === "api_token" ? tokenData.userId : tokenData.uid;
-
     const { id } = await params;
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -268,13 +251,6 @@ async function unlinkCarFromProject(
     // Verify project exists and user has access
     const project = await db.collection("projects").findOne({
       _id: projectId,
-      $or: [
-        { ownerId: userId },
-        {
-          "members.userId": userId,
-          "members.role": { $in: ["owner", "manager"] },
-        },
-      ],
     });
 
     if (!project) {

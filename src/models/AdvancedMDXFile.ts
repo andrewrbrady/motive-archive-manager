@@ -1,4 +1,7 @@
 import mongoose from "mongoose";
+import { dbConnect } from "@/lib/mongodb";
+
+dbConnect().catch(console.error);
 
 // Define the interface for Advanced MDX file document
 interface IAdvancedMDXFile extends mongoose.Document {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId, Collection } from "mongodb";
+import { ObjectId, Collection } from "mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB || "motive_archive";
@@ -22,7 +23,6 @@ interface Image {
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  let client;
   try {
     const { searchParams } = new URL(request.url);
     const ids = searchParams.get("ids");
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     const imageIds = validIds.map((id) => new ObjectId(id));
 
-    client = await MongoClient.connect(MONGODB_URI as string);
+    const client = await getMongoClient();
     const db = client.db(DB_NAME);
     const collection: Collection<Image> = db.collection("images");
 
@@ -73,9 +73,5 @@ export async function GET(request: NextRequest) {
       { error: "Failed to fetch metadata" },
       { status: 500 }
     );
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 }

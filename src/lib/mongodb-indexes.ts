@@ -34,13 +34,13 @@ const CRITICAL_INDEXES: IndexDefinition[] = [
   // Events collection - critical for events tab
   {
     collection: "events",
-    index: { project_id: 1 },
-    options: { name: "events_project_id", background: true },
+    index: { projectId: 1 },
+    options: { name: "events_projectId", background: true },
   },
   {
     collection: "events",
-    index: { car_id: 1 },
-    options: { name: "events_car_id", background: true, sparse: true },
+    index: { carId: 1 },
+    options: { name: "events_carId", background: true, sparse: true },
   },
 
   // Project events collection - for attached events

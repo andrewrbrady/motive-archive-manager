@@ -54,7 +54,6 @@ export async function GET(
     // Get project and verify user has access
     const project = await db.collection("projects").findOne({
       _id: projectId,
-      $or: [{ ownerId: userId }, { "members.userId": userId }],
     });
 
     if (!project) {
@@ -201,13 +200,6 @@ export async function POST(
     // Verify project exists and user has access
     const project = await db.collection("projects").findOne({
       _id: projectId,
-      $or: [
-        { ownerId: userId },
-        {
-          "members.userId": userId,
-          "members.role": { $in: ["owner", "manager"] },
-        },
-      ],
     });
 
     if (!project) {
@@ -316,13 +308,6 @@ export async function DELETE(
     // Verify project exists and user has access
     const project = await db.collection("projects").findOne({
       _id: projectId,
-      $or: [
-        { ownerId: userId },
-        {
-          "members.userId": userId,
-          "members.role": { $in: ["owner", "manager"] },
-        },
-      ],
     });
 
     if (!project) {

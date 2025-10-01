@@ -1,4 +1,7 @@
 import mongoose, { Document, Model } from "mongoose";
+import { dbConnect } from "@/lib/mongodb";
+
+dbConnect().catch(console.error);
 import { ClientStylesheet } from "@/types/stylesheet";
 import { ParsedCSS, CSSClass } from "@/lib/css-parser";
 

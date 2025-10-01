@@ -4,8 +4,8 @@ import { Event, EventType, DbEvent } from "@/types/event";
 type EventQuery = {
   type?: EventType;
   teamMemberIds?: string | { $in: string[] };
-  car_id?: string;
-  project_id?: string;
+  carId?: string;
+  projectId?: string;
   createdBy?: string;
   start?:
     | Date
@@ -30,22 +30,22 @@ export class EventModel {
     // Create indexes if they don't exist
     if (collections.length <= 1) {
       // Basic single field indexes
-      await this.collection.createIndex({ car_id: 1 });
-      await this.collection.createIndex({ project_id: 1 });
+      await this.collection.createIndex({ carId: 1 });
+      await this.collection.createIndex({ projectId: 1 });
       await this.collection.createIndex({ type: 1 });
       await this.collection.createIndex({ start: 1 });
-      await this.collection.createIndex({ created_by: 1 });
-      await this.collection.createIndex({ created_at: -1 });
+      await this.collection.createIndex({ createdBy: 1 });
+      await this.collection.createIndex({ createdAt: -1 });
       await this.collection.createIndex({ teamMemberIds: 1 });
     }
   }
 
-  async create(event: Omit<DbEvent, "_id" | "created_at" | "updated_at">) {
+  async create(event: Omit<DbEvent, "_id" | "createdAt" | "updatedAt">) {
     const now = new Date();
     const newEvent = {
       ...event,
-      created_at: now,
-      updated_at: now,
+      createdAt: now,
+      updatedAt: now,
       teamMemberIds: event.teamMemberIds || [],
     };
 
@@ -57,17 +57,23 @@ export class EventModel {
     return await this.collection.findOne({ _id: id });
   }
 
-  async findByCarId(carId: string) {
-    const events = await this.collection
-      .find({ car_id: carId })
-      .sort({ start: 1 })
-      .toArray();
-    return events;
+  async findByCarId(carId: string, options: { limit?: number } = {}) {
+    const filter = this.buildCarMatchFilter(carId);
+
+    const limit = options.limit ?? 500;
+
+    let cursor = this.collection.find(filter).sort({ start: 1 });
+
+    if (limit && limit > 0) {
+      cursor = cursor.limit(limit);
+    }
+
+    return cursor.toArray();
   }
 
   async findByProjectId(projectId: string) {
     const events = await this.collection
-      .find({ project_id: projectId })
+      .find({ projectId })
       .sort({ start: 1 })
       .toArray();
     return events;
@@ -81,19 +87,19 @@ export class EventModel {
       filter.type = query.type;
     }
 
-    // Add car_id filter
-    if (query.car_id) {
-      filter.car_id = query.car_id;
+    // Add carId filter
+    if (query.carId) {
+      filter.carId = query.carId;
     }
 
-    // Add project_id filter
-    if (query.project_id) {
-      filter.project_id = query.project_id;
+    // Add projectId filter
+    if (query.projectId) {
+      filter.projectId = query.projectId;
     }
 
     // Add createdBy filter
     if (query.createdBy) {
-      filter.created_by = query.createdBy;
+      filter.createdBy = query.createdBy;
     }
 
     // Add team member filter
@@ -140,8 +146,8 @@ export class EventModel {
       }
 
       // Ensure dates are proper Date objects
-      if (updates.updated_at && !(updates.updated_at instanceof Date)) {
-        updates.updated_at = new Date(updates.updated_at);
+      if (updates.updatedAt && !(updates.updatedAt instanceof Date)) {
+        updates.updatedAt = new Date(updates.updatedAt);
       }
 
       const result = await this.collection.updateOne(
@@ -150,7 +156,7 @@ export class EventModel {
           $set: {
             ...updates,
             // Always update the updated_at timestamp
-            updated_at: updates.updated_at || new Date(),
+            updatedAt: updates.updatedAt || new Date(),
           },
         }
       );
@@ -190,24 +196,54 @@ export class EventModel {
       return undefined;
     };
 
+    const primaryCarId = dbEvent.carId
+      ? typeof dbEvent.carId === "string"
+        ? dbEvent.carId
+        : dbEvent.carId.toString()
+      : undefined;
+
+    const legacyCarId = dbEvent.car_id
+      ? typeof dbEvent.car_id === "string"
+        ? dbEvent.car_id
+        : dbEvent.car_id.toString()
+      : undefined;
+
     return {
       id: dbEvent._id.toString(),
-      car_id: dbEvent.car_id,
-      project_id: dbEvent.project_id,
+      car_id: primaryCarId || legacyCarId,
+      project_id: dbEvent.projectId,
       type: dbEvent.type,
       title: dbEvent.title,
       description: dbEvent.description,
       url: dbEvent.url,
       start: toISOString(dbEvent.start) || new Date().toISOString(),
       end: toISOString(dbEvent.end),
-      isAllDay: dbEvent.is_all_day || false,
+      isAllDay: dbEvent.isAllDay || false,
       teamMemberIds: dbEvent.teamMemberIds || [],
-      locationId: dbEvent.location_id?.toString(),
-      primaryImageId: dbEvent.primary_image_id?.toString(),
-      imageIds: dbEvent.image_ids?.map((id) => id.toString()) || [],
-      createdBy: dbEvent.created_by,
-      createdAt: toISOString(dbEvent.created_at) || new Date().toISOString(),
-      updatedAt: toISOString(dbEvent.updated_at) || new Date().toISOString(),
+      locationId: dbEvent.locationId?.toString(),
+      primaryImageId: dbEvent.primaryImageId?.toString(),
+      imageIds: dbEvent.imageIds?.map((id) => id.toString()) || [],
+      createdBy: dbEvent.createdBy,
+      createdAt: toISOString(dbEvent.createdAt) || new Date().toISOString(),
+      updatedAt: toISOString(dbEvent.updatedAt) || new Date().toISOString(),
     };
+  }
+
+  private buildCarMatchFilter(carId: string): Filter<DbEvent> {
+    if (!carId) {
+      return {};
+    }
+
+    const filters: Filter<DbEvent>[] = [{ carId } as Filter<DbEvent>];
+
+    if (ObjectId.isValid(carId)) {
+      const objectId = new ObjectId(carId);
+      filters.push({ carId: objectId } as Filter<DbEvent>);
+      filters.push({ car_id: objectId } as Filter<DbEvent>);
+    }
+
+    filters.push({ car_id: carId } as Filter<DbEvent>);
+
+    return ({ $or: filters } as unknown) as Filter<DbEvent>;
   }
 }

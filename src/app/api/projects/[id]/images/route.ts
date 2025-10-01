@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId, UpdateFilter } from "mongodb";
+import { ObjectId, UpdateFilter } from "mongodb";
 import { getDatabase, getMongoClient } from "@/lib/mongodb";
 import { DB_NAME } from "@/constants";
 import { fixCloudflareImageUrl } from "@/lib/image-utils";

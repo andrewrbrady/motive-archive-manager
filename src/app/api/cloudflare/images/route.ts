@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient, ObjectId, Collection } from "mongodb";
+import { ObjectId, Collection } from "mongodb";
 import { getDatabase } from "@/lib/mongodb";
 import { analyzeImage } from "@/lib/imageAnalyzer";
 
@@ -151,7 +151,6 @@ export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
   const customStream = new TransformStream();
   const writer = customStream.writable.getWriter();
-  let mongoClient: MongoClient | undefined;
   let retryCount = 0;
   const MAX_RETRIES = 3;
 

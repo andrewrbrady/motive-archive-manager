@@ -1,18 +1,12 @@
-import { MongoClient } from "mongodb";
 import { NextApiRequest, NextApiResponse } from "next";
-
-const uri = "mongodb://localhost:27017";
-const dbName = "motive_archive";
+import { getDatabase } from "@/lib/mongodb";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   try {
-    const client = new MongoClient(uri);
-    await client.connect();
-
-    const db = client.db(dbName);
+    const db = await getDatabase();
     const carsCollection = db.collection("cars");
 
     const pageQuery = Array.isArray(req.query.page)
@@ -33,8 +27,6 @@ export default async function handler(
       .toArray();
 
     const total = await carsCollection.countDocuments();
-
-    await client.close();
 
     res.status(200).json({
       cars,
