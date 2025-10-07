@@ -4,7 +4,7 @@ import {
   getUserIdFromToken,
   verifyFirebaseToken,
 } from "@/lib/firebase-auth-middleware";
-import { connectToDatabase } from "@/lib/mongodb";
+import { dbConnect } from "@/lib/mongodb";
 import { Deliverable } from "@/models/Deliverable";
 import { ObjectId } from "mongodb";
 
@@ -39,7 +39,7 @@ export async function GET(
       );
     }
 
-    await connectToDatabase();
+    await dbConnect();
 
     const deliverable = await Deliverable.findById(deliverableId);
 
@@ -118,7 +118,7 @@ export async function PUT(
       );
     }
 
-    await connectToDatabase();
+    await dbConnect();
 
     // Check if deliverable exists
     const existingDeliverable = await Deliverable.findById(deliverableId);
@@ -295,7 +295,7 @@ export async function DELETE(
       );
     }
 
-    await connectToDatabase();
+    await dbConnect();
 
     // Check if deliverable exists
     const existingDeliverable = await Deliverable.findById(deliverableId);

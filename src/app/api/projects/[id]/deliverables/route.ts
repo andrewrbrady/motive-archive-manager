@@ -5,7 +5,7 @@ import {
   verifyFirebaseToken,
   getUserEmailFromToken,
 } from "@/lib/firebase-auth-middleware";
-import { connectToDatabase } from "@/lib/mongodb";
+import { dbConnect } from "@/lib/mongodb";
 import { Project } from "@/models/Project";
 import { Deliverable } from "@/models/Deliverable";
 import { ObjectId } from "mongodb";
@@ -46,7 +46,7 @@ export async function GET(
     const { id } = await params;
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📋 Project ID:", id);
 
-    await connectToDatabase();
+    await dbConnect();
 
     const project = await Project.findById(id);
     if (!project) {
@@ -130,10 +130,9 @@ export async function POST(
     const { id } = await params;
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("📋 Project ID from params:", id);
 
-    await connectToDatabase();
+    await dbConnect();
 
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔗 Connecting to database...");
-    await connectToDatabase();
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ Database connected successfully");
 
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 Finding project with ID:", id);
@@ -323,7 +322,7 @@ export async function DELETE(
       );
     }
 
-    await connectToDatabase();
+    await dbConnect();
 
     const project = await Project.findById(id);
     if (!project) {

@@ -4,7 +4,7 @@ import {
   getUserIdFromToken,
   verifyFirebaseToken,
 } from "@/lib/firebase-auth-middleware";
-import { connectToDatabase } from "@/lib/mongodb";
+import { dbConnect } from "@/lib/mongodb";
 import { Project } from "@/models/Project";
 import { Deliverable } from "@/models/Deliverable";
 
@@ -54,7 +54,7 @@ export async function DELETE(
       projectId
     );
 
-    await connectToDatabase();
+    await dbConnect();
 
     const project = await Project.findById(projectId);
     if (!project) {
@@ -170,7 +170,7 @@ export async function PUT(
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 REQUEST BODY:", JSON.stringify(body, null, 2));
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 CAR_ID IN BODY:", body.carId);
 
-    await connectToDatabase();
+    await dbConnect();
 
     // Check if user has access to this project
     const project = await Project.findById(projectId);

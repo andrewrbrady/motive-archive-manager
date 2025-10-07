@@ -4,7 +4,7 @@ import {
   getUserIdFromToken,
   verifyFirebaseToken,
 } from "@/lib/firebase-auth-middleware";
-import { connectToDatabase } from "@/lib/mongodb";
+import { dbConnect } from "@/lib/mongodb";
 import { Project } from "@/models/Project";
 import { ProjectMemberRole } from "@/types/project";
 
@@ -35,7 +35,7 @@ export async function GET(
     const userId = getUserIdFromToken(tokenData);
 
     const { id } = await params;
-    await connectToDatabase();
+    await dbConnect();
 
     const project = await Project.findById(id);
     if (!project) {
@@ -114,7 +114,7 @@ export async function POST(
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
 
-    await connectToDatabase();
+    await dbConnect();
 
     const project = await Project.findById(id);
     if (!project) {
@@ -219,7 +219,7 @@ export async function PUT(
       );
     }
 
-    await connectToDatabase();
+    await dbConnect();
 
     const project = await Project.findById(id);
     if (!project) {
@@ -318,7 +318,7 @@ export async function DELETE(
       );
     }
 
-    await connectToDatabase();
+    await dbConnect();
 
     const project = await Project.findById(id);
     if (!project) {

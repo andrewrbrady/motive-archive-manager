@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
+import { dbConnect } from "@/lib/mongodb";
 import { Project } from "@/models/Project";
 import {
   UpdateProjectRequest,
@@ -75,7 +75,7 @@ async function getProject(
     }
 
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔗 getProject: Connecting to database...");
-    await connectToDatabase();
+    await dbConnect();
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("✅ getProject: Database connected successfully");
 
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔍 getProject: Searching for project...");
@@ -174,7 +174,7 @@ async function updateProject(
       tokenType: tokenData.tokenType,
     });
 
-    await connectToDatabase();
+    await dbConnect();
     const { id: projectId } = await params;
     const data: UpdateProjectRequest = await request.json();
 
@@ -378,7 +378,7 @@ async function deleteProject(
       tokenType: tokenData.tokenType,
     });
 
-    await connectToDatabase();
+    await dbConnect();
     const { id: projectId } = await params;
 
     // Validate ObjectId

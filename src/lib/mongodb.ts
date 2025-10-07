@@ -22,7 +22,7 @@
 // - Reduced API response times for complex queries (cars, projects, events)
 // - Better handling of concurrent requests without connection pool exhaustion
 // - Improved connection reuse efficiency across API routes
-import mongoose from "mongoose";
+import mongoose, { ConnectOptions } from "mongoose";
 import { MongoClient, Db, MongoClientOptions } from "mongodb";
 
 // Check if we're in a build environment and should skip database connections
@@ -230,9 +230,40 @@ export async function dbConnect() {
       throw new Error("MongoDB URI not found in environment variables");
     }
 
-    await mongoose.connect(process.env.MONGODB_URI, {
-      dbName: process.env.MONGODB_DB || "motive_archive",
-    });
+    const dbName = process.env.MONGODB_DB || "motive_archive";
+    const parseNumericEnv = (value?: string | number | null) => {
+      if (value === undefined || value === null) {
+        return undefined;
+      }
+
+      const numeric =
+        typeof value === "number" ? value : Number(String(value).trim());
+      return Number.isFinite(numeric) ? numeric : undefined;
+    };
+    const parsedMaxPool = parseNumericEnv(process.env.MONGOOSE_MAX_POOL_SIZE);
+    const parsedMinPool = parseNumericEnv(process.env.MONGOOSE_MIN_POOL_SIZE);
+    const isProduction = process.env.NODE_ENV === "production";
+    const resolvedMaxPool = Math.max(
+      1,
+      parsedMaxPool ?? (isProduction ? 10 : 5)
+    );
+    const resolvedMinPool = Math.min(
+      resolvedMaxPool,
+      Math.max(0, parsedMinPool ?? (isProduction ? 1 : 0))
+    );
+    const mongooseOptions: ConnectOptions = {
+      dbName,
+      maxPoolSize: resolvedMaxPool,
+      minPoolSize: resolvedMinPool,
+      serverSelectionTimeoutMS:
+        Number(process.env.MONGOOSE_SERVER_SELECTION_TIMEOUT_MS) ||
+        (isProduction ? 10000 : 15000),
+      socketTimeoutMS:
+        Number(process.env.MONGOOSE_SOCKET_TIMEOUT_MS) ||
+        (isProduction ? 45000 : 60000),
+    };
+
+    await mongoose.connect(process.env.MONGODB_URI, mongooseOptions);
   } catch (error) {
     console.error("MongoDB - Connection error:", {
       error: error instanceof Error ? error.message : "Unknown error",

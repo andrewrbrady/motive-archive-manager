@@ -4,7 +4,7 @@ import {
   getUserIdFromToken,
   verifyFirebaseToken,
 } from "@/lib/firebase-auth-middleware";
-import { connectToDatabase } from "@/lib/mongodb";
+import { dbConnect } from "@/lib/mongodb";
 import { Project } from "@/models/Project";
 import { ObjectId } from "mongodb";
 
@@ -35,7 +35,7 @@ export async function GET(
     const userId = getUserIdFromToken(tokenData);
 
     const { id } = await params;
-    await connectToDatabase();
+    await dbConnect();
 
     const project = await Project.findById(id);
     if (!project) {
@@ -94,7 +94,7 @@ export async function PUT(
     const { milestones, startDate, endDate, estimatedDuration } = body;
     const { id } = await params;
 
-    await connectToDatabase();
+    await dbConnect();
 
     const project = await Project.findById(id);
     if (!project) {
@@ -184,7 +184,7 @@ export async function POST(
       );
     }
 
-    await connectToDatabase();
+    await dbConnect();
 
     const project = await Project.findById(id);
     if (!project) {
@@ -281,7 +281,7 @@ export async function DELETE(
       );
     }
 
-    await connectToDatabase();
+    await dbConnect();
 
     const project = await Project.findById(id);
     if (!project) {
