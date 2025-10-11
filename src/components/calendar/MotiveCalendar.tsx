@@ -72,6 +72,8 @@ export interface MotiveCalendarProps {
   showVisibilityControls?: boolean;
   isFullscreen?: boolean;
   calendarRef?: React.RefObject<HTMLDivElement>;
+  allowEventEditing?: boolean;
+  eventsApiBasePath?: string;
 }
 
 export function MotiveCalendar({
@@ -90,9 +92,40 @@ export function MotiveCalendar({
   showVisibilityControls = true,
   isFullscreen = false,
   calendarRef,
+  allowEventEditing = true,
+  eventsApiBasePath,
 }: MotiveCalendarProps) {
   const api = useAPI();
   const { platforms: availablePlatforms } = usePlatforms();
+  const isEventEditingEnabled = allowEventEditing ?? true;
+
+  const getEventsApiBasePath = useCallback(
+    (eventResource?: Event) => {
+      if (eventsApiBasePath && eventsApiBasePath.trim().length > 0) {
+        return eventsApiBasePath;
+      }
+
+      if (carId) {
+        return `/api/cars/${carId}/events`;
+      }
+
+      if (projectId) {
+        return `/api/projects/${projectId}/events`;
+      }
+
+      const resource = eventResource;
+      if (resource?.car_id) {
+        return `/api/cars/${resource.car_id}/events`;
+      }
+
+      if (resource?.project_id) {
+        return `/api/projects/${resource.project_id}/events`;
+      }
+
+      return null;
+    },
+    [carId, eventsApiBasePath, projectId]
+  );
 
   // Create a unique storage key for this calendar context
   const storageKey = `motive-calendar-filters-${projectId || carId || "default"}`;
@@ -1233,6 +1266,15 @@ export function MotiveCalendar({
       }
 
       if (event.type === "event") {
+        if (!isEventEditingEnabled) {
+          toast.error("Event updates are disabled in this view");
+          if (onEventDrop) {
+            onEventDrop(args);
+          }
+          return;
+        }
+
+        const eventResource = event.resource as Event | undefined;
         let adjustedEnd;
 
         // For all-day events, ensure they stay within their day
@@ -1244,22 +1286,29 @@ export function MotiveCalendar({
           adjustedEnd.setHours(23, 59, 59, 999);
         } else {
           // For non-all-day events, maintain original duration
-          const originalEvent = event.resource as Event;
-          const originalStart = new Date(originalEvent.start);
-          const originalEnd = originalEvent.end
-            ? new Date(originalEvent.end)
-            : new Date(originalEvent.start);
+          const originalStart = new Date(eventResource?.start || start);
+          const originalEnd = eventResource?.end
+            ? new Date(eventResource.end)
+            : new Date(eventResource?.start || start);
           const originalDuration =
             originalEnd.getTime() - originalStart.getTime();
           adjustedEnd = new Date(start.getTime() + originalDuration);
         }
 
-        // Determine the correct API endpoint based on context
-        const apiEndpoint = carId
-          ? `/api/cars/${carId}/events/${event.id}`
-          : `/api/projects/${projectId}/events/${event.id}`;
+        const basePath = getEventsApiBasePath(eventResource);
+        if (!basePath) {
+          toast.error("Unable to determine event context for updates");
+          if (onEventDrop) {
+            onEventDrop(args);
+          }
+          return;
+        }
 
-        await api.put(apiEndpoint, {
+        const sanitizedBasePath = basePath.endsWith("/")
+          ? basePath.slice(0, -1)
+          : basePath;
+
+        await api.put(`${sanitizedBasePath}/${event.id}`, {
           start: start.toISOString(),
           end: adjustedEnd.toISOString(),
           isAllDay: isAllDay,
@@ -1320,12 +1369,30 @@ export function MotiveCalendar({
       }
 
       if (event.type === "event") {
-        // Determine the correct API endpoint based on context
-        const apiEndpoint = carId
-          ? `/api/cars/${carId}/events/${event.id}`
-          : `/api/projects/${projectId}/events/${event.id}`;
+        if (!isEventEditingEnabled) {
+          toast.error("Event updates are disabled in this view");
+          if (onEventResize) {
+            onEventResize(args);
+          }
+          return;
+        }
 
-        await api.put(apiEndpoint, {
+        const eventResource = event.resource as Event | undefined;
+        const basePath = getEventsApiBasePath(eventResource);
+
+        if (!basePath) {
+          toast.error("Unable to determine event context for updates");
+          if (onEventResize) {
+            onEventResize(args);
+          }
+          return;
+        }
+
+        const sanitizedBasePath = basePath.endsWith("/")
+          ? basePath.slice(0, -1)
+          : basePath;
+
+        await api.put(`${sanitizedBasePath}/${event.id}`, {
           start: start.toISOString(),
           end: end.toISOString(),
         });

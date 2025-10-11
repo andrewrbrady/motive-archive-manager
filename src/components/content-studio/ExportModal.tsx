@@ -32,18 +32,11 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { ContentBlock } from "./types";
+import type { ExportOptions } from "@/lib/content-export";
 
 export type ExportFormat = "web" | "email";
 export type EmailPlatform = "mailchimp" | "sendgrid" | "generic";
 export type ExportAction = "download" | "copy";
-
-interface ExportOptions {
-  format: ExportFormat;
-  emailPlatform?: EmailPlatform;
-  action: ExportAction;
-  includeCSS: boolean;
-  fileName?: string;
-}
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -56,6 +49,8 @@ interface ExportModalProps {
   carId?: string;
   onExport: (options: ExportOptions) => Promise<void>;
   hasEmailFeatures: boolean;
+  minimalHtml: boolean;
+  onMinimalHtmlChange: (value: boolean) => void;
 }
 
 const EMAIL_PLATFORMS = {
@@ -100,6 +95,8 @@ export function ExportModal({
   carId,
   onExport,
   hasEmailFeatures,
+  minimalHtml,
+  onMinimalHtmlChange,
 }: ExportModalProps) {
   const { toast } = useToast();
   const [format, setFormat] = useState<ExportFormat>("email");
@@ -113,25 +110,48 @@ export function ExportModal({
   // Reset form when modal opens
   React.useEffect(() => {
     if (isOpen) {
-      setFormat("email");
+      setFormat(minimalHtml ? "web" : "email");
       setEmailPlatform("sendgrid"); // Default to SendGrid for user's needs
       setAction("copy");
-      setIncludeCSS(!!selectedStylesheetId); // Allow CSS if stylesheet is available
+      setIncludeCSS(!!selectedStylesheetId && !minimalHtml); // Allow CSS if stylesheet is available and minimal HTML is not forced
       setFileName("");
     }
-  }, [isOpen, selectedStylesheetId]);
+  }, [isOpen, selectedStylesheetId, minimalHtml]);
+
+  React.useEffect(() => {
+    if (minimalHtml && includeCSS) {
+      setIncludeCSS(false);
+    }
+  }, [minimalHtml, includeCSS]);
 
   // Note: Removed auto-disable CSS for SendGrid - let users choose
+
+  const handleFormatChange = (value: ExportFormat) => {
+    setFormat(value);
+    if (value !== "web" && minimalHtml) {
+      onMinimalHtmlChange(false);
+    }
+    if (value === "email") {
+      setIncludeCSS(!!selectedStylesheetId);
+    } else if (!minimalHtml) {
+      setIncludeCSS(!!selectedStylesheetId);
+    }
+  };
 
   const handleExport = async () => {
     setIsExporting(true);
 
     try {
+      const shouldUseMinimalHtml = format === "web" ? minimalHtml : false;
+      const shouldIncludeCSS =
+        includeCSS && !!selectedStylesheetId && !shouldUseMinimalHtml;
+
       const exportOptions: ExportOptions = {
         format,
         emailPlatform: format === "email" ? emailPlatform : undefined,
         action,
-        includeCSS: includeCSS && !!selectedStylesheetId,
+        includeCSS: shouldIncludeCSS,
+        minimalHtml: shouldUseMinimalHtml,
         fileName:
           action === "download" ? fileName || compositionName : undefined,
       };
@@ -152,6 +172,9 @@ export function ExportModal({
 
   const platformInfo =
     format === "email" ? EMAIL_PLATFORMS[emailPlatform] : null;
+  const cssOptionsDisabled = minimalHtml && format === "web";
+  const cssIncluded =
+    includeCSS && !!selectedStylesheetId && !cssOptionsDisabled;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -181,7 +204,7 @@ export function ExportModal({
               </Label>
               <Select
                 value={format}
-                onValueChange={(value: ExportFormat) => setFormat(value)}
+                onValueChange={(value: ExportFormat) => handleFormatChange(value)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -202,6 +225,41 @@ export function ExportModal({
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Minimal HTML option for web exports */}
+            {format === "web" && (
+              <div className="space-y-3">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  HTML Output
+                </Label>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="minimal-html"
+                    checked={minimalHtml}
+                    onCheckedChange={(checked) => {
+                      if (checked === true) {
+                        if (format !== "web") {
+                          setFormat("web");
+                        }
+                        onMinimalHtmlChange(true);
+                      } else {
+                        onMinimalHtmlChange(false);
+                      }
+                    }}
+                  />
+                  <Label
+                    htmlFor="minimal-html"
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Generate minimal HTML (no classes)
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground ml-6">
+                  Produces simplified markup using only basic tags. Images retain their alt text.
+                </p>
+              </div>
+            )}
 
             {/* Email Platform Selection (only for email format) */}
             {format === "email" && (
@@ -309,28 +367,41 @@ export function ExportModal({
                   <Checkbox
                     id="include-css"
                     checked={includeCSS}
-                    onCheckedChange={(checked) =>
-                      setIncludeCSS(checked === true)
-                    }
+                    onCheckedChange={(checked) => {
+                      if (cssOptionsDisabled) return;
+                      setIncludeCSS(checked === true);
+                    }}
+                    disabled={cssOptionsDisabled}
                   />
                   <Label
                     htmlFor="include-css"
-                    className="text-sm font-normal cursor-pointer"
+                    className={`text-sm font-normal ${
+                      cssOptionsDisabled ? "text-muted-foreground" : "cursor-pointer"
+                    }`}
                   >
                     Include custom CSS stylesheet
                   </Label>
                   <Badge variant="secondary" className="ml-2">
-                    {format === "email" ? "Email-optimized" : "Full CSS"}
+                    {cssOptionsDisabled
+                      ? "Unavailable"
+                      : format === "email"
+                      ? "Email-optimized"
+                      : "Full CSS"}
                   </Badge>
                 </div>
-                {emailPlatform === "sendgrid" && includeCSS && (
+                {cssOptionsDisabled && (
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Custom CSS is not included when minimal HTML is enabled.
+                  </p>
+                )}
+                {emailPlatform === "sendgrid" && cssIncluded && (
                   <p className="text-xs text-orange-600 ml-6">
                     ⚠️ Warning: Custom CSS may cause "Your design could not be
                     saved" errors in SendGrid. Try without CSS first if you
                     encounter issues.
                   </p>
                 )}
-                {includeCSS && emailPlatform !== "sendgrid" && (
+                {cssIncluded && emailPlatform !== "sendgrid" && (
                   <p className="text-xs text-muted-foreground ml-6">
                     {format === "email"
                       ? "CSS will be processed for email client compatibility"
@@ -424,7 +495,12 @@ export function ExportModal({
                   • Action:{" "}
                   {action === "copy" ? "Copy to Clipboard" : "Download File"}
                 </p>
-                <p>• CSS: {includeCSS ? "Included" : "Not included"}</p>
+                {format === "web" && (
+                  <p>
+                    • Minimal HTML: {minimalHtml ? "Enabled" : "Disabled"}
+                  </p>
+                )}
+                <p>• CSS: {cssIncluded ? "Included" : "Not included"}</p>
                 <p>
                   • Blocks: {blocks.length} content block
                   {blocks.length !== 1 ? "s" : ""}

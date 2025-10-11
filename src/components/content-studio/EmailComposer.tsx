@@ -213,8 +213,17 @@ export function EmailComposer(props: EmailComposerProps) {
             projectId={exportProps.effectiveProjectId}
             carId={exportProps.effectiveCarId}
             hasEmailFeatures={hasEmailFeatures(exportProps.blocks)}
+            minimalHtml={exportProps.isMinimalHtml}
+            onMinimalHtmlChange={exportProps.onMinimalHtmlChange}
             onExport={(options) =>
-              handleExportWithOptions(options, exportProps.selectedStylesheetId)
+              handleExportWithOptions(
+                {
+                  ...options,
+                  minimalHtml:
+                    options.minimalHtml ?? exportProps.isMinimalHtml,
+                },
+                exportProps.selectedStylesheetId
+              )
             }
           />
         </>

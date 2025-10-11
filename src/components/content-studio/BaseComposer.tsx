@@ -42,6 +42,7 @@ import { ToolbarRow } from "./ToolbarRow";
 import { LoadModal } from "./LoadModal";
 import { SaveModal } from "./SaveModal";
 import { MarkdownPasteModal } from "./MarkdownPasteModal";
+import { Switch } from "@/components/ui/switch";
 
 // Custom hooks
 import { useFrontmatterOperations } from "@/hooks/useFrontmatterOperations";
@@ -109,6 +110,8 @@ export interface ExportButtonsProps {
   effectiveProjectId?: string;
   effectiveCarId?: string;
   template?: string | null;
+  isMinimalHtml: boolean;
+  onMinimalHtmlChange: (value: boolean) => void;
 }
 
 export interface SpecializedControlsProps {
@@ -180,6 +183,7 @@ export function BaseComposer({
   const [showPreview, setShowPreview] = useState(false);
   const [previewMode, setPreviewMode] = useState<string>(defaultPreviewMode);
   const [editorMode, setEditorMode] = useState<"blocks" | "css">("blocks");
+  const [isMinimalHtml, setIsMinimalHtml] = useState(false);
 
   // Stylesheet management
   const [selectedStylesheetId, setSelectedStylesheetId] = useState<
@@ -189,6 +193,10 @@ export function BaseComposer({
   // Memoize setSelectedStylesheetId to prevent unnecessary re-renders
   const handleStylesheetChange = useCallback((stylesheetId: string | null) => {
     setSelectedStylesheetId(stylesheetId);
+  }, []);
+
+  const handleMinimalHtmlChange = useCallback((value: boolean) => {
+    setIsMinimalHtml(value);
   }, []);
 
   // CSS Editor state
@@ -930,6 +938,8 @@ export function BaseComposer({
       effectiveProjectId,
       effectiveCarId,
       template: template?.id || null,
+      isMinimalHtml,
+      onMinimalHtmlChange: handleMinimalHtmlChange,
     }),
     [
       blocks,
@@ -938,6 +948,8 @@ export function BaseComposer({
       effectiveProjectId,
       effectiveCarId,
       template,
+      isMinimalHtml,
+      handleMinimalHtmlChange,
     ]
   );
 
@@ -1046,6 +1058,21 @@ export function BaseComposer({
                   </SelectContent>
                 </Select>
               )}
+
+              {/* Minimal HTML Toggle */}
+              <div className="flex items-center gap-2 rounded-md border border-border/40 bg-background px-3 py-1">
+                <Switch
+                  id="toolbar-minimal-html"
+                  checked={isMinimalHtml}
+                  onCheckedChange={handleMinimalHtmlChange}
+                />
+                <Label
+                  htmlFor="toolbar-minimal-html"
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  Minimal HTML
+                </Label>
+              </div>
 
               {/* Export Buttons */}
               {renderExportButtons(exportButtonsProps)}

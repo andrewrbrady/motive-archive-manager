@@ -46,6 +46,14 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { Command as CommandPrimitive } from "cmdk";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ExportModal } from "./ExportModal";
+import { ExportOptions } from "@/lib/content-export";
 
 // Remove the composer type and render props from the base props
 interface NewsComposerProps
@@ -92,13 +100,14 @@ export function NewsComposer(props: NewsComposerProps) {
   const [carouselOpen, setCarouselOpen] = useState(false);
   const [gallerySearch, setGallerySearch] = useState("");
   const [carouselSearch, setCarouselSearch] = useState("");
+  const [showExportModal, setShowExportModal] = useState(false);
 
   // Fetch available galleries
   const { data: galleriesData } = useGalleries({ limit: 100 });
   const galleries = galleriesData?.galleries || [];
 
   // Export functionality
-  const { exportToMDX } = useContentExport();
+  const { exportToMDX, exportWithOptions } = useContentExport();
 
   // Initialize selection state from loaded composition metadata
   useEffect(() => {
@@ -195,6 +204,27 @@ export function NewsComposer(props: NewsComposerProps) {
           exportProps.compositionName,
           galleryIds,
           carouselIds
+        );
+      };
+
+      const handleExportHtml = () => {
+        setShowExportModal(true);
+      };
+
+      const handleExportWithOptions = async (options: ExportOptions) => {
+        const resolvedOptions: ExportOptions = {
+          ...options,
+          minimalHtml: options.minimalHtml ?? exportProps.isMinimalHtml,
+        };
+
+        await exportWithOptions(
+          exportProps.blocks,
+          exportProps.template || null,
+          exportProps.compositionName,
+          resolvedOptions,
+          exportProps.effectiveProjectId,
+          exportProps.effectiveCarId,
+          exportProps.selectedStylesheetId
         );
       };
 
@@ -372,15 +402,51 @@ export function NewsComposer(props: NewsComposerProps) {
             </PopoverContent>
           </Popover>
 
-          {/* Export MDX Button */}
-          <Button
-            onClick={handleExportMDX}
-            variant="outline"
-            className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export MDX
-          </Button>
+          {/* Combined Export Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="bg-background border-border/40 hover:bg-muted/20 shadow-sm"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault();
+                  handleExportHtml();
+                }}
+              >
+                Export HTML
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault();
+                  handleExportMDX();
+                }}
+              >
+                Export MDX
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <ExportModal
+            isOpen={showExportModal}
+            onClose={() => setShowExportModal(false)}
+            blocks={exportProps.blocks}
+            compositionName={exportProps.compositionName}
+            selectedStylesheetId={exportProps.selectedStylesheetId}
+            template={exportProps.template}
+            projectId={exportProps.effectiveProjectId}
+            carId={exportProps.effectiveCarId}
+            hasEmailFeatures={false}
+            minimalHtml={exportProps.isMinimalHtml}
+            onMinimalHtmlChange={exportProps.onMinimalHtmlChange}
+            onExport={handleExportWithOptions}
+          />
         </div>
       );
     },
@@ -398,6 +464,8 @@ export function NewsComposer(props: NewsComposerProps) {
       selectedCarouselLabel,
       galleryOptions,
       carouselOptions,
+      showExportModal,
+      exportWithOptions,
     ]
   );
 

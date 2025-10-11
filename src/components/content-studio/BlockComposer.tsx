@@ -49,6 +49,7 @@ import {
 import { CSSEditor } from "./CSSEditor";
 import { MarkdownPasteModal } from "./MarkdownPasteModal";
 import { ToolbarRow } from "./ToolbarRow";
+import { Switch } from "@/components/ui/switch";
 
 // Custom hooks
 import { useFrontmatterOperations } from "@/hooks/useFrontmatterOperations";
@@ -141,6 +142,7 @@ export function BlockComposer({
 
   // Export modal state
   const [showExportModal, setShowExportModal] = useState(false);
+  const [minimalHtml, setMinimalHtml] = useState(false);
 
   // Markdown paste modal state
   const [showMarkdownModal, setShowMarkdownModal] = useState(false);
@@ -756,6 +758,19 @@ export function BlockComposer({
                   </SelectContent>
                 </Select>
               )}
+              <div className="flex items-center gap-2 rounded-md border border-border/40 bg-background px-3 py-1">
+                <Switch
+                  id="block-composer-minimal-html"
+                  checked={minimalHtml}
+                  onCheckedChange={setMinimalHtml}
+                />
+                <Label
+                  htmlFor="block-composer-minimal-html"
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  Minimal HTML
+                </Label>
+              </div>
               <Button
                 onClick={() => setShowExportModal(true)}
                 variant="outline"
@@ -1001,12 +1016,18 @@ export function BlockComposer({
         projectId={effectiveProjectId}
         carId={effectiveCarId}
         hasEmailFeatures={hasEmailFeatures(blocks)}
+        minimalHtml={minimalHtml}
+        onMinimalHtmlChange={setMinimalHtml}
         onExport={async (options: ExportOptions) => {
+          const resolvedOptions: ExportOptions = {
+            ...options,
+            minimalHtml: options.minimalHtml ?? minimalHtml,
+          };
           await exportWithOptions(
             blocks,
             template?.id || null,
             compositionName,
-            options,
+            resolvedOptions,
             effectiveProjectId,
             effectiveCarId,
             selectedStylesheetId

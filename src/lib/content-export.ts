@@ -38,6 +38,7 @@ export interface ExportOptions {
   fileName?: string;
   // Global spacing applied across blocks in email export
   blockSpacing?: string;
+  minimalHtml?: boolean;
 }
 
 /**
@@ -58,7 +59,8 @@ export class ContentExporter {
     selectedStylesheetId?: string | null,
     emailPlatform: "mailchimp" | "sendgrid" | "generic" = "generic",
     includeCSS: boolean = true,
-    blockSpacing?: string
+    blockSpacing?: string,
+    minimalHtml: boolean = false
   ): Promise<string> {
     const metadata: ExportMetadata = {
       name: compositionName,
@@ -78,7 +80,8 @@ export class ContentExporter {
       format,
       selectedStylesheetId,
       emailPlatform,
-      includeCSS,
+      includeCSS: minimalHtml ? false : includeCSS,
+      minimalHtml,
     };
 
     const response = (await api.post(
@@ -115,7 +118,8 @@ export class ContentExporter {
       selectedStylesheetId,
       options.emailPlatform || "generic",
       options.includeCSS,
-      options.blockSpacing
+      options.blockSpacing,
+      options.minimalHtml || false
     );
 
     if (options.action === "download") {

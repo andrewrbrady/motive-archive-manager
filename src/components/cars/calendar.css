@@ -69,23 +69,27 @@
 }
 
 /* Header fixes */
-.events-calendar .rbc-month-header {
+.events-calendar .rbc-row.rbc-month-header {
   display: flex !important;
-  height: 32px !important;
+  flex: 0 0 auto !important;
+  min-height: 26px !important;
+  height: 26px !important;
   @apply border-b border-[hsl(var(--border))] border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-20;
 }
 
-.events-calendar .rbc-month-header .rbc-header {
-  padding: 8px 2px;
+.events-calendar .rbc-row.rbc-month-header .rbc-header {
+  height: 100% !important;
+  padding: 2px 4px;
   display: flex;
   align-items: center;
   justify-content: center;
+  line-height: 1.1;
   @apply bg-[hsl(var(--background))] dark:bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground-subtle))] font-medium;
   font-size: 0.75rem;
   border: none;
 }
 
-.events-calendar .rbc-month-header .rbc-header + .rbc-header {
+.events-calendar .rbc-row.rbc-month-header .rbc-header + .rbc-header {
   @apply border-l border-zinc-100 border-opacity-10 dark:border-[hsl(var(--border))] dark:border-opacity-50;
 }
 

@@ -7,6 +7,11 @@ import {
   DividerBlock,
   HTMLBlock,
   ButtonBlock,
+  ListBlock,
+  ColumnsBlock,
+  VideoBlock,
+  SpacerBlock,
+  FrontmatterBlock,
 } from "@/components/content-studio/types";
 import { dbConnect } from "@/lib/mongodb";
 import { Stylesheet } from "@/models/Stylesheet";
@@ -29,6 +34,7 @@ export async function POST(request: NextRequest) {
       selectedStylesheetId,
       emailPlatform = "generic",
       includeCSS = true,
+      minimalHtml = false,
     } = body;
 
     // Validate required fields
@@ -41,7 +47,9 @@ export async function POST(request: NextRequest) {
 
     // Fetch stylesheet CSS if provided and user wants CSS included
     let stylesheetCSS = null;
-    if (selectedStylesheetId && includeCSS) {
+    const shouldIncludeCSS = includeCSS && !minimalHtml;
+
+    if (selectedStylesheetId && shouldIncludeCSS) {
       try {
         stylesheetCSS = await fetchStylesheetCSS(selectedStylesheetId);
       } catch (error) {
@@ -63,9 +71,11 @@ export async function POST(request: NextRequest) {
             metadata,
             stylesheetCSS,
             emailPlatform,
-            includeCSS,
+            shouldIncludeCSS,
             globalBlockSpacing as string | null
           )
+        : minimalHtml
+        ? generateMinimalHTMLFromBlocks(blocks, metadata)
         : generateHTMLFromBlocks(blocks, template, metadata, stylesheetCSS);
 
     return NextResponse.json({
@@ -1575,6 +1585,225 @@ function generateEmailBlockHTML(block: ContentBlock): string {
     default:
       return `<!-- Unsupported block type: ${block.type} -->`;
   }
+}
+
+/**
+ * Generate extremely minimal HTML from content blocks
+ * Produces a barebones document with no classes or inline styles
+ */
+function generateMinimalHTMLFromBlocks(
+  blocks: ContentBlock[],
+  metadata: any
+): string {
+  const title = metadata?.name || "Untitled Composition";
+  const exportedAt = metadata?.exportedAt || new Date().toISOString();
+
+  const sortedBlocks = [...blocks].sort((a, b) => a.order - b.order);
+  const blockHTML = sortedBlocks
+    .map((block) => generateMinimalBlockHTML(block))
+    .filter((content): content is string => typeof content === "string" && content.length > 0)
+    .join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(title)}</title>
+  <meta name="generator" content="Motive Archive Manager Content Studio">
+  <meta name="exported" content="${exportedAt}">
+</head>
+<body>
+${blockHTML}
+</body>
+</html>`;
+}
+
+/**
+ * Convert a single block into minimal HTML markup
+ */
+function generateMinimalBlockHTML(block: ContentBlock): string | null {
+  switch (block.type) {
+    case "text": {
+      const textBlock = block as TextBlock;
+      const content = textBlock.content?.trim() || "";
+      if (!content && !textBlock.richFormatting?.formattedContent) {
+        return null;
+      }
+
+      const element = textBlock.element || "p";
+      const formattedContent = formatMinimalTextContent(
+        textBlock.richFormatting?.formattedContent || content
+      );
+      return `<${element}>${formattedContent}</${element}>`;
+    }
+
+    case "image": {
+      const imageBlock = block as ImageBlock;
+      if (!imageBlock.imageUrl) {
+        return null;
+      }
+
+      const src = escapeHtml(imageBlock.imageUrl);
+      const alt = escapeHtml(imageBlock.altText || "");
+      const imageTag = `<img src="${src}" alt="${alt}" />`;
+
+      const wrappedImage = imageBlock.linkUrl
+        ? `<a href="${escapeHtml(imageBlock.linkUrl)}">${imageTag}</a>`
+        : imageTag;
+
+      if (imageBlock.caption) {
+        return `<figure>
+  ${wrappedImage}
+  <figcaption>${formatMinimalTextContent(imageBlock.caption)}</figcaption>
+</figure>`;
+      }
+
+      return wrappedImage;
+    }
+
+    case "divider": {
+      return "<hr />";
+    }
+
+    case "button": {
+      const buttonBlock = block as ButtonBlock;
+      const text = buttonBlock.text?.trim();
+      const url = buttonBlock.url?.trim();
+
+      if (!text && !url) {
+        return null;
+      }
+
+      if (url) {
+        return `<p><a href="${escapeHtml(url)}">${escapeHtml(
+          text || url
+        )}</a></p>`;
+      }
+
+      return `<p>${escapeHtml(text || "")}</p>`;
+    }
+
+    case "list": {
+      const listBlock = block as ListBlock;
+      const items = listBlock.items || [];
+      if (!items.length) {
+        return null;
+      }
+
+      const listTag = listBlock.style === "ol" ? "ol" : "ul";
+      const listItems = items
+        .map((item) => `<li>${formatMinimalTextContent(item)}</li>`)
+        .join("\n");
+      return `<${listTag}>
+${listItems}
+</${listTag}>`;
+    }
+
+    case "spacer": {
+      const spacer = block as SpacerBlock;
+      const height = parseInt(spacer.height || "0", 10);
+      const lineBreaks = Math.max(1, Math.round(height / 20) || 1);
+      return new Array(lineBreaks).fill("<br />").join("\n");
+    }
+
+    case "columns": {
+      const columnsBlock = block as ColumnsBlock;
+      if (!columnsBlock.columns || !columnsBlock.columns.length) {
+        return null;
+      }
+
+      return columnsBlock.columns
+        .map((column) =>
+          column
+            .map((child) => generateMinimalBlockHTML(child))
+            .filter((content): content is string => !!content)
+            .join("\n")
+        )
+        .filter((content) => content.length > 0)
+        .join("\n");
+    }
+
+    case "video": {
+      const videoBlock = block as VideoBlock;
+      const url = videoBlock.url || "";
+      const title = videoBlock.title || "Watch video";
+      if (!url) {
+        return null;
+      }
+      return `<p><a href="${escapeHtml(url)}">${escapeHtml(title)}</a></p>`;
+    }
+
+    case "frontmatter": {
+      const frontmatterBlock = block as FrontmatterBlock;
+      const dataEntries = Object.entries(frontmatterBlock.data || {}).filter(
+        ([, value]) => value !== undefined && value !== null && value !== ""
+      );
+
+      if (!dataEntries.length) {
+        return null;
+      }
+
+      return dataEntries
+        .map(
+          ([key, value]) =>
+            `<p><strong>${escapeHtml(key)}:</strong> ${escapeHtml(
+              String(value)
+            )}</p>`
+        )
+        .join("\n");
+    }
+
+    case "html": {
+      const htmlBlock = block as HTMLBlock;
+      const content = htmlBlock.content?.trim();
+      if (!content) {
+        return null;
+      }
+
+      return stripClassAttributes(content);
+    }
+
+    default:
+      return null;
+  }
+}
+
+/**
+ * Minimal text formatting helper
+ * Converts markdown-like emphasis and links to HTML equivalents
+ */
+function formatMinimalTextContent(content: string): string {
+  if (!content) {
+    return "";
+  }
+
+  let processedContent = content;
+  processedContent = processedContent.replace(
+    /\*\*([^*]+)\*\*/g,
+    "<strong>$1</strong>"
+  );
+  processedContent = processedContent.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    (_match, text, url) => `<a href="${escapeHtml(url)}">${escapeHtml(text)}</a>`
+  );
+  processedContent = processedContent.replace(/\n/g, "<br />");
+  processedContent = stripClassAttributes(processedContent);
+
+  const hasHtmlTags = /<[^>]+>/.test(processedContent);
+  return hasHtmlTags ? processedContent : escapeHtml(processedContent);
+}
+
+/**
+ * Remove class attributes from arbitrary HTML content
+ */
+function stripClassAttributes(html: string): string {
+  if (!html) {
+    return "";
+  }
+
+  return html
+    .replace(/\sclass(?:name)?\s*=\s*(".*?"|'.*?'|[^\s>]+)/gi, "")
+    .replace(/\s+>/g, ">");
 }
 
 /**
