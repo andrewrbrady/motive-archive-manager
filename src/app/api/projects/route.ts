@@ -577,6 +577,17 @@ async function getProjects(request: NextRequest) {
         return project;
       });
 
+      if (process.env.NODE_ENV !== "production") {
+        console.log(
+          "[Projects API] Status diagnostics:",
+          processedProjects.slice(0, 25).map((project) => ({
+            id: project?._id?.toString?.() ?? project?._id,
+            status: project?.status ?? null,
+            statusType: typeof project?.status,
+          }))
+        );
+      }
+
       // Enhanced response following cars/deliverables pattern
       const response = NextResponse.json({
         projects: processedProjects.map((project) =>

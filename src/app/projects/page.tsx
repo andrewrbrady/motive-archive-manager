@@ -26,6 +26,11 @@ import { LoadingSpinner } from "@/components/ui/loading";
 import { useProjects } from "@/lib/hooks/query/useProjects";
 import { toast } from "@/components/ui/use-toast";
 import { ProjectImageDisplay } from "@/components/projects/ProjectImageDisplay";
+import {
+  KNOWN_PROJECT_STATUSES,
+  formatProjectStatus,
+  getProjectStatusColor,
+} from "@/utils/projectStatus";
 
 export default function ProjectsPage() {
   const { data: session, status } = useSession();
@@ -93,20 +98,44 @@ export default function ProjectsPage() {
     }
   }, [error]);
 
-  const getStatusColor = (status: ProjectStatus) => {
-    switch (status) {
-      case "active":
-        return "bg-blue-100 text-blue-800";
-      case "in_review":
-        return "bg-yellow-100 text-yellow-800";
-      case "completed":
-        return "bg-green-100 text-green-800";
-      case "archived":
-        return "bg-gray-100 text-gray-600";
-      default:
-        return "bg-gray-100 text-gray-800";
+  useEffect(() => {
+    if (
+      process.env.NODE_ENV !== "production" &&
+      Array.isArray(projects) &&
+      projects.length > 0
+    ) {
+      const malformedStatuses = projects
+        .filter((project) => {
+          if (!project || typeof project.status !== "string") {
+            return true;
+          }
+          return !KNOWN_PROJECT_STATUSES.includes(
+            project.status as ProjectStatus
+          );
+        })
+        .map((project) => ({
+          id: project?._id,
+          status: project?.status,
+          statusType: typeof project?.status,
+        }));
+
+      if (malformedStatuses.length > 0) {
+        console.warn(
+          "[ProjectsPage] Detected projects with malformed status values:",
+          malformedStatuses
+        );
+      } else {
+        console.log(
+          "[ProjectsPage] Project statuses loaded:",
+          projects.map((project) => ({
+            id: project._id,
+            status: project.status,
+            formattedStatus: formatProjectStatus(project.status),
+          }))
+        );
+      }
     }
-  };
+  }, [projects]);
 
   const getTypeLabel = (type: ProjectType) => {
     switch (type) {
@@ -254,7 +283,20 @@ export default function ProjectsPage() {
               baseCols="grid grid-cols-1"
               gap="gap-6"
             >
-              {projects.map((project) => {
+              {projects.map((project, index) => {
+                if (!project || typeof project !== "object") {
+                  if (process.env.NODE_ENV !== "production") {
+                    console.error(
+                      "[ProjectsPage] Encountered invalid project entry during render:",
+                      { index, project }
+                    );
+                  }
+                  return null;
+                }
+
+                const statusLabel = formatProjectStatus(project.status);
+                const statusColor = getProjectStatusColor(project.status);
+
                 return (
                   <Card
                     key={project._id}
@@ -276,10 +318,8 @@ export default function ProjectsPage() {
                         <CardTitle className="text-lg line-clamp-1">
                           {project.title}
                         </CardTitle>
-                        <Badge
-                          className={`ml-2 ${getStatusColor(project.status)}`}
-                        >
-                          {project.status.replace("_", " ")}
+                        <Badge className={`ml-2 ${statusColor}`}>
+                          {statusLabel}
                         </Badge>
                       </div>
                       <CardDescription className="line-clamp-2">

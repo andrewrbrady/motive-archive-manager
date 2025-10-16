@@ -11,6 +11,7 @@ import {
   ViewsProps,
   DayLayoutAlgorithm,
   DayLayoutFunction,
+  NavigateAction,
 } from "react-big-calendar";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import { format, parse, startOfWeek, getDay } from "date-fns";
@@ -128,6 +129,10 @@ export interface BaseCalendarProps<T extends BaseCalendarEvent> {
   showFilterControls?: boolean;
   showVisibilityControls?: boolean;
   filterOptions?: FilterOptions;
+  currentDate?: Date;
+  currentView?: View;
+  onNavigate?: (date: Date, view: View, action: NavigateAction) => void;
+  onViewChange?: (view: View) => void;
 }
 
 // Locales for the calendar
@@ -186,9 +191,15 @@ export default function BaseCalendar<T extends BaseCalendarEvent>({
   showFilterControls = false,
   showVisibilityControls = false,
   filterOptions,
+  currentDate,
+  currentView,
+  onNavigate,
+  onViewChange,
 }: BaseCalendarProps<T>) {
-  const [view, setView] = useState<View>(defaultView as View);
-  const [date, setDate] = useState(new Date());
+  const [view, setView] = useState<View>(
+    (currentView || defaultView) as View
+  );
+  const [date, setDate] = useState(currentDate || new Date());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const calendarRef = useRef<HTMLDivElement>(null);
 
@@ -214,6 +225,21 @@ export default function BaseCalendar<T extends BaseCalendarEvent>({
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (currentView && currentView !== view) {
+      setView(currentView);
+    }
+  }, [currentView, view]);
+
+  useEffect(() => {
+    if (currentDate) {
+      const currentTime = currentDate.getTime();
+      if (currentTime !== date.getTime()) {
+        setDate(currentDate);
+      }
+    }
+  }, [currentDate, date]);
 
   // Default toolbar component
   const defaultToolbar = (toolbarProps: any) => (
@@ -588,8 +614,18 @@ export default function BaseCalendar<T extends BaseCalendarEvent>({
         views={views as any}
         view={view}
         date={date}
-        onView={(newView: View) => setView(newView)}
-        onNavigate={(newDate: Date) => setDate(newDate)}
+        onView={(newView: View) => {
+          setView(newView);
+          onViewChange?.(newView);
+        }}
+        onNavigate={(
+          newDate: Date,
+          newView: View,
+          action: NavigateAction
+        ) => {
+          setDate(newDate);
+          onNavigate?.(newDate, newView, action);
+        }}
         min={min}
         max={max}
         components={components}

@@ -16,6 +16,22 @@ interface EventTooltipProps {
   event: Event;
 }
 
+const MAX_DESCRIPTION_LENGTH = 220;
+
+const getDescriptionPreview = (description: string) => {
+  const normalized = description.trim();
+
+  if (!normalized) {
+    return "No description provided.";
+  }
+
+  if (normalized.length <= MAX_DESCRIPTION_LENGTH) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, MAX_DESCRIPTION_LENGTH - 1).trimEnd()}…`;
+};
+
 export default function EventTooltip({ children, event }: EventTooltipProps) {
   const formatEventType = (type: string) => {
     return type
@@ -29,10 +45,11 @@ export default function EventTooltip({ children, event }: EventTooltipProps) {
       <HoverCardTrigger asChild>{children}</HoverCardTrigger>
       <HoverCardContent
         side="right"
-        align="start"
-        sideOffset={2}
+        align="center"
+        sideOffset={12}
+        collisionPadding={16}
         className={cn(
-          "z-50 w-80 rounded-lg border border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] p-4 shadow-md",
+          "z-50 w-[22rem] max-w-[90vw] rounded-xl border border-[hsl(var(--border-subtle))] bg-[var(--background-primary)] px-5 py-4 shadow-lg",
           "dark:border-[hsl(var(--border-subtle))] dark:bg-[hsl(var(--background))]"
         )}
       >
@@ -41,8 +58,11 @@ export default function EventTooltip({ children, event }: EventTooltipProps) {
             <h4 className="font-medium text-[hsl(var(--foreground))] dark:text-[hsl(var(--foreground))]">
               {formatEventType(event.type)}
             </h4>
-            <p className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]">
-              {event.description}
+            <p
+              className="text-sm text-[hsl(var(--foreground-muted))] dark:text-[hsl(var(--foreground-muted))]"
+              title={event.description}
+            >
+              {getDescriptionPreview(event.description)}
             </p>
           </div>
 

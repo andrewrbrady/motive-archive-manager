@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Components, EventProps } from "react-big-calendar";
+import { Components, EventProps, View, NavigateAction } from "react-big-calendar";
 import BaseCalendar, { BaseCalendarEvent } from "./BaseCalendar";
 import { Event } from "@/types/event";
 import { Deliverable } from "@/types/deliverable";
@@ -74,6 +74,10 @@ export interface MotiveCalendarProps {
   calendarRef?: React.RefObject<HTMLDivElement>;
   allowEventEditing?: boolean;
   eventsApiBasePath?: string;
+  currentDate?: Date;
+  currentView?: View;
+  onNavigate?: (date: Date, view: View, action: NavigateAction) => void;
+  onViewChange?: (view: View) => void;
 }
 
 export function MotiveCalendar({
@@ -94,6 +98,10 @@ export function MotiveCalendar({
   calendarRef,
   allowEventEditing = true,
   eventsApiBasePath,
+  currentDate,
+  currentView,
+  onNavigate,
+  onViewChange,
 }: MotiveCalendarProps) {
   const api = useAPI();
   const { platforms: availablePlatforms } = usePlatforms();
@@ -515,6 +523,16 @@ export function MotiveCalendar({
     deliverableEventFilters.length,
     milestoneStatusFilters.length,
   ]);
+
+  // Automatically include newly discovered filter options
+  useEffect(() => {
+    if (uniqueEventTypes.length > 0) {
+      setEventTypeFiltersState((prev) => {
+        const missing = uniqueEventTypes.filter((type) => !prev.includes(type));
+        return missing.length > 0 ? [...prev, ...missing] : prev;
+      });
+    }
+  }, [uniqueEventTypes]);
 
   // Clean up invalid filter values (simplified approach)
   useEffect(() => {
@@ -1464,6 +1482,10 @@ export function MotiveCalendar({
         setDeliverablePlatformFilters,
       }}
       customToolbar={customToolbar}
+      currentDate={currentDate}
+      currentView={currentView}
+      onNavigate={onNavigate}
+      onViewChange={onViewChange}
     />
   );
 }

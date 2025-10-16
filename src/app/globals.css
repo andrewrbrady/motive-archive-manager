@@ -452,16 +452,6 @@ body.landing-page {
 }
 
 /* Hover card styles */
-.rbc-event .hover-card-content {
-  display: none;
-  position: absolute;
-  z-index: 50;
-}
-
-.rbc-event:hover .hover-card-content {
-  display: block;
-}
-
 /* Toolbar styles */
 .rbc-toolbar {
   @apply mb-4 flex items-center justify-between gap-2;
