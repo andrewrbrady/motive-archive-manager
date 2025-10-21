@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
-import { ProjectTemplate } from "@/models/ProjectTemplate";
 import {
   ProjectTemplate as IProjectTemplate,
   ProjectType,

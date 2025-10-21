@@ -1,9 +1,7 @@
 "use strict";
 import mongoose, { Document, Model } from "mongoose";
 import { dbConnect } from "@/lib/mongodb";
-
-// Ensure database connection is established
-dbConnect();
+// No auto-connect; caller must invoke dbConnect()
 
 // Contact document interface
 export interface IContactDocument extends Document {

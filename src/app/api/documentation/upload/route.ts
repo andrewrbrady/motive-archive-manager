@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { uploadDocumentationFile } from "@/lib/s3";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { Car } from "@/models/Car";
-import { Documentation } from "@/models/Documentation";
 
 // Use the new route segment config export
 export const dynamic = "force-dynamic";

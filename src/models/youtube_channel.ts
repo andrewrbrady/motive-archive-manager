@@ -1,7 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 import { dbConnect } from "@/lib/mongodb";
-
-dbConnect().catch(console.error);
+// No auto-connect; caller must invoke dbConnect()
 
 export interface IYoutubeChannel {
   channel_id: string;

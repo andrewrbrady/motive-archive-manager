@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { Deliverable, IDeliverable } from "@/models/Deliverable";
-import { dbConnect } from "@/lib/mongodb";
 import { adminDb } from "@/lib/firebase-admin";
 import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 
@@ -159,7 +157,7 @@ export async function GET(request: NextRequest) {
 
       // Get paginated, filtered, and sorted deliverables with optimized projection
       const deliverables = await db
-        .collection<IDeliverable>("deliverables")
+        .collection("deliverables")
         .find(searchQuery)
         .sort(sortObject)
         .skip(skip)
@@ -270,8 +268,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
-    await dbConnect();
-
+    const db = await getDatabase();
     const data = await request.json();
 
     // Remove editor field if present and handle platform migration
@@ -305,11 +302,25 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create new deliverable
-    const deliverable = new Deliverable(deliverableData);
-    await deliverable.save();
+    // Coerce ID-like fields to ObjectId where appropriate
+    const doc: any = {
+      ...deliverableData,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    if (doc.car_id && typeof doc.car_id === "string" && ObjectId.isValid(doc.car_id)) {
+      doc.car_id = new ObjectId(doc.car_id);
+    }
+    if (doc.platform_id && typeof doc.platform_id === "string" && ObjectId.isValid(doc.platform_id)) {
+      doc.platform_id = new ObjectId(doc.platform_id);
+    }
+    if (doc.mediaTypeId && typeof doc.mediaTypeId === "string" && ObjectId.isValid(doc.mediaTypeId)) {
+      doc.mediaTypeId = new ObjectId(doc.mediaTypeId);
+    }
 
-    return NextResponse.json(deliverable.toPublicJSON(), { status: 201 });
+    const result = await db.collection("deliverables").insertOne(doc);
+    const saved = await db.collection("deliverables").findOne({ _id: result.insertedId });
+    return NextResponse.json(saved, { status: 201 });
   } catch (error) {
     console.error("Error creating deliverable:", error);
     return NextResponse.json(

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { dbConnect } from "@/lib/mongodb";
-import { Deliverable } from "@/models/Deliverable";
+// Use native driver only to avoid mixed connections
 import {
   DeliverableType,
   Platform,
@@ -77,7 +76,6 @@ export async function POST(
       }
     }
 
-    await dbConnect();
     const db = await getDatabase();
 
     // Check if car exists
@@ -89,73 +87,47 @@ export async function POST(
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    // Create all deliverables in parallel
-    const deliverablePromises = deliverables.map(
-      async (deliverableData, index) => {
-        try {
-          console.log(
-            `📝 Creating deliverable ${index}: "${deliverableData.title}"`
-          );
-          console.log(
-            `   Platform: "${deliverableData.platform}" (ID: ${deliverableData.platform_id})`
-          );
-          console.log(
-            `   MediaType: "${deliverableData.type}" (ID: ${deliverableData.mediaTypeId})`
-          );
+    // Insert all deliverables in parallel using native driver
+    const docs = deliverables.map((deliverableData) => ({
+      car_id: new ObjectId(carId),
+      title: deliverableData.title,
+      description: deliverableData.description || "",
+      platform: deliverableData.platform,
+      platform_id: deliverableData.platform_id
+        ? new ObjectId(deliverableData.platform_id)
+        : undefined,
+      type: deliverableData.type,
+      mediaTypeId: deliverableData.mediaTypeId
+        ? new ObjectId(deliverableData.mediaTypeId)
+        : undefined,
+      duration: deliverableData.duration || 0,
+      actual_duration: deliverableData.actual_duration,
+      aspect_ratio: deliverableData.aspect_ratio || "16:9",
+      firebase_uid: deliverableData.firebase_uid,
+      editor: deliverableData.editor || "Unassigned",
+      status: deliverableData.status || "not_started",
+      edit_dates: deliverableData.edit_dates || [],
+      edit_deadline: new Date(deliverableData.edit_deadline),
+      release_date: deliverableData.release_date
+        ? new Date(deliverableData.release_date)
+        : new Date(),
+      target_audience: deliverableData.target_audience,
+      music_track: deliverableData.music_track,
+      thumbnail_url: deliverableData.thumbnail_url,
+      tags: deliverableData.tags || [],
+      publishing_url: deliverableData.publishing_url,
+      dropbox_link: deliverableData.dropbox_link,
+      social_media_link: deliverableData.social_media_link,
+      metrics: deliverableData.metrics,
+      assets_location: deliverableData.assets_location,
+      priority_level: deliverableData.priority_level,
+      scheduled: deliverableData.scheduled || false,
+      created_at: new Date(),
+      updated_at: new Date(),
+    }));
 
-          const deliverable = new Deliverable({
-            car_id: new ObjectId(carId),
-            title: deliverableData.title,
-            description: deliverableData.description || "",
-            platform: deliverableData.platform,
-            platform_id: deliverableData.platform_id
-              ? new ObjectId(deliverableData.platform_id)
-              : undefined,
-            type: deliverableData.type,
-            mediaTypeId: deliverableData.mediaTypeId
-              ? new ObjectId(deliverableData.mediaTypeId)
-              : undefined,
-            duration: deliverableData.duration || 0,
-            actual_duration: deliverableData.actual_duration,
-            aspect_ratio: deliverableData.aspect_ratio || "16:9",
-            firebase_uid: deliverableData.firebase_uid,
-            editor: deliverableData.editor || "Unassigned",
-            status: deliverableData.status || "not_started",
-            edit_dates: deliverableData.edit_dates || [],
-            edit_deadline: new Date(deliverableData.edit_deadline),
-            release_date: deliverableData.release_date
-              ? new Date(deliverableData.release_date)
-              : new Date(),
-            target_audience: deliverableData.target_audience,
-            music_track: deliverableData.music_track,
-            thumbnail_url: deliverableData.thumbnail_url,
-            tags: deliverableData.tags || [],
-            publishing_url: deliverableData.publishing_url,
-            dropbox_link: deliverableData.dropbox_link,
-            social_media_link: deliverableData.social_media_link,
-            metrics: deliverableData.metrics,
-            assets_location: deliverableData.assets_location,
-            priority_level: deliverableData.priority_level,
-            scheduled: deliverableData.scheduled || false,
-            created_at: new Date(),
-            updated_at: new Date(),
-          });
-
-          const saved = await deliverable.save();
-          console.log(
-            `✅ Saved deliverable ${index} with platform_id: ${saved.platform_id}, mediaTypeId: ${saved.mediaTypeId}`
-          );
-          return saved;
-        } catch (saveError) {
-          console.error(`Error saving deliverable ${index}:`, saveError);
-          throw saveError;
-        }
-      }
-    );
-
-    // Wait for all deliverables to be created in parallel
-    const savedDeliverables = await Promise.all(deliverablePromises);
-    const createdDeliverables = savedDeliverables.map((d) => d.toPublicJSON());
+    const insertResult = await db.collection("deliverables").insertMany(docs);
+    const createdDeliverables = Object.values(insertResult.insertedIds).map((id) => ({ _id: id }));
 
     return NextResponse.json({
       message: `Successfully created ${createdDeliverables.length} deliverables`,

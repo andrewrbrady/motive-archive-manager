@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
-import { Project } from "@/models/Project";
 import {
   CreateProjectRequest,
   ProjectFilters,
@@ -14,7 +13,6 @@ import {
   verifyFirebaseToken,
 } from "@/lib/firebase-auth-middleware";
 import { ObjectId } from "mongodb";
-import { ProjectTemplate } from "@/models/ProjectTemplate";
 import { convertProjectForFrontend } from "@/utils/objectId";
 
 async function createProject(request: NextRequest) {

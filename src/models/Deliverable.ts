@@ -7,7 +7,7 @@ import {
 } from "@/types/deliverable";
 
 // Ensure database connection is established
-dbConnect().catch(console.error);
+// Explicit connections are now handled by callers (API routes/scripts)
 
 // Delete the existing model if it exists to ensure schema changes are picked up
 if (mongoose.models.Deliverable) {

@@ -21,6 +21,8 @@
     "fix:console-logs": "tsx scripts/remove-console-logs.ts --fix",
     "fix:console-logs:dry": "tsx scripts/remove-console-logs.ts --fix --dry-run",
     "validate:oauth": "tsx scripts/validate-oauth-config.ts",
+    "verify:mongo": "tsx scripts/verify-mongo-usage.ts",
+    "smoke:mongo": "tsx scripts/runtime-connection-smoke.ts",
     "fix:admin-claims": "tsx scripts/fix-admin-claims.ts",
     "migrate:metadata": "tsx scripts/migrate-image-metadata.ts",
     "test:mongodb": "tsx scripts/test-mongodb.ts",

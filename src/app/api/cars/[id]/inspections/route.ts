@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { Inspection } from "@/models/Inspection";
-import { Car } from "@/models/Car";
 import { CreateInspectionRequest } from "@/types/inspection";
 
 // GET /api/cars/[id]/inspections - Get all inspections for a car

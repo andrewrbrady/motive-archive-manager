@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { getDocumentationFileUrl } from "@/lib/s3";
-import { Car } from "@/models/Car";
-import { Documentation } from "@/models/Documentation";
 
 export const dynamic = "force-dynamic";
 

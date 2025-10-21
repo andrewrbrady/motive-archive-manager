@@ -1,14 +1,7 @@
 // app/api/cars/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { Car } from "@/models/Car";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import clientPromise from "@/lib/mongodb";
-import { Car as InventoryCar } from "@/types/inventory";
-import { getMongoClient } from "@/lib/mongodb";
-import { DB_NAME } from "@/constants";
-import { MongoPipelineStage } from "@/types/mongodb";
-import { StandardizedCar } from "@/types/routes/cars";
 import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 import { fixCloudflareImageUrl } from "@/lib/image-utils";
 

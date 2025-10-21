@@ -4,10 +4,9 @@ import {
   getUserIdFromToken,
   verifyFirebaseToken,
 } from "@/lib/firebase-auth-middleware";
-import { dbConnect } from "@/lib/mongodb";
-import { Deliverable } from "@/models/Deliverable";
 import { adminDb } from "@/lib/firebase-admin";
 import { getDatabase } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
 export async function POST(request: NextRequest) {
   // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("🔒 POST /api/deliverables/assign: Starting request");
@@ -48,17 +47,11 @@ export async function POST(request: NextRequest) {
 
     // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Received assignment request:", body);
 
-    // Connect to MongoDB
-    await dbConnect();
-
-    // Find the deliverable
-    const deliverable = await Deliverable.findById(deliverableId);
-
+    const db = await getDatabase();
+    const deliverablesCol = db.collection("deliverables");
+    const deliverable = await deliverablesCol.findOne({ _id: new ObjectId(deliverableId) });
     if (!deliverable) {
-      return NextResponse.json(
-        { error: "Deliverable not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Deliverable not found" }, { status: 404 });
     }
 
     // If userId is provided, get user details from Firebase
@@ -167,13 +160,19 @@ export async function POST(request: NextRequest) {
 
     // Save the updated deliverable with explicit write concern options
     try {
-      // Use simpler save options to avoid write concern errors
-      const saveResult = await deliverable.save();
-      // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] // [REMOVED] console.log("Deliverable save successful:", saveResult._id);
+      await deliverablesCol.updateOne(
+        { _id: new ObjectId(deliverableId) },
+        {
+          $set: {
+            firebase_uid: deliverable.firebase_uid || "",
+            editor: deliverable.editor || "Unassigned",
+            updated_at: new Date(),
+          },
+        }
+      );
     } catch (error) {
       console.error("Error saving deliverable:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       return NextResponse.json(
         { error: "Failed to save deliverable: " + errorMessage },
         { status: 500 }
@@ -183,7 +182,11 @@ export async function POST(request: NextRequest) {
     // Return the updated deliverable
     return NextResponse.json({
       success: true,
-      deliverable: deliverable.toPublicJSON(),
+      deliverable: {
+        ...deliverable,
+        firebase_uid: deliverable.firebase_uid || "",
+        editor: deliverable.editor || "Unassigned",
+      },
     });
   } catch (error: any) {
     console.error("Error in deliverable assignment API:", error);

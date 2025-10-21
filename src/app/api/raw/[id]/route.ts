@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { RawAsset } from "@/models/raw_assets";
 
 export async function GET(request: Request) {
   try {

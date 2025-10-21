@@ -1,8 +1,6 @@
 import mongoose, { Document } from "mongoose";
 import { dbConnect } from "@/lib/mongodb";
-
-// Ensure database connection is established
-dbConnect().catch(console.error);
+// No auto-connect; caller must invoke dbConnect()
 
 // Delete the existing model if it exists to ensure schema changes are picked up
 if (mongoose.models.MediaType) {

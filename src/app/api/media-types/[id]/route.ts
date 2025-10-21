@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
-import { MediaType, IMediaType } from "@/models/MediaType";
+// Avoid importing Mongoose model to prevent creating extra connections
+type MediaTypeUpdate = {
+  name: string;
+  description: string;
+  sortOrder: number;
+  isActive: boolean;
+  updatedAt: Date;
+};
 import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 import { ObjectId } from "mongodb";
 
@@ -111,7 +118,7 @@ export async function PUT(
     }
 
     // Prepare update data
-    const updateData: Partial<IMediaType> = {
+    const updateData: Partial<MediaTypeUpdate> = {
       name: name.trim(),
       description: description?.trim() || "",
       sortOrder: typeof sortOrder === "number" ? sortOrder : 0,

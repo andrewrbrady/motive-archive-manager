@@ -3,7 +3,7 @@ import { generateText } from "@/lib/llmService";
 import { findModelById } from "@/lib/llmProviders";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import AIImageAnalysisPrompt from "@/models/AIImageAnalysisPrompt";
+// Use native driver rather than Mongoose to avoid creating a second pool
 
 export async function POST(request: NextRequest) {
   try {
@@ -267,10 +267,11 @@ export async function POST(request: NextRequest) {
       fallbackContext = `Image: ${filename}`;
     }
 
-    // Get the appropriate prompt from the database
-    let promptConfig = null;
+    // Get the appropriate prompt from the database (native driver)
+    let promptConfig: any = null;
     try {
-      promptConfig = await AIImageAnalysisPrompt.findOne({
+      const db = await getDatabase();
+      promptConfig = await db.collection("ai_image_analysis_prompts").findOne({
         analysisType: analysisType,
         isActive: true,
         isDefault: true,
@@ -278,7 +279,7 @@ export async function POST(request: NextRequest) {
 
       // If no default found, get any active prompt for this type
       if (!promptConfig) {
-        promptConfig = await AIImageAnalysisPrompt.findOne({
+        promptConfig = await db.collection("ai_image_analysis_prompts").findOne({
           analysisType: analysisType,
           isActive: true,
         });

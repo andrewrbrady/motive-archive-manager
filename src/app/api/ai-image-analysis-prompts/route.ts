@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import AIImageAnalysisPrompt from "@/models/AIImageAnalysisPrompt";
+import { dbConnect } from "@/lib/mongodb";
 import {
   withFirebaseAuth,
   verifyAuthMiddleware,
@@ -8,6 +9,7 @@ import {
 // GET - Fetch all AI image analysis prompts
 export async function GET(request: NextRequest) {
   try {
+    await dbConnect();
     const prompts = await AIImageAnalysisPrompt.find({}).sort({
       isDefault: -1,
       analysisType: 1,
@@ -39,6 +41,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    await dbConnect();
     const data = await request.json();
     const {
       name,
@@ -107,6 +110,7 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
+    await dbConnect();
     const data = await request.json();
     const { _id, ...updateData } = data;
 
@@ -149,6 +153,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
+    await dbConnect();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 

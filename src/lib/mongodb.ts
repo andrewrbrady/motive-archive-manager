@@ -49,8 +49,9 @@ const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/fallback";
 // ⚡ OPTIMIZED CONNECTION OPTIONS - Reduced validation overhead
 const options: MongoClientOptions = {
   // Connection pool optimization - prevent exhaustion with complex queries
-  maxPoolSize: 8, // ⚡ INCREASED: Better handling of complex aggregation pipelines
-  minPoolSize: 2, // ⚡ INCREASED: Keep more connections warm to reduce connection churn
+  // Keep pool sizes conservative to avoid cluster-wide exhaustion in serverless
+  maxPoolSize: 3,
+  minPoolSize: 1,
   maxIdleTimeMS: 45000, // ⚡ INCREASED: Reduce connection cycling during high-load periods
 
   // Timeout optimization - faster failure detection
@@ -86,8 +87,8 @@ const isVercel = process.env.VERCEL === "1";
 
 if (isVercel) {
   // ⚡ VERCEL OPTIMIZATION: Balanced pool size for serverless efficiency
-  options.maxPoolSize = 6; // ⚡ INCREASED: Better balance for complex queries vs. connection limits
-  options.minPoolSize = 1; // Keep at least one warm connection
+  options.maxPoolSize = 2;
+  options.minPoolSize = 0; // allow scaling to zero between requests
   options.maxIdleTimeMS = 30000; // Faster release for serverless
   options.serverSelectionTimeoutMS = 8000;
   options.connectTimeoutMS = 12000;
@@ -245,11 +246,11 @@ export async function dbConnect() {
     const isProduction = process.env.NODE_ENV === "production";
     const resolvedMaxPool = Math.max(
       1,
-      parsedMaxPool ?? (isProduction ? 10 : 5)
+      parsedMaxPool ?? (isProduction ? 2 : 2)
     );
     const resolvedMinPool = Math.min(
       resolvedMaxPool,
-      Math.max(0, parsedMinPool ?? (isProduction ? 1 : 0))
+      Math.max(0, parsedMinPool ?? (isProduction ? 0 : 0))
     );
     const mongooseOptions: ConnectOptions = {
       dbName,
@@ -601,9 +602,6 @@ export async function ensureCollectionExists(
     );
     return { exists: false, client };
   } finally {
-    // Close the client only if we created it
-    if (ownClient && client && !dbClient) {
-      await client.close();
-    }
+    // Do not close the shared global client here; callers should manage their own clients
   }
 }

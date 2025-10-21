@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import { dbConnect } from "@/lib/mongodb";
-
-dbConnect().catch(console.error);
+// No auto-connect; caller must invoke dbConnect()
 
 // AI File document interface
 export interface IAIFileDocument extends mongoose.Document {

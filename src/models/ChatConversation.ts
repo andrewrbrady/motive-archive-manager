@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import { dbConnect } from "@/lib/mongodb";
-
-dbConnect().catch(console.error);
+// No auto-connect; caller must invoke dbConnect()
 
 // Chat message interface
 export interface IChatMessage {

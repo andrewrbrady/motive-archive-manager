@@ -3,8 +3,7 @@ import mongoose, { Document, Model } from "mongoose";
 import { dbConnect } from "@/lib/mongodb";
 import bcryptjs from "bcryptjs";
 
-// Ensure database connection is established
-dbConnect();
+// No auto-connect; caller must invoke dbConnect()
 
 // User document interface
 export interface IUserDocument extends Document {

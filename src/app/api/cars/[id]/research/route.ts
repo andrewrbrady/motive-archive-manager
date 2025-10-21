@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId, UpdateFilter } from "mongodb";
-import { ResearchFile } from "@/models/ResearchFile";
 import {
   uploadResearchFile,
   deleteResearchFile,
   generatePresignedDownloadUrl,
   deleteFile,
 } from "@/lib/s3";
-import clientPromise from "@/lib/mongodb";
 import { getDatabase } from "@/lib/mongodb";
 
 export const maxDuration = 60;

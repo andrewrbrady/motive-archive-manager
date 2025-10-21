@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { RawAsset } from "@/models/raw_assets";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

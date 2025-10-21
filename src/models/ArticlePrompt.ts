@@ -1,8 +1,6 @@
 import mongoose, { Document, Schema } from "mongoose";
 import { dbConnect } from "@/lib/mongodb";
-
-// Call dbConnect to ensure a connection is established
-dbConnect().catch(console.error);
+// No auto-connect; caller must invoke dbConnect()
 
 export interface IArticlePrompt extends Document {
   name: string;

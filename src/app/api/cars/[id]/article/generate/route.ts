@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import ArticlePrompt from "@/models/ArticlePrompt";
-import { dbConnect } from "@/lib/mongodb";
+// Removed Mongoose import and connection to avoid mixed drivers
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { RateLimiter } from "limiter";
@@ -98,8 +97,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Connect to database
-    await dbConnect();
+    // Get database via native driver
     const db = await getDatabase();
 
     // Parse request body

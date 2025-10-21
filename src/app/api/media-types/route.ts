@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
-import { MediaType, IMediaType } from "@/models/MediaType";
+// Avoid importing Mongoose models to prevent extra connections
 import { verifyAuthMiddleware } from "@/lib/firebase-auth-middleware";
 
 export const dynamic = "force-dynamic";
@@ -88,15 +88,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create new media type
-    const newMediaType = new MediaType({
+    // Create new media type using native driver for connection reuse
+    const insertResult = await db.collection("media_types").insertOne({
       name: name.trim(),
       description: description?.trim() || "",
       sortOrder: typeof sortOrder === "number" ? sortOrder : 0,
       isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
 
-    const savedMediaType = await newMediaType.save();
+    const savedMediaType = await db
+      .collection("media_types")
+      .findOne({ _id: insertResult.insertedId });
 
     return NextResponse.json(
       {

@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import { dbConnect } from "@/lib/mongodb";
-
-dbConnect().catch(console.error);
+// No auto-connect; caller must invoke dbConnect()
 
 // Check if the model is already defined to prevent overwriting
 const Gallery =
